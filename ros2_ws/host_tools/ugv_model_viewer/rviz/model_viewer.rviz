@@ -1,8 +1,6 @@
 Panels:
-  - Class: rviz_common/Displays
-    Name: Displays
-  - Class: rviz_common/Views
-    Name: Views
+  - Class: ugv_model_viewer/ModelPanel
+    Name: Chassis models
 Visualization Manager:
   Class: ""
   Displays:
@@ -38,13 +36,15 @@ Visualization Manager:
       Collision Enabled: false
       Alpha: 1
       Value: true
-    - Class: rviz_default_plugins/InteractiveMarkers
-      Name: Model menu
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Size box
       Enabled: true
-      Interactive Markers Namespace: /model_menu
-      Show Axes: false
-      Show Descriptions: false
-      Show Visual Aids: false
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /model_viewer/markers
       Value: true
     - Class: rviz_default_plugins/Axes
       Name: Origin (x = forward)
@@ -80,5 +80,5 @@ Visualization Manager:
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
 Window Geometry:
-  Width: 1400
-  Height: 900
+  Width: 1600
+  Height: 1000

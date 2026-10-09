@@ -1,32 +1,49 @@
 #!/usr/bin/env python3
 """Show the Wheeltec chassis models from the extension in RViz, one at a time.
 
-Switch models from the RViz right-click menu on the model label, or:
+Switch models from the "Chassis models" RViz panel, or:
   ros2 param set /model_viewer model top_4wd_bs_robot
   ros2 service call /model_viewer/next std_srvs/srv/Trigger
   ros2 service call /model_viewer/prev std_srvs/srv/Trigger
   ros2 service call /model_viewer/list std_srvs/srv/Trigger
 """
 
+import json
+import threading
+
 from geometry_msgs.msg import Point, TransformStamped
-from interactive_markers import InteractiveMarkerServer, MenuHandler
 import rclpy
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rclpy.parameter_client import AsyncParameterClient
+from rclpy.qos import DurabilityPolicy, QoSProfile
 from rcl_interfaces.msg import SetParametersResult
 from sensor_msgs.msg import JointState
+from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from tf2_ros import StaticTransformBroadcaster
-from visualization_msgs.msg import InteractiveMarker, InteractiveMarkerControl, Marker
+from visualization_msgs.msg import Marker, MarkerArray
 
 from ugv_model_viewer.catalog import Catalog, family_of
 
 WORLD_FRAME = 'world'
 
 
-def _metres(value):
-    return '-' if value is None else f'{value:.3f}'
+LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+
+
+def _mm(value):
+    return '-' if value is None else f'{value * 1000:.0f}'
+
+
+def _catalog_entry(model, summary):
+    entry = {'name': model, 'family': family_of(model)}
+    if summary is not None:
+        size = None if summary.bbox_min is None else summary.bbox_max - summary.bbox_min
+        entry.update(size=None if size is None else [float(v) for v in size],
+                     track=summary.track, wheelbase=summary.wheelbase,
+                     wheel_diameter=summary.wheel_diameter)
+    return entry
 
 
 class ModelViewer(Node):
@@ -45,9 +62,10 @@ class ModelViewer(Node):
         self.joint_pub = self.create_publisher(JointState, 'joint_states', 10)
         self.static_tf = StaticTransformBroadcaster(self)
         self.rsp = AsyncParameterClient(self, 'robot_state_publisher')
-        self.menu_server = InteractiveMarkerServer(self, 'model_menu')
-        self.menu, self.menu_targets = MenuHandler(), {}
-        self._build_menu()
+        self.marker_pub = self.create_publisher(MarkerArray, '~/markers', LATCHED)
+        self.current_pub = self.create_publisher(String, '~/current', LATCHED)
+        self.catalog_pub = self.create_publisher(String, '~/catalog', LATCHED)
+        self.create_subscription(String, '~/select', self._on_select, 10)
 
         self.create_service(Trigger, '~/next', lambda req, res: self._step(res, 1))
         self.create_service(Trigger, '~/prev', lambda req, res: self._step(res, -1))
@@ -59,6 +77,10 @@ class ModelViewer(Node):
         self._configure_cycle(self.get_parameter('cycle_period').value)
 
         self.show(self.get_parameter('model').value or self.models[0])
+
+        # Names first so the panel fills at once, then sizes once every mesh is measured.
+        self._publish_catalog(with_summaries=False)
+        threading.Thread(target=self._publish_catalog, daemon=True).start()
 
     # Model switching
 
@@ -76,7 +98,8 @@ class ModelViewer(Node):
             self.get_logger().error('robot_state_publisher parameter service not available')
 
         self.static_tf.sendTransform(self._world_to_root())
-        self._publish_label()
+        self._publish_markers()
+        self.current_pub.publish(String(data=model))
         self.get_logger().info(self._label_text().replace('\n', ' | '))
 
     def _step(self, response, offset):
@@ -84,6 +107,17 @@ class ModelViewer(Node):
         self.show(self.models[index])
         response.success, response.message = True, self.current
         return response
+
+    def _on_select(self, msg):
+        if msg.data in self.models:
+            self.show(msg.data)
+        else:
+            self.get_logger().warning(f"unknown model '{msg.data}'")
+
+    def _publish_catalog(self, with_summaries=True):
+        entries = [_catalog_entry(m, self.catalog.summary(m) if with_summaries else None)
+                   for m in self.models]
+        self.catalog_pub.publish(String(data=json.dumps({'models': entries})))
 
     def _list(self, request, response):
         response.success = True
@@ -139,35 +173,22 @@ class ModelViewer(Node):
 
     def _label_text(self):
         s = self.summary
-        lines = [f'{self.current}  ({self.models.index(self.current) + 1}/{len(self.models)})',
-                 family_of(self.current)]
+        lines = [self.current, family_of(self.current)]
         if s.bbox_min is not None:
             length, width, height = s.bbox_max - s.bbox_min
-            lines.append(f'size  L {length:.3f}  W {width:.3f}  H {height:.3f} m')
-        lines.append(f'track {_metres(s.track)}  wheelbase {_metres(s.wheelbase)}  '
-                     f'wheel D {_metres(s.wheel_diameter)} m')
-        lines.append('right-click for models')
+            lines.append(f'L {_mm(length)}  W {_mm(width)}  H {_mm(height)} mm')
+        lines.append(f'track {_mm(s.track)}  wheelbase {_mm(s.wheelbase)}  '
+                     f'wheel {_mm(s.wheel_diameter)} mm')
         return '\n'.join(lines)
 
-    def _publish_label(self):
-        s, lift = self.summary, self._lift()
-        top = 0.3 if s.bbox_max is None else float(s.bbox_max[2]) + lift
-
-        text = Marker(type=Marker.TEXT_VIEW_FACING, text=self._label_text())
-        text.pose.position.z = top + 0.12
-        text.scale.z = 0.035
-        text.color.r = text.color.g = text.color.b = text.color.a = 1.0
-
-        control = InteractiveMarkerControl(
-            interaction_mode=InteractiveMarkerControl.MENU, always_visible=True, markers=[text])
-        if s.bbox_min is not None:
-            control.markers.append(self._bbox_marker(lift))
-
-        marker = InteractiveMarker(name='model', description='', scale=0.2, controls=[control])
-        marker.header.frame_id = WORLD_FRAME
-        self.menu_server.insert(marker)
-        self.menu.apply(self.menu_server, marker.name)
-        self.menu_server.applyChanges()
+    def _publish_markers(self):
+        # Model details are shown in the RViz panel; the scene only gets the size box.
+        markers = [Marker(action=Marker.DELETEALL)]
+        if self.summary.bbox_min is not None:
+            markers.append(self._bbox_marker(self._lift()))
+        for marker in markers:
+            marker.header.frame_id = WORLD_FRAME
+        self.marker_pub.publish(MarkerArray(markers=markers))
 
     def _bbox_marker(self, lift):
         lo, hi = self.summary.bbox_min.copy(), self.summary.bbox_max.copy()
@@ -177,25 +198,11 @@ class ModelViewer(Node):
                    for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
         edges = [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3),
                  (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)]
-        box = Marker(type=Marker.LINE_LIST)
+        box = Marker(ns='bbox', type=Marker.LINE_LIST)
         box.points = [corners[i] for edge in edges for i in edge]
         box.scale.x = 0.003
         box.color.r, box.color.g, box.color.b, box.color.a = 1.0, 0.8, 0.2, 0.8
         return box
-
-    def _build_menu(self):
-        self.menu.insert('Next model', callback=lambda fb: self._step(Trigger.Response(), 1))
-        self.menu.insert('Previous model', callback=lambda fb: self._step(Trigger.Response(), -1))
-        families = {}
-        for model in self.models:
-            family = family_of(model)
-            if family not in families:
-                families[family] = self.menu.insert(family)
-            entry = self.menu.insert(model, parent=families[family], callback=self._on_menu)
-            self.menu_targets[entry] = model
-
-    def _on_menu(self, feedback):
-        self.show(self.menu_targets[feedback.menu_entry_id])
 
 
 def main():

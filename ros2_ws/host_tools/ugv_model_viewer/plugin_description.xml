@@ -1,0 +1,6 @@
+<library path="ugv_model_viewer_panel">
+  <class name="ugv_model_viewer/ModelPanel" type="ugv_model_viewer::ModelPanel"
+         base_class_type="rviz_common::Panel">
+    <description>Browse and switch the Wheeltec chassis models shown by model_viewer.</description>
+  </class>
+</library>
