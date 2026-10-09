@@ -1,0 +1,6 @@
+# Cross-compile sysroot & colcon artifacts
+ubuntu_arm64/
+build/
+install/
+log/
+ugv_ws.tar.gz

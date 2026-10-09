@@ -1,0 +1,6 @@
+# Extensions are downloaded separately (see extensions/README.md), never committed
+extensions/*
+!extensions/README.md
+
+# Vendor material stays local for now (too large for GitHub)
+vendor/

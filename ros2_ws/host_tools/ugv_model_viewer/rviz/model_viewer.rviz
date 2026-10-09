@@ -1,0 +1,84 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid (0.1 m)
+      Enabled: true
+      Cell Size: 0.1
+      Plane Cell Count: 30
+      Normal Cell Count: 0
+      Plane: XY
+      Reference Frame: <Fixed Frame>
+      Color: 160; 160; 164
+      Alpha: 0.5
+      Line Style:
+        Line Width: 0.03
+        Value: Lines
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Value: true
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_description
+      Visual Enabled: true
+      Collision Enabled: false
+      Alpha: 1
+      Value: true
+    - Class: rviz_default_plugins/InteractiveMarkers
+      Name: Model menu
+      Enabled: true
+      Interactive Markers Namespace: /model_menu
+      Show Axes: false
+      Show Descriptions: false
+      Show Visual Aids: false
+      Value: true
+    - Class: rviz_default_plugins/Axes
+      Name: Origin (x = forward)
+      Enabled: true
+      Length: 0.15
+      Radius: 0.005
+      Reference Frame: <Fixed Frame>
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: world
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Measure
+      Line color: 128; 128; 0
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Distance: 1.8
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0.15
+      Pitch: 0.45
+      Yaw: 0.8
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz)
+Window Geometry:
+  Width: 1400
+  Height: 900
