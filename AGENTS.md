@@ -2,8 +2,12 @@
 
 ## Project structure
 
-- `examples/`: **範例**。C50C 控制板各功能的範例程序，同時用來驗證功能是否正常。
+- `examples/`: **範例**。C50C 控制板各功能的範例程序，同時用來驗證功能是否正常（建置與燒錄見 `examples/README.md`）。
+  - `common/board.h`: C50C 腳位與板級常數的唯一出處。
 - `tools/`: 項目的腳本與工具（build、scripts 等）。
+  - `cmake/arm-none-eabi.cmake`: STM32F407 交叉編譯工具鏈。
+  - `c50c.py`: C50C 燒錄（串口或 SWD）、重設與主控台。
+- `third_party/`: git submodule，ST 官方的 STM32F4 HAL、CMSIS Device 與 CMSIS Core，版本已釘住。
 - `vendor/`: **原廠資料**。C50C 控制板的原廠代碼、PCB 原理圖與各 IC 資料手冊。目前不提交到 git。
 - `extensions/`: **擴充資源**。不提交到 git，使用者自行從雲端下載，下載方式見 `extensions/README.md`。
 - `ros2_ws/`: ROS2 workspace（含 arm64 交叉編譯腳本，見 `ros2_ws/scripts/README.md`）。

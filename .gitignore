@@ -4,3 +4,6 @@ extensions/*
 
 # Vendor material stays local for now (too large for GitHub)
 vendor/
+
+# Firmware build output
+examples/build/
