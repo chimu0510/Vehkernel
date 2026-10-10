@@ -64,8 +64,11 @@ add_library(board STATIC
     common/board_id.c
     common/console.c
     common/encoder.c
+    common/key.c
     common/motor.c
+    common/oled.c
     common/report.c
+    common/settings.c
     common/soft_i2c.c
 )
 target_include_directories(board PUBLIC common)
@@ -118,3 +121,4 @@ c50c_example(bringup/41_sbus)
 c50c_example(bringup/42_can)
 
 # 範例程序（demos/<名稱>）：在功能驗證通過的單元上做的完整功能，名稱不帶編號。
+c50c_example(demos/oled_menu)

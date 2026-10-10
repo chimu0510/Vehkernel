@@ -1,6 +1,6 @@
 /*
  * 5×7 ASCII 點陣字型（0x20–0x7E），常見的公有領域字形。
- * 每字 5 個位元組，各為一欄、bit0 在上。只由 oled.c 引用。
+ * 每字 5 個位元組，各為一欄、bit0 在上。只由 oled.c 引用（陣列為 static）。
  */
 #ifndef FONT5X7_H
 #define FONT5X7_H

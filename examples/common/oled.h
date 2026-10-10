@@ -23,6 +23,8 @@ void oled_pixel(int x, int y, bool on);
 void oled_rect(int x, int y, int w, int h, bool on);
 /* 從字元格 (col, row) 開始寫字串，超出右邊界的部分不畫。 */
 void oled_text(int col, int row, const char *s);
+/* 反白整個字元行（亮底暗字），用於標題列與選取項目；畫完該行文字後再呼叫。 */
+void oled_invert_row(int row);
 void oled_flush(void);
 
 /* 直接控制顯示器的命令，不影響畫面緩衝。 */

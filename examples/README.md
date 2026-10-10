@@ -42,7 +42,9 @@ RESULT: FAIL (8/9 passed, 1 skipped)
 
 ### 範例程序（`demos/`）
 
-尚無。
+| 範例 | 功能 | 依賴 | 操作 |
+|---|---|---|---|
+| `oled_menu` | OLED 菜單：狀態頁（電池、開機時間、依車頭方向換算的左右輪圈數）、車頭方向設定（存 Flash、重開機生效，見 ADR-0001）、關於頁（硬體版本、IMU、UID） | `12_key_buzzer`、`13_flash_params`、`21_oled`、`23_battery_adc`、`31_encoder` | 使用者按鍵：單擊下一項、長按進入／確認、雙擊返回 |
 
 ## 建置
 
@@ -96,6 +98,9 @@ tools/c50c.py monitor --reset
   - `console.c`：USART1 主控台與 `printf`。
   - `report.c`：PASS/FAIL 回報格式。
   - `soft_i2c.c`：軟體 I2C。IMU 的 SCL/SDA 接法與硬體 I2C1 相反，只能用軟體 I2C。
+  - `oled.c`：SSD1306 OLED 驅動（GPIO 模擬 SPI）與 5×7 字型。
+  - `key.c`：使用者按鍵事件（去彈跳、單擊、雙擊、長按）。
+  - `settings.c`：存在 Flash sector 7 的控制板設定（車頭方向）。`13_flash_params` 會清掉這個 sector。
 - `bringup/NN_名稱/`：功能驗證，`NN` 的十位數是依賴層級。新增時建立目錄，並在 `CMakeLists.txt` 依層級順序加一行 `c50c_example(bringup/NN_名稱)`。
 - `demos/名稱/`：範例程序；在 `CMakeLists.txt` 加一行 `c50c_example(demos/名稱)`。
 - 韌體名稱取最後一段目錄名（燒錄時用 `tools/c50c.py flash 21_oled`），所以 `bringup/` 與 `demos/` 之間不能重名。

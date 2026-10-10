@@ -137,6 +137,16 @@ void oled_text(int col, int row, const char *s)
     }
 }
 
+void oled_invert_row(int row)
+{
+    if (row < 0 || row >= OLED_HEIGHT / OLED_CHAR_H) {
+        return;
+    }
+    for (int x = 0; x < OLED_WIDTH; x++) {
+        s_fb[row][x] ^= 0xFFU;
+    }
+}
+
 void oled_flush(void)
 {
     for (unsigned page = 0; page < OLED_HEIGHT / 8; page++) {
