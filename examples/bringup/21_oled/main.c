@@ -1,5 +1,5 @@
 /*
- * 12 OLED：0.96 吋 SSD1306（GPIO 模擬 SPI，只寫不讀），由使用者看螢幕回答 y/n。
+ * 21 OLED：0.96 吋 SSD1306（GPIO 模擬 SPI，只寫不讀），由使用者看螢幕回答 y/n。
  *   1. 全亮（0xA5，忽略 RAM）：確認接線、重設、電荷泵與顯示開啟。
  *   2. 邊框與文字：確認 128×64 位址對齊（SH1106 等 132 欄的控制器會缺邊或錯位）、
  *      字型與顯示方向。
@@ -34,7 +34,7 @@ static void draw_test_pattern(void)
 {
     oled_clear();
     oled_rect(0, 0, OLED_WIDTH, OLED_HEIGHT, true);
-    oled_text(1, 1, "C50C  12_oled");
+    oled_text(1, 1, "C50C  21_oled");
     oled_text(1, 3, "0123456789 +-=:.%");
     oled_text(1, 4, "ABCDEFGHIJKLMNOPQRS");
     oled_text(1, 5, "abcdefghijklmnopqrs");
@@ -50,7 +50,7 @@ static void stream(void)
         const uint32_t ms = HAL_GetTick();
         oled_clear();
         oled_rect(0, 0, OLED_WIDTH, OLED_HEIGHT, true);
-        oled_text(1, 1, "C50C  12_oled");
+        oled_text(1, 1, "C50C  21_oled");
         snprintf(line, sizeof line, "up  %5lu.%01lu s",
                  (unsigned long)(ms / 1000U), (unsigned long)(ms / 100U % 10U));
         oled_text(1, 3, line);
@@ -64,7 +64,7 @@ static void stream(void)
 int main(void)
 {
     board_init();
-    report_begin("12_oled");
+    report_begin("21_oled");
 
     const board_id_t id = board_id_detect();
     if (!report_check(id.version == HW_V1_0 || id.version == HW_V1_1, "hardware version",

@@ -2,7 +2,9 @@
 
 ## Project structure
 
-- `examples/`: **範例**。C50C 控制板各功能的範例程序，同時用來驗證功能是否正常（建置與燒錄見 `examples/README.md`）。
+- `examples/`: **範例**。C50C 控制板的韌體範例（建置與燒錄見 `examples/README.md`）。
+  - `bringup/`: 各單元的功能驗證，依依賴層級編號（十位數是層）。
+  - `demos/`: 建立在已驗證單元上的範例程序。
   - `common/board.h`: C50C 腳位與板級常數的唯一出處。
 - `tools/`: 項目的腳本與工具（build、scripts 等）。
   - `cmake/arm-none-eabi.cmake`: STM32F407 交叉編譯工具鏈。

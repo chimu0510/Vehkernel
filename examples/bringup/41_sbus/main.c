@@ -1,5 +1,5 @@
 /*
- * 09 SBUS 接收（CN7：1 = 訊號、2 = 5V、3 = GND；PD2 = UART5_RX，100000 baud 8E2）。
+ * 41 SBUS 接收（CN7：1 = 訊號、2 = 5V、3 = GND；PD2 = UART5_RX，100000 baud 8E2）。
  * 板上已用 NPN 把 SBUS 的反相訊號轉回來，UART 以一般極性接收。
  *   1. 收到完整訊框、訊框率、錯誤比例、failsafe 旗標。
  *   2. 搖桿：15 秒內把兩支搖桿推到四個角落，通道 1–4 都要到達兩端。
@@ -235,7 +235,7 @@ static void stream(void)
 int main(void)
 {
     board_init();
-    report_begin("09_sbus");
+    report_begin("41_sbus");
     sbus_init();
 
     if (test_link()) {

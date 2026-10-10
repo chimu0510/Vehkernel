@@ -83,9 +83,11 @@ target_link_libraries(board_runtime PUBLIC board)
 
 set(LINKER_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/common/STM32F407VETx_FLASH.ld")
 
-# c50c_example(<目錄名>)：以 <目錄名>/*.c 建立一個韌體，並輸出 .bin/.hex 與大小。
-function(c50c_example name)
-    file(GLOB sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/${name}/*.c")
+# c50c_example(<相對路徑>)：以 <相對路徑>/*.c 建立一個韌體，目標名稱取最後一段目錄名
+# （如 bringup/01_board_info → 01_board_info），並輸出 .bin/.hex 與大小。
+function(c50c_example path)
+    get_filename_component(name "${path}" NAME)
+    file(GLOB sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/${path}/*.c")
     add_executable(${name} ${sources})
     set_target_properties(${name} PROPERTIES SUFFIX ".elf")
     target_link_libraries(${name} PRIVATE board_runtime board m)
@@ -100,15 +102,19 @@ function(c50c_example name)
         COMMENT "${name}: .bin/.hex")
 endfunction()
 
-c50c_example(01_board_info)
-c50c_example(02_led)
-c50c_example(03_key_buzzer)
-c50c_example(04_uart)
-c50c_example(05_imu_icm20948)
-c50c_example(06_battery_adc)
-c50c_example(07_encoder)
-c50c_example(08_motor)
-c50c_example(09_sbus)
-c50c_example(10_flash_params)
-c50c_example(11_can)
-c50c_example(12_oled)
+# 功能驗證：依依賴層級排序，十位數是層（0 核心、1 板上基本 I/O、2 板上周邊、
+# 3 底盤驅動、4 通訊），後面的層假設前面的已經通過。
+c50c_example(bringup/01_board_info)
+c50c_example(bringup/02_uart)
+c50c_example(bringup/11_led)
+c50c_example(bringup/12_key_buzzer)
+c50c_example(bringup/13_flash_params)
+c50c_example(bringup/21_oled)
+c50c_example(bringup/22_imu)
+c50c_example(bringup/23_battery_adc)
+c50c_example(bringup/31_encoder)
+c50c_example(bringup/32_motor)
+c50c_example(bringup/41_sbus)
+c50c_example(bringup/42_can)
+
+# 範例程序（demos/<名稱>）：在功能驗證通過的單元上做的完整功能，名稱不帶編號。

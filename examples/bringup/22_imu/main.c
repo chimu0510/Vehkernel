@@ -1,5 +1,5 @@
 /*
- * 05 ICM-20948 IMU（軟體 I2C：PB9 = SCL、PB8 = SDA，位址 0x68）。
+ * 22 ICM-20948 IMU（軟體 I2C：PB9 = SCL、PB8 = SDA，位址 0x68）。
  *   1. 辨識晶片並設定量程：加速度 ±2 g、角速度 ±500 dps、DLPF 約 51 Hz。
  *   2. 靜止 2 秒：檢查重力大小、陀螺儀零偏與雜訊、溫度。
  *   3. 以 bypass 模式讀內建磁力計 AK09916。
@@ -288,7 +288,7 @@ int main(void)
     uint8_t who = 0;
 
     board_init();
-    report_begin("05_imu_icm20948");
+    report_begin("22_imu");
     soft_i2c_init(bus);
 
     if (!report_check(imu_bank(0) && imu_read(REG_WHO_AM_I, &who, 1) && who == WHO_AM_I_VALUE,

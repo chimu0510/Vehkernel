@@ -1,5 +1,5 @@
 /*
- * 08 馬達開環：馬達 A、B 各以兩種 IN 方向低速運轉，用編碼器確認是否轉動、
+ * 32 馬達開環：馬達 A、B 各以兩種 IN 方向低速運轉，用編碼器確認是否轉動、
  * 帶動哪一路編碼器、反向時編碼器正負號是否相反，並請使用者指出是左輪或右輪。
  *
  * 安全：
@@ -189,7 +189,7 @@ int main(void)
 {
     board_init();
     motor_init();          /* 一開機就把 IN 腳拉低，確保脫機 */
-    report_begin("08_motor");
+    report_begin("32_motor");
     encoder_init();
 
     if (preflight()) {
@@ -197,7 +197,7 @@ int main(void)
         test_motor(MOTOR_B);
     }
     motor_stop_all();
-    printf("  compare with 07_encoder: the encoder sign when rolling toward the drive end\n"
+    printf("  compare with 31_encoder: the encoder sign when rolling toward the drive end\n"
            "  tells which IN pattern drives each wheel forward\n");
     report_end();
     report_halt();

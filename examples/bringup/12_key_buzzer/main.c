@@ -1,5 +1,5 @@
 /*
- * 03 按鍵、使能開關與蜂鳴器。
+ * 12 按鍵、使能開關與蜂鳴器。
  *   - 使用者按鍵（PC5）：在時限內按下並放開一次。
  *   - 使能開關（PE4）：在時限內切換到兩種狀態各一次。
  *   - 蜂鳴器（PD11）：響三聲，由使用者回答是否聽到；需插上蜂鳴器跳線帽。
@@ -95,7 +95,7 @@ static void test_buzzer(void)
 int main(void)
 {
     board_init();
-    report_begin("03_key_buzzer");
+    report_begin("12_key_buzzer");
 
     test_user_key();
     test_enable_switch();

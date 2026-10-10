@@ -1,5 +1,5 @@
 /*
- * 04 串口：測試兩個 Type-C 串口的收發。
+ * 02 串口：測試兩個 Type-C 串口的收發。
  *   - USART1（PA9/PA10，主控台）：輸入 ping 後按 Enter。
  *   - USART3（PB10/PB11）：接上第二個 Type-C 口，用 115200 開終端機，輸入 ping 後按 Enter。
  * 兩者都會把收到的內容回顯，並在主控台回報結果。
@@ -106,7 +106,7 @@ static void test_aux(void)
 int main(void)
 {
     board_init();
-    report_begin("04_uart");
+    report_begin("02_uart");
 
     report_check(true, "usart1 tx", "you are reading this at %lu baud", (unsigned long)CONSOLE_BAUD);
     test_console();

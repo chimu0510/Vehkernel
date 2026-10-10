@@ -1,7 +1,7 @@
 /*
  * 馬達 A、B 經接口 P2 驅動 D50A（腳位見 board.h），PWM 20 kHz。
  * duty > 0：IN1 = H、IN2 = L；duty < 0：IN1 = L、IN2 = H；duty = 0：兩腳皆 L（脫機）。
- * IN1/IN2 接到 D50A 的 INA/INB 哪一腳由排線決定，實際轉向以 08_motor 量測為準。
+ * IN1/IN2 接到 D50A 的 INA/INB 哪一腳由排線決定，實際轉向以 32_motor 量測為準。
  */
 #ifndef MOTOR_H
 #define MOTOR_H

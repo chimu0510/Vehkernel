@@ -1,5 +1,5 @@
 /*
- * 06 電池電壓 ADC（PB0 = ADC1_IN8，分壓 11:1）。
+ * 23 電池電壓 ADC（PB0 = ADC1_IN8，分壓 11:1）。
  * 量測方式見 common/battery.h。需要接上電池；只接 USB 供電時會判定失敗。
  * 可選：輸入萬用電表量到的電池電壓，檢查誤差是否在 3% 內。
  */
@@ -43,7 +43,7 @@ int main(void)
     battery_reading_t r;
 
     board_init();
-    report_begin("06_battery_adc");
+    report_begin("23_battery_adc");
     battery_init();
 
     if (!report_check(battery_measure(&r), "adc conversion", "64 samples per channel")) {

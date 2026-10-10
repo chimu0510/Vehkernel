@@ -1,5 +1,5 @@
 /*
- * 02 LED：確認 RGB LED 的腳位對應與點亮電位，再確認各顏色。
+ * 11 LED：確認 RGB LED 的腳位對應與點亮電位，再確認各顏色。
  *   1. 腳位辨識：每次只把一支 LED 腳拉高（其餘拉低），由使用者回答看到的顏色。
  *      高電位點亮時每次只會亮一色；低電位點亮時會亮另外兩色的混色。
  *      由此推算極性與每支腳的顏色，並與 board.h 比對。
@@ -167,7 +167,7 @@ static void confirm_colors(void)
 int main(void)
 {
     board_init();
-    report_begin("02_led");
+    report_begin("11_led");
 
     if (identify_pins()) {
         confirm_colors();

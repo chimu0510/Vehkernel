@@ -1,5 +1,5 @@
 /*
- * 11 CAN1（PD0 = RX、PD1 = TX，板載 VP230 收發器），500 kbit/s。
+ * 42 CAN1（PD0 = RX、PD1 = TX，板載 VP230 收發器），500 kbit/s。
  *   1. 靜默迴環（silent loopback）：只測 CAN 控制器本身，不碰匯流排。
  *   2. 迴環（loopback）：TX 實際送到收發器，RX 在內部接回；確認腳位設定沒有讓控制器出錯。
  *   3. 外部節點（可選）：接一個 500 kbit/s 的 USB-CAN 轉接器，送出任一標準訊框，
@@ -125,7 +125,7 @@ int main(void)
     GPIO_InitTypeDef io = {0};
 
     board_init();
-    report_begin("11_can");
+    report_begin("42_can");
 
     __HAL_RCC_CAN1_CLK_ENABLE();
     io.Mode = GPIO_MODE_AF_PP;

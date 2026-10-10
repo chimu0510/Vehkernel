@@ -1,5 +1,5 @@
 /*
- * 10 Flash 參數儲存：驗證能在內部 Flash 保存設定並在斷電後保留，
+ * 13 Flash 參數儲存：驗證能在內部 Flash 保存設定並在斷電後保留，
  * 這是 ADR-0001「車頭方向存在 C50C 的 Flash」的前提。
  *
  * 使用最後一個 sector（sector 7，0x08060000，128 KB），範例程式只佔前兩個 sector，
@@ -97,7 +97,7 @@ static bool write_record(const param_record_t *r)
 int main(void)
 {
     board_init();
-    report_begin("10_flash_params");
+    report_begin("13_flash_params");
 
     const param_record_t *stored = (const param_record_t *)PARAM_ADDR;
     uint32_t boot_count = 0;
