@@ -60,10 +60,16 @@ target_compile_options(stm32f4_hal PRIVATE -w)
 # 範例共用的板級支援。
 add_library(board STATIC
     common/battery.c
+    common/battery_monitor.c
     common/board.c
     common/board_id.c
     common/console.c
+    common/ahrs.c
+    common/ctrl_tick.c
     common/encoder.c
+    common/gauge.c
+    common/gyro_cal.c
+    common/imu.c
     common/key.c
     common/motor.c
     common/oled.c
@@ -122,3 +128,6 @@ c50c_example(bringup/42_can)
 
 # 範例程序（demos/<名稱>）：在功能驗證通過的單元上做的完整功能，名稱不帶編號。
 c50c_example(demos/oled_menu)
+c50c_example(demos/battery_monitor)
+c50c_example(demos/imu_yaw)
+c50c_example(demos/imu_ahrs)

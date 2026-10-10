@@ -147,6 +147,85 @@ void oled_invert_row(int row)
     }
 }
 
+/* Bresenham 直線。 */
+void oled_line(int x0, int y0, int x1, int y1, bool on)
+{
+    const int dx = x1 > x0 ? x1 - x0 : x0 - x1, dy = -(y1 > y0 ? y1 - y0 : y0 - y1);
+    const int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy;
+
+    for (;;) {
+        oled_pixel(x0, y0, on);
+        if (x0 == x1 && y0 == y1) {
+            break;
+        }
+        const int e2 = 2 * err;
+        if (e2 >= dy) {
+            err += dy;
+            x0 += sx;
+        }
+        if (e2 <= dx) {
+            err += dx;
+            y0 += sy;
+        }
+    }
+}
+
+/* 中點畫圓法。 */
+void oled_circle(int cx, int cy, int r, bool on)
+{
+    int x = r, y = 0, err = 1 - r;
+
+    while (x >= y) {
+        const int px[8] = {x, y, -y, -x, -x, -y, y, x};
+        const int py[8] = {y, x, x, y, -y, -x, -x, -y};
+        for (int i = 0; i < 8; i++) {
+            oled_pixel(cx + px[i], cy + py[i], on);
+        }
+        y++;
+        if (err < 0) {
+            err += 2 * y + 1;
+        } else {
+            x--;
+            err += 2 * (y - x) + 1;
+        }
+    }
+}
+
+void oled_disc(int cx, int cy, int r, bool on)
+{
+    for (int dy = -r; dy <= r; dy++) {
+        for (int dx = -r; dx <= r; dx++) {
+            if (dx * dx + dy * dy <= r * r) {
+                oled_pixel(cx + dx, cy + dy, on);
+            }
+        }
+    }
+}
+
+/* 以邊函數判斷包圍盒內每個像素是否在三角形內（含邊上），與頂點順序無關。 */
+void oled_triangle(int x0, int y0, int x1, int y1, int x2, int y2, bool on)
+{
+    const int minx = x0 < x1 ? (x0 < x2 ? x0 : x2) : (x1 < x2 ? x1 : x2);
+    const int maxx = x0 > x1 ? (x0 > x2 ? x0 : x2) : (x1 > x2 ? x1 : x2);
+    const int miny = y0 < y1 ? (y0 < y2 ? y0 : y2) : (y1 < y2 ? y1 : y2);
+    const int maxy = y0 > y1 ? (y0 > y2 ? y0 : y2) : (y1 > y2 ? y1 : y2);
+
+    for (int y = miny; y <= maxy; y++) {
+        for (int x = minx; x <= maxx; x++) {
+            const int e0 = (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0);
+            const int e1 = (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1);
+            const int e2 = (x0 - x2) * (y - y2) - (y0 - y2) * (x - x2);
+            if ((e0 >= 0 && e1 >= 0 && e2 >= 0) || (e0 <= 0 && e1 <= 0 && e2 <= 0)) {
+                oled_pixel(x, y, on);
+            }
+        }
+    }
+    oled_line(x0, y0, x1, y1, on);
+    oled_line(x1, y1, x2, y2, on);
+    oled_line(x2, y2, x0, y0, on);
+}
+
 void oled_flush(void)
 {
     for (unsigned page = 0; page < OLED_HEIGHT / 8; page++) {

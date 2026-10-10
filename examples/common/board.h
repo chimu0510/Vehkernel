@@ -77,6 +77,12 @@
 #define ICM20948_I2C_ADDR   0x68U   /* AD0 = 0 */
 #define MPU6050_I2C_ADDR    0x68U   /* 舊版 C50C（V1.0）使用 */
 
+/*
+ * 偏航角速度的正負號：乘上陀螺儀 z 軸讀值，得到「由上往下看逆時針為正」（ROS REP-103）。
+ * 假設控制板元件面朝上（晶片 z 軸朝上）；待 demos/imu_yaw 實機確認。
+ */
+#define IMU_YAW_SIGN        (+1)
+
 /* 電池電壓：PB0 = ADC1_IN8，分壓比 11:1。 */
 #define VBAT_PORT           GPIOB
 #define VBAT_PIN            GPIO_PIN_0

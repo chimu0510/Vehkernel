@@ -27,6 +27,12 @@ void oled_text(int col, int row, const char *s);
 void oled_invert_row(int row);
 void oled_flush(void);
 
+/* 繪圖基本功能：座標可超出螢幕，超出的像素不畫。 */
+void oled_line(int x0, int y0, int x1, int y1, bool on);
+void oled_circle(int cx, int cy, int r, bool on);              /* 圓周 */
+void oled_disc(int cx, int cy, int r, bool on);                /* 實心圓 */
+void oled_triangle(int x0, int y0, int x1, int y1, int x2, int y2, bool on);  /* 實心三角形 */
+
 /* 直接控制顯示器的命令，不影響畫面緩衝。 */
 void oled_all_on(bool on);       /* 忽略 RAM、全部像素點亮 */
 void oled_invert(bool on);
