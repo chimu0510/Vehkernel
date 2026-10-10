@@ -31,6 +31,7 @@ add_library(stm32f4_hal STATIC
     ${HAL_DIR}/Src/stm32f4xx_hal.c
     ${HAL_DIR}/Src/stm32f4xx_hal_adc.c
     ${HAL_DIR}/Src/stm32f4xx_hal_adc_ex.c
+    ${HAL_DIR}/Src/stm32f4xx_hal_can.c
     ${HAL_DIR}/Src/stm32f4xx_hal_cortex.c
     ${HAL_DIR}/Src/stm32f4xx_hal_dma.c
     ${HAL_DIR}/Src/stm32f4xx_hal_dma_ex.c
@@ -42,6 +43,8 @@ add_library(stm32f4_hal STATIC
     ${HAL_DIR}/Src/stm32f4xx_hal_pwr_ex.c
     ${HAL_DIR}/Src/stm32f4xx_hal_rcc.c
     ${HAL_DIR}/Src/stm32f4xx_hal_rcc_ex.c
+    ${HAL_DIR}/Src/stm32f4xx_hal_tim.c
+    ${HAL_DIR}/Src/stm32f4xx_hal_tim_ex.c
     ${HAL_DIR}/Src/stm32f4xx_hal_uart.c
 )
 target_include_directories(stm32f4_hal PUBLIC
@@ -56,9 +59,12 @@ target_compile_options(stm32f4_hal PRIVATE -w)
 
 # 範例共用的板級支援。
 add_library(board STATIC
+    common/battery.c
     common/board.c
     common/board_id.c
     common/console.c
+    common/encoder.c
+    common/motor.c
     common/report.c
     common/soft_i2c.c
 )
@@ -100,3 +106,8 @@ c50c_example(03_key_buzzer)
 c50c_example(04_uart)
 c50c_example(05_imu_icm20948)
 c50c_example(06_battery_adc)
+c50c_example(07_encoder)
+c50c_example(08_motor)
+c50c_example(09_sbus)
+c50c_example(10_flash_params)
+c50c_example(11_can)
