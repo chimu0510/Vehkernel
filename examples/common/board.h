@@ -157,6 +157,19 @@
 #define CAN_TX_PIN          GPIO_PIN_1
 #define CAN_AF              GPIO_AF9_CAN1
 
+/*
+ * OLED 接口（0.96 吋 128×64，SSD1306，4 線 SPI 只寫不讀），以 GPIO 模擬 SPI。
+ * 這是 V1.0/V1.1 的接法，與原理圖 V4.1 一致；V1.2 改為 SCL PD7、SDA PD4、RST PE1、DC PE0。
+ */
+#define OLED_SCL_PORT       GPIOD
+#define OLED_SCL_PIN        GPIO_PIN_7
+#define OLED_SDA_PORT       GPIOD
+#define OLED_SDA_PIN        GPIO_PIN_6
+#define OLED_RST_PORT       GPIOD
+#define OLED_RST_PIN        GPIO_PIN_5
+#define OLED_DC_PORT        GPIOD
+#define OLED_DC_PIN         GPIO_PIN_4
+
 /* 板級初始化：HAL、168 MHz 時脈、GPIO 時脈、DWT 計時器、主控台。 */
 void board_init(void);
 
