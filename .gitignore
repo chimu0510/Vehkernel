@@ -2,8 +2,8 @@
 extensions/*
 !extensions/README.md
 
-# Vendor material stays local for now (too large for GitHub)
-vendor/
+# Vendor ROS 2 SDK is too large for GitHub (~2.2 GB); the rest of vendor/ is committed
+vendor/*wheeltec_ros2_src*/
 
 # Firmware build output
 examples/build/

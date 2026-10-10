@@ -9,7 +9,7 @@
   - `c50c.py`: C50C 燒錄（串口或 SWD）、重設與主控台。
   - `setup.sh`: 新環境的開發環境檢查與安裝（韌體與 ROS2），`--check` 只檢查。
 - `third_party/`: git submodule，ST 官方的 STM32F4 HAL、CMSIS Device 與 CMSIS Core，版本已釘住。
-- `vendor/`: **原廠資料**。C50C 控制板的原廠代碼、PCB 原理圖與各 IC 資料手冊。目前不提交到 git。
+- `vendor/`: **原廠資料**。C50C 控制板的原廠代碼、PCB 原理圖與各 IC 資料手冊。原廠 ROS2 代碼（`*wheeltec_ros2_src*/`，約 2.2 GB）不提交到 git。
 - `extensions/`: **擴充資源**。不提交到 git，使用者自行從雲端下載，下載方式見 `extensions/README.md`。
 - `ros2_ws/`: ROS2 workspace（含 arm64 交叉編譯腳本，見 `ros2_ws/scripts/README.md`）。
   - `src/`: 部署到 Raspberry Pi 5 的套件，交叉編譯只編譯這裡。
