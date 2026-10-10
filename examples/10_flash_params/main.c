@@ -60,11 +60,13 @@ static bool erase_sector(uint32_t *elapsed_ms)
     erase.NbSectors = 1;
     erase.VoltageRange = FLASH_VOLTAGE_RANGE_3;   /* VDD 2.7–3.6 V，可用 32 位元寫入 */
 
-    const uint32_t t0 = HAL_GetTick();
+    /* 抹除時 CPU 讀 Flash 會停住，SysTick 中斷無法執行，HAL_GetTick() 不會前進；
+     * DWT 週期計數器照常計數，相減在 2^32 繞回時仍正確（168 MHz 下約 25 s 內）。 */
+    const uint32_t t0 = DWT->CYCCNT;
     HAL_FLASH_Unlock();
     const HAL_StatusTypeDef st = HAL_FLASHEx_Erase(&erase, &bad_sector);
     HAL_FLASH_Lock();
-    *elapsed_ms = HAL_GetTick() - t0;
+    *elapsed_ms = (DWT->CYCCNT - t0) / (SystemCoreClock / 1000U);
     return st == HAL_OK;
 }
 
