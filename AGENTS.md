@@ -7,6 +7,7 @@
 - `tools/`: 項目的腳本與工具（build、scripts 等）。
   - `cmake/arm-none-eabi.cmake`: STM32F407 交叉編譯工具鏈。
   - `c50c.py`: C50C 燒錄（串口或 SWD）、重設與主控台。
+  - `setup.sh`: 新環境的開發環境檢查與安裝（韌體與 ROS2），`--check` 只檢查。
 - `third_party/`: git submodule，ST 官方的 STM32F4 HAL、CMSIS Device 與 CMSIS Core，版本已釘住。
 - `vendor/`: **原廠資料**。C50C 控制板的原廠代碼、PCB 原理圖與各 IC 資料手冊。目前不提交到 git。
 - `extensions/`: **擴充資源**。不提交到 git，使用者自行從雲端下載，下載方式見 `extensions/README.md`。

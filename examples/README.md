@@ -34,7 +34,9 @@ RESULT: FAIL (8/9 passed, 1 skipped)
 
 ## 建置
 
-需要 `arm-none-eabi-gcc`、CMake 3.20 以上與 Ninja。HAL 與 CMSIS 以 git submodule 放在 `third_party/`：
+新環境先執行 `tools/setup.sh`：檢查並安裝工具鏈、submodule、pyserial、串口權限等，最後會編譯全部範例。
+
+手動準備時需要 `arm-none-eabi-gcc`、CMake 3.20 以上與 Ninja。HAL 與 CMSIS 以 git submodule 放在 `third_party/`：
 
 ```bash
 git submodule update --init --depth 1
