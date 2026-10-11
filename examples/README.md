@@ -48,6 +48,7 @@ RESULT: FAIL (8/9 passed, 1 skipped)
 | `imu_yaw` | 陀螺儀零偏校正（靜置 2 s，晃動就重來）、200 Hz 控制中斷積分航向角，OLED 顯示航向角指針、角速度、零偏、漂移與中斷執行時間 | `12_key_buzzer`、`21_oled`、`22_imu` | 開機靜置；逆時針轉 90° 應約 +90；長按歸零、雙擊重新校正 |
 | `imu_ahrs` | `imu_yaw` 的完整版：Mahony 濾波融合陀螺儀與加速度計估測 roll／pitch／yaw；開機校正三軸零偏與水平基準，靜止時持續更新零偏並鎖住角度；OLED 三頁（人工地平儀、航向儀、感測器狀態） | `12_key_buzzer`、`21_oled`、`22_imu` | 開機靜置；單擊換頁、長按 yaw 歸零、雙擊重新校正 |
 | `imu_ekf` | 乘性誤差狀態 EKF：估測姿態與三軸零偏（z 軸靠靜止時的零角速度量測），加速度權重隨 \|a\| 偏離 1 g 自動降低，輸出各角度與零偏的 1σ；同時執行 Mahony 比較 yaw、漂移與零偏 | `12_key_buzzer`、`21_oled`、`22_imu` | 不需開機靜置（Mahony 那一路需要）；單擊換頁、長按 yaw 歸零、雙擊兩者重來 |
+| `ahrs_bench` | 姿態估測工作台的韌體端：200 Hz 同時執行 EKF 與 Mahony，經 USART1（921600 baud 二進位協議）把每一筆原始量測與輸出送給 `tools/ahrs_bench` 的 Web UI，接受主機修改參數、重設與 Mahony 靜置校正；OLED 顯示兩者的姿態與連線統計 | `12_key_buzzer`、`21_oled`、`22_imu` | 執行 `tools/ahrs_bench/server.py` 後開啟網頁；長按按鍵兩者重設。USART1 不再是文字主控台 |
 | `oled_menu` | OLED 菜單：狀態頁（電池、開機時間、依車頭方向換算的左右輪圈數）、車頭方向設定（存 Flash、重開機生效，見 ADR-0001）、關於頁（硬體版本、IMU、UID） | `12_key_buzzer`、`13_flash_params`、`21_oled`、`23_battery_adc`、`31_encoder` | 使用者按鍵：單擊下一項、長按進入／確認、雙擊返回 |
 
 ## 建置
@@ -108,8 +109,9 @@ tools/c50c.py monitor --reset
   - `imu.c`：ICM-20948 加速度計與陀螺儀驅動（設定同 `22_imu`，輸出率 225 Hz）。
   - `ctrl_tick.c`：TIM6 定頻控制中斷，量測回呼執行時間與逾時次數。
   - `gyro_cal.c`：陀螺儀零偏校正、靜止偵測與靜止時的零偏追蹤。
-  - `ahrs.c`：Mahony 姿態濾波（四元數），輸出 REP-103 尤拉角。
-  - `ekf_ahrs.c`：乘性誤差狀態 EKF（姿態與三軸零偏、零角速度量測、自適應加速度權重、1σ 輸出）。
+  - `ahrs.c`：Mahony 姿態濾波（四元數，K<sub>p</sub>、K<sub>i</sub> 可在執行期修改），輸出 REP-103 尤拉角。
+  - `ekf_ahrs.c`：乘性誤差狀態 EKF（姿態與三軸零偏、零角速度量測、自適應加速度權重、1σ 輸出）；參數可在執行期修改，並保留最近一步的內部量（創新量、S、K）供 `ahrs_bench` 視覺化。
+  - `frame.c`：串口訊框（COBS 分幀、CRC16），純計算，主機端用同一套規則。
   - `gauge.c`：OLED 儀表（航向儀、人工地平儀）；`oled.c` 另有直線、圓、三角形等繪圖功能。
   - `settings.c`：存在 Flash sector 7 的控制板設定（車頭方向）。`13_flash_params` 會清掉這個 sector。
 - `bringup/NN_名稱/`：功能驗證，`NN` 的十位數是依賴層級。新增時建立目錄，並在 `CMakeLists.txt` 依層級順序加一行 `c50c_example(bringup/NN_名稱)`。

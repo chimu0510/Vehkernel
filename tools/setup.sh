@@ -117,6 +117,13 @@ check_firmware() {
     else
         todo "pyserial (tools/c50c.py)"; need_apt python3-serial
     fi
+    if python3 -c 'import numpy, scipy' 2>/dev/null; then
+        ok "numpy $(python3 -c 'import numpy; print(numpy.__version__)'), scipy $(python3 -c 'import scipy; print(scipy.__version__)')"
+    else
+        todo "numpy, scipy (tools/ahrs_bench)"; need_apt python3-numpy python3-scipy
+    fi
+    if have gcc; then ok "gcc $(gcc -dumpversion) (tools/ahrs_bench compiles the filters for the host)"
+    else todo "gcc (tools/ahrs_bench)"; need_apt gcc; fi
 
     local cli
     if cli="$(find_programmer)"; then

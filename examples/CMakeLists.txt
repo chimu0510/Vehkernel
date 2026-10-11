@@ -68,6 +68,7 @@ add_library(board STATIC
     common/ctrl_tick.c
     common/ekf_ahrs.c
     common/encoder.c
+    common/frame.c
     common/gauge.c
     common/gyro_cal.c
     common/imu.c
@@ -133,3 +134,4 @@ c50c_example(demos/battery_monitor)
 c50c_example(demos/imu_yaw)
 c50c_example(demos/imu_ahrs)
 c50c_example(demos/imu_ekf)
+c50c_example(demos/ahrs_bench)

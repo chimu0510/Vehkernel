@@ -9,6 +9,7 @@
 - `tools/`: 項目的腳本與工具（build、scripts 等）。
   - `cmake/arm-none-eabi.cmake`: STM32F407 交叉編譯工具鏈。
   - `c50c.py`: C50C 燒錄（串口或 SWD）、重設與主控台。
+  - `ahrs_bench/`: 姿態估測的 Web UI（搭配 `examples/demos/ahrs_bench` 韌體或內建模擬器），見其 README。
   - `setup.sh`: 新環境的開發環境檢查與安裝（韌體與 ROS2），`--check` 只檢查。
 - `third_party/`: git submodule，ST 官方的 STM32F4 HAL、CMSIS Device 與 CMSIS Core，版本已釘住。
 - `vendor/`: **原廠資料**。C50C 控制板的原廠代碼、PCB 原理圖與各 IC 資料手冊。原廠 ROS2 代碼（`*wheeltec_ros2_src*/`，約 2.2 GB）不提交到 git。

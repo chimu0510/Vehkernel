@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AHRS Bench</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.iife.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <div class="brand">AHRS Bench <span class="sub">姿態估測工作台</span></div>
+    <div class="source">
+      <select id="src-type" title="資料來源">
+        <option value="serial">控制板（串口）</option>
+        <option value="sim">模擬器</option>
+        <option value="replay">重播錄製檔</option>
+      </select>
+      <select id="src-arg"></select>
+      <button id="src-go" class="primary">連線</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div class="bar tools">
+    <nav class="tabs">
+      <button data-tab="live" class="on">即時監看</button>
+      <button data-tab="model">模型檢視</button>
+      <button data-tab="tuning">參數分析</button>
+      <button data-tab="scenario">離線模擬</button>
+    </nav>
+    <div class="actions">
+      <div class="grp" title="控制板與主機副本同時執行">
+        <span class="grp-l">濾波器</span>
+        <button data-cmd="reset_both" title="EKF 與 Mahony 都重設">全部重設</button>
+        <button data-cmd="reset_ekf">EKF</button>
+        <button data-cmd="reset_mahony">Mahony</button>
+        <button data-cmd="mahony_cal" title="靜置 2 s，取陀螺儀平均當 Mahony 的零偏">Mahony 靜置校正</button>
+      </div>
+      <div class="grp">
+        <span class="grp-l">候選</span>
+        <button data-cmd="reset_B" title="只重設主機上候選參數 B 的副本">重設 B</button>
+      </div>
+      <div class="grp">
+        <button id="rec" class="rec" title="把原始量測存到 recordings/">● 錄製</button>
+        <button id="pause">暫停畫面</button>
+        <label title="展開每張圖下方的說明"><input type="checkbox" id="notes"> 顯示所有說明</label>
+      </div>
+    </div>
+  </div>
+  <div class="legend-key">
+    <span class="k a">A 目前（控制板的參數）</span>
+    <span class="k m">Mahony（A 參數）</span>
+    <span class="k b">B 候選（只在主機）</span>
+    <span class="k t">真值（模擬器）</span>
+  </div>
+</header>
+
+<main>
+  <section id="tab-live" class="tab on">
+    <div class="live-grid">
+      <div class="card view3d">
+        <div class="card-h"><span class="ttl">姿態</span><span class="hint">世界座標 ENU、z 朝上；拖曳旋轉</span>
+          <span class="ctl">
+            <label><input type="checkbox" id="v-mah" checked> Mahony</label>
+            <label><input type="checkbox" id="v-b" checked> B</label>
+            <label><input type="checkbox" id="v-t" checked> 真值</label>
+          </span>
+        </div>
+        <div id="live3d" class="canvas3d"></div>
+      </div>
+      <div class="card panel" id="tiles"></div>
+    </div>
+    <div class="row-ctl">
+      時間窗 <select id="win"><option>10</option><option selected>30</option><option>60</option><option>120</option></select> s
+      <span class="hint">點圖例隱藏曲線；拖曳框選放大、雙擊還原；滑鼠停在圖上看數值。</span>
+    </div>
+    <div id="live-charts"></div>
+  </section>
+
+  <section id="tab-model" class="tab">
+    <div class="model-grid">
+      <div class="eqs">
+        <div class="hint" style="margin-bottom:8px">EKF 每一步依 1 → 4 的順序執行（靜止時再加 5）。點一張卡片，右邊的 3D 只顯示這一步相關的量；再點一次恢復全部。</div>
+        <div id="eqs"></div>
+      </div>
+      <div class="model-right">
+        <div class="card">
+          <div class="card-h"><span class="ttl">量測更新的幾何</span><span class="hint">本體座標、EKF A</span>
+            <span class="ctl">
+              <span class="hint">y、S 倍率</span><input type="range" id="mag" min="0" max="4" step="0.1" value="2"><b id="mag-v" class="hint"></b>
+              <label><input type="checkbox" id="freeze"> 凍結</label>
+            </span>
+          </div>
+          <div id="model3d" class="canvas3d tall"></div>
+          <div class="geo-legend" id="geo-legend"></div>
+        </div>
+        <div class="card" id="mat-card">
+          <div class="card-h"><span class="ttl">共變異數 P（相關係數）與卡爾曼增益 K</span>
+            <button class="info" title="說明" onclick="this.closest('.card').classList.toggle('open')">ⓘ</button></div>
+          <div class="mats"><canvas id="pmat" width="300" height="300"></canvas><canvas id="kmat" width="200" height="300"></canvas></div>
+          <div class="chart-note" id="mat-note"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-tuning" class="tab">
+    <div class="tune-grid">
+      <div class="card params">
+        <div class="card-h">參數
+          <span class="ctl">
+            <button id="b-to-a" title="把 B 的值設為 A；接控制板時會寫入控制板">B → A 套用</button>
+            <button id="a-to-b">A → B</button>
+            <button id="def-to-b">預設值 → B</button>
+          </span>
+        </div>
+        <div id="ptable"></div>
+        <div class="card-h sub">真實雜訊模型（模擬器與「實際 σ」用）</div>
+        <div id="stable"></div>
+      </div>
+      <div class="analysis" id="analysis"></div>
+    </div>
+  </section>
+
+  <section id="tab-scenario" class="tab">
+    <div class="card scen-ctl">
+      <select id="scen"></select>
+      <span id="scen-desc" class="hint"></span>
+      種子 <input id="seed" type="number" value="1" min="1" style="width:4em">
+      <label><input type="checkbox" id="mcal" checked> Mahony 已做靜置校正（零偏初值 = 真值）</label>
+      <button id="scen-run">執行 A、B</button>
+      <button id="scen-live">在即時監看播放</button>
+    </div>
+    <div id="scen-out"></div>
+  </section>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
