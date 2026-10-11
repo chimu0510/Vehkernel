@@ -49,6 +49,7 @@ typedef struct {
 /* 由控制中斷寫入，主迴圈關中斷複製一份後使用。 */
 static volatile state_t s_state;
 static gyro_cal_t s_cal;
+static ahrs_t s_ahrs;
 static float s_roll0, s_pitch0;        /* 水平基準 */
 static float s_yaw_offset, s_last_yaw;
 static volatile bool s_req_zero, s_req_cal;
@@ -91,15 +92,15 @@ static void ctrl_step(void)
     float roll, pitch, yaw;
     if (st == GYRO_CAL_DONE) {
         /* 從校正時的平均加速度決定初始姿態與水平基準，yaw 歸零。 */
-        ahrs_reset(s_cal.level_g);
-        ahrs_euler(&s_roll0, &s_pitch0, &yaw);
+        ahrs_reset(&s_ahrs, NULL, s_cal.level_g);
+        ahrs_euler(&s_ahrs, &s_roll0, &s_pitch0, &yaw);
         s_yaw_offset = yaw;
         s_last_yaw = yaw;
         s_state.yaw_total = 0.0;
     } else {
-        ahrs_update(rate, s.accel_g, 1.0f / (float)CTRL_HZ, s_cal.still);
+        ahrs_update(&s_ahrs, rate, s.accel_g, 1.0f / (float)CTRL_HZ, s_cal.still);
     }
-    ahrs_euler(&roll, &pitch, &yaw);
+    ahrs_euler(&s_ahrs, &roll, &pitch, &yaw);
 
     if (s_req_zero) {
         s_req_zero = false;
@@ -119,7 +120,7 @@ static void ctrl_step(void)
     s_state.still = s_cal.still;
     s_state.still_s = s_cal.still_s;
     s_state.bias_updates = s_cal.bias_updates;
-    s_state.accel_used = ahrs_accel_used();
+    s_state.accel_used = s_ahrs.accel_used;
 }
 
 static state_t snapshot(void)
@@ -231,7 +232,7 @@ int main(void)
         }
     }
     printf("Mahony AHRS at %u Hz, Kp %.1f; keep still for %.0f s to calibrate\n",
-           CTRL_HZ, (double)AHRS_KP, (double)GYRO_CAL_SECONDS);
+           CTRL_HZ, (double)((ahrs_params_t)AHRS_DEFAULT_PARAMS).kp, (double)GYRO_CAL_SECONDS);
 
     gyro_cal_start(&s_cal, (float)CTRL_HZ);
     ctrl_tick_start(CTRL_HZ, ctrl_step);

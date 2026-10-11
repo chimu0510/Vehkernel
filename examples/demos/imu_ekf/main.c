@@ -51,6 +51,7 @@ typedef struct {
 static volatile state_t s_state;
 static ekf_ahrs_t s_ekf;
 static gyro_cal_t s_cal;
+static ahrs_t s_ahrs;
 static bool s_ekf_ready;
 static float s_ekf_off, s_ekf_last, s_mah_off, s_mah_last;
 static volatile bool s_req_zero, s_req_reset;
@@ -77,7 +78,7 @@ static void ctrl_step(void)
     }
     if (s_req_reset || !s_ekf_ready) {
         s_req_reset = false;
-        ekf_ahrs_init(&s_ekf, s.accel_g);
+        ekf_ahrs_init(&s_ekf, NULL, s.accel_g);
         gyro_cal_start(&s_cal, (float)CTRL_HZ);
         s_ekf_ready = true;
         s_ekf_off = s_ekf_last = 0.0f;
@@ -94,13 +95,13 @@ static void ctrl_step(void)
     const gyro_cal_state_t cs = gyro_cal_feed(&s_cal, &s, rate);
     float mroll, mpitch, myaw = 0.0f;
     if (cs == GYRO_CAL_DONE) {
-        ahrs_reset(s_cal.level_g);
-        ahrs_euler(&mroll, &mpitch, &myaw);
+        ahrs_reset(&s_ahrs, NULL, s_cal.level_g);
+        ahrs_euler(&s_ahrs, &mroll, &mpitch, &myaw);
         s_mah_off = s_mah_last = myaw;
         s_state.mah_total = 0.0;
     } else if (cs == GYRO_CAL_TRACKING) {
-        ahrs_update(rate, s.accel_g, DT, s_cal.still);
-        ahrs_euler(&mroll, &mpitch, &myaw);
+        ahrs_update(&s_ahrs, rate, s.accel_g, DT, s_cal.still);
+        ahrs_euler(&s_ahrs, &mroll, &mpitch, &myaw);
     }
 
     if (s_req_zero) {

@@ -46,9 +46,13 @@ static void symmetrize(float P[N][N])
     }
 }
 
-void ekf_ahrs_init(ekf_ahrs_t *f, const float a[3])
+void ekf_ahrs_init(ekf_ahrs_t *f, const ekf_ahrs_params_t *p, const float a[3])
 {
+    static const ekf_ahrs_params_t defaults = EKF_AHRS_DEFAULT_PARAMS;
+    const ekf_ahrs_params_t params = p != NULL ? *p : defaults;
+
     memset(f, 0, sizeof *f);
+    f->p = params;
 
     const float roll = atan2f(a[1], a[2]);
     const float pitch = atan2f(-a[0], sqrtf(a[1] * a[1] + a[2] * a[2]));
@@ -60,7 +64,7 @@ void ekf_ahrs_init(ekf_ahrs_t *f, const float a[3])
     f->q[3] = -sr * sp;
     normalize_q(f->q);
 
-    const float sa = EKF_INIT_ANGLE_DEG * DEG2RAD, sb = EKF_INIT_BIAS_DPS * DEG2RAD;
+    const float sa = f->p.init_angle_deg * DEG2RAD, sb = f->p.init_bias_dps * DEG2RAD;
     f->P[0][0] = f->P[1][1] = sa * sa;
     f->P[2][2] = 1e-6f;                 /* yaw 定義為 0，起點沒有不確定度 */
     f->P[3][3] = f->P[4][4] = f->P[5][5] = sb * sb;
@@ -101,7 +105,7 @@ static void predict(ekf_ahrs_t *f, const float w[3], float dt)
             Pn[i][j] = s;
         }
     }
-    const float qa = EKF_GYRO_NOISE_DPS * DEG2RAD, qb = EKF_BIAS_WALK_DPS * DEG2RAD;
+    const float qa = f->p.gyro_noise_dps * DEG2RAD, qb = f->p.bias_walk_dps * DEG2RAD;
     for (int i = 0; i < 3; i++) {
         Pn[i][i] += qa * qa * dt;
         Pn[3 + i][3 + i] += qb * qb * dt;
@@ -132,8 +136,12 @@ static bool invert3(const float m[3][3], float inv[3][3])
     return true;
 }
 
-/* 三維量測的 EKF 修正：H 為 3×6，y 為創新量，r 為各軸量測變異數；把誤差併回名義狀態。 */
-static void update3(ekf_ahrs_t *f, const float H[3][N], const float y[3], float r)
+/*
+ * 三維量測的 EKF 修正：H 為 3×6，y 為創新量，r 為各軸量測變異數；把誤差併回名義狀態。
+ * 回傳 NIS（yᵀ S⁻¹ y）；S 不可逆時不修正並回傳負值。S、K、dx 可為 NULL。
+ */
+static float update3(ekf_ahrs_t *f, const float H[3][N], const float y[3], float r,
+                     float S_out[3][3], float K_out[N][3], float dx_out[N])
 {
     float PHt[N][3], S[3][3], Si[3][3], K[N][3], dx[N];
 
@@ -156,7 +164,13 @@ static void update3(ekf_ahrs_t *f, const float H[3][N], const float y[3], float 
         }
     }
     if (!invert3(S, Si)) {
-        return;
+        return -1.0f;
+    }
+    float nis = 0.0f;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            nis += y[i] * Si[i][j] * y[j];
+        }
     }
     for (int i = 0; i < N; i++) {
         dx[i] = 0.0f;
@@ -181,18 +195,32 @@ static void update3(ekf_ahrs_t *f, const float H[3][N], const float y[3], float 
     for (int i = 0; i < 3; i++) {
         f->b[i] += dx[3 + i];
     }
+    if (S_out != NULL) {
+        memcpy(S_out, S, sizeof S);
+    }
+    if (K_out != NULL) {
+        memcpy(K_out, K, sizeof K);
+    }
+    if (dx_out != NULL) {
+        memcpy(dx_out, dx, sizeof dx);
+    }
+    return nis;
 }
 
 static void update_accel(ekf_ahrs_t *f, const float a[3])
 {
+    ekf_ahrs_diag_t *d = &f->diag;
     const float an = sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
     const float dev = fabsf(an - 1.0f);
-    if (dev > EKF_ACCEL_REJECT_G || an < 1e-3f) {
+    float v[3];
+
+    gravity_body(f->q, v);
+    memcpy(d->v, v, sizeof v);
+    d->accel_used = false;
+    if (dev > f->p.accel_reject_g || an < 1e-3f) {
         f->accel_rejects++;
         return;
     }
-    float v[3];
-    gravity_body(f->q, v);
     /* 姿態誤差 δθ 使預測方向變成 v + [v]× δθ，所以 H_θ = [v]×。 */
     const float H[3][N] = {
         {0.0f, -v[2], v[1], 0, 0, 0},
@@ -200,8 +228,14 @@ static void update_accel(ekf_ahrs_t *f, const float a[3])
         {-v[1], v[0], 0.0f, 0, 0, 0},
     };
     const float y[3] = {a[0] / an - v[0], a[1] / an - v[1], a[2] / an - v[2]};
-    const float sigma = EKF_ACCEL_NOISE + EKF_ACCEL_ADAPT * dev;
-    update3(f, H, y, sigma * sigma);
+    const float sigma = f->p.accel_noise + f->p.accel_adapt * dev;
+    for (int i = 0; i < 3; i++) {
+        d->a_unit[i] = a[i] / an;
+        d->y[i] = y[i];
+    }
+    d->sigma_a = sigma;
+    d->nis = update3(f, H, y, sigma * sigma, d->S, d->K, d->dx);
+    d->accel_used = d->nis >= 0.0f;
     f->accel_updates++;
 }
 
@@ -214,16 +248,18 @@ static void update_zupt(ekf_ahrs_t *f, const float w_meas[3])
         {0, 0, 0, 0, 0, 1},
     };
     const float y[3] = {w_meas[0] - f->b[0], w_meas[1] - f->b[1], w_meas[2] - f->b[2]};
-    const float r = EKF_ZUPT_NOISE_DPS * DEG2RAD;
-    update3(f, H, y, r * r);
+    const float r = f->p.zupt_noise_dps * DEG2RAD;
+    memcpy(f->diag.y_zupt, y, sizeof y);
+    f->diag.nis_zupt = update3(f, H, y, r * r, NULL, NULL, NULL);
+    f->diag.zupt_used = true;
     f->zupt_updates++;
 }
 
 static void detect_still(ekf_ahrs_t *f, const float w[3], const float a[3], float dt)
 {
-    const float lim_var = EKF_STILL_VAR_DPS * DEG2RAD, lim_w = EKF_STILL_DPS * DEG2RAD;
+    const float lim_var = f->p.still_var_dps * DEG2RAD, lim_w = f->p.still_dps * DEG2RAD;
     const float an = sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
-    bool quiet = fabsf(an - 1.0f) < EKF_STILL_G;
+    bool quiet = fabsf(an - 1.0f) < f->p.still_g;
 
     for (int i = 0; i < 3; i++) {
         const float d = w[i] - f->mean[i];
@@ -232,7 +268,7 @@ static void detect_still(ekf_ahrs_t *f, const float w[3], const float a[3], floa
         quiet &= f->var[i] < lim_var * lim_var && fabsf(w[i] - f->b[i]) < lim_w;
     }
     f->quiet_n = quiet ? f->quiet_n + 1U : 0U;
-    f->still = (float)f->quiet_n * dt >= EKF_STILL_SECONDS;
+    f->still = (float)f->quiet_n * dt >= f->p.still_s;
 }
 
 void ekf_ahrs_step(ekf_ahrs_t *f, const float gyro_dps[3], const float accel_g[3], float dt)
@@ -243,9 +279,11 @@ void ekf_ahrs_step(ekf_ahrs_t *f, const float gyro_dps[3], const float accel_g[3
 
     rotate_q(f->q, th);
     predict(f, w, dt);
+    memcpy(f->diag.P_prior, f->P, sizeof f->P);
     update_accel(f, accel_g);
     detect_still(f, wm, accel_g, dt);
-    if (f->still) {
+    f->diag.zupt_used = false;
+    if (f->still && f->p.zupt_enable != 0.0f) {
         update_zupt(f, wm);
     }
 }
