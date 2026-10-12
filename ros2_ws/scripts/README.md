@@ -43,12 +43,13 @@ ros2_ws/                                 # 工作空間根目錄 (WORKSPACE_DIR)
 ## 三、 使用步驟
 
 ### 1. 初始化交叉編譯環境 (僅需執行一次)
-確保已安裝 Docker 與 sudo 權限，執行：
+確保已安裝 Docker 與 sudo 權限（腳本會自動檢查並安裝 `docker-buildx` 與交叉編譯工具鏈），執行：
 ```bash
 cd scripts
 ./setup_qemu_environment.sh
 ```
-> **提示**：若先前已在其他工作目錄生成過 `ubuntu_arm64`，亦可直接在工作空間根目錄建立軟連結：
+> **提示**：亦可於項目根目錄執行 `./tools/setup.sh --only ros` 一併檢查並安裝 Docker、Buildx 與依賴。
+> 若先前已在其他工作目錄生成過 `ubuntu_arm64`，亦可直接在工作空間根目錄建立軟連結：
 > ```bash
 > ln -s /path/to/existing/ubuntu_arm64 ../ubuntu_arm64
 > ./fix_sysroot_paths.sh ../ubuntu_arm64

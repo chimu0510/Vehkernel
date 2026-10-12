@@ -201,7 +201,12 @@ check_ros() {
     if have docker; then
         ok "docker $(docker --version | awk '{print $3}' | tr -d ,)"
     else
-        todo "docker (builds the arm64 sysroot)"; need_apt docker.io
+        todo "docker (builds the arm64 sysroot)"; need_apt docker.io docker-buildx
+    fi
+    if docker buildx version >/dev/null 2>&1; then
+        ok "docker buildx"
+    else
+        todo "docker buildx (BuildKit builder for docker)"; need_apt docker-buildx
     fi
     if in_group docker; then
         ok "user '$USER' in group docker"

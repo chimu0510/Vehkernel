@@ -73,9 +73,9 @@ source "${ROS2_INSTALL_PATH}/setup.bash"
 
 # Link local workspace install directory into Sysroot workspace for package chaining
 mkdir -p "${SYSROOT}/workspace"
-rm -rf "${SYSROOT}/${ROS_WS_INSTALL_PATH}"
+rm -rf "${SYSROOT}${ROS_WS_INSTALL_PATH}"
 mkdir -p "${WORKSPACE_DIR}/install"
-ln -s "${WORKSPACE_DIR}/install" "${SYSROOT}/${ROS_WS_INSTALL_PATH}"
+ln -s "${WORKSPACE_DIR}/install" "${SYSROOT}${ROS_WS_INSTALL_PATH}"
 
 # Switch to workspace directory for standard colcon build execution
 cd "${WORKSPACE_DIR}"
@@ -84,7 +84,7 @@ PYTHON_HOST_BIN="$(command -v python3)"
 
 echo -e "\033[1;32mInvoking colcon build on target directory: src ...\033[0m"
 
-colcon build \
+if ! colcon build \
     --base-paths src \
     --merge-install \
     --cmake-force-configure \
@@ -92,9 +92,7 @@ colcon build \
         -Wno-dev \
         -DCMAKE_TOOLCHAIN_FILE="${SCRIPT_DIR}/toolchain.cmake" \
         -DCMAKE_MAKE_PROGRAM="/usr/bin/make" \
-        -DPython3_EXECUTABLE="${PYTHON_HOST_BIN}"
-
-if [ $? -ne 0 ]; then
+        -DPython3_EXECUTABLE="${PYTHON_HOST_BIN}"; then
     echo -e "\033[1;31mError: Failed to cross-compile ROS 2 packages.\033[0m"
     exit 1
 fi
@@ -159,11 +157,11 @@ if [ "$1" == "dest" ]; then
         exit 1
     fi
 
-    USER=$(echo "${TARGET_SPEC}" | cut -d'@' -f1)
+    REMOTE_USER=$(echo "${TARGET_SPEC}" | cut -d'@' -f1)
     HOST=$(echo "${TARGET_SPEC}" | cut -d'@' -f2 | cut -d':' -f1)
     REMOTE_PATH=$(echo "${TARGET_SPEC}" | cut -d':' -f2)
 
-    if [ -z "${USER}" ] || [ -z "${HOST}" ] || [ -z "${REMOTE_PATH}" ]; then
+    if [ -z "${REMOTE_USER}" ] || [ -z "${HOST}" ] || [ -z "${REMOTE_PATH}" ]; then
         echo -e "\033[1;31mError: Invalid target device format: '${TARGET_SPEC}'\033[0m"
         echo -e "\033[1;33mExpected format: username@host:/path/to/target\033[0m"
         exit 1
@@ -178,21 +176,21 @@ if [ "$1" == "dest" ]; then
     restore_host_paths "${REMOTE_PATH}"
 
     echo -e "\033[1;32mEnsuring remote directory exists at ${REMOTE_PATH}...\033[0m"
-    if ! ssh -p "${PORT}" "${USER}@${HOST}" "mkdir -p '${REMOTE_PATH}'"; then
+    if ! ssh -p "${PORT}" "${REMOTE_USER}@${HOST}" "mkdir -p '${REMOTE_PATH}'"; then
         echo -e "\033[1;31mError: Failed to create remote directory '${REMOTE_PATH}'. Check permissions and path.\033[0m"
         rm -f "${WORKSPACE_DIR}/${ARCHIVE_NAME}"
         exit 1
     fi
 
-    echo -e "\033[1;32mTransferring archive to ${USER}@${HOST}:${REMOTE_PATH} (port ${PORT})...\033[0m"
-    if ! scp -P "${PORT}" "${WORKSPACE_DIR}/${ARCHIVE_NAME}" "${USER}@${HOST}:${REMOTE_PATH}/${ARCHIVE_NAME}"; then
+    echo -e "\033[1;32mTransferring archive to ${REMOTE_USER}@${HOST}:${REMOTE_PATH} (port ${PORT})...\033[0m"
+    if ! scp -P "${PORT}" "${WORKSPACE_DIR}/${ARCHIVE_NAME}" "${REMOTE_USER}@${HOST}:${REMOTE_PATH}/${ARCHIVE_NAME}"; then
         echo -e "\033[1;31mError: SCP transfer failed.\033[0m"
         rm -f "${WORKSPACE_DIR}/${ARCHIVE_NAME}"
         exit 1
     fi
 
     echo -e "\033[1;32mExtracting archive on remote target at ${REMOTE_PATH}...\033[0m"
-    if ! ssh -p "${PORT}" "${USER}@${HOST}" "cd '${REMOTE_PATH}' && tar -xzf '${ARCHIVE_NAME}' && rm -f '${ARCHIVE_NAME}'"; then
+    if ! ssh -p "${PORT}" "${REMOTE_USER}@${HOST}" "cd '${REMOTE_PATH}' && tar -xzf '${ARCHIVE_NAME}' && rm -f '${ARCHIVE_NAME}'"; then
         echo -e "\033[1;31mError: Remote extraction failed.\033[0m"
         rm -f "${WORKSPACE_DIR}/${ARCHIVE_NAME}"
         exit 1
