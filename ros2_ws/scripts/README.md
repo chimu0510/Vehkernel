@@ -33,7 +33,7 @@ ros2_ws/                                 # 工作空間根目錄 (WORKSPACE_DIR)
 | 腳本 / 文件 | 說明 |
 | :--- | :--- |
 | `setup_qemu_environment.sh` | 註冊 QEMU binfmt 模擬環境，調用 Docker 構建 ARM64 環境鏡像，自動導出 Sysroot 至 `../ubuntu_arm64`，並調用 `fix_sysroot_paths.sh` 進行規範化。 |
-| `Dockerfile` | 以 `ros:jazzy` ARM64 為基礎鏡像，配置清華源，並通過 `rosdepc` 自動讀取 `../src` 下所有包的 `package.xml` 並安裝二進制依賴。 |
+| `Dockerfile` | 以 `ros:jazzy` ARM64 為基礎鏡像，配置清華源，並通過 `rosdep` 自動讀取 `../src` 下所有包的 `package.xml` 並安裝二進制依賴。 |
 | `toolchain.cmake` | CMake 交叉編譯工具鏈。自動定位 `aarch64-linux-gnu-gcc/g++`，動態綁定 `${CMAKE_SYSROOT}` 與 `pkg-config`，避免主機路徑污染。 |
 | `fix_sysroot_paths.sh` | 遞歸修復導出的 Sysroot 中 hardcoded 之絕對路徑，全數替換為動態 CMake 變數 `${CMAKE_SYSROOT}`。 |
 | `cross_compile.sh` | 交叉編譯入口。自動定位工作空間根目錄與 `src` 目錄，配置交叉編譯環境變數，調用 `colcon build --base-paths src` 進行編譯；支援離線打包（`pack`）與 SSH/SCP 自動遠端部署（`dest`），打包完整工作空間（`install/` + `build/` + `log/` + `src/`）。 |

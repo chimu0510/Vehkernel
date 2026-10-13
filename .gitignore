@@ -14,3 +14,6 @@ tools/ahrs_bench/recordings/
 
 # Python bytecode
 __pycache__/
+
+# Local assistant configuration
+.claude/

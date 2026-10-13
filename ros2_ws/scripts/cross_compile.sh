@@ -167,7 +167,18 @@ if [ "$1" == "dest" ]; then
         exit 1
     fi
 
-    echo -e "\033[1;32m=== Deploying Complete Workspace to ${TARGET_SPEC} ===\033[0m"
+    # Automatically resolve leading '~' to absolute path (/home/<user> or /root)
+    # This prevents tilde quote issues in shell expansion and ensures proper install prefix paths
+    if [[ "${REMOTE_PATH}" == "~"* ]]; then
+        if [ "${REMOTE_USER}" == "root" ]; then
+            REMOTE_HOME="/root"
+        else
+            REMOTE_HOME="/home/${REMOTE_USER}"
+        fi
+        REMOTE_PATH="${REMOTE_HOME}${REMOTE_PATH:1}"
+    fi
+
+    echo -e "\033[1;32m=== Deploying Complete Workspace to ${REMOTE_USER}@${HOST}:${REMOTE_PATH} ===\033[0m"
     normalize_target_paths "${REMOTE_PATH}"
 
     echo -e "\033[1;32mCompressing full workspace (install + build + log + src) for deployment...\033[0m"
@@ -183,10 +194,15 @@ if [ "$1" == "dest" ]; then
     fi
 
     echo -e "\033[1;32mTransferring archive to ${REMOTE_USER}@${HOST}:${REMOTE_PATH} (port ${PORT})...\033[0m"
-    if ! scp -P "${PORT}" "${WORKSPACE_DIR}/${ARCHIVE_NAME}" "${REMOTE_USER}@${HOST}:${REMOTE_PATH}/${ARCHIVE_NAME}"; then
-        echo -e "\033[1;31mError: SCP transfer failed.\033[0m"
-        rm -f "${WORKSPACE_DIR}/${ARCHIVE_NAME}"
-        exit 1
+    # Use 'scp -O' (legacy SCP protocol) to avoid SFTP subsystem failure ('subsystem request failed on channel 0')
+    # Fallback to SSH stream if remote system lacks scp or SCP transfer fails
+    if ! scp -O -P "${PORT}" "${WORKSPACE_DIR}/${ARCHIVE_NAME}" "${REMOTE_USER}@${HOST}:${REMOTE_PATH}/${ARCHIVE_NAME}"; then
+        echo -e "\033[1;33mWarning: scp -O failed, falling back to SSH streaming transfer...\033[0m"
+        if ! ssh -p "${PORT}" "${REMOTE_USER}@${HOST}" "cat > '${REMOTE_PATH}/${ARCHIVE_NAME}'" < "${WORKSPACE_DIR}/${ARCHIVE_NAME}"; then
+            echo -e "\033[1;31mError: Transfer failed via both SCP and SSH stream.\033[0m"
+            rm -f "${WORKSPACE_DIR}/${ARCHIVE_NAME}"
+            exit 1
+        fi
     fi
 
     echo -e "\033[1;32mExtracting archive on remote target at ${REMOTE_PATH}...\033[0m"
