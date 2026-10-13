@@ -154,9 +154,12 @@
  * 底盤驅動輪（以 31_encoder、32_motor 在 V1.1 實機確認）。左右以「驅動端在前」時面向驅動端為準：
  *   左輪 = 馬達 A／編碼器 A，右輪 = 馬達 B／編碼器 B（鏡像安裝）。
  * 輪子往驅動端滾動時的編碼器正負號；乘上計數即得「往驅動端為正」。
+ * 馬達使輪子往驅動端滾動時的驅動極性正負號；鏡像安裝需正負相反。
  */
 #define WHEEL_LEFT_ENC_SIGN    (+1)
 #define WHEEL_RIGHT_ENC_SIGN   (-1)
+#define WHEEL_LEFT_MOTOR_SIGN  (+1)
+#define WHEEL_RIGHT_MOTOR_SIGN (-1)
 
 /* SBUS 接口 CN7：訊號經 NPN（Q3）反相後接 PD2 = UART5_RX，100000 baud 8E2。 */
 #define SBUS_UART           UART5

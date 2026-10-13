@@ -293,6 +293,7 @@ class ChassisCalibrator:
         stop_time = None
 
         # 最多監聽 5 秒
+        zero_count = 0
         while time.time() - disconn_time < 5.0:
             msg = self.poll_msg()
             now = time.time()
@@ -304,10 +305,15 @@ class ChassisCalibrator:
                     failsafe_detected = True
                 samples.append((t_rel, vx, fs_active))
 
-                if t_rel > 0.2 and abs(vx) < 0.02 and stop_time is None:
-                    stop_time = now
-                    stopped = True
-                    break
+                # 判定停止: 必須已超過下位機通訊超時門檻 (> 0.5s 或已進入 failsafe)，且連續數個週期速度穩定接近 0
+                if (failsafe_detected or t_rel > 0.5) and abs(vx) < 0.03:
+                    zero_count += 1
+                    if zero_count >= 5 and stop_time is None:
+                        stop_time = now
+                        stopped = True
+                        break
+                else:
+                    zero_count = 0
             time.sleep(0.01)
 
         print("\n" + "-" * 60)

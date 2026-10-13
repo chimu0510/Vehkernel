@@ -119,8 +119,13 @@ static void on_ctrl_tick(void)
     float cmd_vx = 0.0f, cmd_wz = 0.0f;
     arbitration_update(&s_arb, dt, now_ms, &cmd_vx, &cmd_wz);
 
-    /* 7. 偏航角速度 wz 閉環補償 (ADR-0002) */
-    const float cmd_wz_corrected = yaw_rate_loop_update(&s_yaw_loop, cmd_wz, gyro_wz_rad, dt);
+    /* 7. 偏航角速度 wz 閉環補償 (ADR-0002: 車體運動時啟用，靜止時重設以避免零偏漂移擾動) */
+    float cmd_wz_corrected = cmd_wz;
+    if (fabsf(cmd_vx) > 0.01f || fabsf(cmd_wz) > 0.01f) {
+        cmd_wz_corrected = yaw_rate_loop_update(&s_yaw_loop, cmd_wz, gyro_wz_rad, dt);
+    } else {
+        yaw_rate_loop_reset(&s_yaw_loop);
+    }
 
     /* 8. 逆運動學：由車體 (Vx, wz) 映射解算左右馬達目標速度 (ADR-0001) */
     float target_motor_l = 0.0f, target_motor_r = 0.0f;
@@ -130,13 +135,15 @@ static void on_ctrl_tick(void)
     const float duty_l = pid_update(&s_pid_l, target_motor_l, vel_l, dt);
     const float duty_r = pid_update(&s_pid_r, target_motor_r, vel_r, dt);
 
-    /* 10. 輸出到馬達驅動器 */
+    /* 10. 輸出到馬達驅動器 (左右馬達鏡像安裝，乘上 board.h 定義之極性符號) */
     if (estop || (s_arb.failsafe_active && fabsf(s_arb.cmd_vx) < 0.01f && fabsf(s_arb.cmd_wz) < 0.01f)) {
         motor_stop_all();
+        pid_reset(&s_pid_l);
+        pid_reset(&s_pid_r);
         led_set(true, false, false); /* 紅燈: 停機/急停 */
     } else {
-        motor_set(MOTOR_A, duty_l);
-        motor_set(MOTOR_B, duty_r);
+        motor_set(MOTOR_A, duty_l * (float)WHEEL_LEFT_MOTOR_SIGN);
+        motor_set(MOTOR_B, duty_r * (float)WHEEL_RIGHT_MOTOR_SIGN);
 
         /* LED 狀態指示: 藍色=自主模式(ROS2), 綠色=手動遙控(SBUS), 黃色=減速斜坡中 */
         if (s_arb.active_source == UGV_CONTROL_SOURCE_ROS2) {
