@@ -135,12 +135,31 @@ static void on_ctrl_tick(void)
     const float duty_l = pid_update(&s_pid_l, target_motor_l, vel_l, dt);
     const float duty_r = pid_update(&s_pid_r, target_motor_r, vel_r, dt);
 
-    /* 10. 輸出到馬達驅動器 (左右馬達鏡像安裝，乘上 board.h 定義之極性符號) */
-    if (estop || (s_arb.failsafe_active && fabsf(s_arb.cmd_vx) < 0.01f && fabsf(s_arb.cmd_wz) < 0.01f)) {
+    /*
+     * 10. 馬達安全輸出保護 (ADR-0004):
+     * - 急停開關切斷 (estop) -> 強制停機
+     * - 無活躍控制來源 (active_source == NONE):
+     *     若處於失效保護減速斜坡中 (failsafe_active 且車速 >= 0.01) -> 允許減速斜坡
+     *     其餘情況 (開機待機、減速完成、失聯無指令) -> 強制鎖定停機 (motor_stop_all) 並重設 PID
+     */
+    const bool is_ramping_failsafe = s_arb.failsafe_active &&
+                                     (fabsf(s_arb.cmd_vx) >= 0.01f || fabsf(s_arb.cmd_wz) >= 0.01f);
+    const bool allow_motor_drive = !estop &&
+                                   ((s_arb.active_source != UGV_CONTROL_SOURCE_NONE) || is_ramping_failsafe);
+
+    if (!allow_motor_drive) {
         motor_stop_all();
         pid_reset(&s_pid_l);
         pid_reset(&s_pid_r);
-        led_set(true, false, false); /* 紅燈: 停機/急停 */
+        yaw_rate_loop_reset(&s_yaw_loop);
+
+        if (estop) {
+            led_set(true, false, false); /* 紅燈: 急停開關關閉 */
+        } else if (s_arb.failsafe_active) {
+            led_set(true, true, false);  /* 黃燈: 失效保護煞停完成 */
+        } else {
+            led_set(false, false, false); /* 熄滅: 待機無控制來源，馬達完全安全脫機鎖定 */
+        }
     } else {
         motor_set(MOTOR_A, duty_l * (float)WHEEL_LEFT_MOTOR_SIGN);
         motor_set(MOTOR_B, duty_r * (float)WHEEL_RIGHT_MOTOR_SIGN);
