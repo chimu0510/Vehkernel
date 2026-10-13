@@ -28,6 +28,7 @@ from ugv_protocol import (
     Heartbeat,
     SetVelocity,
     Telemetry,
+    SystemStatusFlags,
     decode_frame_stream,
 )
 
@@ -46,7 +47,11 @@ class ChassisCalibrator:
 
     def connect(self):
         print(f"Connecting to C50C on {self.port} at {self.baud} baud...")
-        self.ser = serial.Serial(self.port, self.baud, timeout=0.05)
+        try:
+            self.ser = serial.Serial(self.port, self.baud, timeout=0.05)
+        except (serial.SerialException, OSError) as e:
+            print(f"Error: Could not open serial port {self.port}: {e}")
+            return False
         time.sleep(0.5)
 
         # Send Handshake
@@ -257,6 +262,82 @@ class ChassisCalibrator:
         print(f"    校準後有效輪距 track_width = {calibrated_track:.5f} m")
         return calibrated_track, scale_factor
 
+    def test_failsafe(self, speed: float = 0.8):
+        print("\n" + "=" * 60)
+        print("  3. 最大減速度與斜坡煞車測試 (Failsafe Deceleration)")
+        print("=" * 60)
+        print(f"測試目標速度: {speed:.2f} m/s")
+        print("請確保前方具備 3 m 以上開闊緩衝區，並注意車體動態。")
+        input("按 [Enter] 開始加速並測試失效保護煞車...")
+
+        while self.last_telem is None:
+            self.poll_msg()
+            time.sleep(0.01)
+
+        print(f"加速至 {speed:.2f} m/s 中...")
+        accel_duration = 2.0
+        start_time = time.time()
+        while time.time() - start_time < accel_duration:
+            self.send_velocity(speed, 0.0)
+            self.poll_msg()
+            time.sleep(0.02)
+
+        peak_speed = self.last_telem.measured_vx if self.last_telem else speed
+        print(f"達到目標速度 (遙測 Vx: {peak_speed:.3f} m/s)。")
+        print("模擬通訊斷開 (停止下發心跳/速度指令)，等待下位機觸發失效保護斜坡煞車...")
+
+        disconn_time = time.time()
+        samples = []
+        failsafe_detected = False
+        stopped = False
+        stop_time = None
+
+        # 最多監聽 5 秒
+        while time.time() - disconn_time < 5.0:
+            msg = self.poll_msg()
+            now = time.time()
+            if isinstance(msg, Telemetry):
+                t_rel = now - disconn_time
+                vx = msg.measured_vx
+                fs_active = bool(msg.status_flags & SystemStatusFlags.FLAG_FAILSAFE_ACTIVE)
+                if fs_active:
+                    failsafe_detected = True
+                samples.append((t_rel, vx, fs_active))
+
+                if t_rel > 0.2 and abs(vx) < 0.02 and stop_time is None:
+                    stop_time = now
+                    stopped = True
+                    break
+            time.sleep(0.01)
+
+        print("\n" + "-" * 60)
+        print("測試結果與減速數據分析:")
+        print(f"  初始車速: {peak_speed:.3f} m/s")
+        print(f"  是否成功觸發失效保護 (FLAG_FAILSAFE_ACTIVE): {'是' if failsafe_detected else '否 (或逾時門檻尚未達到)'}")
+
+        if stop_time is not None:
+            t_stop = stop_time - disconn_time
+            a_brake = abs(peak_speed) / t_stop if t_stop > 0 else 0.0
+            print(f"  停止總耗時 t_stop: {t_stop:.3f} s")
+            print(f"  等效平均減速度 a_brake: {a_brake:.3f} m/s^2")
+            if a_brake <= 1.5:
+                print("  安全評估: PASS (a_brake <= 1.5 m/s^2，符合平滑斜坡煞車規範)")
+            else:
+                print("  安全評估: WARNING (a_brake > 1.5 m/s^2，減速過猛可能有衝擊風險)")
+        else:
+            print("  停止檢測: 5 秒內未完全停止或遙測中斷。")
+
+        if samples:
+            print("\n  減速斜坡曲線採樣 (時間, Vx, Failsafe):")
+            step = max(1, len(samples) // 10)
+            for s in samples[::step]:
+                print(f"    t={s[0]:.2f}s | Vx={s[1]:.3f} m/s | Failsafe={s[2]}")
+            if samples[-1] != samples[::step][-1]:
+                s = samples[-1]
+                print(f"    t={s[0]:.2f}s | Vx={s[1]:.3f} m/s | Failsafe={s[2]}")
+
+        print("-" * 60)
+
 
 def main():
     parser = argparse.ArgumentParser(description="ROS2-UGV Chassis Calibration Tool")
@@ -266,7 +347,31 @@ def main():
         "--heading",
         default="drive_front",
         choices=["drive_front", "omni_front"],
-        help="Heading mode",
+        help="Heading mode (default: drive_front)",
+    )
+    parser.add_argument(
+        "--mode",
+        default="all",
+        choices=["all", "linear", "angular", "failsafe"],
+        help="Calibration mode: linear, angular, failsafe, or all (default: all)",
+    )
+    parser.add_argument(
+        "--dist",
+        type=float,
+        default=2.0,
+        help="Target travel distance for linear calibration in meters (default: 2.0)",
+    )
+    parser.add_argument(
+        "--turns",
+        type=float,
+        default=5.0,
+        help="Number of in-place rotation turns for angular calibration (default: 5.0)",
+    )
+    parser.add_argument(
+        "--speed",
+        type=float,
+        default=0.8,
+        help="Target speed for failsafe deceleration test in m/s (default: 0.8)",
     )
     args = parser.parse_args()
 
@@ -275,17 +380,26 @@ def main():
         sys.exit(1)
 
     try:
-        calibrated_d, lin_scale = cal.calibrate_linear()
-        calibrated_t, ang_scale = cal.calibrate_angular(nominal_diameter=calibrated_d)
+        if args.mode == "linear":
+            cal.calibrate_linear(target_distance=args.dist)
+        elif args.mode == "angular":
+            cal.calibrate_angular(turns=args.turns)
+        elif args.mode == "failsafe":
+            cal.test_failsafe(speed=args.speed)
+        elif args.mode == "all":
+            calibrated_d, lin_scale = cal.calibrate_linear(target_distance=args.dist)
+            calibrated_t, ang_scale = cal.calibrate_angular(
+                nominal_diameter=calibrated_d, turns=args.turns
+            )
 
-        print("\n" + "=" * 60)
-        print("  標定總結報告 (可直接套用於 ugv_base_params.yaml)")
-        print("=" * 60)
-        print(f"linear_scale: {lin_scale:.5f}")
-        print(f"angular_scale: {ang_scale:.5f}")
-        print(f"effective_wheel_diameter: {calibrated_d:.5f}  # m")
-        print(f"effective_track_width: {calibrated_t:.5f}     # m")
-        print("=" * 60)
+            print("\n" + "=" * 60)
+            print("  標定總結報告 (可直接套用於 ugv_base_params.yaml)")
+            print("=" * 60)
+            print(f"linear_scale: {lin_scale:.5f}")
+            print(f"angular_scale: {ang_scale:.5f}")
+            print(f"effective_wheel_diameter: {calibrated_d:.5f}  # m")
+            print(f"effective_track_width: {calibrated_t:.5f}     # m")
+            print("=" * 60)
 
     except KeyboardInterrupt:
         print("\n使用者中斷，停止底盤。")
