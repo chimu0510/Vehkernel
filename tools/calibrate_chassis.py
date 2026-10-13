@@ -284,11 +284,18 @@ class ChassisCalibrator:
 
         peak_speed = self.last_telem.measured_vx if self.last_telem else speed
         print(f"達到目標速度 (遙測 Vx: {peak_speed:.3f} m/s)。")
+        if abs(peak_speed) < abs(speed) * 0.6:
+            print(
+                f"警告: 遙測車速 ({peak_speed:.3f} m/s) 明顯低於目標速度 ({speed:.2f} m/s)！\n"
+                f"      可能原因：馬達轉向相反導致原地打轉、編碼器極性反接、或輪胎打滑。"
+            )
+
         print("模擬通訊斷開 (停止下發心跳/速度指令)，等待下位機觸發失效保護斜坡煞車...")
 
         disconn_time = time.time()
         samples = []
         failsafe_detected = False
+        fs_trigger_time = None
         stopped = False
         stop_time = None
 
@@ -303,6 +310,8 @@ class ChassisCalibrator:
                 fs_active = bool(msg.status_flags & SystemStatusFlags.FLAG_FAILSAFE_ACTIVE)
                 if fs_active:
                     failsafe_detected = True
+                    if fs_trigger_time is None:
+                        fs_trigger_time = now
                 samples.append((t_rel, vx, fs_active))
 
                 # 判定停止: 必須已超過下位機通訊超時門檻 (> 0.5s 或已進入 failsafe)，且連續數個週期速度穩定接近 0
@@ -319,14 +328,27 @@ class ChassisCalibrator:
         print("\n" + "-" * 60)
         print("測試結果與減速數據分析:")
         print(f"  初始車速: {peak_speed:.3f} m/s")
-        print(f"  是否成功觸發失效保護 (FLAG_FAILSAFE_ACTIVE): {'是' if failsafe_detected else '否 (或逾時門檻尚未達到)'}")
+        print(
+            f"  是否成功觸發失效保護 (FLAG_FAILSAFE_ACTIVE): {'是' if failsafe_detected else '否 (或逾時門檻尚未達到)'}"
+        )
 
         if stop_time is not None:
-            t_stop = stop_time - disconn_time
-            a_brake = abs(peak_speed) / t_stop if t_stop > 0 else 0.0
-            print(f"  停止總耗時 t_stop: {t_stop:.3f} s")
-            print(f"  等效平均減速度 a_brake: {a_brake:.3f} m/s^2")
-            if a_brake <= 1.5:
+            t_total = stop_time - disconn_time
+            if fs_trigger_time is not None:
+                t_latency = fs_trigger_time - disconn_time
+                t_brake = stop_time - fs_trigger_time
+                a_brake = abs(peak_speed) / t_brake if t_brake > 0 else 0.0
+                print(f"  通訊中斷反應延遲 t_detect: {t_latency:.3f} s (下位機超時門檻 0.25 s)")
+                print(f"  實際斜坡煞停耗時 t_brake: {t_brake:.3f} s")
+                print(f"  實測斜坡減速度 a_brake: {a_brake:.3f} m/s^2")
+            else:
+                a_brake = abs(peak_speed) / t_total if t_total > 0 else 0.0
+                print(f"  停止總耗時 t_stop: {t_total:.3f} s (含通訊超時判定)")
+                print(f"  等效平均減速度 a_brake: {a_brake:.3f} m/s^2")
+
+            if abs(peak_speed) < 0.3:
+                print("  安全評估: INVALID (初始車速過低，無法有效評估斜坡減速行為)")
+            elif a_brake <= 1.5:
                 print("  安全評估: PASS (a_brake <= 1.5 m/s^2，符合平滑斜坡煞車規範)")
             else:
                 print("  安全評估: WARNING (a_brake > 1.5 m/s^2，減速過猛可能有衝擊風險)")

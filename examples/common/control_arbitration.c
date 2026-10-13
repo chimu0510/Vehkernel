@@ -139,8 +139,9 @@ void arbitration_update(arbitration_state_t *arb, float dt, uint32_t now_ms, flo
             target_wz = arb->ros2.wz;
             arb->failsafe_active = false;
         } else {
-            /* 如果先前在自主模式，突然中斷失去心跳，標記為失效保護 */
-            if (arb->current_mode == UGV_OPERATING_MODE_AUTONOMOUS) {
+            /* 如果先前在自主模式或已進入失效保護，未收到新指令時持續維持失效保護 */
+            if (arb->current_mode == UGV_OPERATING_MODE_AUTONOMOUS ||
+                arb->current_mode == UGV_OPERATING_MODE_FAILSAFE) {
                 require_failsafe = true;
             }
             arb->active_source = UGV_CONTROL_SOURCE_NONE;
