@@ -1,0 +1,13 @@
+### 2D LiDAR driver parameters (SLLiDAR / RPLIDAR A1/A2/S1/C1 series)
+### Mounted on the active sensor mount: laser_link
+
+sllidar_node:
+  ros__parameters:
+    channel_type: "serial"
+    serial_port: "/dev/ttyUSB0"
+    serial_baudrate: 115200
+    frame_id: "laser_link"
+    inverted: false
+    angle_compensate: true
+    scan_mode: "Sensitivity"
+    scan_frequency: 10.0

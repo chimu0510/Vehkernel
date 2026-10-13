@@ -50,6 +50,7 @@ RESULT: FAIL (8/9 passed, 1 skipped)
 | `imu_ekf` | 乘性誤差狀態 EKF：估測姿態與三軸零偏（z 軸靠靜止時的零角速度量測），加速度權重隨 \|a\| 偏離 1 g 自動降低，輸出各角度與零偏的 1σ；同時執行 Mahony 比較 yaw、漂移與零偏 | `12_key_buzzer`、`21_oled`、`22_imu` | 不需開機靜置（Mahony 那一路需要）；單擊換頁、長按 yaw 歸零、雙擊兩者重來 |
 | `ahrs_bench` | 姿態估測工作台的韌體端：200 Hz 同時執行 EKF 與 Mahony，經 USART1（921600 baud 二進位協議）把每一筆原始量測與輸出送給 `tools/ahrs_bench` 的 Web UI，接受主機修改參數、重設與 Mahony 靜置校正；OLED 顯示兩者的姿態與連線統計 | `12_key_buzzer`、`21_oled`、`22_imu` | 執行 `tools/ahrs_bench/server.py` 後開啟網頁；長按按鍵兩者重設。USART1 不再是文字主控台 |
 | `oled_menu` | OLED 菜單：狀態頁（電池、開機時間、依車頭方向換算的左右輪圈數）、車頭方向設定（存 Flash、重開機生效，見 ADR-0001）、關於頁（硬體版本、IMU、UID） | `12_key_buzzer`、`13_flash_params`、`21_oled`、`23_battery_adc`、`31_encoder` | 使用者按鍵：單擊下一項、長按進入／確認、雙擊返回 |
+| `chassis_ctrl` | 生產級底盤整合控制韌體：100 Hz 輪速閉環 PID、差速運動學與軟體車頭方向映射（ADR-0001）、wz 陀螺儀閉環（ADR-0002）、高速 DMA 二進位協議（ADR-0003，50 Hz 遙測）、SBUS > 手柄 > ROS2 固定仲裁與斜坡失效保護（ADR-0004）、OLED 即時儀表與電池監控 | `11_led`、`12_key_buzzer`、`13_flash_params`、`21_oled`、`22_imu`、`23_battery_adc`、`31_encoder`、`32_motor`、`41_sbus` | 接上電池、SBUS 接收機或經 USART1 連接 ROS 2 上位機。OLED 顯示狀態與速度，支援平滑減速失效保護 |
 
 ## 建置
 

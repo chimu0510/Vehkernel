@@ -1,0 +1,219 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="wheeltec_ugv">
+
+  <!-- ========================================================================= -->
+  <!-- Xacro Arguments (ADR-0001: Heading defined in software)                   -->
+  <!-- ========================================================================= -->
+  <xacro:arg name="heading" default="drive_front"/> <!-- "drive_front" or "omni_front" -->
+
+  <!-- Geometry Properties -->
+  <xacro:property name="track_width" value="0.350"/>
+  <xacro:property name="wheel_radius" value="0.104"/>
+  <xacro:property name="wheel_width" value="0.065"/>
+  <xacro:property name="wheelbase" value="0.370"/>
+  <xacro:property name="chassis_length" value="0.620"/>
+  <xacro:property name="chassis_width" value="0.310"/>
+  <xacro:property name="chassis_height" value="0.160"/>
+  <xacro:property name="ground_clearance" value="0.050"/>
+
+  <!-- Heading orientation angle (ADR-0001) -->
+  <xacro:if value="${'$(arg heading)' == 'omni_front'}">
+    <xacro:property name="heading_yaw" value="${pi}"/>
+  </xacro:if>
+  <xacro:unless value="${'$(arg heading)' == 'omni_front'}">
+    <xacro:property name="heading_yaw" value="0.0"/>
+  </xacro:unless>
+
+  <!-- Base footprint: projected on ground plane -->
+  <link name="base_footprint"/>
+
+  <!-- base_link: fixed at the midpoint of the drive axle (ADR-0001) -->
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_link"/>
+
+  <!-- chassis_link: represents physical chassis body, rotated by heading_yaw relative to base_link -->
+  <joint name="chassis_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis_link"/>
+    <origin xyz="0 0 0" rpy="0 0 ${heading_yaw}"/>
+  </joint>
+
+  <link name="chassis_link">
+    <visual>
+      <origin xyz="${-wheelbase * 0.5} 0 ${chassis_height * 0.5}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+      <material name="chassis_mat">
+        <color rgba="0.15 0.35 0.55 0.9"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="${-wheelbase * 0.5} 0 ${chassis_height * 0.5}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="${-wheelbase * 0.5} 0 ${chassis_height * 0.5}" rpy="0 0 0"/>
+      <mass value="12.0"/>
+      <inertia ixx="0.12" ixy="0.0" ixz="0.0" iyy="0.42" iyz="0.0" izz="0.48"/>
+    </inertial>
+  </link>
+
+  <!-- ========================================================================= -->
+  <!-- Driven Wheels (fixed at drive end of chassis_link)                        -->
+  <!-- ========================================================================= -->
+  <xacro:macro name="driven_wheel" params="prefix y_offset">
+    <link name="${prefix}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="tire_mat">
+          <color rgba="0.1 0.1 0.1 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <mass value="1.5"/>
+        <inertia ixx="0.0045" ixy="0.0" ixz="0.0" iyy="0.0045" iyz="0.0" izz="0.008"/>
+      </inertial>
+    </link>
+
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="chassis_link"/>
+      <child link="${prefix}_wheel_link"/>
+      <origin xyz="0 ${y_offset} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:driven_wheel prefix="drive_left" y_offset="${track_width * 0.5}"/>
+  <xacro:driven_wheel prefix="drive_right" y_offset="${-track_width * 0.5}"/>
+
+  <!-- ========================================================================= -->
+  <!-- Passive Omni Wheels (fixed at omni end of chassis_link)                   -->
+  <!-- ========================================================================= -->
+  <xacro:macro name="omni_wheel" params="prefix y_offset">
+    <link name="${prefix}_omni_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="omni_mat">
+          <color rgba="0.3 0.3 0.3 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <mass value="1.0"/>
+        <inertia ixx="0.003" ixy="0.0" ixz="0.0" iyy="0.003" iyz="0.0" izz="0.005"/>
+      </inertial>
+    </link>
+
+    <joint name="${prefix}_omni_joint" type="continuous">
+      <parent link="chassis_link"/>
+      <child link="${prefix}_omni_link"/>
+      <origin xyz="${-wheelbase} ${y_offset} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:omni_wheel prefix="omni_left" y_offset="${track_width * 0.5}"/>
+  <xacro:omni_wheel prefix="omni_right" y_offset="${-track_width * 0.5}"/>
+
+  <!-- ========================================================================= -->
+  <!-- Sensor Mounts (ADR-0001: Sensor mounts at both ends)                      -->
+  <!-- ========================================================================= -->
+  <link name="sensor_mount_drive_end"/>
+  <joint name="sensor_mount_drive_end_joint" type="fixed">
+    <parent link="chassis_link"/>
+    <child link="sensor_mount_drive_end"/>
+    <origin xyz="0.08 0 ${chassis_height}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="sensor_mount_omni_end"/>
+  <joint name="sensor_mount_omni_end_joint" type="fixed">
+    <parent link="chassis_link"/>
+    <child link="sensor_mount_omni_end"/>
+    <origin xyz="${-wheelbase - 0.08} 0 ${chassis_height}" rpy="0 0 ${pi}"/>
+  </joint>
+
+  <!-- Active Sensor Mount: Front-facing mount determined by heading parameter -->
+  <link name="sensor_mount_active"/>
+  <joint name="sensor_mount_active_joint" type="fixed">
+    <parent link="chassis_link"/>
+    <child link="sensor_mount_active"/>
+    <xacro:if value="${'$(arg heading)' == 'omni_front'}">
+      <origin xyz="${-wheelbase - 0.08} 0 ${chassis_height}" rpy="0 0 ${pi}"/>
+    </xacro:if>
+    <xacro:unless value="${'$(arg heading)' == 'omni_front'}">
+      <origin xyz="0.08 0 ${chassis_height}" rpy="0 0 0"/>
+    </xacro:unless>
+  </joint>
+
+  <!-- 2D LiDAR attached to the active sensor mount -->
+  <link name="laser_link">
+    <visual>
+      <origin xyz="0 0 0.025" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.038" length="0.05"/>
+      </geometry>
+      <material name="laser_mat">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="laser_joint" type="fixed">
+    <parent link="sensor_mount_active"/>
+    <child link="laser_link"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Camera attached to the active sensor mount -->
+  <link name="camera_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.025 0.09 0.025"/>
+      </geometry>
+      <material name="camera_mat">
+        <color rgba="0.7 0.7 0.7 1.0"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="camera_joint" type="fixed">
+    <parent link="sensor_mount_active"/>
+    <child link="camera_link"/>
+    <origin xyz="0.05 0 -0.02" rpy="0 0 0"/>
+  </joint>
+
+  <!-- IMU: Fixed to C50C controller board inside chassis -->
+  <link name="imu_link"/>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+  </joint>
+
+</robot>

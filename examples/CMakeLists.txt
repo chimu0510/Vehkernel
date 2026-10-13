@@ -78,8 +78,18 @@ add_library(board STATIC
     common/report.c
     common/settings.c
     common/soft_i2c.c
+    common/pid.c
+    common/kinematics.c
+    common/yaw_rate_loop.c
+    common/control_arbitration.c
+    common/sbus.c
+    common/ugv_link.c
 )
-target_include_directories(board PUBLIC common)
+target_include_directories(board PUBLIC
+    common
+    ${REPO_ROOT}/protocol/include
+    ${REPO_ROOT}/protocol/c
+)
 target_link_libraries(board PUBLIC stm32f4_hal)
 target_compile_options(board PUBLIC -Wall -Wextra -Wshadow -Wdouble-promotion)
 
@@ -135,3 +145,4 @@ c50c_example(demos/imu_yaw)
 c50c_example(demos/imu_ahrs)
 c50c_example(demos/imu_ekf)
 c50c_example(demos/ahrs_bench)
+c50c_example(demos/chassis_ctrl)
