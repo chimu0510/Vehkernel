@@ -4,8 +4,10 @@
 #   tools/setup.sh                 檢查全部，列出要做的事，確認後安裝缺少的項目
 #   tools/setup.sh --check         只檢查，不安裝；有缺少時以非 0 結束
 #   tools/setup.sh --yes           不詢問，直接安裝
-#   tools/setup.sh --only firmware 只處理 C50C 韌體開發（examples、燒錄）
-#   tools/setup.sh --only ros      只處理 ROS2（主機工具、arm64 交叉編譯）
+#   tools/setup.sh --firmware      只處理 C50C 韌體開發（arm-none-eabi 工具鏈、ninja、submodules、燒錄與權限）
+#   tools/setup.sh --ros           只處理 ROS2（主機工具、arm64 交叉編譯環境）
+#   tools/setup.sh --only firmware 同 --firmware
+#   tools/setup.sh --only ros      同 --ros
 #
 # 無法自動安裝的項目（需要登入 ST 網站或手動下載）只會檢查並提示。
 # 可以重複執行；已經就緒的項目會略過。
@@ -17,12 +19,14 @@ CHECK_ONLY=0
 ASSUME_YES=0
 ONLY=""
 
-usage() { sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+usage() { sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --check) CHECK_ONLY=1 ;;
         --yes|-y) ASSUME_YES=1 ;;
+        --firmware) ONLY="firmware" ;;
+        --ros) ONLY="ros" ;;
         --only) ONLY="${2:-}"; shift ;;
         -h|--help) usage 0 ;;
         *) echo "unknown option: $1" >&2; usage 1 ;;
@@ -101,9 +105,10 @@ check_firmware() {
         ok "arm-none-eabi-gcc $(arm-none-eabi-gcc -dumpversion) ($(command -v arm-none-eabi-gcc))"
     else
         todo "arm-none-eabi-gcc"
-        need_apt gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi
+        need_apt gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
     fi
 
+    if have make; then ok "make"; else todo "make"; need_apt build-essential; fi
     if have cmake && version_ge "$(cmake --version | awk 'NR==1{print $3}')" 3.20; then
         ok "cmake $(cmake --version | awk 'NR==1{print $3}')"
     else
@@ -158,11 +163,16 @@ build_examples() {
         manual "examples not built: toolchain or submodules still missing"
         return
     fi
-    if cmake -S "$REPO/examples" -B "$REPO/examples/build" -G Ninja >/dev/null &&
-       cmake --build "$REPO/examples/build" >/dev/null; then
+    local build_log
+    build_log="$(mktemp)"
+    if cmake -S "$REPO/examples" -B "$REPO/examples/build" -G Ninja >"$build_log" 2>&1 &&
+       cmake --build "$REPO/examples/build" >>"$build_log" 2>&1; then
         ok "examples built: $(ls "$REPO"/examples/build/*.bin 2>/dev/null | wc -l) firmware images in examples/build/"
+        rm -f "$build_log"
     else
-        todo "examples failed to build; run: cmake --build examples/build"
+        todo "examples failed to build; see error details below:"
+        cat "$build_log"
+        rm -f "$build_log"
     fi
 }
 
