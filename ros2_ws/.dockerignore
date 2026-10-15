@@ -1,0 +1,3 @@
+# Docker build context only needs src/ (see scripts/Dockerfile)
+*
+!src/

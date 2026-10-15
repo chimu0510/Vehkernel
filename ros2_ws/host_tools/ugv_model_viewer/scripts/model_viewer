@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+"""Show the Wheeltec chassis models from the extension in RViz, one at a time.
+
+Switch models from the "Chassis models" RViz panel, or:
+  ros2 param set /model_viewer model top_4wd_bs_robot
+  ros2 service call /model_viewer/next std_srvs/srv/Trigger
+  ros2 service call /model_viewer/prev std_srvs/srv/Trigger
+  ros2 service call /model_viewer/list std_srvs/srv/Trigger
+"""
+
+import json
+import threading
+
+from geometry_msgs.msg import Point, TransformStamped
+import rclpy
+from rclpy.node import Node
+from rclpy.parameter import Parameter
+from rclpy.parameter_client import AsyncParameterClient
+from rclpy.qos import DurabilityPolicy, QoSProfile
+from rcl_interfaces.msg import SetParametersResult
+from sensor_msgs.msg import JointState
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
+from tf2_ros import StaticTransformBroadcaster
+from visualization_msgs.msg import Marker, MarkerArray
+
+from ugv_model_viewer.catalog import Catalog, family_of
+
+WORLD_FRAME = 'world'
+
+
+LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+
+
+def _mm(value):
+    return '-' if value is None else f'{value * 1000:.0f}'
+
+
+def _catalog_entry(model, summary):
+    entry = {'name': model, 'family': family_of(model)}
+    if summary is not None:
+        size = None if summary.bbox_min is None else summary.bbox_max - summary.bbox_min
+        entry.update(size=None if size is None else [float(v) for v in size],
+                     track=summary.track, wheelbase=summary.wheelbase,
+                     wheel_diameter=summary.wheel_diameter)
+    return entry
+
+
+class ModelViewer(Node):
+
+    def __init__(self):
+        super().__init__('model_viewer')
+        self.declare_parameter('urdf_dir', '')
+        self.declare_parameter('model', '')
+        self.declare_parameter('cycle_period', 0.0)
+
+        self.catalog = Catalog(self.get_parameter('urdf_dir').value)
+        self.models = self.catalog.models
+        self.current = None
+        self.summary = None
+
+        self.joint_pub = self.create_publisher(JointState, 'joint_states', 10)
+        self.static_tf = StaticTransformBroadcaster(self)
+        self.rsp = AsyncParameterClient(self, 'robot_state_publisher')
+        self.marker_pub = self.create_publisher(MarkerArray, '~/markers', LATCHED)
+        self.current_pub = self.create_publisher(String, '~/current', LATCHED)
+        self.catalog_pub = self.create_publisher(String, '~/catalog', LATCHED)
+        self.create_subscription(String, '~/select', self._on_select, 10)
+
+        self.create_service(Trigger, '~/next', lambda req, res: self._step(res, 1))
+        self.create_service(Trigger, '~/prev', lambda req, res: self._step(res, -1))
+        self.create_service(Trigger, '~/list', self._list)
+        self.add_on_set_parameters_callback(self._validate_params)
+        self.add_post_set_parameters_callback(self._apply_params)
+        self.create_timer(0.1, self._publish_joint_states)
+        self.cycle_timer = None
+        self._configure_cycle(self.get_parameter('cycle_period').value)
+
+        self.show(self.get_parameter('model').value or self.models[0])
+
+        # Names first so the panel fills at once, then sizes once every mesh is measured.
+        self._publish_catalog(with_summaries=False)
+        threading.Thread(target=self._publish_catalog, daemon=True).start()
+
+    # Model switching
+
+    def show(self, model):
+        if model == self.current:
+            return
+        self.current, self.summary = model, self.catalog.summary(model)
+        if self.get_parameter('model').value != model:
+            self.set_parameters([Parameter('model', value=model)])
+
+        if self.rsp.wait_for_services(timeout_sec=5.0):
+            self.rsp.set_parameters(
+                [Parameter('robot_description', value=self.catalog.description(model))])
+        else:
+            self.get_logger().error('robot_state_publisher parameter service not available')
+
+        self.static_tf.sendTransform(self._world_to_root())
+        self._publish_markers()
+        self.current_pub.publish(String(data=model))
+        self.get_logger().info(self._label_text().replace('\n', ' | '))
+
+    def _step(self, response, offset):
+        index = (self.models.index(self.current) + offset) % len(self.models)
+        self.show(self.models[index])
+        response.success, response.message = True, self.current
+        return response
+
+    def _on_select(self, msg):
+        if msg.data in self.models:
+            self.show(msg.data)
+        else:
+            self.get_logger().warning(f"unknown model '{msg.data}'")
+
+    def _publish_catalog(self, with_summaries=True):
+        entries = [_catalog_entry(m, self.catalog.summary(m) if with_summaries else None)
+                   for m in self.models]
+        self.catalog_pub.publish(String(data=json.dumps({'models': entries})))
+
+    def _list(self, request, response):
+        response.success = True
+        response.message = '\n'.join(f'{family_of(m)}: {m}' for m in self.models)
+        return response
+
+    # Parameters
+
+    def _validate_params(self, params):
+        for param in params:
+            if param.name == 'model' and param.value and param.value not in self.models:
+                return SetParametersResult(successful=False,
+                                           reason=f"unknown model '{param.value}'")
+            if param.name == 'urdf_dir':
+                return SetParametersResult(successful=False, reason='urdf_dir is read-only')
+        return SetParametersResult(successful=True)
+
+    def _apply_params(self, params):
+        for param in params:
+            if param.name == 'model' and param.value:
+                self.show(param.value)
+            elif param.name == 'cycle_period':
+                self._configure_cycle(param.value)
+
+    def _configure_cycle(self, period):
+        if self.cycle_timer is not None:
+            self.destroy_timer(self.cycle_timer)
+            self.cycle_timer = None
+        if period > 0.0:
+            self.cycle_timer = self.create_timer(period, lambda: self._step(Trigger.Response(), 1))
+
+    # Publishing
+
+    def _publish_joint_states(self):
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = [name for name, _ in self.summary.movable_joints]
+        msg.position = [position for _, position in self.summary.movable_joints]
+        self.joint_pub.publish(msg)
+
+    def _lift(self):
+        # Rest the model on the RViz grid (z = 0 is the ground).
+        return 0.0 if self.summary.bbox_min is None else -float(self.summary.bbox_min[2])
+
+    def _world_to_root(self):
+        tf = TransformStamped()
+        tf.header.stamp = self.get_clock().now().to_msg()
+        tf.header.frame_id = WORLD_FRAME
+        tf.child_frame_id = self.summary.root_link
+        tf.transform.translation.z = self._lift()
+        tf.transform.rotation.w = 1.0
+        return tf
+
+    def _label_text(self):
+        s = self.summary
+        lines = [self.current, family_of(self.current)]
+        if s.bbox_min is not None:
+            length, width, height = s.bbox_max - s.bbox_min
+            lines.append(f'L {_mm(length)}  W {_mm(width)}  H {_mm(height)} mm')
+        lines.append(f'track {_mm(s.track)}  wheelbase {_mm(s.wheelbase)}  '
+                     f'wheel {_mm(s.wheel_diameter)} mm')
+        return '\n'.join(lines)
+
+    def _publish_markers(self):
+        # Model details are shown in the RViz panel; the scene only gets the size box.
+        markers = [Marker(action=Marker.DELETEALL)]
+        if self.summary.bbox_min is not None:
+            markers.append(self._bbox_marker(self._lift()))
+        for marker in markers:
+            marker.header.frame_id = WORLD_FRAME
+        self.marker_pub.publish(MarkerArray(markers=markers))
+
+    def _bbox_marker(self, lift):
+        lo, hi = self.summary.bbox_min.copy(), self.summary.bbox_max.copy()
+        lo[2] += lift
+        hi[2] += lift
+        corners = [Point(x=float(x), y=float(y), z=float(z))
+                   for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
+        edges = [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3),
+                 (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)]
+        box = Marker(ns='bbox', type=Marker.LINE_LIST)
+        box.points = [corners[i] for edge in edges for i in edge]
+        box.scale.x = 0.003
+        box.color.r, box.color.g, box.color.b, box.color.a = 1.0, 0.8, 0.2, 0.8
+        return box
+
+
+def main():
+    rclpy.init()
+    node = ModelViewer()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.try_shutdown()
+
+
+if __name__ == '__main__':
+    main()
