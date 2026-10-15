@@ -1,0 +1,10 @@
+ugv_base_node:
+  ros__parameters:
+    port: "/dev/ttyACM0"
+    baud: 115200
+    heading: "drive_front"    # "drive_front" (驅動端在前) 或 "omni_front" (全向輪端在前)
+    publish_tf: true
+    odom_frame: "odom"
+    base_frame: "base_link"
+    linear_scale: 1.0
+    angular_scale: 1.0

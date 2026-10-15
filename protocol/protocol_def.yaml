@@ -1,0 +1,330 @@
+# ==============================================================================
+# ROS2-UGV Custom Serial Protocol Definition (ADR-0003)
+# ==============================================================================
+# Version: 1
+# Encoding: Binary little-endian packed structs
+# Framing: COBS (Consistent Overhead Byte Stuffing), 0x00 delimiter
+# Integrity: CRC16-CCITT (poly 0x1021, init 0xFFFF, little-endian)
+# Hardware: C50C (STM32F407) <-> Raspberry Pi 5 (CH9102F USB-UART)
+# ==============================================================================
+
+protocol_version: 1
+
+enums:
+  HeadingMode:
+    description: "底盤定義之車頭方向 (ADR-0001)"
+    type: uint8
+    values:
+      DRIVE_FRONT: 0    # 驅動端在前（預設）
+      OMNI_FRONT: 1     # 全向輪端在前
+
+  ControlSource:
+    description: "固定優先序控制來源 (ADR-0004: SBUS > GAMEPAD > ROS2)"
+    type: uint8
+    values:
+      NONE: 0
+      SBUS: 1           # SBUS 航模接收機 (最高優先級)
+      GAMEPAD: 2        # 板載 USB Host 遊戲手柄 (次高)
+      ROS2: 3           # Raspberry Pi 5 上位機 (常態/最低)
+
+  OperatingMode:
+    description: "系統運行模式"
+    type: uint8
+    values:
+      MANUAL: 0         # 手動模式 (SBUS 或 USB 手柄控制中)
+      AUTONOMOUS: 1     # 自主模式 (ROS 2 控制中)
+      FAILSAFE: 2       # 失效保護模式 (斜坡減速中或已鎖定馬達)
+
+  BatteryLevel:
+    description: "電池電量健康狀態"
+    type: uint8
+    values:
+      OK: 0             # 正常 (> 21.0V)
+      LOW: 1            # 低電量 (< 20.0V)
+      CRITICAL: 2       # 嚴重低電量 (< 19.0V)
+      NO_BATTERY: 3     # 未接主電池 (僅 USB 5V 供電)
+
+  SystemStatus:
+    description: "系統狀態與警報旗標 (位元遮罩)"
+    type: uint16
+    values:
+      ESTOP_ACTIVE: 0x0001        # PE4 使能開關斷開 (硬體急停)
+      FAILSAFE_ACTIVE: 0x0002     # 失效保護啟動中 (斜坡減速中或已鎖住馬達)
+      LOW_BATTERY: 0x0004         # 電池低電量
+      IMU_READY: 0x0008           # ICM-20948 IMU 通訊與校正正常
+      HEADING_MISMATCH: 0x0010    # 上位機與下位機車頭方向不符 (拒絕自主)
+      MOTOR_OVERCURRENT: 0x0020   # 馬達驅動過流保護 (若支援)
+      COMM_TIMEOUT: 0x0040        # 上位機心跳或速度指令逾時
+
+  LogLevel:
+    description: "字串日誌等級"
+    type: uint8
+    values:
+      DEBUG: 0
+      INFO: 1
+      WARN: 2
+      ERROR: 3
+
+# ------------------------------------------------------------------------------
+# 訊息定義
+# 所有封包負載開頭統一包含通用標頭 (ugv_msg_header_t):
+#   - msg_id: uint8
+#   - reserved: uint8
+#   - seq: uint32
+#   - timestamp_us: uint32 (MCU 微秒時間戳，用於 ROS 2 估算時鐘偏移)
+# ------------------------------------------------------------------------------
+
+messages:
+  # 握手 (Handshake) - 上電連線時第一步
+  - name: HandshakeReq
+    id: 0x01
+    direction: HostToMcu
+    description: "上位機請求握手並聲明版本與預期車頭方向 (ADR-0001, ADR-0003)"
+    fields:
+      - name: host_proto_version
+        type: uint16
+        description: "上位機協議版本"
+      - name: expected_heading
+        type: uint8
+        enum: HeadingMode
+        description: "上位機預期的車頭方向"
+      - name: reserved_padding
+        type: uint8
+        description: "字節對齊填充"
+
+  - name: HandshakeResp
+    id: 0x02
+    direction: McuToHost
+    description: "下位機回應握手狀態、硬體版本與 MCU UID"
+    fields:
+      - name: mcu_proto_version
+        type: uint16
+        description: "下位機協議版本"
+      - name: mcu_heading
+        type: uint8
+        enum: HeadingMode
+        description: "下位機 Flash 中儲存的車頭方向"
+      - name: heading_matched
+        type: uint8
+        description: "1=雙端一致, 0=不一致(禁止進入自主模式)"
+      - name: hw_version
+        type: uint8
+        description: "硬體版本 (e.g. 0x11 = V1.1)"
+      - name: reserved_padding
+        type: uint8
+        description: "字節對齊填充"
+      - name: mcu_uid
+        type: uint8[12]
+        description: "STM32 96-bit Unique Device ID"
+
+  # 心跳 (Heartbeat) - 10 Hz 維持連線，逾時 (e.g. 200ms) 觸發失效保護
+  - name: Heartbeat
+    id: 0x03
+    direction: HostToMcu
+    description: "上位機發送心跳"
+    fields:
+      - name: host_state
+        type: uint8
+        description: "上位機狀態 (0=OK, 1=WARN, 2=ERR)"
+      - name: req_autonomous
+        type: uint8
+        description: "請求進入自主模式 (1=請求, 0=放棄)"
+      - name: reserved
+        type: uint16
+        description: "填充"
+
+  - name: HeartbeatAck
+    id: 0x04
+    direction: McuToHost
+    description: "下位機應答心跳與當前控制來源 (ADR-0004)"
+    fields:
+      - name: echo_host_seq
+        type: uint32
+        description: "回顯上位機發送的序號 (供計算 RTT 往返時延)"
+      - name: active_control_source
+        type: uint8
+        enum: ControlSource
+        description: "當前擁有控制權的來源 (SBUS > GAMEPAD > ROS2)"
+      - name: current_mode
+        type: uint8
+        enum: OperatingMode
+        description: "當前運行模式 (MANUAL/AUTONOMOUS/FAILSAFE)"
+      - name: status_flags
+        type: uint16
+        enum: SystemStatus
+        description: "系統狀態標誌"
+
+  # 速度控制 (Velocity Command) - ROS 2 下發 cmd_vel
+  - name: SetVelocity
+    id: 0x10
+    direction: HostToMcu
+    description: "下達車體速度 (ADR-0002: 只交換 Vx 與 wz)"
+    fields:
+      - name: target_vx
+        type: float
+        description: "前進速度 (m/s)"
+      - name: target_wz
+        type: float
+        description: "偏航角速度 (rad/s, 逆時針為正)"
+
+  # 高頻遙測 (Telemetry) - MCU 以 50Hz/100Hz 回報
+  - name: Telemetry
+    id: 0x20
+    direction: McuToHost
+    description: "定頻回報車體速度、左右輪速、編碼器位置、IMU 與電池狀態"
+    fields:
+      - name: measured_vx
+        type: float
+        description: "量測之車體前進速度 (m/s)"
+      - name: measured_wz
+        type: float
+        description: "量測之車體偏航角速度 (rad/s)"
+      - name: wheel_vel_l
+        type: float
+        description: "左驅動輪線速度 (m/s)"
+      - name: wheel_vel_r
+        type: float
+        description: "右驅動輪線速度 (m/s)"
+      - name: wheel_pos_l
+        type: int32
+        description: "左驅動輪編碼器累計計數"
+      - name: wheel_pos_r
+        type: int32
+        description: "右驅動輪編碼器累計計數"
+      - name: imu_accel_x
+        type: float
+        description: "IMU X軸加速度 (m/s^2)"
+      - name: imu_accel_y
+        type: float
+        description: "IMU Y軸加速度 (m/s^2)"
+      - name: imu_accel_z
+        type: float
+        description: "IMU Z軸加速度 (m/s^2)"
+      - name: imu_gyro_x
+        type: float
+        description: "IMU X軸角速度 (rad/s)"
+      - name: imu_gyro_y
+        type: float
+        description: "IMU Y軸角速度 (rad/s)"
+      - name: imu_gyro_z
+        type: float
+        description: "IMU Z軸角速度 (rad/s)"
+      - name: battery_voltage
+        type: float
+        description: "主電池電壓 (V)"
+      - name: battery_level
+        type: uint8
+        enum: BatteryLevel
+        description: "電池電量健康等級"
+      - name: control_source
+        type: uint8
+        enum: ControlSource
+        description: "當前控制來源"
+      - name: status_flags
+        type: uint16
+        enum: SystemStatus
+        description: "系統狀態標誌"
+
+  # 控制參數配置 (PID & Limits Config)
+  - name: SetPidConfig
+    id: 0x30
+    direction: HostToMcu
+    description: "配置輪速 PID、wz 陀螺儀外環增益與加減速限制"
+    fields:
+      - name: wheel_kp
+        type: float
+      - name: wheel_ki
+        type: float
+      - name: wheel_kd
+        type: float
+      - name: yaw_kp
+        type: float
+      - name: yaw_ki
+        type: float
+      - name: yaw_kd
+        type: float
+      - name: max_accel
+        type: float
+        description: "最大允許加速度 (m/s^2)"
+      - name: max_decel
+        type: float
+        description: "最大允許減速度 (m/s^2, 用於失效保護斜坡停車)"
+
+  - name: PidConfigResp
+    id: 0x31
+    direction: McuToHost
+    description: "回應當前生效之 PID 與限制參數"
+    fields:
+      - name: wheel_kp
+        type: float
+      - name: wheel_ki
+        type: float
+      - name: wheel_kd
+        type: float
+      - name: yaw_kp
+        type: float
+      - name: yaw_ki
+        type: float
+      - name: yaw_kd
+        type: float
+      - name: max_accel
+        type: float
+      - name: max_decel
+        type: float
+
+  # 車頭方向設定 (Heading Config)
+  - name: SetHeadingConfig
+    id: 0x32
+    direction: HostToMcu
+    description: "修改車頭方向並可選寫入 Flash (ADR-0001: 重開機生效)"
+    fields:
+      - name: target_heading
+        type: uint8
+        enum: HeadingMode
+        description: "欲設定之車頭方向"
+      - name: save_to_flash
+        type: uint8
+        description: "1=寫入內部 Flash sector 7, 0=僅查詢"
+      - name: reserved
+        type: uint16
+        description: "填充"
+
+  - name: HeadingConfigResp
+    id: 0x33
+    direction: McuToHost
+    description: "回應當前車頭方向與 Flash 儲存結果"
+    fields:
+      - name: current_heading
+        type: uint8
+        enum: HeadingMode
+        description: "當前運行中生效之車頭方向"
+      - name: flash_heading
+        type: uint8
+        enum: HeadingMode
+        description: "Flash 中儲存之車頭方向"
+      - name: write_result
+        type: uint8
+        description: "0=成功/未寫入, 1=寫入成功需重啟, 2=寫入失敗"
+      - name: reserved
+        type: uint8
+        description: "填充"
+
+  # 文字日誌 (Text Log) - 供 MCU 傳送調試文字至 ROS2
+  - name: TextLog
+    id: 0x40
+    direction: McuToHost
+    description: "下位機除錯與日誌字串訊息"
+    fields:
+      - name: level
+        type: uint8
+        enum: LogLevel
+        description: "日誌等級"
+      - name: length
+        type: uint8
+        description: "字串長度 (最大 64)"
+      - name: reserved
+        type: uint16
+        description: "填充"
+      - name: message
+        type: char[64]
+        description: "ASCII 字串 (無須保證 \\0 結尾)"

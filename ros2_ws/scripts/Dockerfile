@@ -18,12 +18,12 @@ RUN apt-get update && apt-get install -y \
 # 拷貝源碼目錄 (相對於 Docker build context，即 scripts 上一層的 src)
 COPY ./src /ros_test_ws/src
 
-# 使用 rosdepc 自動解析並安裝源碼所需的 ROS 依賴
-RUN apt-get update && apt-get install -y python3-pip && \
-    pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple rosdepc --break-system-packages && \
-    rosdepc init && \
-    rosdepc update --rosdistro jazzy && \
-    rosdepc install --from-paths src --ignore-src -r -y --rosdistro jazzy && \
+# 使用官方 rosdep 自動解析並安裝源碼所需的 ROS 依賴
+# 抑制 Docker 容器內以 root 執行 rosdep update 時的常規權限提醒
+RUN sed -i "s/if os.geteuid() == 0:/if False:/g" /usr/lib/python3/dist-packages/rosdep2/main.py && \
+    apt-get update && \
+    rosdep update --rosdistro jazzy && \
+    rosdep install --from-paths src --ignore-src -r -y --rosdistro jazzy && \
     apt-get autoremove -y -qq && \
     rm -rf /var/lib/apt/lists/*
 

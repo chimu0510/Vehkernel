@@ -1,0 +1,26 @@
+### Teleoperation joystick configuration for WHEELTEC C50C UGV
+### Designed for standard USB / Bluetooth gamepads (Logitech F710, Xbox, PS4/PS5)
+
+teleop_twist_joy_node:
+  ros__parameters:
+    # Axis mapping
+    axis_linear:
+      x: 1             # Left stick vertical
+    axis_angular:
+      yaw: 3           # Right stick horizontal (or 0 for left stick horizontal)
+
+    # Scaling speeds
+    scale_linear:
+      x: 0.5           # Default 0.5 m/s forward/backward
+    scale_linear_turbo:
+      x: 1.0           # Turbo 1.0 m/s
+    scale_angular:
+      yaw: 1.0         # Default 1.0 rad/s yaw rate
+    scale_angular_turbo:
+      yaw: 2.0         # Turbo 2.0 rad/s
+
+    # Deadman switches
+    enable_button: 4   # LB / L1: Deadman switch (must hold to drive)
+    enable_turbo_button: 5  # RB / R1: Turbo boost switch
+    require_enable_button: true
+    inverted_reverse: false
