@@ -1,8 +1,8 @@
 # ROS2-UGV
 
-[![C50C Firmware](https://img.shields.io/badge/Firmware-STM32F407%20(C50C)-blue.svg)](#firmware-architecture)
-[![ROS 2](https://img.shields.io/badge/ROS%202-Jazzy%20Jalisco-green.svg)](#ros-2-navigation-stack)
-[![Cross-Compilation](https://img.shields.io/badge/Cross--Compile-aarch64%20(Pi%205)-orange.svg)](#arm64-cross-compilation)
+[![C50C Firmware](https://img.shields.io/badge/Firmware-STM32F407%20(C50C)-blue.svg)](#2-embedded-firmware-examples)
+[![ROS 2](https://img.shields.io/badge/ROS%202-Jazzy%20Jalisco-green.svg)](#4-ros-2-workspace-ros2_ws)
+[![Cross-Compilation](https://img.shields.io/badge/Cross--Compile-aarch64%20(Pi%205)-orange.svg)](#arm64-cross-compilation-target-deployment)
 [![Architecture](https://img.shields.io/badge/ADR-0001--0004-purple.svg)](docs/adr/)
 [![License](https://img.shields.io/badge/License-MIT%20%2F%20Academic-lightgrey.svg)](#license)
 
@@ -12,31 +12,7 @@ The project serves both as an autonomous robot development foundation and as an 
 
 ---
 
-## Architecture Overview
-
-```mermaid
-graph TD
-    subgraph Host / High-Level SBC ["High-Level SBC (Raspberry Pi 5)"]
-        Nav2["Nav2 Navigation Stack / SLAM"] -->|/cmd_vel| BaseNode["ugv_base (Hardware Bridge)"]
-        Teleop["Teleop / Joy"] -->|/cmd_vel| BaseNode
-        BaseNode -->|Odom & Sensor Transforms| TF["TF / Robot State Publisher"]
-    end
-
-    subgraph Transport ["Binary Serial Transport (ADR-0003)"]
-        BaseNode <===>|"COBS-Framed CRC16 Serial (115200 / 921600)"| Proto["Custom Binary Protocol"]
-    end
-
-    subgraph MCU ["Low-Level Controller (C50C STM32F407)"]
-        Proto <===> Core["chassis_ctrl Main Loop (100 Hz)"]
-        Core --> Arbiter["Control Source Arbiter (ADR-0004)<br/>SBUS > USB Gamepad > ROS 2 > Failsafe"]
-        Arbiter --> Kinematics["Kinematics & Software Heading (ADR-0001)<br/>Drive-End vs. Omni-End Forward"]
-        Kinematics --> ClosedLoop["Wheel PID & Gyroscope wz Loop (ADR-0002)"]
-        ClosedLoop --> Motors["Dual DC Motors & Encoders"]
-        Sensors["ICM-20948 IMU / AHRS / Battery ADC"] --> Core
-    end
-```
-
-### System Highlights
+## System Highlights
 
 * **Unified Domain Abstraction**: Strict single-source terminology adhering to [`CONTEXT.md`](CONTEXT.md) and Architecture Decision Records ([`docs/adr/`](docs/adr/)).
 * **Software-Defined Heading ([ADR-0001](docs/adr/0001-heading-defined-in-software.md))**: Swap the physical front between the pneumatic *Drive End* and passive *Omni End* via Flash-persisted settings without rewiring or altering kinematic sign conventions.
