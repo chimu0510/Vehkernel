@@ -46,14 +46,14 @@ enum class BatteryLevel : uint8_t {
 };
 
 // 系統狀態與警報旗標 (位元遮罩)
-enum class SystemStatusFlags : uint16_t {
-    FLAG_ESTOP_ACTIVE = 1,
-    FLAG_FAILSAFE_ACTIVE = 2,
-    FLAG_LOW_BATTERY = 4,
-    FLAG_IMU_READY = 8,
-    FLAG_HEADING_MISMATCH = 0x0010,
-    FLAG_MOTOR_OVERCURRENT = 0x0020,
-    FLAG_COMM_TIMEOUT = 0x0040,
+enum class SystemStatus : uint16_t {
+    ESTOP_ACTIVE = 1,
+    FAILSAFE_ACTIVE = 2,
+    LOW_BATTERY = 4,
+    IMU_READY = 8,
+    HEADING_MISMATCH = 0x0010,
+    MOTOR_OVERCURRENT = 0x0020,
+    COMM_TIMEOUT = 0x0040,
 };
 
 // 字串日誌等級
@@ -63,6 +63,9 @@ enum class LogLevel : uint8_t {
     WARN = 2,
     ERROR = 3,
 };
+
+// Compatibility aliases
+using SystemStatusFlags = SystemStatus;
 
 enum class MessageId : uint8_t {
     HandshakeReq = 0x01,

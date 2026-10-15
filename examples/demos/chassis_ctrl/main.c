@@ -215,10 +215,10 @@ static void handle_rx_messages(void)
         ack.active_control_source = s_arb.active_source;
         ack.current_mode = s_arb.current_mode;
         ack.status_flags = (uint16_t)(
-            (!enable_switch_high() ? UGV_SYSTEM_STATUS_FLAGS_FLAG_ESTOP_ACTIVE : 0) |
-            (s_arb.failsafe_active ? UGV_SYSTEM_STATUS_FLAGS_FLAG_FAILSAFE_ACTIVE : 0) |
-            (bat->level >= BATT_LOW ? UGV_SYSTEM_STATUS_FLAGS_FLAG_LOW_BATTERY : 0) |
-            UGV_SYSTEM_STATUS_FLAGS_FLAG_IMU_READY
+            (!enable_switch_high() ? UGV_SYSTEM_STATUS_ESTOP_ACTIVE : 0) |
+            (s_arb.failsafe_active ? UGV_SYSTEM_STATUS_FAILSAFE_ACTIVE : 0) |
+            (bat->level >= BATT_LOW ? UGV_SYSTEM_STATUS_LOW_BATTERY : 0) |
+            UGV_SYSTEM_STATUS_IMU_READY
         );
         ugv_link_send(&ack, sizeof(ack));
         break;
@@ -324,10 +324,10 @@ static void send_telemetry_50hz(void)
     telem.control_source = (uint8_t)s_arb.active_source;
 
     telem.status_flags = (uint16_t)(
-        (!enable_switch_high() ? UGV_SYSTEM_STATUS_FLAGS_FLAG_ESTOP_ACTIVE : 0) |
-        (s_arb.failsafe_active ? UGV_SYSTEM_STATUS_FLAGS_FLAG_FAILSAFE_ACTIVE : 0) |
-        (bat->level >= BATT_LOW ? UGV_SYSTEM_STATUS_FLAGS_FLAG_LOW_BATTERY : 0) |
-        UGV_SYSTEM_STATUS_FLAGS_FLAG_IMU_READY
+        (!enable_switch_high() ? UGV_SYSTEM_STATUS_ESTOP_ACTIVE : 0) |
+        (s_arb.failsafe_active ? UGV_SYSTEM_STATUS_FAILSAFE_ACTIVE : 0) |
+        (bat->level >= BATT_LOW ? UGV_SYSTEM_STATUS_LOW_BATTERY : 0) |
+        UGV_SYSTEM_STATUS_IMU_READY
     );
 
     ugv_link_send(&telem, sizeof(telem));
@@ -345,7 +345,7 @@ static void update_oled_display_10hz(void)
 
     /* 第 0 行: 車型與車頭方向 + 模式 */
     char line1[24];
-    const char *hd_str = (s_settings.heading == HEADING_DRIVE_END_FRONT) ? "DRV" : "OMN";
+    const char *hd_str = (s_settings.heading == HEADING_DRIVE_FRONT) ? "DRV" : "OMN";
     const char *mode_str = (s_arb.current_mode == UGV_OPERATING_MODE_AUTONOMOUS) ? "AUTO" :
                            (s_arb.current_mode == UGV_OPERATING_MODE_FAILSAFE) ? "FAIL" : "MANU";
     snprintf(line1, sizeof(line1), "UGV [%s] [%s]", hd_str, mode_str);

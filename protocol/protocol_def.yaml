@@ -44,17 +44,17 @@ enums:
       CRITICAL: 2       # 嚴重低電量 (< 19.0V)
       NO_BATTERY: 3     # 未接主電池 (僅 USB 5V 供電)
 
-  SystemStatusFlags:
+  SystemStatus:
     description: "系統狀態與警報旗標 (位元遮罩)"
     type: uint16
     values:
-      FLAG_ESTOP_ACTIVE: 0x0001        # PE4 使能開關斷開 (硬體急停)
-      FLAG_FAILSAFE_ACTIVE: 0x0002     # 失效保護啟動中 (斜坡減速中或已鎖住馬達)
-      FLAG_LOW_BATTERY: 0x0004         # 電池低電量
-      FLAG_IMU_READY: 0x0008           # ICM-20948 IMU 通訊與校正正常
-      FLAG_HEADING_MISMATCH: 0x0010    # 上位機與下位機車頭方向不符 (拒絕自主)
-      FLAG_MOTOR_OVERCURRENT: 0x0020   # 馬達驅動過流保護 (若支援)
-      FLAG_COMM_TIMEOUT: 0x0040        # 上位機心跳或速度指令逾時
+      ESTOP_ACTIVE: 0x0001        # PE4 使能開關斷開 (硬體急停)
+      FAILSAFE_ACTIVE: 0x0002     # 失效保護啟動中 (斜坡減速中或已鎖住馬達)
+      LOW_BATTERY: 0x0004         # 電池低電量
+      IMU_READY: 0x0008           # ICM-20948 IMU 通訊與校正正常
+      HEADING_MISMATCH: 0x0010    # 上位機與下位機車頭方向不符 (拒絕自主)
+      MOTOR_OVERCURRENT: 0x0020   # 馬達驅動過流保護 (若支援)
+      COMM_TIMEOUT: 0x0040        # 上位機心跳或速度指令逾時
 
   LogLevel:
     description: "字串日誌等級"
@@ -151,7 +151,7 @@ messages:
         description: "當前運行模式 (MANUAL/AUTONOMOUS/FAILSAFE)"
       - name: status_flags
         type: uint16
-        enum: SystemStatusFlags
+        enum: SystemStatus
         description: "系統狀態標誌"
 
   # 速度控制 (Velocity Command) - ROS 2 下發 cmd_vel
@@ -222,7 +222,7 @@ messages:
         description: "當前控制來源"
       - name: status_flags
         type: uint16
-        enum: SystemStatusFlags
+        enum: SystemStatus
         description: "系統狀態標誌"
 
   # 控制參數配置 (PID & Limits Config)

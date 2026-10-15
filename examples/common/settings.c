@@ -43,7 +43,7 @@ bool settings_load(settings_t *out)
 {
     const record_t *r = (const record_t *)SETTINGS_ADDR;
 
-    out->heading = HEADING_DRIVE_END_FRONT;
+    out->heading = HEADING_DRIVE_FRONT;
     if (!record_valid(r)) {
         return false;
     }

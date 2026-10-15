@@ -54,7 +54,7 @@ static void wheel_revs(float *left, float *right)
                     (float)COUNTS_PER_WHEEL_REV;
     const float r = (float)(WHEEL_RIGHT_ENC_SIGN * (s_counts[ENC_B] - s_zero[ENC_B])) /
                     (float)COUNTS_PER_WHEEL_REV;
-    if (s_boot.heading == HEADING_DRIVE_END_FRONT) {
+    if (s_boot.heading == HEADING_DRIVE_FRONT) {
         *left = l;
         *right = r;
     } else {
@@ -96,7 +96,7 @@ static void draw_status(void)
     snprintf(line, sizeof line, "Uptime  %6lu.%01lu s",
              (unsigned long)(ms / 1000U), (unsigned long)(ms / 100U % 10U));
     oled_text(0, 2, line);
-    snprintf(line, sizeof line, "Head %s", s_boot.heading == HEADING_DRIVE_END_FRONT ? "drive end" : "omni end");
+    snprintf(line, sizeof line, "Head %s", s_boot.heading == HEADING_DRIVE_FRONT ? "drive end" : "omni end");
     oled_text(0, 3, line);
     wheel_revs(&left, &right);
     snprintf(line, sizeof line, "Left   %+7.2f rev", (double)left);

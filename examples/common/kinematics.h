@@ -11,14 +11,17 @@
 /* 預設幾何常數 (待實車標定，見 ADR-0002) */
 #define DEFAULT_TRACK_WIDTH_M     0.350f   /* 兩驅動輪有效輪距 (m) */
 #define DEFAULT_WHEEL_DIAMETER_M  0.208f   /* 充氣驅動輪直徑 (m) */
+#define DEFAULT_COUNTS_PER_REV    36000U   /* 驅動輪轉一圈編碼器計數 (500線 * 4倍頻 * 18減速比) */
 
 typedef struct {
-    float track_width;      /* 輪距 (m) */
-    float wheel_diameter;   /* 輪徑 (m) */
-    heading_t heading;           /* 車頭方向 (ADR-0001) */
+    float track_width;          /* 輪距 (m) */
+    float wheel_diameter;       /* 輪徑 (m) */
+    uint32_t counts_per_rev;    /* 單輪每圈編碼器總計數 */
+    heading_t heading;          /* 車頭方向 (ADR-0001) */
 } kinematics_config_t;
 
 void kinematics_init(kinematics_config_t *cfg, float track_width, float wheel_diameter, heading_t heading);
+void kinematics_init_full(kinematics_config_t *cfg, float track_width, float wheel_diameter, uint32_t counts_per_rev, heading_t heading);
 
 /**
  * 逆運動學：由車體速度 (Vx, wz) 計算左右馬達的目標線速度 (m/s)

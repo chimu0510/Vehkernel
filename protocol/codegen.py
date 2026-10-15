@@ -112,6 +112,18 @@ def generate_c_header(spec, output_path):
         lines.append(f"}} {c_enum_name};")
         lines.append("")
 
+    # Compatibility aliases
+    lines.append("/* Compatibility aliases */")
+    lines.append("typedef ugv_system_status_t ugv_system_status_flags_t;")
+    lines.append("#define UGV_SYSTEM_STATUS_FLAGS_FLAG_ESTOP_ACTIVE UGV_SYSTEM_STATUS_ESTOP_ACTIVE")
+    lines.append("#define UGV_SYSTEM_STATUS_FLAGS_FLAG_FAILSAFE_ACTIVE UGV_SYSTEM_STATUS_FAILSAFE_ACTIVE")
+    lines.append("#define UGV_SYSTEM_STATUS_FLAGS_FLAG_LOW_BATTERY UGV_SYSTEM_STATUS_LOW_BATTERY")
+    lines.append("#define UGV_SYSTEM_STATUS_FLAGS_FLAG_IMU_READY UGV_SYSTEM_STATUS_IMU_READY")
+    lines.append("#define UGV_SYSTEM_STATUS_FLAGS_FLAG_HEADING_MISMATCH UGV_SYSTEM_STATUS_HEADING_MISMATCH")
+    lines.append("#define UGV_SYSTEM_STATUS_FLAGS_FLAG_MOTOR_OVERCURRENT UGV_SYSTEM_STATUS_MOTOR_OVERCURRENT")
+    lines.append("#define UGV_SYSTEM_STATUS_FLAGS_FLAG_COMM_TIMEOUT UGV_SYSTEM_STATUS_COMM_TIMEOUT")
+    lines.append("")
+
     # Message IDs
     lines.append("/* Message IDs */")
     lines.append("typedef enum {")
@@ -247,6 +259,11 @@ def generate_cpp_header(spec, output_path):
             lines.append(f"    {val_name} = {val_str},")
         lines.append("};")
         lines.append("")
+
+    # Compatibility aliases
+    lines.append("// Compatibility aliases")
+    lines.append("using SystemStatusFlags = SystemStatus;")
+    lines.append("")
 
     # Message IDs
     lines.append("enum class MessageId : uint8_t {")
@@ -436,6 +453,11 @@ def generate_python_module(spec, output_path):
         for val_name, val in enum_info["values"].items():
             lines.append(f"    {val_name} = {val}")
         lines.append("")
+
+    # Compatibility aliases
+    lines.append("# Compatibility aliases")
+    lines.append("SystemStatusFlags = SystemStatus")
+    lines.append("")
 
     # Message IDs
     lines.append("class MessageId(IntEnum):")

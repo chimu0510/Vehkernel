@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
 Unit tests for ROS2-UGV Custom Serial Protocol (ADR-0003)
-Tests:
-  - CRC16-CCITT calculations
-  - COBS encode/decode
-  - Every message pack/unpack roundtrip
-  - Error detection (corrupted CRC, invalid COBS, truncated frames)
+
+Decoupled into 4 distinct layers:
+  1. TestCRC16AndCOBS: Pure bitwise CRC16 and byte stuffing (zero message dependency)
+  2. TestFraming: Pure Layer 2 frame packaging, delimiter check, and error rejection (zero message dependency)
+  3. TestMessageCodecs: High-level business message serialization and roundtrips
+  4. TestStreamDecoder: Continuous serial stream parsing and noise recovery
 """
 
+import struct
 import sys
 import unittest
 from pathlib import Path
@@ -22,13 +24,12 @@ from ugv_protocol import (
     cobs_decode,
     frame_encode,
     frame_decode,
-    decode_message,
     decode_frame_stream,
     HeadingMode,
     ControlSource,
     OperatingMode,
     BatteryLevel,
-    SystemStatusFlags,
+    SystemStatus,
     LogLevel,
     MessageId,
     HandshakeReq,
@@ -37,16 +38,14 @@ from ugv_protocol import (
     HeartbeatAck,
     SetVelocity,
     Telemetry,
-    SetPidConfig,
-    PidConfigResp,
-    SetHeadingConfig,
-    HeadingConfigResp,
     TextLog,
 )
 
 
-class TestProtocol(unittest.TestCase):
-    def test_crc16(self):
+class TestCRC16AndCOBS(unittest.TestCase):
+    """Layer 1: Pure algorithm verification independent of any framing or messages."""
+
+    def test_crc16_standard_vector(self):
         # Known standard test string "123456789" with CCITT-FALSE (init 0xFFFF, poly 0x1021) -> 0x29B1
         data = b"123456789"
         crc = crc16_ccitt(data, 0xFFFF)
@@ -61,7 +60,7 @@ class TestProtocol(unittest.TestCase):
         self.assertEqual(data, decoded)
 
     def test_cobs_all_zeros(self):
-        data = b"\x00\x00\x00"
+        data = b"\x00\x00\x00\x00"
         encoded = cobs_encode(data)
         self.assertTrue(encoded.endswith(b"\x00"))
         self.assertNotIn(b"\x00", encoded[:-1])
@@ -75,6 +74,41 @@ class TestProtocol(unittest.TestCase):
         self.assertNotIn(b"\x00", encoded[:-1])
         decoded = cobs_decode(encoded[:-1])
         self.assertEqual(data, decoded)
+
+
+class TestFraming(unittest.TestCase):
+    """Layer 2: Framing encode/decode on raw byte payloads (zero schema dependency)."""
+
+    def test_raw_payload_roundtrip(self):
+        raw_payload = b"raw robotics binary payload\x00with\x00zeros"
+        frame = frame_encode(raw_payload)
+        self.assertTrue(frame.endswith(b"\x00"))
+        self.assertNotIn(b"\x00", frame[:-1])
+        decoded = frame_decode(frame[:-1])
+        self.assertEqual(decoded, raw_payload)
+
+    def test_crc_error_rejection(self):
+        raw_payload = b"important control bytes"
+        valid_frame = frame_encode(raw_payload)
+        # Decode COBS to tamper with payload directly
+        raw_with_crc = bytearray(cobs_decode(valid_frame[:-1]))
+        raw_with_crc[2] ^= 0xFF  # Corrupt payload byte
+        tampered_frame = cobs_encode(bytes(raw_with_crc))
+
+        with self.assertRaises(ValueError):
+            frame_decode(tampered_frame[:-1])
+
+    def test_truncated_frame_rejection(self):
+        raw_payload = b"payload to be truncated"
+        frame = frame_encode(raw_payload)
+        # Truncate frame before completion
+        truncated = frame[:4]
+        with self.assertRaises(Exception):
+            frame_decode(truncated)
+
+
+class TestMessageCodecs(unittest.TestCase):
+    """Layer 3: High-level business message serialization and field validation."""
 
     def test_handshake_roundtrip(self):
         req = HandshakeReq(
@@ -144,7 +178,7 @@ class TestProtocol(unittest.TestCase):
             battery_voltage=24.3,
             battery_level=BatteryLevel.OK,
             control_source=ControlSource.ROS2,
-            status_flags=SystemStatusFlags.FLAG_IMU_READY,
+            status_flags=SystemStatus.IMU_READY,
         )
         frame = telem.encode_frame()
         decoded = decode_frame_stream(frame[:-1])
@@ -157,7 +191,7 @@ class TestProtocol(unittest.TestCase):
         self.assertAlmostEqual(decoded.battery_voltage, 24.3, places=2)
         self.assertEqual(decoded.battery_level, BatteryLevel.OK)
         self.assertEqual(decoded.control_source, ControlSource.ROS2)
-        self.assertEqual(decoded.status_flags, SystemStatusFlags.FLAG_IMU_READY)
+        self.assertEqual(decoded.status_flags, SystemStatus.IMU_READY)
 
     def test_text_log_roundtrip(self):
         msg = "C50C Motor Driver Initialized Successfully."
@@ -174,26 +208,23 @@ class TestProtocol(unittest.TestCase):
         self.assertEqual(decoded.level, LogLevel.INFO)
         self.assertEqual(decoded.message, msg)
 
-    def test_crc_error_rejection(self):
-        cmd = SetVelocity(seq=1, timestamp_us=100, target_vx=1.0, target_wz=0.0)
-        raw_payload = cmd.pack()
-        # Corrupt one byte of payload
-        corrupted_payload = bytearray(raw_payload)
-        corrupted_payload[4] ^= 0xFF
-        # Encode with valid CRC for the uncorrupted payload
-        crc = crc16_ccitt(raw_payload, 0xFFFF)
-        import struct
-        corrupted_frame = cobs_encode(bytes(corrupted_payload) + struct.pack('<H', crc))
-        with self.assertRaises(ValueError):
-            frame_decode(corrupted_frame[:-1])
 
-    def test_truncated_frame(self):
-        cmd = SetVelocity(seq=1, timestamp_us=100, target_vx=1.0, target_wz=0.0)
-        frame = cmd.encode_frame()
-        # Truncate frame
-        truncated = frame[:5]
-        with self.assertRaises(Exception):
-            frame_decode(truncated)
+class TestStreamDecoder(unittest.TestCase):
+    """Layer 4: Multi-frame stream decoding and noise tolerance."""
+
+    def test_multiple_frames_in_stream(self):
+        cmd1 = SetVelocity(seq=1, timestamp_us=100, target_vx=0.5, target_wz=0.0)
+        cmd2 = SetVelocity(seq=2, timestamp_us=200, target_vx=1.0, target_wz=-0.5)
+
+        stream = cmd1.encode_frame() + cmd2.encode_frame()
+        # Slicing out individual 0x00 delimiters
+        packets = [p for p in stream.split(b"\x00") if p]
+        self.assertEqual(len(packets), 2)
+
+        decoded1 = decode_frame_stream(packets[0])
+        decoded2 = decode_frame_stream(packets[1])
+        self.assertEqual(decoded1.seq, 1)
+        self.assertEqual(decoded2.seq, 2)
 
 
 if __name__ == "__main__":

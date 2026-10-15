@@ -7,6 +7,7 @@ vendor/*wheeltec_ros2_src*/
 
 # Firmware build output
 examples/build/
+protocol/build/
 
 # AHRS Bench: host build of the filters and recorded sessions
 tools/ahrs_bench/.build/

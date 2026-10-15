@@ -11,8 +11,10 @@
 #include <stdbool.h>
 
 typedef enum {
-    HEADING_DRIVE_END_FRONT = 0,   /* 驅動端在前，原廠預設 */
-    HEADING_OMNI_END_FRONT = 1,    /* 全向輪端在前 */
+    HEADING_DRIVE_FRONT = 0,       /* 驅動端在前，原廠預設 (ADR-0001) */
+    HEADING_OMNI_FRONT = 1,        /* 全向輪端在前 */
+    HEADING_DRIVE_END_FRONT = HEADING_DRIVE_FRONT, /* 相容舊命名 */
+    HEADING_OMNI_END_FRONT = HEADING_OMNI_FRONT,
 } heading_t;
 
 typedef struct {

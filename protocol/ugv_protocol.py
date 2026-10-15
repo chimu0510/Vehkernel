@@ -85,20 +85,23 @@ class BatteryLevel(IntEnum):
     CRITICAL = 2
     NO_BATTERY = 3
 
-class SystemStatusFlags(IntEnum):
-    FLAG_ESTOP_ACTIVE = 1
-    FLAG_FAILSAFE_ACTIVE = 2
-    FLAG_LOW_BATTERY = 4
-    FLAG_IMU_READY = 8
-    FLAG_HEADING_MISMATCH = 16
-    FLAG_MOTOR_OVERCURRENT = 32
-    FLAG_COMM_TIMEOUT = 64
+class SystemStatus(IntEnum):
+    ESTOP_ACTIVE = 1
+    FAILSAFE_ACTIVE = 2
+    LOW_BATTERY = 4
+    IMU_READY = 8
+    HEADING_MISMATCH = 16
+    MOTOR_OVERCURRENT = 32
+    COMM_TIMEOUT = 64
 
 class LogLevel(IntEnum):
     DEBUG = 0
     INFO = 1
     WARN = 2
     ERROR = 3
+
+# Compatibility aliases
+SystemStatusFlags = SystemStatus
 
 class MessageId(IntEnum):
     HandshakeReq = 1
