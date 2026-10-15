@@ -4,7 +4,7 @@
 [![ROS 2](https://img.shields.io/badge/ROS%202-Jazzy%20Jalisco-green.svg)](#4-ros-2-workspace-ros2_ws)
 [![Cross-Compilation](https://img.shields.io/badge/Cross--Compile-aarch64%20(Pi%205)-orange.svg)](#arm64-cross-compilation-target-deployment)
 [![Architecture](https://img.shields.io/badge/ADR-0001--0004-purple.svg)](docs/adr/)
-[![License](https://img.shields.io/badge/License-MIT%20%2F%20Academic-lightgrey.svg)](#license)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 A modular, production-grade, and education-friendly autonomous Ground Vehicle (UGV) stack designed for WHEELTEC differential Drive-Steer (BS) mobile robots. The platform pairs a low-level **C50C Control Board** (STM32F407VET6) with an onboard **Raspberry Pi 5** single-board computer running **ROS 2 Jazzy**.
 
@@ -203,5 +203,10 @@ To ensure engineering consistency across firmware, communications, and ROS 2 lay
 
 ## License
 
-This project is released under the [MIT License](LICENSE).
-Third-party vendor libraries (STM32 HAL, CMSIS) are licensed under their respective vendor licenses.
+This project is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License](https://www.gnu.org/licenses/gpl-3.0) as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+See the [LICENSE](LICENSE) file for the full license text.
+
+Third-party vendor libraries and submodules:
+* **STM32F4 HAL & CMSIS** (`third_party/`): STMicroelectronics Apache-2.0 / BSD-3-Clause.
+* **ROS 2 Workspace Packages** (`ros2_ws/`): GPL-3.0-or-later.

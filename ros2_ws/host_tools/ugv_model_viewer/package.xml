@@ -5,7 +5,7 @@
   <version>0.1.0</version>
   <description>Preview every Wheeltec chassis model (from the wheeltec_robot_urdf extension) in RViz to identify the chassis.</description>
   <maintainer email="4b12c912@stust.edu.tw">gugugaga-hehe</maintainer>
-  <license>Apache-2.0</license>
+  <license>GPL-3.0-or-later</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
