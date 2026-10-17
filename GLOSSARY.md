@@ -24,6 +24,10 @@ _Avoid_: V4.1（與原廠韌體名稱的對應未經確認）
 板級定義中，一支腳位在特定 Frame 下的另一種用途，開機時依參數選用。
 _Avoid_: AF、複用（AF 是 STM32 腳位的 alternate function 編號，是不同的概念）
 
+**MCU 資料庫（MCU Database）**：
+某款 MCU 的腳位 AF 對照與 DMA 請求對照，產生器據此驗證板級定義。
+_Avoid_: pinmap、chip table
+
 **上位機（Companion Computer）**：
 與 MCU 連線、執行 ROS2 的電腦，例如 Raspberry Pi 5。
 _Avoid_: 主機、Pi、host
@@ -41,6 +45,20 @@ _Avoid_: 指令、命令
 **指令仲裁（Command Arbitration）**：
 MCU 依模式與安全狀態，決定哪個來源的 setpoint 有控制權。
 _Avoid_: 優先權切換
+
+## 參數
+
+**參數（Parameter）**：
+可以在執行時調整、斷電後仍保留的設定值，名稱不超過 16 個字元。
+_Avoid_: 設定、config
+
+**參數群組（Parameter Group）**：
+同一個模組的參數集合，在 MCU 上是一個結構體。
+_Avoid_: PG
+
+**Frame 預設組（Frame Preset）**：
+套用到特定 Frame 或車款的一組參數預設值。
+_Avoid_: airframe、車型參數
 
 ## 通訊
 
