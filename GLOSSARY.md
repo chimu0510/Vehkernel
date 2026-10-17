@@ -9,8 +9,27 @@
 _Avoid_: 車、機器人、平台
 
 **Frame**：
-載具的運動構型，決定致動器如何影響車體運動，例如差速、阿克曼、麥輪、全向、推進器陣列。
+載具的運動構型，決定致動器如何影響車體運動，由 Frame Class 與 Frame Type 組成。
 _Avoid_: 車型、CarType
+
+**Frame Class**：
+依分配的數學模型劃分的 Frame 類別，例如 WHEELED、ACKERMANN、THRUSTER。
+_Avoid_: 載具種類
+
+**Frame Type**：
+Frame Class 底下具名的幾何配置，例如 MECANUM_4、DIFF_2WD。
+
+**載具模型（Vehicle Model）**：
+把車體運動需求分配成各致動器需求的數學模型，由 Frame Class 決定。
+_Avoid_: mixer、運動學解算
+
+**控制鏈（Control Chain）**：
+從 setpoint 到致動器輸出、所有 Frame 共用的一串控制層。
+_Avoid_: 控制迴圈
+
+**估測器（Estimator）**：
+由一個濾波演算法加上若干數學模型組成、發布標準狀態 Topic 的模組。
+_Avoid_: AHRS、EKF（這兩個是特定的估測器）
 
 **控制板（Board）**：
 執行韌體的硬體板卡，例如 C50C。
