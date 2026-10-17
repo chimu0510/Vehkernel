@@ -16,6 +16,14 @@ _Avoid_: 車型、CarType
 執行韌體的硬體板卡，例如 C50C。
 _Avoid_: 主板、target
 
+**硬體版本（Board Revision）**：
+同一款控制板的硬體修訂，名稱以原廠韌體回報的為準，例如 C50C V1.1。
+_Avoid_: V4.1（與原廠韌體名稱的對應未經確認）
+
+**替代配置（Alt Config）**：
+板級定義中，一支腳位在特定 Frame 下的另一種用途，開機時依參數選用。
+_Avoid_: AF、複用（AF 是 STM32 腳位的 alternate function 編號，是不同的概念）
+
 **上位機（Companion Computer）**：
 與 MCU 連線、執行 ROS2 的電腦，例如 Raspberry Pi 5。
 _Avoid_: 主機、Pi、host
