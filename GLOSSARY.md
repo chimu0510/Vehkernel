@@ -41,7 +41,15 @@ MCU 內部模組之間交換資料的發布/訂閱機制，是韌體的骨幹。
 _Avoid_: uORB、message queue
 
 **Topic**：
-匯流排上有型別、有名稱的一條資料流。
+匯流排上有型別、有名稱的一條資料流。同一個 Topic 可以有多個實例，例如兩顆 IMU。
+
+**Work Queue**：
+依頻率層級劃分的執行單位，一個 Work Queue 對應一個 RTOS task。
+_Avoid_: 執行緒、thread
+
+**工作項目（Work Item）**：
+掛在 Work Queue 上執行的模組，由計時器或 Topic 發布觸發。
+_Avoid_: task、job
 
 **Link**：
 MCU 與外部系統之間的一條通訊連線，由 Topic 映射、協議模組與傳輸組成。
