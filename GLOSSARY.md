@@ -65,6 +65,20 @@ _Avoid_: 指令、命令
 MCU 依模式與安全狀態，決定哪個來源的 setpoint 有控制權。
 _Avoid_: 優先權切換
 
+## 日誌
+
+**日誌後端（Log Sink）**：
+日誌寫入的目的地，例如 SD 卡、SPI Flash、串流到上位機、事件記錄器。
+_Avoid_: logger device
+
+**日誌設定檔（Log Profile）**：
+一組要記錄的 Topic 和各自的記錄頻率，可以組合使用。
+_Avoid_: 日誌等級
+
+**批次訊息（Batch Message）**：
+在一則訊息中裝入多個連續樣本的 Topic，用於高頻資料。
+_Avoid_: FIFO topic
+
 ## 參數
 
 **參數（Parameter）**：
