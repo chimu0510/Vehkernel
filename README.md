@@ -79,6 +79,7 @@ This is the initial skeleton and may change during implementation.
 
 | Directory | Contents | ADRs |
 |---|---|---|
+| `docs/` | ADRs (`adr/`), milestone specs (`specs/`) and agent docs (`agents/`) | 0021 |
 | `boards/` | Board definitions (TOML) and board defconfigs | 0010, 0011, 0017 |
 | `mcu/` | One subdirectory per MCU: the MCU database (AF map, DMA request map, Flash sector table, as JSON) and the Kconfig MCU defaults (`defconfig`) | 0011, 0017, 0020 |
 | `schema/msg/` | Topic schemas (`.msg`) | 0006 |
