@@ -1,0 +1,14 @@
+# ADR-0020-style layout on the test MCU: stub, parameters, event log, firmware.
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA1", role = "STATUS_LED", func = "GPIO_OUTPUT" },
+]
+
+flash = [
+  { region = "BOOT",     start = 0x08000000, size = "16K" },
+  { region = "PARAMS",   start = 0x08004000, size = "32K" },
+  { region = "EVENTLOG", start = 0x0800C000, size = 16384 },
+  { region = "FIRMWARE", start = 0x08010000, size = "64K" },
+]

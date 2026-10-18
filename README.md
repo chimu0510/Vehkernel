@@ -46,13 +46,23 @@ The development environment is [`.devcontainer/`](.devcontainer/); every tool th
 
 | Preset | Output |
 |---|---|
-| `c50c-v1_1` | C50C V1.1 firmware image (`.elf`, `.bin`, `.hex`) |
+| `c50c-v1_1` | C50C V1.1 firmware: `vehkernel.elf`, `vehkernel.hex` (boot stub and firmware), `vehkernel-boot.bin` (S0) and `vehkernel.bin` (firmware only, from S4) |
 | `sitl` | SITL executable for the development host |
 | `test` | Host tests, run with `ctest --preset test` |
 
 ```bash
 cmake --preset c50c-v1_1
 cmake --build --preset c50c-v1_1
+```
+
+Every firmware build prints the usage of each memory region; outgrowing a region fails the link (ADR-0017, ADR-0020). To flash over USB DFU, write the boot stub once and the firmware on every update; the parameter and event log sectors in between are left untouched:
+
+```bash
+dfu-util -a 0 -s 0x08000000 -D build/c50c-v1_1/app/vehkernel-boot.bin
+```
+
+```bash
+dfu-util -a 0 -s 0x08010000:leave -D build/c50c-v1_1/app/vehkernel.bin
 ```
 
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.

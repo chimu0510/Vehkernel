@@ -1,5 +1,12 @@
 add_subdirectory(unit)
 
+# Size budget smoke test (ADR-0017): a firmware image too large for its Flash
+# region must fail the link with the region and overage named.
+add_test(NAME flash_budget_smoke
+  COMMAND ${CMAKE_COMMAND} -DVK_SOURCE_DIR=${CMAKE_SOURCE_DIR}
+    -DVK_BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/flash_budget_smoke -DVK_GENERATOR=${CMAKE_GENERATOR}
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/flash_budget_smoke.cmake)
+
 # Host tool tests (pytest), through each tool's command line.
 add_test(NAME mcudb
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/mcudb/tests)

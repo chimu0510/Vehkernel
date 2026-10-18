@@ -36,6 +36,10 @@ void Default_Handler(void)
 
 void Reset_Handler(void)
 {
+    /* Point VTOR at this table even when started without the boot stub, e.g. by a debugger. */
+    volatile uint32_t *const vtor = (volatile uint32_t *)0xE000ED08u;
+    *vtor = (uint32_t)(uintptr_t)vk_vector_table;
+
     for (uint32_t *src = _sidata, *dst = _sdata; dst < _edata;) {
         *dst++ = *src++;
     }

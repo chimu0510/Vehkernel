@@ -1,26 +1,30 @@
 /*
- * Provisional single-image layout for STM32F407VET6. The board generator
- * replaces this with the Flash layout of ADR-0020 (S0 stub, firmware at S4).
+ * Linker script for STM32F4 firmware. The board generator emits memory.ld
+ * with the board's Flash layout and the MCU's RAM (ADR-0020); every region
+ * size there is a budget, so outgrowing one fails the link.
  */
+INCLUDE memory.ld
+
 ENTRY(Reset_Handler)
 
-MEMORY
-{
-    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 512K
-    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
-    CCM   (rw)  : ORIGIN = 0x10000000, LENGTH = 64K
-}
-
+/* Main stack, reserved in RAM so the RAM budget accounts for it. */
+__vk_main_stack_size = 4K;
 _estack = ORIGIN(RAM) + LENGTH(RAM);
 
 SECTIONS
 {
+    .boot_stub :
+    {
+        KEEP(*(.boot_vectors))
+        KEEP(*(.boot_text))
+    } > BOOT
+
     .isr_vector :
     {
         . = ALIGN(4);
         KEEP(*(.isr_vector))
         . = ALIGN(4);
-    } > FLASH
+    } > FIRMWARE
 
     .text :
     {
@@ -30,19 +34,19 @@ SECTIONS
         KEEP(*(.init))
         KEEP(*(.fini))
         . = ALIGN(4);
-    } > FLASH
+    } > FIRMWARE
 
     .ARM.exidx :
     {
         *(.ARM.exidx* .gnu.linkonce.armexidx.*)
-    } > FLASH
+    } > FIRMWARE
 
     .preinit_array :
     {
         PROVIDE_HIDDEN(__preinit_array_start = .);
         KEEP(*(.preinit_array*))
         PROVIDE_HIDDEN(__preinit_array_end = .);
-    } > FLASH
+    } > FIRMWARE
 
     .init_array :
     {
@@ -50,7 +54,7 @@ SECTIONS
         KEEP(*(SORT(.init_array.*)))
         KEEP(*(.init_array*))
         PROVIDE_HIDDEN(__init_array_end = .);
-    } > FLASH
+    } > FIRMWARE
 
     _sidata = LOADADDR(.data);
 
@@ -61,7 +65,7 @@ SECTIONS
         *(.data .data.*)
         . = ALIGN(4);
         _edata = .;
-    } > RAM AT > FLASH
+    } > RAM AT > FIRMWARE
 
     .bss (NOLOAD) :
     {
@@ -71,5 +75,17 @@ SECTIONS
         *(COMMON)
         . = ALIGN(4);
         _ebss = .;
+    } > RAM
+
+    .ccm (NOLOAD) :
+    {
+        *(.ccm .ccm.*)
+    } > CCM
+
+    /* The stack grows down from _estack; this only reserves its size after .bss. */
+    .main_stack (NOLOAD) :
+    {
+        . = ALIGN(8);
+        . += __vk_main_stack_size;
     } > RAM
 }

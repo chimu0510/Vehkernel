@@ -61,6 +61,19 @@
     1,
     2
   ],
+  "flash": [],
+  "ram": [
+    {
+      "region": "CCM",
+      "start": 268435456,
+      "size": 16384
+    },
+    {
+      "region": "RAM",
+      "start": 536870912,
+      "size": 65536
+    }
+  ],
   "dma": [
     {
       "request": "USART1_TX",

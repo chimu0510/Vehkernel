@@ -1,0 +1,5 @@
+board.toml:9: error: unknown Flash region 'SCRATCH' (expected one of: BOOT, PARAMS, EVENTLOG, FIRMWARE)
+board.toml:10: error: Flash region FIRMWARE (0x08010000-0x0802FFFF) lies outside Flash (0x08000000-0x0801FFFF)
+board.toml:11: error: Flash region PARAMS is already defined (line 7)
+board.toml:12: error: Flash region BOOT needs an integer 'start' and a positive 'size' such as 16384, "16K" or "1M"
+board.toml:8: error: Flash region EVENTLOG overlaps PARAMS

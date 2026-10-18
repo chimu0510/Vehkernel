@@ -1,0 +1,4 @@
+DMA assignment for board demo, generated from board.toml.
+
+request  stream  channel  priority  notes  candidates
+(no DMA requests)

@@ -1,0 +1,2 @@
+board.toml:8: error: Flash region PARAMS is not aligned to sectors: it ends inside sector S2 (0x08008000-0x0800BFFF)
+board.toml:9: error: Flash region FIRMWARE is not aligned to sectors: it starts inside sector S4 (0x08010000-0x0801FFFF)

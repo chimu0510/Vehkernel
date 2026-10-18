@@ -11,3 +11,11 @@ pins = [
   { pin = "PE3",  role = "REV_ID1", func = "GPIO_INPUT" },
   { pin = "PC13", role = "REV_ID2", func = "GPIO_INPUT" },
 ]
+
+# ADR-0020: S0 boot stub, S1-S2 parameters, S3 event log, S4-S7 firmware.
+flash = [
+  { region = "BOOT",     start = 0x08000000, size = "16K" },
+  { region = "PARAMS",   start = 0x08004000, size = "32K" },
+  { region = "EVENTLOG", start = 0x0800C000, size = "16K" },
+  { region = "FIRMWARE", start = 0x08010000, size = "448K" },
+]

@@ -1,0 +1,13 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = []
+
+flash = [
+  { region = "PARAMS",   start = 0x08000000, size = "32K" },
+  { region = "EVENTLOG", start = 0x08004000, size = "16K" },
+  { region = "SCRATCH",  start = 0x0800C000, size = "16K" },
+  { region = "FIRMWARE", start = 0x08010000, size = "128K" },
+  { region = "PARAMS",   start = 0x0800C000, size = "16K" },
+  { region = "BOOT",     start = 0x08000000, size = "0K" },
+]

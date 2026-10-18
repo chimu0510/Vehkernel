@@ -20,11 +20,12 @@ from pathlib import Path
 
 from .diagnostics import BoardError, Diagnostics, Loc
 from .dma import DmaAssignment, assign, collect_requests
+from .flash import FlashRegion, RamRegion, check_layout, ram_regions
 
 GPIO_FUNCTIONS = ("GPIO_INPUT", "GPIO_OUTPUT")
 PIN_KEYS = {"pin", "role", "func", "alt"}
 ALT_KEYS = {"config", "role", "func"}
-TOP_LEVEL_KEYS = {"name", "mcu", "extends", "remove", "pins", "dma"}
+TOP_LEVEL_KEYS = {"name", "mcu", "extends", "remove", "pins", "dma", "flash"}
 
 _ROLE_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _PIN_RE = re.compile(r"^P([A-K])(\d+)$")
@@ -68,6 +69,8 @@ class Board:
     pins: tuple[Pin, ...]
     dma: tuple[DmaAssignment, ...] = ()
     alt_configs: tuple[int, ...] = field(default=())
+    flash: tuple[FlashRegion, ...] = ()
+    ram: tuple[RamRegion, ...] = ()
 
 
 @dataclass
@@ -82,6 +85,7 @@ class _Resolved:
     mcu: object
     pins: list[_Entry]
     dma: list[_Entry]
+    flash: list[_Entry]
 
 
 def _entry_lines(text: str, key: str, count: int) -> list[int | None]:
@@ -128,7 +132,7 @@ def _resolve(path: Path, shown: str, diag: Diagnostics,
     top = Loc(shown)
     for key in sorted(set(data) - TOP_LEVEL_KEYS):
         diag.error(f"unknown key '{key}'", top)
-    for key in ("pins", "dma", "remove"):
+    for key in ("pins", "dma", "flash", "remove"):
         if not isinstance(data.get(key, []), list):
             diag.error(f"'{key}' must be an array", top)
             return None
@@ -137,13 +141,15 @@ def _resolve(path: Path, shown: str, diag: Diagnostics,
             zip(data.get("pins", []), _entry_lines(text, "pin", len(data.get("pins", []))))]
     dma = [_Entry(e, Loc(shown, line)) for e, line in
            zip(data.get("dma", []), _entry_lines(text, "request", len(data.get("dma", []))))]
+    flash = [_Entry(e, Loc(shown, line)) for e, line in
+             zip(data.get("flash", []), _entry_lines(text, "region", len(data.get("flash", []))))]
     removed = data.get("remove", [])
 
     base_name = data.get("extends")
     if base_name is None:
         if removed:
             diag.error("'remove' needs 'extends'", top)
-        return _Resolved(data.get("name"), data.get("mcu"), pins, dma)
+        return _Resolved(data.get("name"), data.get("mcu"), pins, dma, flash)
 
     if not isinstance(base_name, str) or not _BOARD_NAME_RE.match(base_name):
         diag.error("'extends' must name a board directory", top)
@@ -180,7 +186,8 @@ def _resolve(path: Path, shown: str, diag: Diagnostics,
 
     child_requests = {request_of(e) for e in dma}
     merged_dma = [e for e in base.dma if request_of(e) not in child_requests] + dma
-    return _Resolved(data.get("name"), data.get("mcu", base.mcu), merged, merged_dma)
+    # A Flash layout is replaced as a whole, never merged region by region.
+    return _Resolved(data.get("name"), data.get("mcu", base.mcu), merged, merged_dma, flash or base.flash)
 
 
 def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> Board:
@@ -204,6 +211,8 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
         diag.error(f"unknown MCU '{mcu}': the MCU root has no {mcu}/mcu.json")
         raise BoardError(diag.errors) from None
 
+    flash = check_layout([e.data for e in resolved.flash], [e.loc for e in resolved.flash],
+                         database["flash"], Loc(shown), diag)
     pins = [p for p in (_check_pin(e.data, e.loc, database, diag) for e in resolved.pins) if p]
     configs = sorted({config for p in pins for config, _ in p.alt})
     _check_unique(pins, diag)
@@ -220,7 +229,7 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
     if diag:
         raise BoardError(diag.errors)
     return Board(name=name, mcu=mcu, source=shown, pins=tuple(pins), dma=tuple(dma),
-                 alt_configs=tuple(configs))
+                 alt_configs=tuple(configs), flash=flash, ram=ram_regions(database))
 
 
 def _function(pin: str, role: object, func: object, loc: Loc, database: dict,
