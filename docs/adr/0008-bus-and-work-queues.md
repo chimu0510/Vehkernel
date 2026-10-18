@@ -12,7 +12,7 @@ status: 控制路徑的觸發方式已由 ADR 0015 改為可選（IMU 事件或�
 - **時間戳**：每則訊息帶 64 位元單調遞增的微秒 `timestamp`。
 - **可觀測性**：匯流排可列出所有 Topic、發布頻率與最後更新時間，並透過 Link 對外。
 
-執行模型不是每個模組一個 task，而是依頻率層級分成幾個 Work Queue，每個 Work Queue 是一個 FreeRTOS task。模組是掛在 Work Queue 上的工作項目，由計時器或 Topic 發布觸發。控制路徑走事件鏈：IMU 驅動發布後喚醒估測器，估測器發布後喚醒控制器，再到控制分配與輸出，全部在最高優先級的 `wq:ctrl` 上完成。這樣能落實 ADR 0001 的分頻率排程，也節省 F407 有限的 RAM。Stack 與匯流排緩衝區優先放在 CCM，一般 SRAM 留給 DMA。
+執行模型不是每個模組一個 task，而是依頻率層級分成幾個 Work Queue，每個 Work Queue 是一個 FreeRTOS task。模組是掛在 Work Queue 上的工作項目，由計時器或 Topic 發布觸發。以 `IMU_EVENT` 觸發時（觸發來源可選，見 ADR 0015），控制路徑走事件鏈：IMU 驅動發布後喚醒估測器，估測器發布後喚醒控制器，再到控制分配與輸出，全部在最高優先級的 `wq:ctrl` 上完成。這樣能落實 ADR 0001 的分頻率排程，也節省 F407 有限的 RAM。Stack 與匯流排緩衝區優先放在 CCM，一般 SRAM 留給 DMA。
 
 ## Considered Options
 

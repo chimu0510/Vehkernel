@@ -31,7 +31,7 @@
   - Kconfig 決定韌體編進哪些功能，參數決定執行時啟用哪一個（[0017](docs/adr/0017-kconfig-build-configuration.md)、[0012](docs/adr/0012-parameter-system.md)）。
   - 第三方套件可以使用，但必須固定版本（[0016](docs/adr/0016-dependency-policy.md)）。
 - **控制與估測**：
-  - 所有 Frame 共用一條控制鏈，差異只在載具模型；Frame 分成 Class 與 Type 兩層（[0013](docs/adr/0013-control-chain-and-vehicle-models.md)）。
+  - 所有 Frame 共用一條控制鏈，差異只在載具模型；Frame 分成 Class 與 Type 兩層，載具類型（地面、水面、水下）另外決定深度控制與安全行為的預設值（[0013](docs/adr/0013-control-chain-and-vehicle-models.md)）。
   - 估測器可以替換，數學元件拆成獨立的函式庫（[0014](docs/adr/0014-estimation-architecture.md)）。
   - 時序拆成幾個可以選擇的維度（[0015](docs/adr/0015-selectable-timing.md)）。
 - **品質與觀測**：
@@ -48,12 +48,12 @@
 | `mcu/` | MCU 資料庫：AF 對照、DMA 請求對照（JSON） | 0011 |
 | `schema/msg/` | Topic 的 Schema（`.msg`） | 0006 |
 | `cmake/` | 工具鏈、Kconfig 整合、產生器呼叫 | 0017 |
-| `hal/` | L1 HAL 介面（C++20 concept 與執行時介面） | 0009 |
-| `platform/stm32f4/` | L0 平台實作（ST LL） | 0009 |
+| `hal/` | 介面層：HAL 介面（C++20 concept 與執行時介面） | 0009 |
+| `platform/stm32f4/` | 平台層：STM32F4 實作（ST LL） | 0009 |
 | `platform/sitl/` | SITL 與測試用的平台實作 | 0009、0018 |
-| `drivers/` | L2 裝置驅動 | 0009 |
+| `drivers/` | 驅動層：裝置驅動 | 0009 |
 | `core/` | 匯流排、Work Queue、參數執行時、時序監看 | 0008、0012、0015 |
-| `modules/` | L3 模組：估測器、控制鏈、載具模型、Link、日誌 | 0002、0013、0014、0019 |
+| `modules/` | 模組層：估測器、控制鏈、載具模型、Link、日誌 | 0002、0013、0014、0019 |
 | `lib/estimation/` | 估測數學元件：`models/`、`filters/`、`math/` | 0014 |
 | `tools/generators/` | Schema（含 ULog 格式定義）、板級、參數、日誌設定檔產生器 | 0006、0011、0012、0019 |
 | `bridge/` | 上位機端的 ROS2 Bridge | 0002、0003 |
@@ -62,4 +62,4 @@
 
 ## 授權
 
-GPL-3.0，見 [LICENSE](LICENSE)。
+GNU GPL 第 3 版或任何更新的版本（SPDX：`GPL-3.0-or-later`），全文見 [LICENSE](LICENSE)。

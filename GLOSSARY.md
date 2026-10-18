@@ -8,6 +8,10 @@
 由韌體控制的整台機器，例如 UGV、USV、UUV。
 _Avoid_: 車、機器人、平台
 
+**載具類型（Vehicle Type）**：
+載具運作的環境：地面、水面或水下，與 Frame 互相獨立。決定是否啟用深度控制，以及安全行為等參數的預設值。
+_Avoid_: 載具種類、Frame Class
+
 **Frame**：
 載具的運動構型，決定致動器如何影響車體運動，由 Frame Class 與 Frame Type 組成。
 _Avoid_: 車型、CarType
@@ -31,6 +35,18 @@ _Avoid_: 控制迴圈
 由一個濾波演算法加上若干數學模型組成、發布標準狀態 Topic 的模組。
 _Avoid_: AHRS、EKF（這兩個是特定的估測器）
 
+**車體速度量測（Body Velocity Measurement）**：
+車體座標下的速度量測，帶來源 ID 與共變異數。來源可以是載具模型的輪速換算、DVL 這類測速感測器，或上位機送下的 VIO 速度。
+_Avoid_: 輪速里程計、wheel odom
+
+**局部里程計（Local Odometry）**：
+估測器融合車體速度量測與航向推算出的局部位姿與速度，發布為 `vehicle_local_odometry`。不綁定任何一種感測器。
+_Avoid_: 輪式里程計
+
+**外部估測器（External Estimator）**：
+把上位機送下的位姿（例如 VIO）換算成 MCU 時間後發布的估測器，可以選為主要估測器，上位機斷線時切回 MCU 自己的估測器。
+_Avoid_: VIO 直通
+
 **控制板（Board）**：
 執行韌體的硬體板卡，例如 C50C。
 _Avoid_: 主板、target
@@ -47,9 +63,17 @@ _Avoid_: AF、複用（AF 是 STM32 腳位的 alternate function 編號，是不
 某款 MCU 的腳位 AF 對照與 DMA 請求對照，產生器據此驗證板級定義。
 _Avoid_: pinmap、chip table
 
+**周邊匯流排（Peripheral Bus）**：
+MCU 與板上裝置之間的硬體匯流排，例如 I2C、SPI，包含以 GPIO 模擬的軟體實作。
+_Avoid_: 匯流排（單獨使用時指內部的發布/訂閱匯流排）
+
 **上位機（Companion Computer）**：
 與 MCU 連線、執行 ROS2 的電腦，例如 Raspberry Pi 5。
-_Avoid_: 主機、Pi、host
+_Avoid_: 主機（單獨使用時）、Pi、host
+
+**開發主機（Development Host）**：
+執行建置、主機單元測試、SITL 與燒錄工具的電腦，例如開發者的電腦或 CI runner。不是上位機。
+_Avoid_: PC、電腦、host（單獨使用時）
 
 ## 運作
 
@@ -60,6 +84,10 @@ _Avoid_: 離線模式
 **Setpoint**：
 送給 MCU 的控制目標，分為三個層級：車體速度、姿態/深度、致動器直出。
 _Avoid_: 指令、命令
+
+**模式（Mode）**：
+決定哪個來源有控制權，以及它可以使用哪些 setpoint 層級的運作狀態，例如上位機模式、手動模式。
+_Avoid_: 致動器直出模式（致動器直出是 setpoint 層級）
 
 **Setpoint 仲裁（Setpoint Arbitration）**：
 MCU 依模式與安全狀態，決定哪個來源的 setpoint 有控制權。
@@ -97,7 +125,7 @@ _Avoid_: airframe、車型參數
 
 **匯流排（Bus）**：
 MCU 內部模組之間交換資料的發布/訂閱機制，是韌體的骨幹。
-_Avoid_: uORB、message queue
+_Avoid_: uORB、message queue；I2C、SPI 這類硬體匯流排稱為周邊匯流排
 
 **Topic**：
 匯流排上有型別、有名稱的一條資料流。同一個 Topic 可以有多個實例，例如兩顆 IMU。
@@ -131,3 +159,23 @@ Topic 與訊息型別的唯一定義來源，MCU、Bridge 與工具的程式碼�
 **Bridge**：
 上位機端把 Link 轉成 ROS2 topic、service 與 parameter 的節點。
 _Avoid_: driver node、agent
+
+## 軟體分層
+
+軟體分層用名稱稱呼，不編號；L0–L5 專指測試分層（ADR 0018）。依賴方向由上往下：模組層 → 驅動層 → 介面層 → 平台層，可以跳過驅動層，但不能繞過介面層（ADR 0009）。
+
+**模組層（Module Layer）**：
+估測器、控制鏈、載具模型、Link、日誌等功能模組，放在 `modules/`。
+_Avoid_: L3、應用層
+
+**驅動層（Driver Layer）**：
+板上與外接裝置的驅動，例如 IMU、編碼器，放在 `drivers/`。
+_Avoid_: L2
+
+**介面層（Interface Layer）**：
+HAL 的契約，以 C++20 concept 與執行時介面定義，放在 `hal/`。
+_Avoid_: L1
+
+**平台層（Platform Layer）**：
+介面層在特定 MCU 或 SITL 上的實作，放在 `platform/`。
+_Avoid_: L0、BSP
