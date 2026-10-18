@@ -1,5 +1,10 @@
 // Firmware entry point. For now the firmware only idles; the RTOS starts here later.
 #include <board.hpp>
+#include <vk/config.h>
+
+#ifndef CONFIG_PLATFORM_STM32F4
+#error "the Kconfig layers must select the STM32F4 platform for firmware builds"
+#endif
 
 static_assert(vk::hal::distinct_pins<vk::board::pins::all>,
               "the board generator must never assign one pin to two roles");

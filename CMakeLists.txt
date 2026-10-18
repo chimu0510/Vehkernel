@@ -22,6 +22,7 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 include(VehkernelLayers)
 include(VehkernelBoard)
+include(VehkernelKconfig)
 
 # Warnings are errors for all Vehkernel code (L0, ADR-0018).
 add_library(vk_warnings INTERFACE)
@@ -39,8 +40,17 @@ if(VK_CLANG_TIDY)
   set(CMAKE_CXX_CLANG_TIDY ${VK_CLANG_TIDY_EXE})
 endif()
 
-# Layers and shared parts (ADR-0009), bottom-up.
+# Layers and shared parts (ADR-0009), bottom-up. The board generator and
+# Kconfig run right after the interface layer exists, before anything that
+# depends on their output.
 add_subdirectory(hal)
+if(VK_PLATFORM STREQUAL "stm32f4")
+  if(NOT VK_BOARD)
+    message(FATAL_ERROR "STM32 builds need VK_BOARD; use a CMake preset")
+  endif()
+  vk_generate_board(${VK_BOARD})
+endif()
+vk_configure_kconfig()
 add_subdirectory(core)
 add_subdirectory(lib)
 add_subdirectory(platform)

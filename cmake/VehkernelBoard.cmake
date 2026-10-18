@@ -33,6 +33,7 @@ function(vk_generate_board board)
     ${generator_sources})
 
   set(VK_BOARD_GENERATED_DIR ${out_dir} PARENT_SCOPE)
+  set(VK_BOARD_MCU ${mcu} PARENT_SCOPE)
   vk_add_library(vk_board LAYER platform INTERFACE)
   target_include_directories(vk_board INTERFACE ${out_dir})
   vk_target_link_libraries(vk_board INTERFACE vk_hal)

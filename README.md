@@ -65,6 +65,12 @@ dfu-util -a 0 -s 0x08000000 -D build/c50c-v1_1/app/vehkernel-boot.bin
 dfu-util -a 0 -s 0x08010000:leave -D build/c50c-v1_1/app/vehkernel.bin
 ```
 
+Kconfig decides what each build contains (ADR-0017). The layers are the MCU defaults (`mcu/<mcu>/defconfig`, or `platform/sitl/defconfig` for SITL), the board defaults (`boards/<board>/defconfig`), and a local debug overlay, `build/<preset>/debug.config`, which is never committed. Edit the overlay by hand or interactively; the next build reconfigures:
+
+```bash
+cmake --build --preset c50c-v1_1 --target menuconfig
+```
+
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 
 ## Directory layout
@@ -85,6 +91,7 @@ This is the initial skeleton and may change during implementation.
 | `modules/` | Module layer: estimators, control chain, vehicle models, Links, logging | 0002, 0013, 0014, 0019 |
 | `lib/estimation/` | Estimation math components: `models/`, `filters/`, `math/` | 0014 |
 | `tools/mcudb/` | Offline converter that regenerates an MCU database from the stm32-data source committed under `mcu/<mcu>/source/` | 0011, 0016 |
+| `tools/kconfig/` | Layered Kconfig solve and `menuconfig` with overlay saving | 0017 |
 | `tools/generators/` | Schema (including ULog format definitions), board, parameter and log profile generators | 0006, 0011, 0012, 0019 |
 | `app/` | Entry points: firmware image and SITL executable | — |
 | `bridge/` | ROS2 Bridge for the companion computer | 0002, 0003 |

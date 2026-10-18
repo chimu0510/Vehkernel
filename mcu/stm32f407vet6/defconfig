@@ -1,0 +1,2 @@
+# STM32F407VET6 defaults: the first configuration layer (ADR-0017).
+CONFIG_PLATFORM_STM32F4=y

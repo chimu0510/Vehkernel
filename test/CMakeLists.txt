@@ -1,5 +1,14 @@
 add_subdirectory(unit)
 
+# Kconfig smoke test (ADR-0017): a debug overlay that sets an option whose
+# dependencies are not met must fail configuration.
+add_test(NAME kconfig_overlay_smoke
+  COMMAND ${CMAKE_COMMAND} -DVK_SOURCE_DIR=${CMAKE_SOURCE_DIR}
+    -DVK_BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/kconfig_overlay_smoke -DVK_GENERATOR=${CMAKE_GENERATOR}
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/kconfig_overlay_smoke.cmake)
+add_test(NAME kconfig
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/kconfig/tests)
+
 # Size budget smoke test (ADR-0017): a firmware image too large for its Flash
 # region must fail the link with the region and overage named.
 add_test(NAME flash_budget_smoke

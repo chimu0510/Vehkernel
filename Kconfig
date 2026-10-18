@@ -1,0 +1,70 @@
+# Build-time configuration (ADR-0017): Kconfig decides what the firmware
+# contains; parameters decide what is enabled after boot. Layers are merged in
+# order: MCU (or SITL) defaults, board defaults, debug overlay.
+mainmenu "Vehkernel configuration"
+
+# Hardware facts. The board generator emits a fragment that turns on the ones
+# a board has; they are declared here so options can depend on them on every
+# platform, including SITL.
+config BOARD_HAS_CAN
+	bool
+
+config BOARD_HAS_FLASH_PARAMS
+	bool
+
+source "$(VK_BOARD_KCONFIG)"
+
+choice PLATFORM
+	prompt "Platform"
+
+config PLATFORM_STM32F4
+	bool "STM32F4"
+
+config PLATFORM_SITL
+	bool "SITL on the development host"
+
+endchoice
+
+menu "Vehicle models"
+
+config VEHICLE_MODEL_WHEELED
+	bool "WHEELED (differential, skid-steer, mecanum, omni)"
+	default y
+
+config VEHICLE_MODEL_ACKERMANN
+	bool "ACKERMANN"
+
+config VEHICLE_MODEL_THRUSTER
+	bool "THRUSTER"
+
+endmenu
+
+menu "Estimators"
+
+config ESTIMATOR_MAHONY
+	bool "Mahony attitude estimator"
+	default y
+	select MATH_QUATERNION
+
+endmenu
+
+menu "Drivers"
+
+config DRIVER_CAN
+	bool "CAN bus"
+	depends on BOARD_HAS_CAN
+
+endmenu
+
+menu "Storage"
+
+config PARAM_STORAGE_FLASH
+	bool "Parameters in internal Flash"
+	depends on BOARD_HAS_FLASH_PARAMS
+	default y
+
+endmenu
+
+# Helper libraries. Only these may be pulled in with select.
+config MATH_QUATERNION
+	bool

@@ -1,8 +1,3 @@
-if(NOT VK_BOARD)
-  message(FATAL_ERROR "STM32 builds need VK_BOARD; use a CMake preset")
-endif()
-vk_generate_board(${VK_BOARD})
-
 # STM32F4 platform. An OBJECT library so the vector table is always linked in.
 vk_add_library(vk_platform LAYER platform OBJECT startup_stm32f407.c boot_stub.c)
 vk_target_link_libraries(vk_platform PUBLIC vk_hal vk_core vk_warnings)
