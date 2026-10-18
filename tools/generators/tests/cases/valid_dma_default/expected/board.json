@@ -9,7 +9,8 @@
       "number": 9,
       "func": "USART1_TX",
       "kind": "af",
-      "af": 7
+      "af": 7,
+      "alt": []
     },
     {
       "role": "SERIAL1_RX",
@@ -18,9 +19,11 @@
       "number": 10,
       "func": "USART1_RX",
       "kind": "af",
-      "af": 7
+      "af": 7,
+      "alt": []
     }
   ],
+  "alt_configs": [],
   "dma": [
     {
       "request": "ADC1_ADC1",

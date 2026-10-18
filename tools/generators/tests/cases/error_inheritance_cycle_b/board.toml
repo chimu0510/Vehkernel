@@ -1,0 +1,3 @@
+name = "cycle-b"
+mcu = "testmcu"
+extends = "error_inheritance_cycle_a"

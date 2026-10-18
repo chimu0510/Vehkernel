@@ -1,0 +1,14 @@
+# Base board for valid_inheritance.
+name = "demo-base"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA9",  role = "SERIAL1_TX", func = "USART1_TX" },
+  { pin = "PA10", role = "SERIAL1_RX", func = "USART1_RX" },
+  { pin = "PA1",  role = "STATUS_LED", func = "GPIO_OUTPUT" },
+  { pin = "PA2",  role = "BUTTON",     func = "GPIO_INPUT" },
+]
+
+dma = [
+  { request = "USART1_TX", dma = false },
+]

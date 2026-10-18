@@ -1,0 +1,14 @@
+# Drops the button, turns the LED pin into an input, adds an encoder channel,
+# and gives USART1_TX its DMA back.
+name = "demo-rev2"
+extends = "valid_inheritance_base"
+remove = ["PA2"]
+
+pins = [
+  { pin = "PA1", role = "MODE_SWITCH", func = "GPIO_INPUT" },
+  { pin = "PB7", role = "ENC_B_B",     func = "TIM4_CH2" },
+]
+
+dma = [
+  { request = "USART1_TX", priority = 1 },
+]

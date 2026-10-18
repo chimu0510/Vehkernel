@@ -9,7 +9,8 @@
       "number": 9,
       "func": "USART1_TX",
       "kind": "af",
-      "af": 7
+      "af": 7,
+      "alt": []
     },
     {
       "role": "SERIAL1_RX",
@@ -18,7 +19,8 @@
       "number": 10,
       "func": "USART1_RX",
       "kind": "af",
-      "af": 7
+      "af": 7,
+      "alt": []
     },
     {
       "role": "ENC_B_A",
@@ -27,7 +29,8 @@
       "number": 6,
       "func": "TIM4_CH1",
       "kind": "af",
-      "af": 2
+      "af": 2,
+      "alt": []
     },
     {
       "role": "ENC_B_B",
@@ -36,7 +39,8 @@
       "number": 7,
       "func": "TIM4_CH2",
       "kind": "af",
-      "af": 2
+      "af": 2,
+      "alt": []
     },
     {
       "role": "BATTERY_SENSE",
@@ -45,7 +49,8 @@
       "number": 0,
       "func": "ADC1_IN0",
       "kind": "analog",
-      "af": null
+      "af": null,
+      "alt": []
     },
     {
       "role": "STATUS_LED",
@@ -54,7 +59,8 @@
       "number": 1,
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
-      "af": null
+      "af": null,
+      "alt": []
     },
     {
       "role": "BUTTON",
@@ -63,9 +69,11 @@
       "number": 2,
       "func": "GPIO_INPUT",
       "kind": "gpio_input",
-      "af": null
+      "af": null,
+      "alt": []
     }
   ],
+  "alt_configs": [],
   "dma": [
     {
       "request": "USART1_RX",

@@ -1,0 +1,8 @@
+# Removes a pin the base never had, and reuses a base role on another pin.
+name = "demo-bad"
+extends = "valid_inheritance_base"
+remove = ["PA2", "PD13"]
+
+pins = [
+  { pin = "PB6", role = "SERIAL1_TX", func = "TIM4_CH1" },
+]

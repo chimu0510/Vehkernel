@@ -4,19 +4,19 @@ from __future__ import annotations
 
 import json
 
-from .board import Board, Pin
+from .board import Board, Function, Pin
 from .dma import DmaAssignment
 
 GENERATOR = "tools/generators/generate_board.py"
 
 
-def _pin_type(p: Pin) -> str:
+def _pin_type(p: Pin, f: Function) -> str:
     port = f"vk::hal::Port::{p.port}"
-    if p.kind == "af":
-        return f'vk::hal::AfPin<{port}, {p.number}, {p.af}, "{p.func}">'
-    if p.kind == "analog":
-        return f'vk::hal::AnalogPin<{port}, {p.number}, "{p.func}">'
-    if p.kind == "gpio_input":
+    if f.kind == "af":
+        return f'vk::hal::AfPin<{port}, {p.number}, {f.af}, "{f.func}">'
+    if f.kind == "analog":
+        return f'vk::hal::AnalogPin<{port}, {p.number}, "{f.func}">'
+    if f.kind == "gpio_input":
         return f"vk::hal::GpioInput<{port}, {p.number}>"
     return f"vk::hal::GpioOutput<{port}, {p.number}>"
 
@@ -39,11 +39,27 @@ def board_header(board: Board) -> str:
         "namespace pins {",
     ]
     for p in board.pins:
-        out.append(f"using {p.role} = {_pin_type(p)};  // {p.pin} {p.func}")
+        out.append(f"using {p.role} = {_pin_type(p, p.default)};  // {p.pin} {p.func}")
     out.append("")
     roles = ", ".join(p.role for p in board.pins)
     out.append(f"using all = vk::hal::PinList<{roles}>;")
+    for config in board.alt_configs:
+        out += ["", f"// Alt config {config}: the pins whose role changes when it is selected at boot.",
+                f"namespace alt{config} {{"]
+        for p in board.pins:
+            f = p.in_config(config)
+            if f != p.default:
+                out.append(f"using {f.role} = {_pin_type(p, f)};  // {p.pin} {f.func}")
+        effective = ", ".join(
+            (f"alt{config}::{p.in_config(config).role}" if p.in_config(config) != p.default else p.role)
+            for p in board.pins)
+        out.append(f"using all = vk::hal::PinList<{effective}>;")
+        out.append(f"}}  // namespace alt{config}")
     out += ["}  // namespace pins", ""]
+    if board.alt_configs:
+        configs = ", ".join(str(c) for c in board.alt_configs)
+        out += [f"// Alt configs selectable at boot besides the default (0): {configs}.",
+                f"inline constexpr unsigned alt_config_count = {len(board.alt_configs)};", ""]
     out += _dma_namespace(board.dma)
     out += ["}  // namespace vk::board", ""]
     return "\n".join(out)
@@ -94,9 +110,12 @@ def board_json(board: Board) -> str:
         "mcu": board.mcu,
         "pins": [
             {"role": p.role, "pin": p.pin, "port": p.port, "number": p.number,
-             "func": p.func, "kind": p.kind, "af": p.af}
+             "func": p.func, "kind": p.kind, "af": p.af,
+             "alt": [{"config": config, "role": f.role, "func": f.func, "kind": f.kind, "af": f.af}
+                     for config, f in p.alt]}
             for p in board.pins
         ],
+        "alt_configs": list(board.alt_configs),
         "dma": [
             {"request": a.request,
              "controller": a.candidate.controller if a.candidate else None,

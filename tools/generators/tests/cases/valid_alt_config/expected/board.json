@@ -1,0 +1,75 @@
+{
+  "name": "demo",
+  "mcu": "testmcu",
+  "pins": [
+    {
+      "role": "ENC_B_B",
+      "pin": "PB7",
+      "port": "B",
+      "number": 7,
+      "func": "TIM4_CH2",
+      "kind": "af",
+      "af": 2,
+      "alt": [
+        {
+          "config": 1,
+          "role": "SERVO_1",
+          "func": "TIM4_CH2",
+          "kind": "af",
+          "af": 2
+        }
+      ]
+    },
+    {
+      "role": "SERIAL1_TX",
+      "pin": "PA9",
+      "port": "A",
+      "number": 9,
+      "func": "USART1_TX",
+      "kind": "af",
+      "af": 7,
+      "alt": [
+        {
+          "config": 2,
+          "role": "STATUS_LED",
+          "func": "GPIO_OUTPUT",
+          "kind": "gpio_output",
+          "af": null
+        }
+      ]
+    },
+    {
+      "role": "ENC_B_A",
+      "pin": "PB6",
+      "port": "B",
+      "number": 6,
+      "func": "TIM4_CH1",
+      "kind": "af",
+      "af": 2,
+      "alt": [
+        {
+          "config": 2,
+          "role": "SERIAL1_TX",
+          "func": "USART1_TX",
+          "kind": "af",
+          "af": 7
+        }
+      ]
+    }
+  ],
+  "alt_configs": [
+    1,
+    2
+  ],
+  "dma": [
+    {
+      "request": "USART1_TX",
+      "controller": "DMA2",
+      "stream": 7,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    }
+  ]
+}

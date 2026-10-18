@@ -1,0 +1,67 @@
+{
+  "name": "demo-rev2",
+  "mcu": "testmcu",
+  "pins": [
+    {
+      "role": "SERIAL1_TX",
+      "pin": "PA9",
+      "port": "A",
+      "number": 9,
+      "func": "USART1_TX",
+      "kind": "af",
+      "af": 7,
+      "alt": []
+    },
+    {
+      "role": "SERIAL1_RX",
+      "pin": "PA10",
+      "port": "A",
+      "number": 10,
+      "func": "USART1_RX",
+      "kind": "af",
+      "af": 7,
+      "alt": []
+    },
+    {
+      "role": "MODE_SWITCH",
+      "pin": "PA1",
+      "port": "A",
+      "number": 1,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "ENC_B_B",
+      "pin": "PB7",
+      "port": "B",
+      "number": 7,
+      "func": "TIM4_CH2",
+      "kind": "af",
+      "af": 2,
+      "alt": []
+    }
+  ],
+  "alt_configs": [],
+  "dma": [
+    {
+      "request": "USART1_RX",
+      "controller": "DMA2",
+      "stream": 2,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART1_TX",
+      "controller": "DMA2",
+      "stream": 7,
+      "channel": 4,
+      "priority": 1,
+      "share": false,
+      "shared_with": []
+    }
+  ]
+}

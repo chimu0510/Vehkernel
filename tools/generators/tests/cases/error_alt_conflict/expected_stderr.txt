@@ -1,0 +1,2 @@
+board.toml:6: error: signal TIM4_CH2 is already used by pin PB7 for role ENC_B_B in alt config 1 (line 5)
+board.toml:7: error: role ENC_B_B is already defined in alt config 1 (line 5)

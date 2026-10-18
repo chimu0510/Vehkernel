@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .diagnostics import Diagnostics
+from .diagnostics import Diagnostics, Loc
 
 DMA_KEYS = {"request", "priority", "dma", "share"}
 
@@ -46,7 +46,7 @@ class DmaRequest:
     priority: int = 0
     share: bool = False
     enabled: bool = True
-    line: int | None = None
+    loc: Loc | None = None
     implied: bool = False
 
 
@@ -72,15 +72,15 @@ def implied_requests(funcs: list[str], dma_map: dict) -> list[str]:
     return sorted(names)
 
 
-def collect_requests(raw: list, lines: list[int | None], funcs: list[str], dma_map: dict,
+def collect_requests(raw: list, locs: list[Loc], funcs: list[str], dma_map: dict,
                      diag: Diagnostics) -> list[DmaRequest]:
     def candidates(name: str) -> tuple[Candidate, ...]:
         return tuple(Candidate(c["controller"], c["stream"], c["channel"]) for c in dma_map[name])
 
     requests = {name: DmaRequest(name, candidates(name), implied=True)
                 for name in implied_requests(funcs, dma_map)}
-    seen: dict[str, int | None] = {}
-    for entry, line in zip(raw, lines):
+    seen: dict[str, Loc] = {}
+    for entry, line in zip(raw, locs):
         if not isinstance(entry, dict):
             diag.error("each dma entry must be an inline table", line)
             continue
@@ -94,8 +94,7 @@ def collect_requests(raw: list, lines: list[int | None], funcs: list[str], dma_m
         if unknown:
             continue
         if name in seen:
-            where = f"line {seen[name]}" if seen[name] else "another entry"
-            diag.error(f"DMA request {name} is already listed ({where})", line)
+            diag.error(f"DMA request {name} is already listed ({seen[name].refer(line)})", line)
             continue
         seen[name] = line
         if name not in dma_map:
@@ -109,7 +108,7 @@ def collect_requests(raw: list, lines: list[int | None], funcs: list[str], dma_m
             diag.error(f"'dma' and 'share' of DMA request {name} must be true or false", line)
             continue
         request = requests.get(name) or DmaRequest(name, candidates(name))
-        request.priority, request.enabled, request.share, request.line = priority, enabled, share, line
+        request.priority, request.enabled, request.share, request.loc = priority, enabled, share, line
         requests[name] = request
     return [requests[name] for name in sorted(requests)]
 
@@ -162,7 +161,7 @@ def assign(requests: list[DmaRequest], diag: Diagnostics) -> list[DmaAssignment]
         names = ", ".join(r.name for r in conflict)
         streams = sorted({c.stream_key for r in conflict for c in r.candidates})
         stream_text = ", ".join(f"{ctrl} S{stream}" for ctrl, stream in streams)
-        line = next((r.line for r in conflict if r.line), None)
+        line = next((r.loc for r in conflict if r.loc), None)
         diag.error(f"DMA requests {names} cannot all get a stream; they compete for {stream_text} "
                    f"(set 'share = true' on all of them, or 'dma = false' on one)", line)
         return []

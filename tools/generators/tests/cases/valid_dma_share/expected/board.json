@@ -9,9 +9,11 @@
       "number": 7,
       "func": "TIM4_CH2",
       "kind": "af",
-      "af": 2
+      "af": 2,
+      "alt": []
     }
   ],
+  "alt_configs": [],
   "dma": [
     {
       "request": "TIM2_UP",

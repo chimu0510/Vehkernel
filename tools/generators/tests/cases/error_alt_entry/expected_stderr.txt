@@ -1,0 +1,4 @@
+board.toml:5: error: alt config number of pin PA1 must be an integer of at least 1
+board.toml:6: error: pin PA2 declares alt config 1 twice
+board.toml:7: error: function TIM2_CH2 is not available on pin PB7 (available: TIM4_CH2, I2C1_SDA, USART1_RX)
+board.toml:8: error: each alt config of pin PB6 needs exactly 'config', 'role' and 'func'

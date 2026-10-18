@@ -1,0 +1,1 @@
+../error_inheritance_cycle_b/board.toml: error: board definitions extend each other in a cycle: board.toml -> ../error_inheritance_cycle_b/board.toml -> board.toml

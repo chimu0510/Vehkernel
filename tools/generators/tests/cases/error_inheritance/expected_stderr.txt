@@ -1,0 +1,2 @@
+board.toml: error: cannot remove pin PD13: ../valid_inheritance_base/board.toml does not define it
+board.toml:7: error: role SERIAL1_TX is already defined (../valid_inheritance_base/board.toml:6)
