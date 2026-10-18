@@ -1,6 +1,8 @@
-// Firmware entry point. For now the firmware only idles; the RTOS starts here later.
+// Firmware entry point: bring up the platform, then hand over to FreeRTOS.
 #include <board.hpp>
 #include <vk/config.h>
+#include <vk/core/scheduler.hpp>
+#include <vk/platform/platform.hpp>
 
 #ifndef CONFIG_PLATFORM_STM32F4
 #error "the Kconfig layers must select the STM32F4 platform for firmware builds"
@@ -20,7 +22,6 @@ int main()
     // Referenced so --gc-sections keeps the fill.
     __asm__ volatile("" : : "r"(vk_flash_fill));
 #endif
-    for (;;) {
-        __asm__ volatile("wfi");
-    }
+    vk::platform::init();
+    vk::core::start_scheduler();  // Never returns.
 }

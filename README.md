@@ -42,12 +42,12 @@ Other board revisions and boards get their own board definitions when needed ([A
 
 ## Building
 
-The development environment is [`.devcontainer/`](.devcontainer/); every tool that affects build output is pinned ([ADR-0016](docs/adr/0016-dependency-policy.md)). Open the repo with VS Code Dev Containers or the `devcontainer` CLI, then use one CMake preset per build target:
+The development environment is [`.devcontainer/`](.devcontainer/); every tool that affects build output is pinned ([ADR-0016](docs/adr/0016-dependency-policy.md)). Third-party C code (FreeRTOS, CMSIS, ST LL) is pinned as git submodules under `third_party/`, so clone with `git clone --recurse-submodules`, or run `git submodule update --init` in an existing clone. Open the repo with VS Code Dev Containers or the `devcontainer` CLI, then use one CMake preset per build target:
 
 | Preset | Output |
 |---|---|
 | `c50c-v1_1` | C50C V1.1 firmware: `vehkernel.elf`, `vehkernel.hex` (boot stub and firmware), `vehkernel-boot.bin` (S0) and `vehkernel.bin` (firmware only, from S4) |
-| `sitl` | SITL executable for the development host |
+| `sitl` | SITL executable for the development host: `vehkernel-sitl [--duration <seconds>]` runs the firmware on the FreeRTOS POSIX port and stops after the duration (default 1 s) |
 | `test` | Host tests, run with `ctest --preset test` |
 
 ```bash
@@ -95,6 +95,7 @@ This is the initial skeleton and may change during implementation.
 | `tools/kconfig/` | Layered Kconfig solve and `menuconfig` with overlay saving | 0017 |
 | `tools/generators/` | Schema (including ULog format definitions), board, parameter and log profile generators | 0006, 0011, 0012, 0019 |
 | `app/` | Entry points: firmware image and SITL executable | — |
+| `third_party/` | Pinned submodules: FreeRTOS kernel, CMSIS core, STM32F4 device headers and LL drivers | 0004, 0016 |
 | `bridge/` | ROS2 Bridge for the companion computer | 0002, 0003 |
 | `sim/` | Built-in simulator and external simulator interface | 0018 |
 | `test/` | `unit/` (L1), `replay/` (L2), `sitl/` (L3), `hardware/` (L4 hardware tests), `ros2/` (L5); L0 static checks run from root config files and CI | 0018 |

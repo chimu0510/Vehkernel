@@ -1,8 +1,9 @@
 /*
  * Minimal Cortex-M4F startup for STM32F407: vector table, memory init, FPU
- * enable, then main(). Every exception and interrupt goes to Default_Handler
- * until drivers install real handlers. Written in C so the vector table is a
- * constant initializer that stays in Flash.
+ * enable, then main(). Exceptions and interrupts without a handler go to
+ * Default_Handler; the named handlers below are weak, so the platform layer
+ * and FreeRTOS override them by defining a function of the same name. Written
+ * in C so the vector table is a constant initializer that stays in Flash.
  */
 #include <stdint.h>
 
@@ -19,13 +20,33 @@ int main(void);
 void Reset_Handler(void);
 void Default_Handler(void);
 
+#define VK_WEAK_HANDLER(name) void name(void) __attribute__((weak, alias("Default_Handler")))
+VK_WEAK_HANDLER(SVC_Handler);     /* FreeRTOS */
+VK_WEAK_HANDLER(PendSV_Handler);  /* FreeRTOS */
+VK_WEAK_HANDLER(SysTick_Handler); /* FreeRTOS tick */
+VK_WEAK_HANDLER(TIM7_IRQHandler); /* microsecond clock overflow */
+
+/* Vector numbers: system exceptions first, then IRQn + VK_SYSTEM_VECTORS. */
+#define VK_SVCALL_VECTOR  11
+#define VK_PENDSV_VECTOR  14
+#define VK_SYSTICK_VECTOR 15
+#define VK_TIM7_VECTOR    (VK_SYSTEM_VECTORS + 55)
+#define VK_LAST_VECTOR    (VK_SYSTEM_VECTORS + VK_STM32F407_IRQS - 1)
+
 typedef void (*vk_vector_t)(void);
 
 __attribute__((section(".isr_vector"), used))
 const vk_vector_t vk_vector_table[VK_SYSTEM_VECTORS + VK_STM32F407_IRQS] = {
     [0] = (vk_vector_t)_estack,
     [1] = Reset_Handler,
-    [2 ... VK_SYSTEM_VECTORS + VK_STM32F407_IRQS - 1] = Default_Handler,
+    [2 ... VK_SVCALL_VECTOR - 1] = Default_Handler,
+    [VK_SVCALL_VECTOR] = SVC_Handler,
+    [VK_SVCALL_VECTOR + 1 ... VK_PENDSV_VECTOR - 1] = Default_Handler,
+    [VK_PENDSV_VECTOR] = PendSV_Handler,
+    [VK_SYSTICK_VECTOR] = SysTick_Handler,
+    [VK_SYSTICK_VECTOR + 1 ... VK_TIM7_VECTOR - 1] = Default_Handler,
+    [VK_TIM7_VECTOR] = TIM7_IRQHandler,
+    [VK_TIM7_VECTOR + 1 ... VK_LAST_VECTOR] = Default_Handler,
 };
 
 void Default_Handler(void)

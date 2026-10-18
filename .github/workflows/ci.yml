@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Build devcontainer image
         run: docker build -t vehkernel-dev -f .devcontainer/Dockerfile .

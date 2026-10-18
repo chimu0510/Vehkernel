@@ -2,8 +2,10 @@
 find_package(GTest CONFIG REQUIRED)
 include(GoogleTest)
 
-add_executable(vk_unit_tests smoke_test.cpp pin_test.cpp dma_test.cpp)
-target_link_libraries(vk_unit_tests PRIVATE GTest::gtest_main vk_hal vk_warnings)
+add_executable(vk_unit_tests smoke_test.cpp pin_test.cpp dma_test.cpp clock_test.cpp)
+target_link_libraries(vk_unit_tests PRIVATE GTest::gtest_main vk_hal vk_platform vk_core vk_warnings)
+# Hardware-free logic of the STM32F4 platform layer, tested on the host.
+target_include_directories(vk_unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/platform/stm32f4/include)
 gtest_discover_tests(vk_unit_tests)
 
 # Every golden board.hpp of the board generator tests must compile: one

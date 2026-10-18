@@ -1,7 +1,7 @@
 # Entry points: the firmware image for STM32 boards, or the SITL executable.
 if(VK_PLATFORM STREQUAL "stm32f4")
   add_executable(vehkernel firmware_main.cpp)
-  target_link_libraries(vehkernel PRIVATE vk_platform vk_board vk_config vk_modules vk_warnings vk_cxx_subset)
+  target_link_libraries(vehkernel PRIVATE vk_platform vk_core vk_board vk_config vk_modules vk_warnings vk_cxx_subset)
   set_target_properties(vehkernel PROPERTIES SUFFIX .elf)
   target_link_options(vehkernel PRIVATE
     -Wl,-Map=$<TARGET_FILE_DIR:vehkernel>/vehkernel.map -Wl,--print-memory-usage)
@@ -19,5 +19,5 @@ if(VK_PLATFORM STREQUAL "stm32f4")
     VERBATIM)
 else()
   add_executable(vehkernel-sitl sitl_main.cpp)
-  target_link_libraries(vehkernel-sitl PRIVATE vk_platform vk_config vk_modules vk_warnings)
+  target_link_libraries(vehkernel-sitl PRIVATE vk_platform vk_core vk_config vk_modules vk_warnings)
 endif()
