@@ -1,86 +1,87 @@
 # Vehkernel
 
-**Vehkernel**（Vehicle + Kernel）是一套支援 ROS2 的開源 MCU 韌體系統，定位為任何載具的通用骨架：同一套系統可以驅動多種載具與 Frame。MCU 負責即時的狀態估計、低階控制與安全，沒有上位機也能獨立運作；全域定位與導航由上層的 ROS2 應用負責。首要測試平台是 UGV。
+**Vehkernel** (Vehicle + Kernel) is open-source MCU firmware with ROS2 support, built as a common core for any vehicle: one system drives many vehicles and frames. The MCU handles real-time state estimation, low-level control and safety, and keeps running without a companion computer; global localization and navigation are left to ROS2 applications above it. The first test platform is a UGV.
 
-**目前狀態：建置骨架階段。** 所有決策都記錄在 [`docs/adr/`](docs/adr/)，用詞以 [`GLOSSARY.md`](GLOSSARY.md) 為準。目前可以建置空的韌體、SITL 執行檔與主機測試，還沒有功能。
+**Status: build skeleton.** Every decision is recorded in [`docs/adr/`](docs/adr/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary. The empty firmware image, the SITL executable and the host tests build; there is no functionality yet.
 
-## 目標硬體
+## Target hardware
 
-| 項目 | 目前支援 |
+| Item | Supported |
 |---|---|
 | MCU | STM32F407VET6 |
-| 控制板 | C50C V1.1（ICM20948、USB 手柄，沒有 485） |
-| 上位機 | Raspberry Pi 5（ROS2） |
+| Board | C50C V1.1 (ICM20948, USB gamepad, no RS-485) |
+| Companion computer | Raspberry Pi 5 (ROS2) |
 
-其他硬體版本或控制板，等需要時再新增各自的板級定義（[ADR-0010](docs/adr/0010-board-revision-policy.md)）。
+Other board revisions and boards get their own board definitions when needed ([ADR-0010](docs/adr/0010-board-revision-policy.md)).
 
-## 架構重點
+## Architecture highlights
 
-- **定位**：MCU 是上位機的即時協處理器與安全守門員，不是自駕儀（[0001](docs/adr/0001-mcu-responsibility-boundary.md)）。
-- **通訊**：
-  - 內部以發布/訂閱匯流排為骨幹，ROS2 只是其中一條 Link；Link 由 Topic 映射、協議模組、傳輸組成，可以替換（[0002](docs/adr/0002-bus-backbone-and-pluggable-links.md)）。
-  - 訊息由單一份 Schema 定義，程式碼自動產生（[0006](docs/adr/0006-schema-and-wire-encoding.md)）。
-- **ROS2 介面**：
-  - 提供載具級的 topic API，setpoint 分三個層級；ros2_control 是選配（[0003](docs/adr/0003-vehicle-level-ros2-api.md)）。
-  - 控制權由模式決定，遙控器隨時可以接管（[0005](docs/adr/0005-setpoint-arbitration.md)）。
-- **執行環境**：FreeRTOS、C++20 子集，Work Queue 依頻率層級劃分（[0004](docs/adr/0004-freertos.md)、[0007](docs/adr/0007-cpp20-subset.md)、[0008](docs/adr/0008-bus-and-work-queues.md)）。
-- **硬體適配**：
-  - 板級定義用 TOML 撰寫，產生器根據 MCU 資料庫驗證腳位、求解 DMA 分配（[0011](docs/adr/0011-toml-board-definition-toolchain.md)）。
-  - HAL 依「在什麼時候做選擇」決定多型的形式（[0009](docs/adr/0009-layered-hal.md)）。
-- **配置**：
-  - Kconfig 決定韌體編進哪些功能，參數決定執行時啟用哪一個（[0017](docs/adr/0017-kconfig-build-configuration.md)、[0012](docs/adr/0012-parameter-system.md)）。
-  - 第三方套件可以使用，但必須固定版本（[0016](docs/adr/0016-dependency-policy.md)）。
-- **控制與估測**：
-  - 所有 Frame 共用一條控制鏈，差異只在載具模型；Frame 分成 Class 與 Type 兩層，載具類型（地面、水面、水下）另外決定深度控制與安全行為的預設值（[0013](docs/adr/0013-control-chain-and-vehicle-models.md)）。
-  - 估測器可以替換，數學元件拆成獨立的函式庫（[0014](docs/adr/0014-estimation-architecture.md)）。
-  - 時序拆成幾個可以選擇的維度（[0015](docs/adr/0015-selectable-timing.md)）。
-- **品質與觀測**：
-  - 測試分六層，SITL 跑的是同一套 RTOS（[0018](docs/adr/0018-test-layers-and-sitl.md)）。
-  - 日誌採用 ULog 格式，後端可以替換（[0019](docs/adr/0019-logging.md)）。
-  - 內部 Flash 分成 bootloader、參數、事件日誌與韌體四區，armed 時只寫不擦（[0020](docs/adr/0020-internal-flash-layout-and-write-policy.md)）。
+- **Role**: the MCU is the companion computer's real-time coprocessor and safety gatekeeper, not an autopilot ([0001](docs/adr/0001-mcu-responsibility-boundary.md)).
+- **Communication**:
+  - A publish/subscribe bus is the internal backbone and ROS2 is just one Link; a Link is made of a topic map, a protocol and a transport, all replaceable ([0002](docs/adr/0002-bus-backbone-and-pluggable-links.md)).
+  - Messages are defined in a single schema and code is generated from it ([0006](docs/adr/0006-schema-and-wire-encoding.md)).
+- **ROS2 interface**:
+  - A vehicle-level topic API with three setpoint levels; ros2_control is optional ([0003](docs/adr/0003-vehicle-level-ros2-api.md)).
+  - The mode decides who is in control, and the remote control can always take over ([0005](docs/adr/0005-setpoint-arbitration.md)).
+- **Runtime**: FreeRTOS, a C++20 subset, and rate-tiered work queues ([0004](docs/adr/0004-freertos.md), [0007](docs/adr/0007-cpp20-subset.md), [0008](docs/adr/0008-bus-and-work-queues.md)).
+- **Hardware support**:
+  - Board definitions are written in TOML; the generator validates pins against the MCU database and solves DMA assignments ([0011](docs/adr/0011-toml-board-definition-toolchain.md)).
+  - The HAL picks its form of polymorphism by when each choice is made ([0009](docs/adr/0009-layered-hal.md)).
+- **Configuration**:
+  - Kconfig decides which features are compiled in; parameters decide which one is enabled at runtime ([0017](docs/adr/0017-kconfig-build-configuration.md), [0012](docs/adr/0012-parameter-system.md)).
+  - Third-party packages are allowed but must be pinned ([0016](docs/adr/0016-dependency-policy.md)).
+- **Control and estimation**:
+  - Every frame shares one control chain and differs only in its vehicle model; frames have a class and a type, and the vehicle type (ground, surface, underwater) also sets depth control and failsafe defaults ([0013](docs/adr/0013-control-chain-and-vehicle-models.md)).
+  - Estimators are replaceable, and the math components form a separate library ([0014](docs/adr/0014-estimation-architecture.md)).
+  - Timing is split into selectable dimensions ([0015](docs/adr/0015-selectable-timing.md)).
+- **Quality and observability**:
+  - Six test layers; SITL runs the same RTOS ([0018](docs/adr/0018-test-layers-and-sitl.md)).
+  - Logs use the ULog format with replaceable sinks ([0019](docs/adr/0019-logging.md)).
+  - Internal Flash is split into bootloader, parameter, event log and firmware regions, and is never erased while armed ([0020](docs/adr/0020-internal-flash-layout-and-write-policy.md)).
+- **Language**: everything in the repository is written in English ([0021](docs/adr/0021-english-project-language.md)).
 
-## 建置
+## Building
 
-開發環境是 [`.devcontainer/`](.devcontainer/)，所有會影響產出的工具都固定版本（[ADR-0016](docs/adr/0016-dependency-policy.md)）。用 VS Code 的 Dev Containers 或 `devcontainer` CLI 開啟 repo 後，每個建置目標一個 CMake preset：
+The development environment is [`.devcontainer/`](.devcontainer/); every tool that affects build output is pinned ([ADR-0016](docs/adr/0016-dependency-policy.md)). Open the repo with VS Code Dev Containers or the `devcontainer` CLI, then use one CMake preset per build target:
 
-| Preset | 產出 |
+| Preset | Output |
 |---|---|
-| `c50c-v1_1` | C50C V1.1 的韌體映像（`.elf`、`.bin`、`.hex`） |
-| `sitl` | 開發主機上的 SITL 執行檔 |
-| `test` | 開發主機上的測試，用 `ctest --preset test` 執行 |
+| `c50c-v1_1` | C50C V1.1 firmware image (`.elf`, `.bin`, `.hex`) |
+| `sitl` | SITL executable for the development host |
+| `test` | Host tests, run with `ctest --preset test` |
 
 ```bash
 cmake --preset c50c-v1_1
 cmake --build --preset c50c-v1_1
 ```
 
-`sitl` 與 `test` 會同時執行 clang-tidy，任何警告都視為錯誤。CI 在同一個 devcontainer 映像中建置所有 preset 並執行測試。
+The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 
-## 目錄結構
+## Directory layout
 
-以下是初始骨架，實作時可以調整。
+This is the initial skeleton and may change during implementation.
 
-| 目錄 | 內容 | 相關 ADR |
+| Directory | Contents | ADRs |
 |---|---|---|
-| `boards/` | 板級定義（TOML）與板級 defconfig | 0010、0011、0017 |
-| `mcu/` | 每款 MCU 一個子目錄：MCU 資料庫（AF 對照、DMA 請求對照、Flash 磁區表，JSON）與 Kconfig 的 MCU 預設（`defconfig`） | 0011、0017、0020 |
-| `schema/msg/` | Topic 的 Schema（`.msg`） | 0006 |
-| `cmake/` | 工具鏈、Kconfig 整合、產生器呼叫 | 0017 |
-| `hal/` | 介面層：HAL 介面（C++20 concept 與執行時介面） | 0009 |
-| `platform/stm32f4/` | 平台層：STM32F4 實作（ST LL） | 0009 |
-| `platform/sitl/` | SITL 與測試用的平台實作 | 0009、0018 |
-| `drivers/` | 驅動層：裝置驅動 | 0009 |
-| `core/` | 匯流排、Work Queue、參數執行時、時序監看 | 0008、0012、0015 |
-| `modules/` | 模組層：估測器、控制鏈、載具模型、Link、日誌 | 0002、0013、0014、0019 |
-| `lib/estimation/` | 估測數學元件：`models/`、`filters/`、`math/` | 0014 |
-| `tools/generators/` | Schema（含 ULog 格式定義）、板級、參數、日誌設定檔產生器 | 0006、0011、0012、0019 |
-| `app/` | 進入點：韌體映像與 SITL 執行檔 | — |
-| `bridge/` | 上位機端的 ROS2 Bridge | 0002、0003 |
-| `sim/` | 內建模擬器與外部模擬器介面 | 0018 |
-| `test/` | `unit/`（L1）、`replay/`（L2）、`sitl/`（L3）、`hardware/`（L4 實機測試）、`ros2/`（L5）；L0 靜態檢查由根目錄的設定檔與 CI 執行 | 0018 |
+| `boards/` | Board definitions (TOML) and board defconfigs | 0010, 0011, 0017 |
+| `mcu/` | One subdirectory per MCU: the MCU database (AF map, DMA request map, Flash sector table, as JSON) and the Kconfig MCU defaults (`defconfig`) | 0011, 0017, 0020 |
+| `schema/msg/` | Topic schemas (`.msg`) | 0006 |
+| `cmake/` | Toolchains, Kconfig integration, generator invocation | 0017 |
+| `hal/` | Interface layer: HAL interfaces (C++20 concepts and runtime interfaces) | 0009 |
+| `platform/stm32f4/` | Platform layer: STM32F4 implementation (ST LL) | 0009 |
+| `platform/sitl/` | Platform implementation for SITL and tests | 0009, 0018 |
+| `drivers/` | Driver layer: device drivers | 0009 |
+| `core/` | Bus, work queues, parameter runtime, timing monitor | 0008, 0012, 0015 |
+| `modules/` | Module layer: estimators, control chain, vehicle models, Links, logging | 0002, 0013, 0014, 0019 |
+| `lib/estimation/` | Estimation math components: `models/`, `filters/`, `math/` | 0014 |
+| `tools/generators/` | Schema (including ULog format definitions), board, parameter and log profile generators | 0006, 0011, 0012, 0019 |
+| `app/` | Entry points: firmware image and SITL executable | — |
+| `bridge/` | ROS2 Bridge for the companion computer | 0002, 0003 |
+| `sim/` | Built-in simulator and external simulator interface | 0018 |
+| `test/` | `unit/` (L1), `replay/` (L2), `sitl/` (L3), `hardware/` (L4 hardware tests), `ros2/` (L5); L0 static checks run from root config files and CI | 0018 |
 
-參數定義（`params.toml`）放在所屬模組或驅動的目錄內，日誌設定檔放在日誌模組底下，移動或刪除模組時會一起帶走（ADR-0012、ADR-0019）。
+Parameter definitions (`params.toml`) live in the directory of their module or driver, and log profiles live under the logging module, so they move or disappear together with their module (ADR-0012, ADR-0019).
 
-## 授權
+## License
 
-GNU GPL 第 3 版或任何更新的版本（SPDX：`GPL-3.0-or-later`），全文見 [LICENSE](LICENSE)。
+GNU GPL version 3 or any later version (SPDX: `GPL-3.0-or-later`); see [LICENSE](LICENSE) for the full text.

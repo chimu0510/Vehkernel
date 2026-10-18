@@ -1,16 +1,16 @@
-# 參數系統：結構體直接存取，以名稱雜湊逐筆儲存
+# Parameter system: direct struct access, per-entry storage keyed by name hash
 
-參數在 RAM 中是普通結構體，模組直接讀取；存進 Flash 時以參數名稱的雜湊為 key 逐筆儲存，所以參數群組的結構改變時，使用者的設定不會失效。這結合了 Betaflight 的存取速度、PX4 的儲存穩健性，以及 PX4 與 ArduPilot 的 metadata。
+In RAM, parameters are plain structs that modules read directly; in Flash they are stored entry by entry, keyed by a hash of the parameter name, so changing the layout of a parameter group never invalidates user settings. This combines Betaflight's access speed, PX4's storage robustness, and the metadata of PX4 and ArduPilot.
 
-- **定義**：每個模組或驅動一份 TOML，寫明說明、型別、單位、範圍、預設值與安全屬性，和板級定義共用工具鏈，工具鏈版本依 ADR-0016 固定。
-- **存取**：產生器把每個參數群組產生成普通結構體，放在 RAM，模組直接讀成員，不需要查詢。參數一改變，就在匯流排上發布 `parameter_update`。
-- **儲存**：以參數名稱的雜湊為 key，逐筆儲存，只存非預設值。開機時依雜湊把值填回結構體，找不到的雜湊就略過，所以群組結構怎麼改都不會讓使用者的設定回到預設值。Flash 用兩個 16 KB 磁區輪替，採附加寫入，斷電也不會損毀。磁區位置與 armed 時的寫入限制見 ADR-0020。
-- **預設值分層**，由低到高：參數定義（可依載具類型給不同的預設值，ADR-0013）→ 板級定義 → Frame 預設組 → 使用者的值。`VEHICLE_TYPE` 與 `FRAME_CLASS` 最先解析（ADR-0013）。
-- **安全屬性**：`reboot_required`，以及 `locked_when_armed`（armed 時禁止修改）。
-- **名稱**：一律 ≤ 16 字元，大寫加模組前綴，例如 `RD_WHEEL_TRACK`，以相容 MAVLink 的參數協議。所有 Link 與 ROS2 都用同一個名稱。
-- **ROS2**：MCU 是唯一的真實來源。Bridge 連線時把參數全部拉回來，依 metadata 宣告成 ROS2 parameter。修改由 MCU 驗證範圍與安全屬性，被拒絕時回傳原因。
+- **Definition**: one TOML file per module or driver, giving the description, type, unit, range, default and safety attributes. It shares the board definition toolchain, whose versions are pinned by ADR-0016.
+- **Access**: the generator turns each parameter group into a plain struct in RAM; modules read members directly, with no lookup. Every change publishes `parameter_update` on the bus.
+- **Storage**: entries keyed by the name hash, storing only non-default values. At boot the values are filled back into the structs by hash and unknown hashes are skipped, so no layout change ever resets user settings. Flash uses two alternating 16 KB sectors with append-only writes, which survives power loss. Sector placement and the write limits while armed are in ADR-0020.
+- **Default layering**, lowest first: parameter definition (which may give different defaults per vehicle type, ADR-0013) → board definition → frame preset → user value. `VEHICLE_TYPE` and `FRAME_CLASS` are resolved first (ADR-0013).
+- **Safety attributes**: `reboot_required`, and `locked_when_armed` (no changes while armed).
+- **Names**: at most 16 characters, upper case with a module prefix, for example `RD_WHEEL_TRACK`, for compatibility with the MAVLink parameter protocol. Every Link and ROS2 use the same name.
+- **ROS2**: the MCU is the single source of truth. On connection the Bridge pulls every parameter and declares it as a ROS2 parameter from its metadata. The MCU validates each change against the range and safety attributes and returns the reason when it rejects one.
 
 ## Considered Options
 
-- **Betaflight 的 PG 整塊儲存**：不採用它的儲存方式。結構體一變就要把版本加一，整組設定回到預設值。只採用它的結構體直接存取。
-- **名稱不受長度限制，由 MAVLink 協議模組另外產生短名稱對照**：不採用。同一個參數會有兩個名字，文件、除錯與搜尋都變複雜。
+- **Betaflight's whole-block PG storage**: its storage is rejected. Any struct change bumps the version and resets the whole group to defaults. Only its direct struct access is adopted.
+- **Unlimited name length, with the MAVLink protocol generating a short-name mapping**: rejected. One parameter would have two names, complicating documentation, debugging and search.

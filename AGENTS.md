@@ -1,5 +1,9 @@
 # Vehkernel
 
+## Language
+
+Write everything in English: docs, ADRs, glossary, code, comments, diagnostics, commit messages, issues and pull requests, in the style of ArduPilot and PX4 documentation. Use the English terms defined in `GLOSSARY.md`. See `docs/adr/0021-english-project-language.md`.
+
 ## Agent skills
 
 ### Issue tracker

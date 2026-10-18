@@ -1,3 +1,3 @@
-# RTOS 採用 FreeRTOS
+# FreeRTOS as the RTOS
 
-選擇 FreeRTOS 而不是 Zephyr，因為它最穩定、資源最多，在 STM32F4 上也最成熟。這個選擇的代價是多板支援得靠自己：Zephyr 的 devicetree 能直接解決板級定義，FreeRTOS 沒有，所以韌體要自建板級定義與 HAL 抽象層（參考 ArduPilot hwdef 的工具鏈與 AP_HAL 的分層概念，見 ADR-0009、ADR-0011），載具邏輯不可直接呼叫 RTOS 或廠商 HAL。
+FreeRTOS was chosen over Zephyr because it is the most stable, has the most resources and is the most mature on STM32F4. The cost is that multi-board support is ours to build: Zephyr's devicetree solves board definitions, FreeRTOS does not. The firmware therefore builds its own board definitions and HAL (borrowing the toolchain idea of ArduPilot's hwdef and the layering idea of AP_HAL, see ADR-0009 and ADR-0011), and vehicle logic never calls the RTOS or the vendor HAL directly.

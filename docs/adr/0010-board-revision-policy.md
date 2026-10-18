@@ -1,11 +1,11 @@
-# 只支援手上的硬體版本，開機時驗證版本，腳位可宣告替代配置
+# Support only the board revisions on hand, verify the revision at boot, allow alt configs per pin
 
-C50C 有多個硬體版本，原廠韌體稱為 V1.0、V1.1、V1.2；原廠文件另有 V4.0～V4.2 的名稱，兩者的對應關係未經確認。我們只為目前手上符合條件的版本撰寫板級定義：C50C V1.1，搭載 ICM20948 與 USB 手柄，沒有 485。其他版本等到需要相容時，再各自新增板級定義。在第二個版本出現之前，不預先抽出共用的基底定義。
+The C50C has several hardware revisions, called V1.0, V1.1 and V1.2 by the vendor firmware; the vendor documents also use the names V4.0 to V4.2, and how the two naming schemes map onto each other is unconfirmed. Board definitions are written only for the revision on hand: C50C V1.1, with an ICM20948, a USB gamepad and no RS-485. Other revisions get their own board definitions when compatibility is needed. No shared base definition is extracted before a second revision exists.
 
-**開機驗證**：每個版本一個韌體檔。開機時同時確認兩件事：IMU 是 ICM20948，且版本識別腳 PE2、PE3、PC13 的讀值為 0。任一項不符時，不啟動致動器，並透過 Link 與 OLED 回報錯誤。
+**Boot verification**: one firmware image per revision. At boot the firmware checks that the IMU is an ICM20948 and that the revision-ID pins PE2, PE3 and PC13 read 0. If either check fails, actuators stay disabled and the error is reported over a Link and on the OLED.
 
-**替代配置**：同一支腳在不同 Frame 下可能有不同用途。例如 PB7 平時是編碼器 C 的 TIM4_CH2，在頂配阿克曼車上則是舵機。板級定義可以為一支腳宣告替代配置（概念同 ArduPilot 的 `ALT()` 加 `BRD_ALT_CONFIG`），開機時由 Frame 參數選用；產生器在編譯時檢查每一種組合都沒有腳位或計時器衝突。
+**Alt configs**: a pin may serve different purposes under different frames. PB7, for example, is TIM4_CH2 for encoder C normally, but drives a servo on the high-end Ackermann car. A board definition may declare an alt config for a pin (like ArduPilot's `ALT()` with `BRD_ALT_CONFIG`), selected at boot by the frame parameters; the generator checks at build time that no combination produces a pin or timer conflict.
 
 ## Consequences
 
-- 原廠的資源分配表把 PC13、PE2、PE3 列為未使用，但它們其實是版本識別腳；OLED 腳位也沒有反映 V1.2 的變更。撰寫板級定義時，要以原理圖、原廠韌體與實測為準。
+- The vendor resource allocation table lists PC13, PE2 and PE3 as unused, although they are the revision-ID pins, and its OLED pins do not reflect the V1.2 change. Board definitions are written from the schematic, the vendor firmware and bench measurements.

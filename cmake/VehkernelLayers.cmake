@@ -40,8 +40,8 @@ function(vk_target_link_libraries target scope)
       get_target_property(dep_layer ${dep} VK_LAYER)
       if(dep_layer AND NOT dep_layer IN_LIST _vk_allowed_${layer})
         message(FATAL_ERROR
-          "分層違規：${target}（${layer}）不能依賴 ${dep}（${dep_layer}）。"
-          "${layer} 只能依賴：${_vk_allowed_${layer}}（ADR-0009）")
+          "Layer violation: ${target} (${layer}) must not depend on ${dep} (${dep_layer}). "
+          "A ${layer} target may depend only on: ${_vk_allowed_${layer}} (ADR-0009)")
       endif()
     endforeach()
   endif()

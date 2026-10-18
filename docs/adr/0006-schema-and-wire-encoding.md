@@ -1,11 +1,11 @@
-# Schema 採 .msg 風格，自訂協議採固定排列 little-endian 編碼
+# `.msg`-style schema; the custom protocol uses packed little-endian encoding
 
-所有 Topic 用 ROS `.msg` 風格的 Schema 定義，可附加單位、頻率等擴充註解，這是唯一的定義來源。產生器據此產生 MCU 端結構體與編解碼、Bridge 的解碼與 ROS2 訊息轉換、工具端解析器、欄位文件，並為每個訊息算出 Schema 雜湊。自訂協議在連線握手時逐一比對雜湊，只要有任何一個不一致就拒絕連線，並回報是哪些訊息不同；協議本身的版本可以協商（ADR-0002），Schema 不行。MAVLink、XRCE-DDS 這類對接標準工具的協議模組，相容性由各自的協議負責，不做雜湊握手。
+Every topic is defined in a ROS `.msg`-style schema, with extension annotations such as units and rates. The schema is the single source of truth. Generators produce the MCU structs and codecs, the Bridge decoders and ROS2 message conversion, tool-side parsers and field documentation, and compute a schema hash for each message. The custom protocol compares the hashes one by one during the handshake and refuses the connection if any of them differs, reporting which messages differ; the protocol version itself is negotiable (ADR-0002), the schema is not. Protocols that talk to standard tools, such as MAVLink and XRCE-DDS, leave compatibility to their own protocol and skip the hash handshake.
 
-每個 Topic 的第一個欄位固定是 64 位元的 `timestamp`（ADR-0008），由產生器檢查。編碼格式屬於各個協議模組。自訂協議採固定排列的 little-endian：照 Schema 順序排列欄位，中間不補空白。內部結構體與線上格式分開，由產生器產生逐欄位的 `encode()` / `decode()`，不直接 `memcpy` 結構體。
+The first field of every topic is a 64-bit `timestamp` (ADR-0008), enforced by the generator. Encoding belongs to each protocol. The custom protocol uses packed little-endian: fields in schema order with no padding. Internal structs and the wire format are kept separate; the generator emits field-by-field `encode()` / `decode()` and never `memcpy`s a struct.
 
 ## Considered Options
 
-- **CDR**：只用在之後的 XRCE-DDS 協議模組，由同一份 Schema 產生。自訂協議不採用，因為對齊會浪費頻寬，對 MCU 也沒有額外好處。
-- **varint / 欄位標籤式（protobuf 類）**：不採用。機器人資料以浮點數為主，省不了頻寬；它「跳過未知欄位」的相容性能力，已經由 Schema 雜湊取代。
-- **直接 `memcpy` 結構體**：不採用。編譯器的補位方式因平台而異，內部結構體也會被協議綁死。
+- **CDR**: used only by the future XRCE-DDS protocol, generated from the same schema. Not used by the custom protocol, because alignment padding wastes bandwidth with no benefit on the MCU.
+- **varint / tagged fields (protobuf-style)**: rejected. Robot data is mostly floating point, so there is no bandwidth to save, and the schema hash replaces "skip unknown fields" compatibility.
+- **`memcpy` of structs**: rejected. Padding differs between compilers and platforms, and the internal structs would be locked to the protocol.

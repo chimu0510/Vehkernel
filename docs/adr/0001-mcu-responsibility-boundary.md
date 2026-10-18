@@ -1,8 +1,8 @@
-# MCU 只負責即時估測與低階控制，不負責導航
+# The MCU does real-time estimation and low-level control, not navigation
 
-韌體首要支援地面、水面與水下載具，飛行器這類高頻響應的載具之後再延伸。MCU 必須能在沒有上位機時獨立運作，因此保留基本狀態估計、姿態與低階控制、載具模型（控制分配）、安全機制。全域定位、建圖與導航交給上層 ROS2 應用。這是與 ArduPilot、PX4 刻意不同的地方：它們把自主導航放在 MCU 上，本項目則把 MCU 定位成上位機的即時協處理器與安全守門員。
+The firmware targets ground, surface and underwater vehicles first; aircraft and other fast-responding vehicles come later. The MCU must keep the vehicle running without a companion computer, so it keeps basic state estimation, attitude and low-level control, the vehicle model (control allocation) and the safety mechanisms. Global localization, mapping and navigation belong to ROS2 applications above it. This is a deliberate departure from ArduPilot and PX4, which run autonomous navigation on the MCU: here the MCU is the companion computer's real-time coprocessor and safety gatekeeper.
 
 ## Consequences
 
-- 不在 MCU 上實作 GPS 融合的全域 EKF、航點任務或路徑規劃，即使之後要支援 USV 也一樣。
-- 雖然首要載具的即時性要求不高，排程器仍要分頻率層級，讓之後延伸到飛行器時不必重寫控制路徑。
+- No GPS-fused global EKF, waypoint missions or path planning on the MCU, even once USVs are supported.
+- Although the first vehicles have relaxed timing needs, the scheduler is still split into rate tiers, so that extending to aircraft later does not mean rewriting the control path.

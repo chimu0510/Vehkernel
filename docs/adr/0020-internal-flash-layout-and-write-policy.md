@@ -1,28 +1,28 @@
-# 內部 Flash 配置與寫入政策：armed 時只寫不擦
+# Internal Flash layout and write policy: write but never erase while armed
 
-STM32F407 的 Flash 只有一個 bank。抹除或寫入期間，CPU 從 Flash 讀取指令或常數都會被卡住，ISR 與 `wq:ctrl` 也不例外。寫入一個 32 位元字組只卡約 16 µs，但抹除一個磁區要數百毫秒到 2 秒，足以讓控制鏈停擺。參數儲存（ADR-0012）與事件日誌（ADR-0019）都會寫內部 Flash，所以需要統一的配置與寫入規則。
+The STM32F407 Flash has a single bank. During an erase or write, every instruction or constant fetch from Flash stalls, including ISRs and `wq:ctrl`. Writing one 32-bit word stalls for only about 16 µs, but erasing a sector takes hundreds of milliseconds up to 2 seconds, long enough to stall the control chain. Parameter storage (ADR-0012) and the event log (ADR-0019) both write internal Flash, so they need one layout and one set of write rules.
 
-**配置**
+**Layout**
 
-| 磁區 | 大小 | 用途 |
+| Sector | Size | Use |
 |---|---|---|
-| S0 | 16 KB | 保留給之後的 bootloader，目前只放跳轉到韌體的 stub |
-| S1–S2 | 16 KB × 2 | 參數儲存，兩個磁區輪替（ADR-0012） |
-| S3 | 16 KB | 事件日誌（ADR-0019） |
-| S4–S7 | 64 KB + 128 KB × 3 | 韌體，共 448 KB，連續存放，中斷向量表由 VTOR 指向 S4 |
+| S0 | 16 KB | Reserved for a future bootloader; for now holds only a stub that jumps to the firmware |
+| S1–S2 | 16 KB × 2 | Parameter storage, two alternating sectors (ADR-0012) |
+| S3 | 16 KB | Event log (ADR-0019) |
+| S4–S7 | 64 KB + 128 KB × 3 | Firmware, 448 KB contiguous; VTOR points the vector table at S4 |
 
-- 磁區配置由板級 TOML 宣告，磁區表來自 MCU 資料庫（ADR-0011）。產生器據此產生連結腳本的記憶體區段，並把韌體區的大小當作 ADR-0017 的 Flash 預算。
-- 燒錄可以用 STM32 內建的 USB DFU 或 SWD，不依賴 bootloader。之後加入透過 Link 更新韌體時，由新的 ADR 決定 S0 的內容，配置不必重排。
+- The board TOML declares the layout, and the sector table comes from the MCU database (ADR-0011). The generator derives the linker script memory regions from it and uses the firmware region size as the Flash budget of ADR-0017.
+- Flashing works through the STM32 built-in USB DFU or SWD, without a bootloader. When firmware updates over a Link are added, a new ADR decides what goes into S0, with no change to the layout.
 
-**寫入政策**
+**Write policy**
 
-- **抹除只在 disarmed 時進行。** 開機時、允許 arming 之前，確保參數的備用磁區已經抹除。
-- **armed 時只允許寫入，不允許抹除。** 寫入以字組為單位分批進行，每次執行最多寫入的字組數有上限，讓單次卡住的時間有界。卡住的時間由時序監看量測並發布（ADR-0015）。
-- **參數**：使用中的磁區寫滿時，把目前的值分批整理寫入已抹除的備用磁區，這一步 armed 時也可以進行；舊磁區的抹除則延到 disarm 之後。如果 armed 期間兩個磁區都沒有空間，新的變更先留在 RAM 並標記為未儲存，disarm 後再寫入。
-- **事件日誌**：事件發生時，把 RAM 環形緩衝分批寫入 S3。S3 裡已有尚未讀出的日誌時，保留舊日誌，新的事件不寫入，並透過 Link 回報。日誌經 Link 讀出或使用者明確清除後，才在 disarmed 時抹除 S3。
+- **Erase only while disarmed.** At boot, before arming is allowed, the spare parameter sector is erased.
+- **While armed, write but never erase.** Writes happen one word at a time in batches, with a cap on words per run so that each stall is bounded. The timing monitor measures and publishes the stall time (ADR-0015).
+- **Parameters**: when the active sector fills up, the current values are compacted into the erased spare sector in batches, which is allowed while armed; erasing the old sector waits until disarm. If both sectors run out of space while armed, new changes stay in RAM, marked unsaved, and are written after disarm.
+- **Event log**: when an event occurs, the RAM ring buffer is written to S3 in batches. If S3 still holds a log that has not been read out, the old log is kept, the new event is not written, and this is reported over a Link. S3 is erased, while disarmed, only after the log has been read out over a Link or explicitly cleared by the user.
 
 ## Considered Options
 
-- **armed 時完全不寫 Flash**：不採用。參數變更與事件日誌都要等到 disarm 才寫入，而事件往往就發生在 armed 期間，這時斷電會遺失最需要的資料。
-- **把控制路徑搬到 SRAM 執行**：不採用。F407 的 CCM 不能執行程式，要搬進一般 SRAM 的除了控制鏈，還有 FreeRTOS、ISR 與驅動，會佔用 DMA 需要的 SRAM，維護成本也高。
-- **韌體從 S0 開始，參數磁區夾在中間**：不採用。雖然多出 16 KB，但韌體會被切成兩段，之後加入 bootloader 時必須重排配置。
+- **No Flash writes at all while armed**: rejected. Parameter changes and event logs would wait until disarm, yet events usually happen while armed, and a power loss then destroys exactly the data that matters most.
+- **Running the control path from SRAM**: rejected. The F407's CCM cannot execute code, so the control chain, FreeRTOS, ISRs and drivers would all have to move into normal SRAM, taking memory DMA needs and costing maintenance.
+- **Firmware starting at S0 with the parameter sectors in between**: rejected. It gains 16 KB but splits the firmware in two and forces a new layout once a bootloader is added.

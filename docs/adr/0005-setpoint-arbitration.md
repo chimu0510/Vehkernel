@@ -1,12 +1,12 @@
-# Setpoint 仲裁：模式決定控制權，遙控器可隨時接管
+# Setpoint arbitration: the mode decides who is in control, and RC can always take over
 
-同一時間可能有多個來源送 setpoint（上位機、遙控器、地面站，以及測試模式下開發主機上的測試執行器，ADR-0018）。我們不採用固定的來源優先序，而是由目前的模式決定哪個來源有控制權，概念同 PX4 的 offboard 模式。模式決定兩件事：哪個來源有控制權，以及這個來源可以使用哪些 setpoint 層級（ADR-0003）。例如在上位機模式下，只接受 Bridge 送來的 setpoint，三個層級都可以；遙控器的手動模式只接受車體速度。致動器直出是一個 setpoint 層級，不是一種模式。
+Several sources may send setpoints at the same time: the companion computer, the remote control, a ground station, and in test mode the test runner on the development host (ADR-0018). Instead of a fixed source priority, the current mode decides which source is in control, as with PX4's offboard mode. A mode decides two things: which source is in control, and which setpoint levels that source may use (ADR-0003). In companion mode, for example, only setpoints from the Bridge are accepted, at any of the three levels; the RC manual mode accepts only body velocity. Direct actuator is a setpoint level, not a mode.
 
-另外有兩條規則不受模式限制：
+Two rules apply regardless of mode:
 
-- **遙控器隨時可以接管或急停。** 這是獨立運作與安全的最後防線。
-- **有控制權的來源逾時，載具會退到設定的安全行為，預設值依載具類型而定，Frame 預設組可以覆寫（ADR-0013）。** 例如地面載具停車，水下載具懸停或上浮。
+- **The remote control can always take over or trigger an emergency stop.** This is the last line of defence for standalone operation and safety.
+- **If the source in control times out, the vehicle falls back to its configured failsafe action. The default depends on the vehicle type and can be overridden by the frame preset (ADR-0013).** A ground vehicle stops, for example; an underwater vehicle holds position or surfaces.
 
 ## Considered Options
 
-- **固定優先序（遙控器 > 地面站 > 上位機）**：不採用。上位機正在自主運行時，低優先級來源的狀態會被高優先級來源隨意打斷，而且無法清楚表達「現在是誰在開」。
+- **Fixed priority (RC > ground station > companion computer)**: rejected. While the companion computer is driving autonomously, any higher-priority source could interrupt it at will, and the priority order cannot express "who is driving right now".

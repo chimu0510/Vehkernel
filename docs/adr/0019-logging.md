@@ -1,44 +1,44 @@
-# 日誌採 ULog，後端可替換，反壓在日誌端完成
+# ULog logging with replaceable sinks; backpressure handled in the logger
 
-日誌採用 ULog 格式，因為現成工具都能直接開啟，它緊密排列的 little-endian 編碼也和我們的 Schema 一致。後端透過 `LogSink` 介面替換，可以同時啟用多個；資料太多時由日誌模組自己降級，產生資料的模組完全不知道日誌存在。
+Logs use the ULog format because existing tools open it directly and its packed little-endian encoding matches our schema. Sinks are replaceable through the `LogSink` interface and several can run at once; when there is too much data the logger degrades on its own, and modules producing data never know the logger exists.
 
-**格式：ULog**
+**Format: ULog**
 
-- 不必自己寫工具：pyulog、PlotJuggler、Lichtblick 都能直接開啟 `.ulg`。
-- 與既有決策吻合：每則訊息的第一個欄位是 `timestamp`（ADR-0006、ADR-0008），自訂協議也採緊密排列的 little-endian（ADR-0006），所以日誌和自訂協議可以共用同一份編碼結果，不必重新編碼。產生器從 Schema 產生 ULog 的格式定義。
-- 會用到的訊息類型：`P`（參數）、`I`（板子、硬體版本、韌體版本、Schema 雜湊）、`L`（文字訊息，同時轉送到 ROS2 的 `/rosout`）、`O`（掉資料）、`S`（同步）。
-- 要記錄的 Topic 必須是固定長度。
-- Bridge 會記錄 MCU 與上位機之間的時鐘偏差，讓 ULog 可以和 rosbag2 錄下的 MCAP 在 Lichtblick 中對齊。
+- No tools to write: pyulog, PlotJuggler and Lichtblick all open `.ulg` files.
+- Fits existing decisions: the first field of every message is `timestamp` (ADR-0006, ADR-0008), and the custom protocol also uses packed little-endian (ADR-0006), so logging and the custom protocol share one encoding with no re-encoding. The generator derives the ULog format definitions from the schema.
+- Message types used: `P` (parameters), `I` (board, board revision, firmware version, schema hash), `L` (text messages, also forwarded to ROS2 `/rosout`), `O` (dropouts) and `S` (sync).
+- Logged topics must be fixed length.
+- The Bridge records the clock offset between the MCU and the companion computer, so ULog can be aligned in Lichtblick with MCAP recorded by rosbag2.
 
-**後端**
+**Sinks**
 
-所有後端都實作 `LogSink` 虛擬介面，可以同時啟用多個：
+Every sink implements the `LogSink` virtual interface, and several can be enabled at once:
 
-- SD 卡：FatFs，每個工作階段一個 `.ulg` 檔。
-- SPI NOR Flash：以區塊附加寫入，不建檔案系統。
-- 串流到上位機：由 Bridge 存檔。
-- RAM 環形緩衝：只在事件發生時，分批寫入內部 Flash 的事件日誌磁區（ADR-0020）。
-- 序列埠記錄器。
+- SD card: FatFs, one `.ulg` file per session.
+- SPI NOR Flash: block-wise append, no file system.
+- Streaming to the companion computer, which the Bridge saves.
+- RAM ring buffer: written to the event log sector of internal Flash, in batches, only when an event occurs (ADR-0020).
+- Serial logger.
 
-板級 TOML 宣告儲存裝置，產生 `BOARD_HAS_*` Kconfig 符號，所以要編進哪些後端由 Kconfig 決定。實際啟用哪些由 bitmask 參數 `LOG_BACKEND` 決定，預設值來自板級定義。C50C 沒有 SD 卡或 SPI Flash，所以預設用串流，內部 Flash 只留給事件日誌（ADR-0020）；這只是它的板級預設值。
+The board TOML declares storage devices, which become `BOARD_HAS_*` Kconfig symbols, so Kconfig decides which sinks are compiled in. The bitmask parameter `LOG_BACKEND` decides which are enabled, with defaults from the board definition. The C50C has no SD card or SPI Flash, so it defaults to streaming and uses internal Flash only for the event log (ADR-0020); this is merely its board default.
 
-**記錄什麼**
+**What to log**
 
-- 參數 `LOG_PROFILE` 是 bitmask，可組合以下設定檔（概念同 PX4 的 `SDLOG_PROFILE`）：預設、估測回放、系統識別、高頻控制、除錯。
-- 每個設定檔以 TOML 定義記錄哪些 Topic、各自的頻率。
-- `LOG_MODE` 決定何時記錄：一直記錄、armed 時記錄、事件時記錄。
-- 產生器估算每個設定檔需要的頻寬，開機時再依實際鮑率檢查一次。
+- The bitmask parameter `LOG_PROFILE` combines these profiles (like PX4's `SDLOG_PROFILE`): default, estimator replay, system identification, high-rate control and debug.
+- Each profile is defined in TOML: which topics to log, at what rate.
+- `LOG_MODE` decides when to log: always, while armed, or on events.
+- The generator estimates each profile's bandwidth, and the firmware checks it again at boot against the actual baud rate.
 
-**高頻資料與反壓**
+**High-rate data and backpressure**
 
-- 需要全頻率記錄的 Topic 必須用 `@queue` 或批次訊息，否則產生器報錯。
-- 批次訊息照 PX4 的 `SensorGyroFifo`：`int16[32]` 加 `samples`、`dt`、`scale`。湊滿 N 個樣本或超過 T 毫秒，任一條件先到就發布。控制鏈仍然訂閱逐樣本的 Topic，它以 `@queue` 宣告（ADR-0015）。
-- 反壓全部在日誌端完成，產生資料的模組完全不知道日誌存在：
-  - 日誌模組依訂閱的世代號碼偵測漏讀，寫入 `O` 訊息。
-  - 寫入環形緩衝前，先以非阻塞的 `try_reserve` 預留空間，失敗就跳過並計數。
-  - 負載過高時，依設定檔的優先級降級。
+- Topics that must be logged at full rate use `@queue` or batch messages; otherwise the generator reports an error.
+- Batch messages follow PX4's `SensorGyroFifo`: `int16[32]` plus `samples`, `dt` and `scale`, published when N samples have accumulated or T milliseconds have passed, whichever comes first. The control chain still subscribes to the per-sample topic, declared with `@queue` (ADR-0015).
+- Backpressure is handled entirely in the logger, and producing modules never know the logger exists:
+  - The logger detects missed samples from subscription generation counters and writes `O` messages.
+  - Before writing to the ring buffer it reserves space with a non-blocking `try_reserve`; on failure it skips the sample and counts the drop.
+  - Under heavy load it degrades by profile priority.
 
 ## Considered Options
 
-- **由產生資料的模組呼叫 `logger_has_headroom()`**：不採用。這會讓高優先級的驅動依賴日誌模組，破壞匯流排解耦，也把判斷放進 `wq:ctrl` 的熱路徑。
-- **Betaflight 的壓縮格式、自訂格式、在 MCU 上產生 MCAP**：不採用。前兩者需要專用工具；MCAP 有索引與壓縮區塊，對 MCU 太複雜，交給上位機的 rosbag2 即可。
+- **Producers calling `logger_has_headroom()`**: rejected. High-priority drivers would depend on the logger, breaking bus decoupling and putting the check on the `wq:ctrl` hot path.
+- **Betaflight's compressed format, a custom format, or MCAP generated on the MCU**: rejected. The first two need dedicated tools; MCAP's indexes and compressed chunks are too complex for the MCU, and rosbag2 on the companion computer already produces it.

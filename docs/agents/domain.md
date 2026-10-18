@@ -52,6 +52,6 @@ If your output contradicts an existing ADR, surface it explicitly rather than si
 
 ## This repo's conventions
 
-- GLOSSARY.md and the ADRs are written in Traditional Chinese; write domain terms in their Chinese form, adding the English name the glossary gives when it helps.
+- All docs are in English (ADR-0021); use the glossary's English terms exactly as defined.
 - When a later decision changes an earlier ADR, edit that ADR in place so its body always reads as the current decision; git history keeps the old text. Cite ADRs as `ADR-NNNN`.
 - ADR bodies currently double as the spec, because there is no code yet. Once code implements a decision, trim the ADR back to the decision and its reasons, leaving the details to the code.

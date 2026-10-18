@@ -1,16 +1,16 @@
-# 匯流排語意與依頻率層級分的 Work Queue 執行模型
+# Bus semantics and a rate-tiered Work Queue execution model
 
-匯流排沿用 PX4 uORB 的思路，但為了 STM32F407 有限的 RAM，全部改成編譯時靜態配置；執行模型也依頻率層級分成少數幾個 Work Queue，而不是每個模組一個 task。匯流排的規則如下：
+The bus follows PX4's uORB, but everything is allocated statically at compile time to fit the STM32F407's limited RAM, and execution is split into a few rate-tiered work queues instead of one task per module. Bus rules:
 
-- **語意**：每個 Topic 預設只保留最新值。訂閱者以世代計數器判斷 `updated()`，再用 `copy()` 取值。需要時可以在 Schema 以 `@queue N` 註解改成佇列。
-- **配置**：所有 Topic 與緩衝區由產生器在編譯時靜態產生，支援多實例（例如多顆 IMU），執行時不呼叫 `malloc`。
-- **執行緒安全**：發布與讀取用短臨界區保護。ISR 不直接發布，只通知對應的驅動工作項目，由它發布。
-- **時間戳**：每則訊息帶 64 位元單調遞增的微秒 `timestamp`，固定是第一個欄位（ADR-0006）。
-- **可觀測性**：匯流排可列出所有 Topic、發布頻率與最後更新時間，並透過 Link 對外。
+- **Semantics**: by default a topic keeps only its latest value. Subscribers check `updated()` against a generation counter and read with `copy()`. A schema annotation `@queue N` turns a topic into a queue where needed.
+- **Allocation**: the generator creates all topics and buffers statically at compile time, including multiple instances (for example several IMUs). Nothing calls `malloc` at runtime.
+- **Concurrency**: publish and read are protected by short critical sections. ISRs never publish; they notify the corresponding driver work item, which publishes.
+- **Timestamps**: every message carries a 64-bit monotonic microsecond `timestamp`, always as its first field (ADR-0006).
+- **Observability**: the bus can list every topic with its publish rate and last update time, and expose them over a Link.
 
-執行模型不是每個模組一個 task，而是依頻率層級分成幾個 Work Queue，每個 Work Queue 是一個 FreeRTOS task。模組是掛在 Work Queue 上的工作項目，由計時器或 Topic 發布觸發。以 `IMU_EVENT` 觸發時（觸發來源可選，見 ADR-0015），控制路徑走事件鏈：IMU 驅動發布後喚醒估測器，估測器發布後喚醒控制器，再到控制分配與輸出，全部在最高優先級的 `wq:ctrl` 上完成。這樣能落實 ADR-0001 的分頻率排程，也節省 F407 有限的 RAM。Stack 與匯流排緩衝區優先放在 CCM，一般 SRAM 留給 DMA。
+Rather than one task per module, execution is divided into rate tiers, each tier a work queue backed by one FreeRTOS task. Modules are work items attached to a work queue and triggered by a timer or by a topic publication. With the `IMU_EVENT` trigger (the trigger source is selectable, see ADR-0015) the control path is an event chain: the IMU driver publishes and wakes the estimator, the estimator publishes and wakes the controllers, then allocation and output follow, all on the highest-priority `wq:ctrl`. This implements the rate tiers of ADR-0001 and saves the F407's scarce RAM. Stacks and bus buffers go into CCM first, leaving normal SRAM for DMA.
 
 ## Considered Options
 
-- **每個模組一個 FreeRTOS task**：不採用。每個 task 都要一份 stack，F407 的 RAM 撐不起；任務之間也要各自對時。
-- **允許 ISR 直接發布**：不採用。這會讓上鎖規則變複雜，ISR 也會變長。
+- **One FreeRTOS task per module**: rejected. Every task needs its own stack, which the F407 cannot afford, and the tasks would have to synchronize with each other.
+- **Publishing directly from ISRs**: rejected. It complicates the locking rules and lengthens ISRs.

@@ -1,38 +1,38 @@
-# 測試分六層，SITL 跑同一套 RTOS
+# Six test layers; SITL runs the same RTOS
 
-測試分成六層，從靜態檢查到 ROS2 整合。SITL 用 FreeRTOS 的 POSIX 移植版跑完整韌體，排程行為和實機相同，不需要硬體就能測到 ROS2 堆疊。各層如下：
+Tests are split into six layers, from static checks to ROS2 integration. SITL runs the complete firmware on the FreeRTOS POSIX port, so scheduling behaves as on hardware and the whole ROS2 stack can be tested without hardware. The layers:
 
-- **L0 靜態檢查**：`-Werror`、clang-tidy、產生器的確定性（同樣的輸入產生同樣的輸出）、板級定義驗證。
-- **L1 單元測試**：在開發主機上使用 GoogleTest + gmock，與 Betaflight、PX4 相同。
-  - 驅動測試時，`platform::` 指向假的周邊匯流排，內含裝置的暫存器模型（ADR-0009）。
-  - Link 解碼器用 libFuzzer 做模糊測試。
-  - 參數儲存要用假的 Flash，模擬寫入途中任意位置斷電。
-- **L2 資料回放**：用錄下的資料重跑估測器，與參考結果比對。資料格式採 ULog，以「估測回放」日誌設定檔錄製（ADR-0019）。
-- **L3 SITL 情境**：完整韌體在開發主機上執行，以腳本描述情境（參考 ArduPilot 的 `rover.py`），例如繞正方形檢查里程計誤差、切斷 Link 檢查安全行為、遙控器接管。
-- **L4 實機測試**：韌體提供測試模式執行 bring-up 案例，結果透過 Link 回報，由開發主機上的執行器負責燒錄與收集。測試模式是一種模式（ADR-0005）：控制權交給這個執行器，只接受致動器直出層級。第一批案例包括：
-  - IMU 接線，讀 WHO_AM_I。
-  - 版本識別腳。
-  - 馬達與編碼器的對應和方向。
-  - PWM 頻率。
-  - 參數儲存。
+- **L0 static checks**: `-Werror`, clang-tidy, generator determinism (the same input produces the same output) and board definition validation.
+- **L1 unit tests**: GoogleTest + gmock on the development host, as in Betaflight and PX4.
+  - Driver tests point `platform::` at a fake peripheral bus containing a register model of the device (ADR-0009).
+  - Link decoders are fuzzed with libFuzzer.
+  - Parameter storage is tested against a fake Flash that simulates power loss at any point during a write.
+- **L2 replay**: re-run estimators on recorded data and compare against reference results. The data is ULog, recorded with the estimator replay log profile (ADR-0019).
+- **L3 SITL scenarios**: the complete firmware runs on the development host, driven by scenario scripts (modelled on ArduPilot's `rover.py`), for example driving a square to check odometry error, cutting a Link to check the failsafe action, and RC takeover.
+- **L4 hardware tests**: the firmware offers a test mode that runs bring-up cases and reports results over a Link, while a runner on the development host flashes the board and collects results. Test mode is a mode (ADR-0005): the runner is in control and only direct-actuator setpoints are accepted. The first cases:
+  - IMU wiring, by reading WHO_AM_I.
+  - Revision-ID pins.
+  - Motor-to-encoder mapping and direction.
+  - PWM frequency.
+  - Parameter storage.
 
-  會轉動輪子的測試，須先確認車輪已經離地，並限制輸出功率。
-- **L5 ROS2 整合**：SITL + Bridge + Nav2，用 launch_testing 執行。
+  Tests that turn the wheels require the wheels to be lifted off the ground first, with output power limited.
+- **L5 ROS2 integration**: SITL + Bridge + Nav2, run with launch_testing.
 
 **SITL**
 
-- SITL 使用 FreeRTOS 官方的 POSIX 移植版，所以 Work Queue、匯流排與排程行為都和實機相同。
-- 模擬器分兩種，參考 PX4 的 SIH / `gz_bridge` 與 ArduPilot 的 `SIM_Rover` / `SIM_JSON`：
-  - **內建輕量模擬器**：依載具類型與 Frame Class 選用物理模型（例如水面與水下的推進器載具動力學不同），在同一個行程中執行，CI 預設使用它。
-  - **外部模擬器介面**：與模擬器無關的通用協議，訊息由 Schema 定義（ADR-0006），可以接 Gazebo、Webots 或使用者自訂的模擬器。
-- SITL 的 Link 透過 pty 或 UDP 接上真正的 Bridge，不需要硬體就能跑完整的 ROS2 堆疊。
+- SITL uses the official FreeRTOS POSIX port, so work queues, the bus and scheduling behave as on hardware.
+- Two kinds of simulator, modelled on PX4's SIH / `gz_bridge` and ArduPilot's `SIM_Rover` / `SIM_JSON`:
+  - **Built-in lightweight simulator**: a physics model selected by vehicle type and frame class (surface and underwater thruster vehicles have different dynamics), running in the same process. CI uses it by default.
+  - **External simulator interface**: a simulator-agnostic protocol with messages defined in the schema (ADR-0006), for Gazebo, Webots or a custom simulator.
+- SITL Links connect to the real Bridge over a pty or UDP, so the complete ROS2 stack runs without hardware.
 
 **CI**
 
-每次 push 執行：
-1. 所有板子的建置與大小預算檢查。
-2. L0 與 L1。
-3. L2，等有錄製的回放資料後加入。
-4. L3，使用內建模擬器。
+On every push:
+1. Build every board and check its size budget.
+2. L0 and L1.
+3. L2, once recorded replay data exists.
+4. L3 with the built-in simulator.
 
-L4 之後接上 self-hosted runner，初期先手動執行。
+L4 moves to a self-hosted runner later; until then it runs manually.

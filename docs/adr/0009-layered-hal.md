@@ -1,25 +1,25 @@
-# 分層 HAL，依「選擇在什麼時候做」決定多型形式
+# Layered HAL; the form of polymorphism follows when the choice is made
 
-韌體要支援多種 MCU、SITL 與單元測試，又要在執行時切換載具與 Frame，所以 HAL 分層，並依「選擇在什麼時候做」決定多型的形式：編譯時就決定的用具體類別加 C++20 concept，執行時才決定的用虛擬介面。板子在編譯時決定，一塊板子一個韌體檔；載具類型、Frame 與連接埠的用途在執行時用參數決定（ADR-0011、ADR-0013）。
+The firmware must support several MCUs, SITL and unit tests, and switch vehicles and frames at runtime. The HAL is therefore layered, and the form of polymorphism follows when a choice is made: concrete classes checked by C++20 concepts for choices fixed at build time, virtual interfaces only for choices made at runtime. The board is fixed at build time, one firmware image per board; the vehicle type, the frame and the use of each port are set at runtime through parameters (ADR-0011, ADR-0013).
 
-**分層**
+**Layers**
 
-由上到下：模組層 → 驅動層 → 介面層 → 平台層，依賴方向只能往下。可以跳過驅動層直接使用介面層的能力，例如 Link 的傳輸用 UART、致動器控制用 `PwmOutput`；但任何一層都不能繞過介面層直接使用平台層。
+Top to bottom: module layer → driver layer → interface layer → platform layer. Dependencies point downward only. A layer may skip the driver layer and use interface-layer capabilities directly, for example a Link transport using a UART or actuator control using `PwmOutput`; no layer may bypass the interface layer to reach the platform layer.
 
-分層之外有兩個共用部分：`core/`（匯流排、Work Queue、參數執行時、時序監看）各層都可以依賴，包括平台層；它本身只依賴 FreeRTOS 與介面層，時鐘、Flash 這些硬體都經由介面層的契約取得，不依賴平台層、驅動層或模組層；`lib/` 的數學函式庫不依賴任何一層，也不依賴 `core/`（ADR-0014）。
+Two shared parts sit outside the layering. Every layer, including the platform layer, may depend on `core/` (bus, work queues, parameter runtime, timing monitor); `core/` itself depends only on FreeRTOS and the interface layer, reaching hardware such as clocks and Flash through interface-layer contracts, never through the platform, driver or module layers. The math libraries in `lib/` depend on no layer and not on `core/` (ADR-0014).
 
-**多型的形式**
+**Forms of polymorphism**
 
-- **平台周邊**：每次建置只有一種 MCU，所以用具體類別，再以 C++20 concept 檢查契約。STM32、SITL、單元測試靠建置配置切換實作，驅動不寫成樣板。
-- **驅動與消費端之間**：不定義介面，透過匯流排解耦。
-- **在執行時才選擇的部分**：Link 的傳輸與協議模組、載具模型與 Frame，用虛擬介面。
+- **Platform peripherals**: one MCU per build, so concrete classes whose contracts are checked by C++20 concepts. STM32, SITL and unit tests switch implementations through build configuration; drivers are not templates.
+- **Between drivers and their consumers**: no interface at all; they are decoupled by the bus.
+- **Choices made at runtime**: Link transports and protocols, vehicle models and frames use virtual interfaces.
 
-介面層保持精簡，只定義通用驅動需要的部分。計時器這類高度依賴平台的功能，以「能力」的形式提供，例如 `PwmOutput`、`QuadratureEncoder`。
+The interface layer stays small and defines only what generic drivers need. Highly platform-specific features such as timers are offered as capabilities, for example `PwmOutput` and `QuadratureEncoder`.
 
-平台層以 ST LL 為主，只在必要時（例如 USB）才用 ST HAL。
+The platform layer is built on ST LL, using ST HAL only where needed (for example USB).
 
 ## Considered Options
 
-- **平台層全部用虛擬介面（ArduPilot）**：不採用。一次建置只有一種平台，執行時多型沒有回報。
-- **以 modm 作為平台層**：不採用。它會帶進自己的整套架構，綁定程度高。只借用它「錯誤的腳位用法在編譯時失敗」的想法，由我們自己的板級產生器產出有型別的腳位常數。
-- **ST HAL2**：STM32F4 不在支援之列。
+- **Virtual interfaces for the whole platform layer (ArduPilot)**: rejected. A build has exactly one platform, so runtime polymorphism buys nothing.
+- **modm as the platform layer**: rejected. It brings its own architecture and strong lock-in. We borrow only its idea that misusing a pin fails at compile time, with our own board generator emitting typed pin constants.
+- **ST HAL2**: does not support STM32F4.

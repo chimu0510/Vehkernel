@@ -1,9 +1,9 @@
-# 允許第三方工具與套件，但固定版本並集中宣告
+# Third-party tools and packages are allowed, pinned and declared centrally
 
-建置與開發主機上的工具可以使用第三方套件，但版本必須固定並集中宣告。早期曾規定產生器只用 Python 標準函式庫，但過度限制會讓我們錯過成熟的生態，例如 kconfiglib、Jinja2，最後反而得自己重寫比較差的版本。規則如下：
+Build and development-host tools may use third-party packages, but versions must be pinned and declared centrally. Generators were once restricted to the Python standard library, but over-restriction means missing mature ecosystems such as kconfiglib and Jinja2 and rewriting worse versions ourselves. The rules:
 
-- 版本必須固定，並集中宣告：Python 套件用 lock 檔，C++ 函式庫用 CMake FetchContent 或 submodule 並指定版本，工具鏈指定確切版本。
-- 提供 devcontainer，讓本機與 CI 使用相同的環境。
-- 會影響產出結果的外部資料要先離線轉換並 commit，例如 MCU 資料庫。這樣建置不需要網路，結果也可重現。
+- Versions are pinned and declared centrally: a lock file for Python packages, CMake FetchContent or submodules at a fixed version for C++ libraries, and exact versions for toolchains.
+- A devcontainer gives local machines and CI the same environment.
+- External data that affects build output, such as the MCU database, is converted offline and committed, so builds need no network and stay reproducible.
 
-已維護停滯的套件，例如 kconfiglib，必要時在 repo 內保留一份副本。
+Unmaintained packages such as kconfiglib may be kept as a copy in the repo when necessary.

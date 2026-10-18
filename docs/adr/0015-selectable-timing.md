@@ -1,26 +1,26 @@
-# 時序拆成可選的維度，不寫死成固定方案
+# Timing as selectable dimensions, not a fixed scheme
 
-時序不寫死成單一方案，而是拆成三個可以獨立選擇的維度，再由時序預設組給出預設值，因為適合的時序取決於硬體條件。主流韌體的時序設計各不相同：
+Timing is not hard-coded into one scheme. It is split into three independently selectable dimensions, with defaults from a timing preset, because the right timing depends on the hardware. Popular firmware projects time their loops differently:
 
-- Betaflight：陀螺儀驅動，用 `pid_process_denom` 分頻。
-- PX4：感測器發布後喚醒控制。
-- ArduPilot：固定頻率主迴圈，由 `SCHED_LOOP_RATE` 加排程表決定，表中記錄每個任務的頻率、最長執行時間與優先級。
+- Betaflight: gyro-driven, divided down with `pid_process_denom`.
+- PX4: sensor publications wake the controllers.
+- ArduPilot: a fixed-rate main loop set by `SCHED_LOOP_RATE` plus a scheduler table that records each task's rate, maximum run time and priority.
 
-三者各有適用的硬體條件。三個維度如下：
+Each suits different hardware. The three dimensions:
 
-1. **觸發來源**：`IMU_EVENT`（資料就緒或 FIFO 水位中斷）或 `TIMER`（固定頻率）。
-2. **基準頻率 + 分頻**：`CTRL_RATE_HZ` 是基準頻率，估測、角速度控制、速度與姿態控制各自設定分頻；定時的工作項目各自設定頻率。
-3. **感測器取樣方式**：逐樣本讀取，或批次讀取 FIFO。驅動宣告最高 ODR 與每次讀取的周邊匯流排成本，板級定義宣告周邊匯流排類型。批次讀取時，驅動仍逐一發布每個樣本，所以 IMU 的逐樣本 Topic 必須以 `@queue N` 宣告，N 不小於一次批次的最大樣本數（ADR-0008），估測器每次執行時把佇列取完。
+1. **Trigger source**: `IMU_EVENT` (data-ready or FIFO watermark interrupt) or `TIMER` (fixed rate).
+2. **Base rate + dividers**: `CTRL_RATE_HZ` is the base rate; estimation, angular rate control, and velocity and attitude control each set a divider. Timed work items set their own rates.
+3. **Sensor sampling method**: per-sample reads or batched FIFO reads. Drivers declare their maximum ODR and the peripheral bus cost of each read; the board definition declares the peripheral bus type. With batched reads the driver still publishes each sample individually, so the IMU's per-sample topic must be declared with `@queue N`, N at least the largest batch (ADR-0008), and the estimator drains the queue on every run.
 
-**時序預設組**把三個維度的值組成一組。預設值依 ADR-0012 分層取得，由板級定義提供，Frame 預設組可以覆寫。
+A **timing preset** groups values for the three dimensions. Its defaults follow the layering of ADR-0012: provided by the board definition, overridable by the frame preset.
 
-開機時依驅動能力與周邊匯流排成本估算 CPU 預算；設定不可行時，降到可行的最高頻率並發出警告。執行時監看每個工作項目的執行時間、抖動與超時次數，並發布到匯流排。
+At boot the firmware estimates the CPU budget from driver capabilities and peripheral bus costs; if a configuration is not feasible, it drops to the highest feasible rate and raises a warning. At runtime the timing monitor tracks each work item's run time, jitter and overruns and publishes them on the bus.
 
 ## Consequences
 
-- C50C V1.1 只是其中一種組合。原廠韌體寫的是 SCL = PB9、SDA = PB8，但 F407 硬體 I2C1 的腳位是 PB8 = SCL、PB9 = SDA，板子可能接反。這件事尚未驗證，板級預設值分兩種情境暫定：
-  - **確認接反**：只能用軟 I2C。一次 IMU 讀取約 135 個 SCL 週期，在 400 kHz 下約 0.34 ms，而且是 CPU 忙等，板級預設暫定約 200 Hz。
-  - **接線與硬體 I2C1 相符**：改用硬體 I2C，可以搭配 DMA，不再忙等，預設頻率由實測決定。
+- C50C V1.1 is just one combination. The vendor firmware says SCL = PB9 and SDA = PB8, but on the F407 hardware I2C1 uses PB8 = SCL and PB9 = SDA, so the board may be wired the other way round. This is unverified, so the board defaults are provisional for two cases:
+  - **Wiring confirmed swapped**: only software I2C works. One IMU read takes about 135 SCL cycles, about 0.34 ms at 400 kHz, with the CPU busy-waiting; the provisional board default is about 200 Hz.
+  - **Wiring matches hardware I2C1**: switch to hardware I2C, optionally with DMA and no busy-waiting; the default rate is set by measurement.
 
-  最後的數值寫在板級 TOML，本 ADR 只當作範例。換成以硬體 SPI 接 IMU 的板子，也只要改板級預設值，架構不變。
-- 實際接線要用 bring-up 測試確認：以軟 I2C 分別試兩種接法，讀 ICM20948 的 WHO_AM_I，正確值是 `0xEA`。
+  The final values live in the board TOML; this ADR only gives an example. A board with the IMU on hardware SPI likewise changes only its board defaults, not the architecture.
+- The actual wiring is confirmed by a bring-up test: try both pin assignments with software I2C and read the ICM20948's WHO_AM_I, which must be `0xEA`.

@@ -1,16 +1,16 @@
-# 內部匯流排為骨幹，ROS2 只是其中一種 Link
+# The internal bus is the backbone; ROS2 is just one Link
 
-MCU 必須能獨立運作，所以韌體內部不能以 ROS2 為骨幹。內部模組之間只透過發布/訂閱匯流排交換資料（同 PX4 的 uORB），對外通訊一律走 Link。Link 拆成三個獨立部分：Topic 映射、協議模組、傳輸，多條 Link 可以同時運作。所有 Topic 由同一份 Schema 定義，MCU、Bridge 與工具的程式碼都由它產生。
+The MCU must run standalone, so ROS2 cannot be the firmware's internal backbone. Modules exchange data only through a publish/subscribe bus (like PX4's uORB), and all external communication goes through Links. A Link has three independent parts: a topic map, a protocol and a transport, and several Links can run at once. Every topic is defined in one schema, from which MCU, Bridge and tool code is generated.
 
-第一個協議模組是自訂的輕量協議，分幀用 COBS + CRC16，並帶序號、時間戳、版本協商與時間同步。版本協商只針對協議本身（分幀與握手、時間同步等控制訊息），雙方選用共同支援的最高版本；Topic 的相容性由 Schema 雜湊決定（ADR-0006）。這樣 MCU 韌體不綁定 ROS2 版本，上位機不在時，設定、調參與日誌工具也能用同一條鏈路。
+The first protocol is a lightweight custom protocol: COBS + CRC16 framing, with sequence numbers, timestamps, version negotiation and time synchronization. Version negotiation covers the protocol itself only (framing and control messages such as the handshake and time sync); both sides pick the highest version they share. Topic compatibility is decided by the schema hash (ADR-0006). The firmware is therefore not tied to a ROS2 release, and configuration, tuning and logging tools work over the same link when no companion computer is present.
 
 ## Considered Options
 
-- **micro-ROS（rclc）讓 MCU 成為 ROS2 節點**：不採用。rclc executor 會和控制鏈共處，需要 Agent，韌體也綁定 ROS2 版本，而且上位機不在時沒有任何工具能用。
-- **XRCE-DDS，照 PX4 的作法直接用 Micro-XRCE-DDS-Client，不用 rclc**：列為第二個協議模組，從同一份 Schema 產生，給想直接接標準 Agent 的使用者。
-- **zenoh-pico + rmw_zenoh**：MCU 端暫不採用，因為 MCU 端要模擬 rmw_zenoh 的線上格式，序列埠支援也還不成熟。zenoh 放在上位機以上的層級，用於上位機和岸端、地面站、車隊之間的不穩定或多跳鏈路。
-- **MAVLink**：列為選配協議模組，讓獨立運作的載具可以直接接數傳電台與 QGroundControl。只借用它的通訊生態，不承擔導航職責。
+- **micro-ROS (rclc), making the MCU a ROS2 node**: rejected. The rclc executor would share the MCU with the control chain, it needs an Agent, it ties the firmware to a ROS2 release, and no tool works without the companion computer.
+- **XRCE-DDS through Micro-XRCE-DDS-Client directly, as PX4 does, without rclc**: planned as the second protocol, generated from the same schema, for users who want to talk to a standard Agent.
+- **zenoh-pico + rmw_zenoh**: not on the MCU for now, because the MCU would have to emulate rmw_zenoh's wire format and serial support is still immature. zenoh belongs above the companion computer, on unreliable or multi-hop links between the vehicle and shore, ground stations or fleets.
+- **MAVLink**: an optional protocol, so a standalone vehicle can talk to a telemetry radio and QGroundControl directly. Vehkernel borrows MAVLink's ecosystem, not its navigation role.
 
 ## Consequences
 
-- 從任何 Link 進來的 setpoint 都必須先經過 Setpoint 仲裁，不可直接驅動致動器。
+- A setpoint arriving on any Link goes through setpoint arbitration; it never drives actuators directly.

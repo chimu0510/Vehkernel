@@ -1,36 +1,36 @@
-# 估測分成可替換的估測器模組與數學元件函式庫
+# Estimation split into replaceable estimator modules and a math component library
 
-估測拆成兩層：可以替換、同時執行的估測器模組，以及不依賴匯流排與 HAL 的數學元件函式庫。這樣演算法可以互相比較、互為備援，也能在開發主機上測試。MCU 端只做局部估測（ADR-0001），範圍如下：
+Estimation has two levels: replaceable estimator modules that can run side by side, and a math component library that depends on neither the bus nor the HAL. Algorithms can then be compared, back each other up, and be tested on the development host. The MCU does only local estimation (ADR-0001):
 
-- IMU 處理：依 ADR-0015 的取樣方式讀取（逐樣本或批次 FIFO）、校正、依板級定義旋轉安裝方向、濾波。
-- 姿態估測。
-- 局部里程計：融合車體速度量測與姿態估測的航向，做航位推算。航向來自姿態估測（陀螺儀積分，啟用時融合磁力計），不用左右輪速差。
+- IMU processing: reading with the sampling method of ADR-0015 (per sample or batched FIFO), calibration, rotation by the mounting orientation from the board definition, filtering.
+- Attitude estimation.
+- Local odometry: dead reckoning from body velocity measurements and the heading from attitude estimation. The heading comes from attitude estimation (gyro integration, fused with the magnetometer when enabled), never from the left/right wheel speed difference.
 
-輸出同時包含校正後的原始資料與融合結果，都帶共變異數。不使用 ICM20948 的 DMP，因為它是封閉的晶片內韌體，時序與濾波都不透明，也拿不到共變異數。是否使用磁力計由參數決定，預設值依載具類型而定，Frame 預設組可以覆寫（ADR-0013）。
+Outputs include both the calibrated raw data and the fused results, all with covariances. The ICM20948's DMP is not used: it is closed on-chip firmware with opaque timing and filtering, and provides no covariance. Magnetometer use is a parameter whose default depends on the vehicle type and can be overridden by the frame preset (ADR-0013).
 
-**量測來源與里程計狀態分開**
+**Measurement sources and odometry state are separate**
 
-里程計不綁定任何一種感測器，否則韌體會退化成只能用在輪式載具。拆成兩部分：
+Odometry is not tied to any one sensor; otherwise the firmware would degrade into wheeled-vehicle firmware. It has two parts:
 
-- **車體速度量測**：標準 Topic，可以有多個實例，每則訊息帶來源 ID、時間戳與共變異數。來源可以是有輪速回授的載具模型（ADR-0013）、DVL 這類測速感測器的驅動，或是上位機經由 Link 送下的速度（例如 VIO）。Link 送下的資料必須已在上位機端轉到車體座標，時間戳經時間同步換算成 MCU 時間（ADR-0002）。
-- **局部里程計**：估測器訂閱車體速度量測，搭配姿態估測的航向做航位推算，發布 `vehicle_local_odometry`。用參數選擇採用哪些來源。
+- **Body velocity measurement**: a standard topic with multiple instances; each message carries a source ID, timestamp and covariance. Sources include vehicle models with wheel speed feedback (ADR-0013), drivers for velocity sensors such as a DVL, and velocities sent by the companion computer over a Link (for example from VIO). Data arriving over a Link must already be in the body frame, with timestamps converted to MCU time by time synchronization (ADR-0002).
+- **Local odometry**: an estimator subscribes to body velocity measurements and dead-reckons with the heading from attitude estimation, publishing `vehicle_local_odometry`. Parameters select which sources are used.
 
-上位機的位姿品質明顯較好時（例如 VIO），可以啟用**外部估測器**：它把 Link 送下的位姿換算成 MCU 時間後重新發布，和其他估測器一樣用參數選為主要估測器。上位機斷線時，健康檢查會切回 MCU 自己的估測器，維持獨立運作（ADR-0001）。啟用外部估測器時，`odom → base_link` 的 TF 只能由 Bridge 或 VIO 節點其中一方發布（ADR-0003）。
+When the companion computer's pose is clearly better (for example from VIO), the **external estimator** can be enabled: it converts the pose received over a Link to MCU time and republishes it, and is selected as the primary estimator through parameters like any other estimator. If the companion computer disconnects, health checks fall back to the MCU's own estimator, keeping standalone operation (ADR-0001). With the external estimator enabled, the `odom → base_link` TF is published by either the Bridge or the VIO node, never both (ADR-0003).
 
-**第一層：估測器模組**
+**Level 1: estimator modules**
 
-- 每個估測器是一個獨立的工作項目，發布標準的狀態 Topic（如 `vehicle_attitude`、`vehicle_local_odometry`），並帶估測器 ID。控制鏈只訂閱標準 Topic。
-- 用參數選擇主要估測器。可以同時執行多個估測器：被選中的發布到標準 Topic，其他的發布到診斷 Topic，用來比較演算法，主要估測器不健康時也能切換到備援。
+- Each estimator is an independent work item that publishes standard state topics (such as `vehicle_attitude` and `vehicle_local_odometry`) tagged with an estimator ID. The control chain subscribes only to the standard topics.
+- A parameter selects the primary estimator. Several estimators may run at once: the selected one publishes to the standard topics and the others to diagnostic topics, for algorithm comparison and as a fallback when the primary estimator becomes unhealthy.
 
-**第二層：數學元件函式庫**
+**Level 2: math component library**
 
-依數學模型切割，放在 `lib/estimation/` 下：
+Split by mathematical model, under `lib/estimation/`:
 
-- 過程模型，例如四元數運動學、輪式運動學。
-- 量測模型，例如加速度計、磁力計、輪速、深度計。
-- 濾波演算法，例如互補濾波、EKF、ESKF。
-- 不配置記憶體的數學工具。
+- Process models, for example quaternion kinematics and wheel kinematics.
+- Measurement models, for example accelerometer, magnetometer, wheel speed and depth sensor.
+- Filter algorithms, for example complementary filter, EKF and ESKF.
+- Non-allocating math utilities.
 
-估測器 = 一個演算法 + 若干模型的組合。函式庫完全不依賴匯流排與 HAL，可以在開發主機上用錄下的資料做單元測試與資料回放。
+An estimator = one algorithm + several models. The library depends on neither the bus nor the HAL, so it can be unit tested and replayed against recorded data on the development host.
 
-開發初期實作：「互補濾波（Mahony）+ 四元數運動學 + 加速度計模型」的姿態估測、航位推算的局部里程計，以及車體速度量測的兩個來源：`WHEELED` 載具模型與 Link 注入的速度。外部估測器初期只定介面與 Schema。目錄與介面一開始就照這個結構建立；EKF 等演算法之後再加入。
+The initial implementation covers attitude estimation with a complementary filter (Mahony) + quaternion kinematics + accelerometer model, local odometry by dead reckoning, and two body velocity sources: the `WHEELED` vehicle model and velocities injected over a Link. For the external estimator, only the interface and schema are defined at first. Directories and interfaces follow this structure from the start; EKF and other algorithms come later.
