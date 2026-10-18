@@ -36,6 +36,15 @@ void Default_Handler(void)
 
 void Reset_Handler(void)
 {
+    /*
+     * Keep the debug clocks running in Sleep, Stop and Standby (DBGMCU_CR
+     * DBG_SLEEP, DBG_STOP, DBG_STANDBY). Without this, HCLK stops during WFI
+     * and a debugger can no longer attach (RM0090, DBGMCU_CR). The cost is a
+     * slightly higher sleep current.
+     */
+    volatile uint32_t *const dbgmcu_cr = (volatile uint32_t *)0xE0042004u;
+    *dbgmcu_cr |= 0x7u;
+
     /* Point VTOR at this table even when started without the boot stub, e.g. by a debugger. */
     volatile uint32_t *const vtor = (volatile uint32_t *)0xE000ED08u;
     *vtor = (uint32_t)(uintptr_t)vk_vector_table;

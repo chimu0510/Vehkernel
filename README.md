@@ -55,15 +55,15 @@ cmake --preset c50c-v1_1
 cmake --build --preset c50c-v1_1
 ```
 
-Every firmware build prints the usage of each memory region; outgrowing a region fails the link (ADR-0017, ADR-0020). To flash over USB DFU, write the boot stub once and the firmware on every update; the parameter and event log sectors in between are left untouched:
+Every firmware build prints the usage of each memory region; outgrowing a region fails the link (ADR-0017, ADR-0020).
+
+Flash the C50C over SWD with an ST-Link on header HDR2 (pin 4 GND, pin 6 PA13/SWDIO, pin 8 PA14/SWCLK; pin 2 is 3.3 V for the probe's voltage sense only, the board stays on its own supply). OpenOCD runs on the host, since the probe is a USB device:
 
 ```bash
-dfu-util -a 0 -s 0x08000000 -D build/c50c-v1_1/app/vehkernel-boot.bin
+openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program build/c50c-v1_1/app/vehkernel.elf verify reset exit"
 ```
 
-```bash
-dfu-util -a 0 -s 0x08010000:leave -D build/c50c-v1_1/app/vehkernel.bin
-```
+Only the boot stub (S0) and firmware (S4 onward) sectors are written; the parameter and event log sectors in between are left untouched. The STM32 built-in USB DFU is not practical on this board, because PA11/PA12 go to the USB gamepad port, not to a Type-C port.
 
 Kconfig decides what each build contains (ADR-0017). The layers are the MCU defaults (`mcu/<mcu>/defconfig`, or `platform/sitl/defconfig` for SITL), the board defaults (`boards/<board>/defconfig`), and a local debug overlay, `build/<preset>/debug.config`, which is never committed. Edit the overlay by hand or interactively; the next build reconfigures:
 
