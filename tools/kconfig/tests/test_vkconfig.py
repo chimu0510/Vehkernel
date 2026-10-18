@@ -71,3 +71,24 @@ def test_selected_only_helpers_cannot_be_set_directly(tmp_path):
     result = solve(tmp_path, ["CONFIG_PLATFORM_SITL=y\n# CONFIG_ESTIMATOR_MAHONY is not set\nCONFIG_MATH_QUATERNION=y\n"])
     assert result.returncode == 1
     assert "CONFIG_MATH_QUATERNION=y did not take effect" in result.stderr
+
+
+def test_icm20948_driver_needs_a_board_with_an_icm20948(tmp_path):
+    result = solve(tmp_path, ["CONFIG_PLATFORM_STM32F4=y\n", "CONFIG_DRIVER_ICM20948=y\n"])
+    assert result.returncode == 1
+    assert "CONFIG_DRIVER_ICM20948=y did not take effect" in result.stderr
+
+
+def test_icm20948_driver_is_on_for_a_board_with_an_icm20948_and_in_sitl(tmp_path):
+    (tmp_path / "board").mkdir()
+    (tmp_path / "sitl").mkdir()
+    assert solve(tmp_path / "board", ["CONFIG_PLATFORM_STM32F4=y\n"], ["BOARD_HAS_ICM20948"]).returncode == 0
+    assert "CONFIG_DRIVER_ICM20948=y" in config(tmp_path / "board")
+    assert solve(tmp_path / "sitl", ["CONFIG_PLATFORM_SITL=y\n"]).returncode == 0
+    assert "CONFIG_DRIVER_ICM20948=y" in config(tmp_path / "sitl")
+
+
+def test_bringup_build_needs_an_icm20948_on_software_i2c(tmp_path):
+    result = solve(tmp_path, ["CONFIG_PLATFORM_STM32F4=y\n", "CONFIG_BRINGUP_TESTS=y\n"], ["BOARD_HAS_ICM20948"])
+    assert result.returncode == 1
+    assert "CONFIG_BRINGUP_TESTS=y did not take effect" in result.stderr

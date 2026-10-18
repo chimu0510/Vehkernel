@@ -1,0 +1,59 @@
+// Register model of the TDK InvenSense ICM20948 (datasheet DS-000189).
+//
+// One model serves as the fake device of the driver's unit tests and as the
+// simulated IMU in SITL (ADR-0018). It implements the registers the driver
+// uses: bank selection, WHO_AM_I, power management, reset, sample rate and
+// full-scale configuration, and the accelerometer, gyroscope and temperature
+// outputs, which follow the values set on the model scaled by the configured
+// full-scale range. The magnetometer is not modelled.
+#pragma once
+
+#include <vk/sim/i2c_bus.hpp>
+
+#include <array>
+#include <cstdint>
+
+namespace vk::sim {
+
+class Icm20948 final : public RegisterDevice {
+public:
+    static constexpr std::uint8_t default_address = 0x68;
+
+    // Outputs, in the sensor's own frame (x, y, z up): specific force in
+    // m/s^2 (lying flat reads +9.81 on z), angular rate in rad/s.
+    void set_accel(const std::array<float, 3>& m_s2) { accel_ = m_s2; }
+    void set_gyro(const std::array<float, 3>& rad_s) { gyro_ = rad_s; }
+    void set_temperature(float celsius) { temperature_ = celsius; }
+
+    // A device that stops responding fails every transfer, as with a loose cable.
+    void set_responding(bool responding) { responding_ = responding; }
+
+    // Register contents, for tests.
+    [[nodiscard]] std::uint8_t register_value(std::uint8_t bank, std::uint8_t reg) const;
+    [[nodiscard]] bool sleeping() const;
+    [[nodiscard]] int resets() const { return resets_; }
+
+    bool write(std::span<const std::uint8_t> data) override;
+    bool read(std::span<std::uint8_t> data) override;
+
+    Icm20948();
+
+protected:
+    void write_register(std::uint8_t reg, std::uint8_t value) override;
+    std::uint8_t read_register(std::uint8_t reg) override;
+
+private:
+    void reset();
+    [[nodiscard]] std::uint8_t bank() const;
+    [[nodiscard]] std::uint8_t output_register(std::uint8_t reg) const;
+
+    std::array<std::array<std::uint8_t, 128>, 4> banks_{};
+    std::uint8_t bank_sel_ = 0;
+    std::array<float, 3> accel_{0.0F, 0.0F, 9.80665F};
+    std::array<float, 3> gyro_{};
+    float temperature_ = 25.0F;
+    bool responding_ = true;
+    int resets_ = 0;
+};
+
+}  // namespace vk::sim

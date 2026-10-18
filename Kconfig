@@ -60,6 +60,14 @@ config DRIVER_CAN
 	bool "CAN bus"
 	depends on BOARD_HAS_CAN
 
+config DRIVER_ICM20948
+	bool "ICM20948 IMU"
+	depends on BOARD_HAS_ICM20948 || PLATFORM_SITL
+	default y
+	help
+	  TDK InvenSense ICM20948 accelerometer and gyroscope on I2C; the
+	  magnetometer inside it is not used yet.
+
 config SOFT_I2C
 	bool "Software I2C on two GPIO pins"
 	depends on BOARD_IMU_BUS_SOFT_I2C || PLATFORM_SITL
