@@ -37,6 +37,7 @@
 - **品質與觀測**：
   - 測試分六層，SITL 跑的是同一套 RTOS（[0018](docs/adr/0018-test-layers-and-sitl.md)）。
   - 日誌採用 ULog 格式，後端可以替換（[0019](docs/adr/0019-logging.md)）。
+  - 內部 Flash 分成 bootloader、參數、事件日誌與韌體四區，armed 時只寫不擦（[0020](docs/adr/0020-internal-flash-layout-and-write-policy.md)）。
 
 ## 目錄結構
 
@@ -45,7 +46,7 @@
 | 目錄 | 內容 | 相關 ADR |
 |---|---|---|
 | `boards/` | 板級定義（TOML）與板級 defconfig | 0010、0011、0017 |
-| `mcu/` | MCU 資料庫：AF 對照、DMA 請求對照（JSON） | 0011 |
+| `mcu/` | 每款 MCU 一個子目錄：MCU 資料庫（AF 對照、DMA 請求對照、Flash 磁區表，JSON）與 Kconfig 的 MCU 預設（`defconfig`） | 0011、0017、0020 |
 | `schema/msg/` | Topic 的 Schema（`.msg`） | 0006 |
 | `cmake/` | 工具鏈、Kconfig 整合、產生器呼叫 | 0017 |
 | `hal/` | 介面層：HAL 介面（C++20 concept 與執行時介面） | 0009 |
@@ -58,7 +59,9 @@
 | `tools/generators/` | Schema（含 ULog 格式定義）、板級、參數、日誌設定檔產生器 | 0006、0011、0012、0019 |
 | `bridge/` | 上位機端的 ROS2 Bridge | 0002、0003 |
 | `sim/` | 內建模擬器與外部模擬器介面 | 0018 |
-| `test/` | `unit/`、`replay/`、`sitl/`、`hil/` | 0018 |
+| `test/` | `unit/`（L1）、`replay/`（L2）、`sitl/`（L3）、`hardware/`（L4 實機測試）、`ros2/`（L5）；L0 靜態檢查由根目錄的設定檔與 CI 執行 | 0018 |
+
+參數定義（`params.toml`）放在所屬模組或驅動的目錄內，日誌設定檔放在日誌模組底下，移動或刪除模組時會一起帶走（ADR 0012、0019）。
 
 ## 授權
 

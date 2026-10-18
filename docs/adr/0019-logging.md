@@ -15,7 +15,7 @@
 - SD 卡：FatFs，每個工作階段一個 `.ulg` 檔。
 - SPI NOR Flash：以區塊附加寫入，不建檔案系統。
 - 串流到上位機：由 Bridge 存檔。
-- RAM 環形緩衝：只在事件發生時寫入內部 Flash。
+- RAM 環形緩衝：只在事件發生時，分批寫入內部 Flash 的事件日誌磁區（ADR 0020）。
 - 序列埠記錄器。
 
 板級 TOML 宣告儲存裝置，產生 `BOARD_HAS_*` Kconfig 符號，所以要編進哪些後端由 Kconfig 決定。實際啟用哪些由 bitmask 參數 `LOG_BACKEND` 決定，預設值來自板級定義。C50C 沒有板載儲存，所以預設用串流，但這只是它的板級預設值。
