@@ -1,0 +1,1 @@
+huge.msg:3: error: message encodes to 248 bytes; a Link frame carries at most 240

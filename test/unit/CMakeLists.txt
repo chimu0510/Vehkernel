@@ -2,11 +2,19 @@
 find_package(GTest CONFIG REQUIRED)
 include(GoogleTest)
 
-add_executable(vk_unit_tests smoke_test.cpp pin_test.cpp dma_test.cpp clock_test.cpp schema_test.cpp bus_test.cpp work_queue_test.cpp i2c_test.cpp rotation_test.cpp icm20948_test.cpp)
+add_executable(vk_unit_tests smoke_test.cpp pin_test.cpp dma_test.cpp clock_test.cpp schema_test.cpp bus_test.cpp work_queue_test.cpp i2c_test.cpp rotation_test.cpp icm20948_test.cpp wire_test.cpp)
 target_link_libraries(vk_unit_tests PRIVATE GTest::gtest_main vk_hal vk_msg vk_drivers vk_sim vk_platform vk_core vk_warnings)
 # Hardware-free logic of the STM32F4 platform layer, tested on the host.
 target_include_directories(vk_unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/platform/stm32f4/include)
 gtest_discover_tests(vk_unit_tests)
+
+# Cross-language check of the generated encoders: C++ encodes, Python compares.
+add_executable(vk_wire_vectors wire_vectors.cpp)
+target_link_libraries(vk_wire_vectors PRIVATE vk_msg_headers vk_warnings)
+add_test(NAME wire_cross_language
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_CURRENT_SOURCE_DIR}/test_wire_cross_language.py)
+set_tests_properties(wire_cross_language PROPERTIES ENVIRONMENT
+  "VK_WIRE_VECTORS=$<TARGET_FILE:vk_wire_vectors>;VK_MSG_PYTHON_DIR=${VK_MSG_PYTHON_DIR}")
 
 # Board defaults, checked against the C50C V1.1 golden board header.
 add_executable(vk_board_defaults_tests board_defaults_test.cpp)

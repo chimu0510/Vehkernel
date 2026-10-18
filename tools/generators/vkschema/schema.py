@@ -40,6 +40,25 @@ TYPES = {
     "float64": "double",
 }
 
+# Schema type -> (bytes on the wire, Python struct code). The custom protocol
+# packs fields little-endian with no padding (ADR-0006).
+WIRE = {
+    "bool": (1, "?"),
+    "int8": (1, "b"),
+    "int16": (2, "h"),
+    "int32": (4, "i"),
+    "int64": (8, "q"),
+    "uint8": (1, "B"),
+    "uint16": (2, "H"),
+    "uint32": (4, "I"),
+    "uint64": (8, "Q"),
+    "float32": (4, "f"),
+    "float64": (8, "d"),
+}
+
+# Largest encoded message a Link frame carries.
+MAX_ENCODED_SIZE = 240
+
 # C++ keywords a field name must not collide with (Python's are checked too,
 # since tool-side parsers are generated from the same schema).
 CPP_KEYWORDS = {
@@ -80,6 +99,19 @@ class Field:
     def schema_type(self) -> str:
         return self.type if self.length is None else f"{self.type}[{self.length}]"
 
+    @property
+    def count(self) -> int:
+        return 1 if self.length is None else self.length
+
+    @property
+    def wire_size(self) -> int:
+        return WIRE[self.type][0] * self.count
+
+    @property
+    def struct_code(self) -> str:
+        code = WIRE[self.type][1]
+        return code if self.length is None else f"{self.length}{code}"
+
 
 @dataclass
 class Message:
@@ -94,6 +126,10 @@ class Message:
     @property
     def type_name(self) -> str:
         return "".join(part.capitalize() for part in self.name.split("_"))
+
+    @property
+    def encoded_size(self) -> int:
+        return sum(f.wire_size for f in self.fields)
 
     @property
     def schema_hash(self) -> int:
@@ -217,6 +253,10 @@ def parse_message(path: Path, display: str, diag: Diagnostics) -> Message | None
         if first_field_line is None:
             first_field_line = number
         _parse_field(match, comment, loc, message, diag)
+
+    if message.encoded_size > MAX_ENCODED_SIZE:
+        diag.error(f"message encodes to {message.encoded_size} bytes; a Link frame carries at most "
+                   f"{MAX_ENCODED_SIZE}", Loc(display, message.fields[-1].line))
 
     first = message.fields[0] if message.fields else None
     if first_field_line is None:

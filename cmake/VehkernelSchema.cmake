@@ -16,7 +16,12 @@ function(vk_generate_schema)
     ${CMAKE_SOURCE_DIR}/tools/generators/vkschema/*.py
     ${CMAKE_SOURCE_DIR}/tools/generators/vkboard/diagnostics.py)
 
-  set(headers ${out_dir}/vk/msg/registry.hpp ${out_dir}/vk/msg/registry.cpp)
+  set(headers
+    ${out_dir}/vk/msg/registry.hpp
+    ${out_dir}/vk/msg/registry.cpp
+    ${out_dir}/vk/msg/topics.hpp
+    ${out_dir}/vk/msg/wire.hpp
+    ${out_dir}/python/vkmsg.py)
   foreach(message IN LISTS messages)
     get_filename_component(name ${message} NAME_WE)
     list(APPEND headers ${out_dir}/vk/msg/${name}.hpp)
@@ -38,6 +43,7 @@ function(vk_generate_schema)
   # Topics are part of the bus, so they sit with core/ and every layer may use
   # them. vk_msg_headers holds the message types; vk_msg adds the registry of
   # every topic instance, which needs core/.
+  set(VK_MSG_PYTHON_DIR ${out_dir}/python PARENT_SCOPE)
   vk_add_library(vk_msg_headers LAYER core INTERFACE)
   target_include_directories(vk_msg_headers INTERFACE ${out_dir})
   add_dependencies(vk_msg_headers vk_msg_generate)
