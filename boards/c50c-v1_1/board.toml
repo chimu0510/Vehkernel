@@ -1,15 +1,116 @@
 # C50C V1.1 board definition (ADR-0010, ADR-0011).
 #
-# Only the revision-ID pins confirmed by ADR-0010 are declared so far; the
-# complete definition, checked line by line against the schematic, follows
-# in a later ticket.
+# Sources, checked line by line against each other: the schematic
+# "C50C-V4.1V4.2" REV 14.4 (2025-03-07) and the vendor firmware
+# WHEELTEC_C50X 2026.05.29, taking the V1.1 branches (ICM20948 present,
+# revision-ID pins read 0). The vendor resource allocation table is not used:
+# it misses the revision-ID pins and the V1.2 OLED change.
+#
+# Open questions, to settle at bring-up:
+# - Buzzer: the firmware drives PD11, but the schematic leaves the buzzer
+#   transistor input unconnected (NC), so no buzzer pin is declared.
+# - IMU mounting rotation: not shown in the schematic; NONE until measured.
+# - CR1-CR4 straps on the motor connectors (PC4, PB1, PA4, PA5) are
+#   unpopulated by default and left undeclared.
 name = "c50c-v1_1"
 mcu = "stm32f407vet6"
 
 pins = [
+  # Revision ID: all three read 0 on V1.1 (schematic sheet 2, firmware sys.h).
   { pin = "PE2",  role = "REV_ID0", func = "GPIO_INPUT" },
   { pin = "PE3",  role = "REV_ID1", func = "GPIO_INPUT" },
   { pin = "PC13", role = "REV_ID2", func = "GPIO_INPUT" },
+
+  # IMU: ICM20948 behind the RS0102 level shifter, PB9 -> SCL, PB8 -> SDA.
+  # That is the reverse of hardware I2C1, so it runs on software I2C (ADR-0015).
+  { pin = "PB9", role = "IMU_SCL", func = "GPIO_OUTPUT" },
+  { pin = "PB8", role = "IMU_SDA", func = "GPIO_OUTPUT" },
+  { pin = "PD3", role = "IMU_INT", func = "GPIO_INPUT" },
+
+  # Quadrature encoders A-D (connectors U23, U22, U21, U12). In alt config 1
+  # (top-spec Ackermann) PB7 drives the steering servo and encoder C is unused.
+  { pin = "PA15", role = "ENC_A_1", func = "TIM2_CH1" },
+  { pin = "PB3",  role = "ENC_A_2", func = "TIM2_CH2" },
+  { pin = "PA6",  role = "ENC_B_1", func = "TIM3_CH1" },
+  { pin = "PA7",  role = "ENC_B_2", func = "TIM3_CH2" },
+  { pin = "PB6",  role = "ENC_C_1", func = "TIM4_CH1", alt = [{ config = 1, role = "SPARE_PB6", func = "GPIO_INPUT" }] },
+  { pin = "PB7",  role = "ENC_C_2", func = "TIM4_CH2", alt = [{ config = 1, role = "SERVO_TOP", func = "TIM4_CH2" }] },
+  { pin = "PA0",  role = "ENC_D_1", func = "TIM5_CH1" },
+  { pin = "PA1",  role = "ENC_D_2", func = "TIM5_CH2" },
+
+  # Motor drivers A-D (connectors P2, P1): TIM8 PWM at 10 kHz plus two direction lines each.
+  { pin = "PC9",  role = "MOTOR_A_PWM", func = "TIM8_CH4" },
+  { pin = "PB13", role = "MOTOR_A_IN1", func = "GPIO_OUTPUT" },
+  { pin = "PB12", role = "MOTOR_A_IN2", func = "GPIO_OUTPUT" },
+  { pin = "PC8",  role = "MOTOR_B_PWM", func = "TIM8_CH3" },
+  { pin = "PC0",  role = "MOTOR_B_IN1", func = "GPIO_OUTPUT" },
+  { pin = "PE15", role = "MOTOR_B_IN2", func = "GPIO_OUTPUT" },
+  { pin = "PC7",  role = "MOTOR_C_PWM", func = "TIM8_CH2" },
+  { pin = "PD10", role = "MOTOR_C_IN1", func = "GPIO_OUTPUT" },
+  { pin = "PD12", role = "MOTOR_C_IN2", func = "GPIO_OUTPUT" },
+  { pin = "PC6",  role = "MOTOR_D_PWM", func = "TIM8_CH1" },
+  { pin = "PC12", role = "MOTOR_D_IN1", func = "GPIO_OUTPUT" },
+  { pin = "PA8",  role = "MOTOR_D_IN2", func = "GPIO_OUTPUT" },
+
+  # High-spec Ackermann steering servo header (HDR1).
+  { pin = "PA2", role = "SERVO_SENIOR", func = "TIM9_CH1" },
+
+  # RC receiver PWM inputs (J2) and the SBUS input, inverted by Q3.
+  { pin = "PE9",  role = "RC_CH1",  func = "TIM1_CH1" },
+  { pin = "PE11", role = "RC_CH2",  func = "TIM1_CH2" },
+  { pin = "PE13", role = "RC_CH3",  func = "TIM1_CH3" },
+  { pin = "PE14", role = "RC_CH4",  func = "TIM1_CH4" },
+  { pin = "PD2",  role = "SBUS_RX", func = "UART5_RX" },
+
+  # Serial ports: USART3 to the Type-C CH9102F, USART1 to the one-key
+  # download CH9102F (DTR/RTS drive BOOT0 and NRST), UART4 to Bluetooth.
+  { pin = "PB10", role = "SERIAL1_TX", func = "USART3_TX" },
+  { pin = "PB11", role = "SERIAL1_RX", func = "USART3_RX" },
+  { pin = "PA9",  role = "SERIAL2_TX", func = "USART1_TX" },
+  { pin = "PA10", role = "SERIAL2_RX", func = "USART1_RX" },
+  { pin = "PC10", role = "SERIAL3_TX", func = "UART4_TX" },
+  { pin = "PC11", role = "SERIAL3_RX", func = "UART4_RX" },
+
+  # CAN through the SN65HVD230 transceiver (U4): D = PD1, R = PD0.
+  { pin = "PD0", role = "CAN1_RX", func = "CAN1_RX" },
+  { pin = "PD1", role = "CAN1_TX", func = "CAN1_TX" },
+
+  # USB host for the gamepad (CN8).
+  { pin = "PA11", role = "USB_DM", func = "USB_OTG_FS_DM" },
+  { pin = "PA12", role = "USB_DP", func = "USB_OTG_FS_DP" },
+
+  # Analog inputs: battery divider, frame selection and steering trim
+  # potentiometers, and the top-spec Ackermann steering feedback.
+  { pin = "PB0", role = "BATTERY_SENSE",  func = "ADC1_IN8" },
+  { pin = "PC2", role = "FRAME_SELECT",   func = "ADC1_IN12" },
+  { pin = "PC3", role = "SERVO_TRIM",     func = "ADC1_IN13" },
+  { pin = "PC1", role = "SERVO_FEEDBACK", func = "ADC1_IN11" },
+
+  # RGB light strip drivers (AT8236) and the on-board RGB LED.
+  { pin = "PB14", role = "LIGHT_B", func = "TIM12_CH1" },
+  { pin = "PB15", role = "LIGHT_R", func = "TIM12_CH2" },
+  { pin = "PE6",  role = "LIGHT_G", func = "TIM9_CH2" },
+
+  # OLED (U11 or J4) on V1.1 pins; V1.2 moved RST and DC to PE1 and PE0.
+  { pin = "PD7", role = "OLED_SCL", func = "GPIO_OUTPUT" },
+  { pin = "PD6", role = "OLED_SDA", func = "GPIO_OUTPUT" },
+  { pin = "PD5", role = "OLED_RST", func = "GPIO_OUTPUT" },
+  { pin = "PD4", role = "OLED_DC",  func = "GPIO_OUTPUT" },
+
+  # User key (S3) and the enable switch, shared with the emergency-stop connector CN6.
+  { pin = "PC5", role = "USER_KEY",      func = "GPIO_INPUT" },
+  { pin = "PE4", role = "ENABLE_SWITCH", func = "GPIO_INPUT" },
+]
+
+serial = [
+  { port = "SERIAL1", tx = "SERIAL1_TX", rx = "SERIAL1_RX", function = "LINK" },
+  { port = "SERIAL2", tx = "SERIAL2_TX", rx = "SERIAL2_RX", function = "LINK" },
+  { port = "SERIAL3", tx = "SERIAL3_TX", rx = "SERIAL3_RX", function = "NONE" },
+  { port = "SERIAL4", rx = "SBUS_RX", function = "RC_INPUT" },
+]
+
+devices = [
+  { device = "IMU0", kind = "IMU", type = "ICM20948", bus = "SOFT_I2C", pins = ["IMU_SCL", "IMU_SDA"], address = 0x68 },
 ]
 
 # ADR-0020: S0 boot stub, S1-S2 parameters, S3 event log, S4-S7 firmware.
@@ -19,3 +120,9 @@ flash = [
   { region = "EVENTLOG", start = 0x0800C000, size = "16K" },
   { region = "FIRMWARE", start = 0x08010000, size = "448K" },
 ]
+
+# 8 MHz crystal Y1; the vendor firmware runs the same 168 MHz PLL setting.
+clock = { hse_hz = 8000000, sysclk_hz = 168000000 }
+
+# Provisional (ADR-0015): one software I2C IMU read busy-waits about 0.34 ms.
+timing = { trigger = "TIMER", base_rate_hz = 200, sampling = "PER_SAMPLE" }

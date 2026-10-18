@@ -1,0 +1,10 @@
+DMA assignment for board c50c-v1_1, generated from boards/c50c-v1_1/board.toml.
+
+request    stream   channel  priority  notes  candidates
+UART4_RX   DMA1 S2  4        0         -      DMA1 S2 C4
+UART4_TX   DMA1 S4  4        0         -      DMA1 S4 C4
+UART5_RX   DMA1 S0  4        0         -      DMA1 S0 C4
+USART1_RX  DMA2 S2  4        0         -      DMA2 S2 C4, DMA2 S5 C4
+USART1_TX  DMA2 S7  4        0         -      DMA2 S7 C4
+USART3_RX  DMA1 S1  4        0         -      DMA1 S1 C4
+USART3_TX  DMA1 S3  4        0         -      DMA1 S3 C4, DMA1 S4 C7

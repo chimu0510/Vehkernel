@@ -1,0 +1,831 @@
+{
+  "name": "c50c-v1_1",
+  "mcu": "stm32f407vet6",
+  "pins": [
+    {
+      "role": "REV_ID0",
+      "pin": "PE2",
+      "port": "E",
+      "number": 2,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "REV_ID1",
+      "pin": "PE3",
+      "port": "E",
+      "number": 3,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "REV_ID2",
+      "pin": "PC13",
+      "port": "C",
+      "number": 13,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "IMU_SCL",
+      "pin": "PB9",
+      "port": "B",
+      "number": 9,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "IMU_SDA",
+      "pin": "PB8",
+      "port": "B",
+      "number": 8,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "IMU_INT",
+      "pin": "PD3",
+      "port": "D",
+      "number": 3,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "ENC_A_1",
+      "pin": "PA15",
+      "port": "A",
+      "number": 15,
+      "func": "TIM2_CH1",
+      "kind": "af",
+      "af": 1,
+      "alt": []
+    },
+    {
+      "role": "ENC_A_2",
+      "pin": "PB3",
+      "port": "B",
+      "number": 3,
+      "func": "TIM2_CH2",
+      "kind": "af",
+      "af": 1,
+      "alt": []
+    },
+    {
+      "role": "ENC_B_1",
+      "pin": "PA6",
+      "port": "A",
+      "number": 6,
+      "func": "TIM3_CH1",
+      "kind": "af",
+      "af": 2,
+      "alt": []
+    },
+    {
+      "role": "ENC_B_2",
+      "pin": "PA7",
+      "port": "A",
+      "number": 7,
+      "func": "TIM3_CH2",
+      "kind": "af",
+      "af": 2,
+      "alt": []
+    },
+    {
+      "role": "ENC_C_1",
+      "pin": "PB6",
+      "port": "B",
+      "number": 6,
+      "func": "TIM4_CH1",
+      "kind": "af",
+      "af": 2,
+      "alt": [
+        {
+          "config": 1,
+          "role": "SPARE_PB6",
+          "func": "GPIO_INPUT",
+          "kind": "gpio_input",
+          "af": null
+        }
+      ]
+    },
+    {
+      "role": "ENC_C_2",
+      "pin": "PB7",
+      "port": "B",
+      "number": 7,
+      "func": "TIM4_CH2",
+      "kind": "af",
+      "af": 2,
+      "alt": [
+        {
+          "config": 1,
+          "role": "SERVO_TOP",
+          "func": "TIM4_CH2",
+          "kind": "af",
+          "af": 2
+        }
+      ]
+    },
+    {
+      "role": "ENC_D_1",
+      "pin": "PA0",
+      "port": "A",
+      "number": 0,
+      "func": "TIM5_CH1",
+      "kind": "af",
+      "af": 2,
+      "alt": []
+    },
+    {
+      "role": "ENC_D_2",
+      "pin": "PA1",
+      "port": "A",
+      "number": 1,
+      "func": "TIM5_CH2",
+      "kind": "af",
+      "af": 2,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_A_PWM",
+      "pin": "PC9",
+      "port": "C",
+      "number": 9,
+      "func": "TIM8_CH4",
+      "kind": "af",
+      "af": 3,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_A_IN1",
+      "pin": "PB13",
+      "port": "B",
+      "number": 13,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_A_IN2",
+      "pin": "PB12",
+      "port": "B",
+      "number": 12,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_B_PWM",
+      "pin": "PC8",
+      "port": "C",
+      "number": 8,
+      "func": "TIM8_CH3",
+      "kind": "af",
+      "af": 3,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_B_IN1",
+      "pin": "PC0",
+      "port": "C",
+      "number": 0,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_B_IN2",
+      "pin": "PE15",
+      "port": "E",
+      "number": 15,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_C_PWM",
+      "pin": "PC7",
+      "port": "C",
+      "number": 7,
+      "func": "TIM8_CH2",
+      "kind": "af",
+      "af": 3,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_C_IN1",
+      "pin": "PD10",
+      "port": "D",
+      "number": 10,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_C_IN2",
+      "pin": "PD12",
+      "port": "D",
+      "number": 12,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_D_PWM",
+      "pin": "PC6",
+      "port": "C",
+      "number": 6,
+      "func": "TIM8_CH1",
+      "kind": "af",
+      "af": 3,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_D_IN1",
+      "pin": "PC12",
+      "port": "C",
+      "number": 12,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_D_IN2",
+      "pin": "PA8",
+      "port": "A",
+      "number": 8,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "SERVO_SENIOR",
+      "pin": "PA2",
+      "port": "A",
+      "number": 2,
+      "func": "TIM9_CH1",
+      "kind": "af",
+      "af": 3,
+      "alt": []
+    },
+    {
+      "role": "RC_CH1",
+      "pin": "PE9",
+      "port": "E",
+      "number": 9,
+      "func": "TIM1_CH1",
+      "kind": "af",
+      "af": 1,
+      "alt": []
+    },
+    {
+      "role": "RC_CH2",
+      "pin": "PE11",
+      "port": "E",
+      "number": 11,
+      "func": "TIM1_CH2",
+      "kind": "af",
+      "af": 1,
+      "alt": []
+    },
+    {
+      "role": "RC_CH3",
+      "pin": "PE13",
+      "port": "E",
+      "number": 13,
+      "func": "TIM1_CH3",
+      "kind": "af",
+      "af": 1,
+      "alt": []
+    },
+    {
+      "role": "RC_CH4",
+      "pin": "PE14",
+      "port": "E",
+      "number": 14,
+      "func": "TIM1_CH4",
+      "kind": "af",
+      "af": 1,
+      "alt": []
+    },
+    {
+      "role": "SBUS_RX",
+      "pin": "PD2",
+      "port": "D",
+      "number": 2,
+      "func": "UART5_RX",
+      "kind": "af",
+      "af": 8,
+      "alt": []
+    },
+    {
+      "role": "SERIAL1_TX",
+      "pin": "PB10",
+      "port": "B",
+      "number": 10,
+      "func": "USART3_TX",
+      "kind": "af",
+      "af": 7,
+      "alt": []
+    },
+    {
+      "role": "SERIAL1_RX",
+      "pin": "PB11",
+      "port": "B",
+      "number": 11,
+      "func": "USART3_RX",
+      "kind": "af",
+      "af": 7,
+      "alt": []
+    },
+    {
+      "role": "SERIAL2_TX",
+      "pin": "PA9",
+      "port": "A",
+      "number": 9,
+      "func": "USART1_TX",
+      "kind": "af",
+      "af": 7,
+      "alt": []
+    },
+    {
+      "role": "SERIAL2_RX",
+      "pin": "PA10",
+      "port": "A",
+      "number": 10,
+      "func": "USART1_RX",
+      "kind": "af",
+      "af": 7,
+      "alt": []
+    },
+    {
+      "role": "SERIAL3_TX",
+      "pin": "PC10",
+      "port": "C",
+      "number": 10,
+      "func": "UART4_TX",
+      "kind": "af",
+      "af": 8,
+      "alt": []
+    },
+    {
+      "role": "SERIAL3_RX",
+      "pin": "PC11",
+      "port": "C",
+      "number": 11,
+      "func": "UART4_RX",
+      "kind": "af",
+      "af": 8,
+      "alt": []
+    },
+    {
+      "role": "CAN1_RX",
+      "pin": "PD0",
+      "port": "D",
+      "number": 0,
+      "func": "CAN1_RX",
+      "kind": "af",
+      "af": 9,
+      "alt": []
+    },
+    {
+      "role": "CAN1_TX",
+      "pin": "PD1",
+      "port": "D",
+      "number": 1,
+      "func": "CAN1_TX",
+      "kind": "af",
+      "af": 9,
+      "alt": []
+    },
+    {
+      "role": "USB_DM",
+      "pin": "PA11",
+      "port": "A",
+      "number": 11,
+      "func": "USB_OTG_FS_DM",
+      "kind": "af",
+      "af": 10,
+      "alt": []
+    },
+    {
+      "role": "USB_DP",
+      "pin": "PA12",
+      "port": "A",
+      "number": 12,
+      "func": "USB_OTG_FS_DP",
+      "kind": "af",
+      "af": 10,
+      "alt": []
+    },
+    {
+      "role": "BATTERY_SENSE",
+      "pin": "PB0",
+      "port": "B",
+      "number": 0,
+      "func": "ADC1_IN8",
+      "kind": "analog",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "FRAME_SELECT",
+      "pin": "PC2",
+      "port": "C",
+      "number": 2,
+      "func": "ADC1_IN12",
+      "kind": "analog",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "SERVO_TRIM",
+      "pin": "PC3",
+      "port": "C",
+      "number": 3,
+      "func": "ADC1_IN13",
+      "kind": "analog",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "SERVO_FEEDBACK",
+      "pin": "PC1",
+      "port": "C",
+      "number": 1,
+      "func": "ADC1_IN11",
+      "kind": "analog",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "LIGHT_B",
+      "pin": "PB14",
+      "port": "B",
+      "number": 14,
+      "func": "TIM12_CH1",
+      "kind": "af",
+      "af": 9,
+      "alt": []
+    },
+    {
+      "role": "LIGHT_R",
+      "pin": "PB15",
+      "port": "B",
+      "number": 15,
+      "func": "TIM12_CH2",
+      "kind": "af",
+      "af": 9,
+      "alt": []
+    },
+    {
+      "role": "LIGHT_G",
+      "pin": "PE6",
+      "port": "E",
+      "number": 6,
+      "func": "TIM9_CH2",
+      "kind": "af",
+      "af": 3,
+      "alt": []
+    },
+    {
+      "role": "OLED_SCL",
+      "pin": "PD7",
+      "port": "D",
+      "number": 7,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "OLED_SDA",
+      "pin": "PD6",
+      "port": "D",
+      "number": 6,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "OLED_RST",
+      "pin": "PD5",
+      "port": "D",
+      "number": 5,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "OLED_DC",
+      "pin": "PD4",
+      "port": "D",
+      "number": 4,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "USER_KEY",
+      "pin": "PC5",
+      "port": "C",
+      "number": 5,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "ENABLE_SWITCH",
+      "pin": "PE4",
+      "port": "E",
+      "number": 4,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "alt": []
+    }
+  ],
+  "alt_configs": [
+    1
+  ],
+  "flash": [
+    {
+      "region": "BOOT",
+      "start": 134217728,
+      "size": 16384,
+      "first_sector": 0,
+      "last_sector": 0
+    },
+    {
+      "region": "PARAMS",
+      "start": 134234112,
+      "size": 32768,
+      "first_sector": 1,
+      "last_sector": 2
+    },
+    {
+      "region": "EVENTLOG",
+      "start": 134266880,
+      "size": 16384,
+      "first_sector": 3,
+      "last_sector": 3
+    },
+    {
+      "region": "FIRMWARE",
+      "start": 134283264,
+      "size": 458752,
+      "first_sector": 4,
+      "last_sector": 7
+    }
+  ],
+  "ram": [
+    {
+      "region": "CCM",
+      "start": 268435456,
+      "size": 65536
+    },
+    {
+      "region": "RAM",
+      "start": 536870912,
+      "size": 131072
+    }
+  ],
+  "serial": [
+    {
+      "port": "SERIAL1",
+      "peripheral": "USART3",
+      "tx": "SERIAL1_TX",
+      "rx": "SERIAL1_RX",
+      "function": "LINK"
+    },
+    {
+      "port": "SERIAL2",
+      "peripheral": "USART1",
+      "tx": "SERIAL2_TX",
+      "rx": "SERIAL2_RX",
+      "function": "LINK"
+    },
+    {
+      "port": "SERIAL3",
+      "peripheral": "UART4",
+      "tx": "SERIAL3_TX",
+      "rx": "SERIAL3_RX",
+      "function": "NONE"
+    },
+    {
+      "port": "SERIAL4",
+      "peripheral": "UART5",
+      "tx": null,
+      "rx": "SBUS_RX",
+      "function": "RC_INPUT"
+    }
+  ],
+  "devices": [
+    {
+      "device": "IMU0",
+      "kind": "IMU",
+      "type": "ICM20948",
+      "bus": "SOFT_I2C",
+      "peripheral": null,
+      "pins": [
+        "IMU_SCL",
+        "IMU_SDA"
+      ],
+      "address": 104,
+      "rotation": "NONE"
+    }
+  ],
+  "storage": [],
+  "clock": {
+    "hse_hz": 8000000,
+    "sysclk_hz": 168000000,
+    "pll_m": 4,
+    "pll_n": 168,
+    "pll_p": 2,
+    "pll_q": 7,
+    "apb1_div": 4,
+    "apb2_div": 2,
+    "flash_wait_states": 5
+  },
+  "peripherals": [
+    {
+      "name": "ADC1",
+      "address": 1073815552,
+      "kind": "adc",
+      "bus_clock": "PCLK2"
+    },
+    {
+      "name": "CAN1",
+      "address": 1073767424,
+      "kind": "can",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "TIM1",
+      "address": 1073807360,
+      "kind": "timer",
+      "bus_clock": "PCLK2"
+    },
+    {
+      "name": "TIM12",
+      "address": 1073747968,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "TIM2",
+      "address": 1073741824,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "TIM3",
+      "address": 1073742848,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "TIM4",
+      "address": 1073743872,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "TIM5",
+      "address": 1073744896,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "TIM8",
+      "address": 1073808384,
+      "kind": "timer",
+      "bus_clock": "PCLK2"
+    },
+    {
+      "name": "TIM9",
+      "address": 1073823744,
+      "kind": "timer",
+      "bus_clock": "PCLK2"
+    },
+    {
+      "name": "UART4",
+      "address": 1073761280,
+      "kind": "usart",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "UART5",
+      "address": 1073762304,
+      "kind": "usart",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "USART1",
+      "address": 1073811456,
+      "kind": "usart",
+      "bus_clock": "PCLK2"
+    },
+    {
+      "name": "USART3",
+      "address": 1073760256,
+      "kind": "usart",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "USB_OTG_FS",
+      "address": 1342177280,
+      "kind": "otg",
+      "bus_clock": "HCLK2"
+    }
+  ],
+  "dma": [
+    {
+      "request": "UART4_RX",
+      "controller": "DMA1",
+      "stream": 2,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "UART4_TX",
+      "controller": "DMA1",
+      "stream": 4,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "UART5_RX",
+      "controller": "DMA1",
+      "stream": 0,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART1_RX",
+      "controller": "DMA2",
+      "stream": 2,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART1_TX",
+      "controller": "DMA2",
+      "stream": 7,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART3_RX",
+      "controller": "DMA1",
+      "stream": 1,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART3_TX",
+      "controller": "DMA1",
+      "stream": 3,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    }
+  ]
+}

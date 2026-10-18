@@ -8,7 +8,9 @@ gtest_discover_tests(vk_unit_tests)
 
 # Every golden board.hpp of the board generator tests must compile: one
 # translation unit per header, each checking its pins are distinct.
-file(GLOB golden_headers ${CMAKE_SOURCE_DIR}/tools/generators/tests/cases/*/expected/board.hpp)
+file(GLOB golden_headers
+  ${CMAKE_SOURCE_DIR}/tools/generators/tests/cases/*/expected/board.hpp
+  ${CMAKE_SOURCE_DIR}/tools/generators/tests/boards/*/expected/board.hpp)
 foreach(header IN LISTS golden_headers)
   get_filename_component(case_dir ${header} DIRECTORY)
   get_filename_component(case_dir ${case_dir} DIRECTORY)

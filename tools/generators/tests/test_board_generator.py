@@ -74,3 +74,22 @@ def test_unchanged_outputs_are_not_rewritten(tmp_path: Path):
     os.utime(header, (0, 0))
     assert generate(board, tmp_path).returncode == 0
     assert header.stat().st_mtime == 0
+
+
+REAL_BOARDS = sorted(p.parent.name for p in (REPO / "boards").glob("*/board.toml"))
+
+
+@pytest.mark.parametrize("board", REAL_BOARDS)
+def test_real_board_outputs_are_locked(board: str, tmp_path: Path):
+    """The outputs of every board in boards/ are golden, so any change to them is reviewed."""
+    result = subprocess.run(
+        [sys.executable, str(GENERATOR), f"boards/{board}/board.toml", "--mcu-root", "mcu",
+         "--output-dir", str(tmp_path)],
+        cwd=REPO, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    expected = HERE / "boards" / board / "expected"
+    produced = sorted(p.name for p in tmp_path.iterdir())
+    if not UPDATE:
+        assert produced == sorted(p.name for p in expected.iterdir())
+    for name in produced:
+        check_golden(expected / name, (tmp_path / name).read_text(encoding="utf-8"))

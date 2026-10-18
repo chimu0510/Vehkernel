@@ -18,9 +18,5 @@ At boot the firmware estimates the CPU budget from driver capabilities and perip
 
 ## Consequences
 
-- C50C V1.1 is just one combination. The vendor firmware says SCL = PB9 and SDA = PB8, but on the F407 hardware I2C1 uses PB8 = SCL and PB9 = SDA, so the board may be wired the other way round. This is unverified, so the board defaults are provisional for two cases:
-  - **Wiring confirmed swapped**: only software I2C works. One IMU read takes about 135 SCL cycles, about 0.34 ms at 400 kHz, with the CPU busy-waiting; the provisional board default is about 200 Hz.
-  - **Wiring matches hardware I2C1**: switch to hardware I2C, optionally with DMA and no busy-waiting; the default rate is set by measurement.
-
-  The final values live in the board TOML; this ADR only gives an example. A board with the IMU on hardware SPI likewise changes only its board defaults, not the architecture.
-- The actual wiring is confirmed by a bring-up test: try both pin assignments with software I2C and read the ICM20948's WHO_AM_I, which must be `0xEA`.
+- C50C V1.1 is just one combination. Its IMU sits on PB9 = SCL and PB8 = SDA, as the vendor firmware says and the schematic confirms (the RS0102 level shifter U19 connects PB9 to SCL and PB8 to SDA). F407 hardware I2C1 uses those pins the other way round, PB8 = SCL and PB9 = SDA, so the IMU runs on software I2C: one read takes about 135 SCL cycles, about 0.34 ms at 400 kHz with the CPU busy-waiting, and the board default is about 200 Hz. The final values live in the board TOML; this ADR only gives an example. A board with the IMU on hardware I2C or SPI changes only its board defaults, not the architecture.
+- A bring-up test still confirms the wiring on real hardware by reading the ICM20948's WHO_AM_I over software I2C, which must be `0xEA`, and measures the achievable rate.
