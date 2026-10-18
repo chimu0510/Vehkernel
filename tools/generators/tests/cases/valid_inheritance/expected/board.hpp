@@ -7,6 +7,7 @@
 #include <vk/hal/dma.hpp>
 #include <vk/hal/pin.hpp>
 #include <vk/hal/rotation.hpp>
+#include <vk/hal/timing.hpp>
 
 namespace vk::board {
 

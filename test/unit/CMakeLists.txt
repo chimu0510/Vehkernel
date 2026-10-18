@@ -8,6 +8,13 @@ target_link_libraries(vk_unit_tests PRIVATE GTest::gtest_main vk_hal vk_msg vk_p
 target_include_directories(vk_unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/platform/stm32f4/include)
 gtest_discover_tests(vk_unit_tests)
 
+# Board defaults, checked against the C50C V1.1 golden board header.
+add_executable(vk_board_defaults_tests board_defaults_test.cpp)
+target_include_directories(vk_board_defaults_tests PRIVATE
+  ${CMAKE_SOURCE_DIR}/tools/generators/tests/boards/c50c-v1_1/expected)
+target_link_libraries(vk_board_defaults_tests PRIVATE GTest::gtest_main vk_hal vk_warnings)
+gtest_discover_tests(vk_board_defaults_tests)
+
 # Every golden board.hpp of the board generator tests must compile: one
 # translation unit per header, each checking its pins are distinct.
 file(GLOB golden_headers

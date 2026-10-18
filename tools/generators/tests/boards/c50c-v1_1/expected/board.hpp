@@ -7,6 +7,7 @@
 #include <vk/hal/dma.hpp>
 #include <vk/hal/pin.hpp>
 #include <vk/hal/rotation.hpp>
+#include <vk/hal/timing.hpp>
 
 namespace vk::board {
 
@@ -250,5 +251,24 @@ struct IMU0 {
     using pins = vk::hal::PinList<pins::IMU_SCL, pins::IMU_SDA>;
 };
 }  // namespace devices
+
+// Board default parameters (ADR-0012), as compile-time constants until the
+// parameter system exists.
+namespace defaults {
+inline constexpr std::int32_t CTRL_RATE_HZ = 200;
+inline constexpr std::string_view CTRL_TRIGGER = "TIMER";
+inline constexpr std::string_view IMU_SAMPLING = "PER_SAMPLE";
+inline constexpr std::string_view SERIAL1_FUNCTION = "LINK";
+inline constexpr std::string_view SERIAL2_FUNCTION = "LINK";
+inline constexpr std::string_view SERIAL3_FUNCTION = "NONE";
+inline constexpr std::string_view SERIAL4_FUNCTION = "RC_INPUT";
+}  // namespace defaults
+
+// Timing preset (ADR-0015), typed.
+namespace timing {
+inline constexpr vk::hal::TimingTrigger trigger = vk::hal::TimingTrigger::Timer;
+inline constexpr std::uint32_t base_rate_hz = 200;
+inline constexpr vk::hal::ImuSampling sampling = vk::hal::ImuSampling::PerSample;
+}  // namespace timing
 
 }  // namespace vk::board

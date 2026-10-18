@@ -33,6 +33,7 @@ def board_header(board: Board) -> str:
         "#include <vk/hal/dma.hpp>",
         "#include <vk/hal/pin.hpp>",
         "#include <vk/hal/rotation.hpp>",
+        "#include <vk/hal/timing.hpp>",
         "",
         "namespace vk::board {",
         "",
@@ -69,6 +70,7 @@ def board_header(board: Board) -> str:
     out += _peripherals_namespace(board)
     out += _ports_namespace(board)
     out += _devices_namespace(board)
+    out += _defaults_namespace(board)
     out += ["}  // namespace vk::board", ""]
     return "\n".join(out)
 
@@ -169,6 +171,41 @@ def _devices_namespace(board: Board) -> list[str]:
         out.append(f"    using pins = vk::hal::PinList<{', '.join(f'pins::{r}' for r in d.pins)}>;")
         out.append("};")
     return out + ["}  // namespace devices", ""]
+
+
+def _default_constant(name: str, value: object) -> str:
+    if isinstance(value, bool):
+        return f"inline constexpr bool {name} = {'true' if value else 'false'};"
+    if isinstance(value, int):
+        return f"inline constexpr std::int32_t {name} = {value};"
+    if isinstance(value, float):
+        return f"inline constexpr float {name} = {value!r}F;"
+    return f'inline constexpr std::string_view {name} = "{value}";'
+
+
+def _defaults_namespace(board: Board) -> list[str]:
+    """Board defaults as constants, usable before the parameter system exists (ADR-0012)."""
+    params = dict(board.hardware.defaults)
+    if not params:
+        return []
+    out = ["// Board default parameters (ADR-0012), as compile-time constants until the",
+           "// parameter system exists.",
+           "namespace defaults {"]
+    out += [_default_constant(name, value) for name, value in board.hardware.defaults]
+    out += ["}  // namespace defaults", ""]
+    timing = []
+    if "CTRL_TRIGGER" in params:
+        timing.append("inline constexpr vk::hal::TimingTrigger trigger = "
+                      f"vk::hal::TimingTrigger::{_camel(params['CTRL_TRIGGER'])};")
+    if "CTRL_RATE_HZ" in params:
+        timing.append(f"inline constexpr std::uint32_t base_rate_hz = {params['CTRL_RATE_HZ']};")
+    if "IMU_SAMPLING" in params:
+        timing.append("inline constexpr vk::hal::ImuSampling sampling = "
+                      f"vk::hal::ImuSampling::{_camel(params['IMU_SAMPLING'])};")
+    if timing:
+        out += ["// Timing preset (ADR-0015), typed.", "namespace timing {", *timing,
+                "}  // namespace timing", ""]
+    return out
 
 
 def board_defaults_json(board: Board) -> str:
