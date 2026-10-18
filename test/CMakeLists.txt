@@ -23,6 +23,16 @@ if(CONFIG_LINK_PTY)
       --msg-dir ${VK_MSG_PYTHON_DIR} --duration 5 --expect-rate imu_sample:0=200)
 endif()
 
+# L3 SITL attitude tests (spec 0004): the estimate against the simulated
+# IMU's true attitude, under each motion profile.
+if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_LINK_UDP)
+  foreach(motion IN ITEMS tilt rotate shake)
+    add_test(NAME sitl_attitude_${motion}
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_attitude.py
+        $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR} --motion ${motion})
+  endforeach()
+endif()
+
 # Kconfig smoke test (ADR-0017): a debug overlay that sets an option whose
 # dependencies are not met must fail configuration.
 add_test(NAME kconfig_overlay_smoke
@@ -74,6 +84,7 @@ vk_add_layer_rule_test(driver core allow)
 vk_add_layer_rule_test(platform core allow)
 vk_add_layer_rule_test(core interface allow)
 vk_add_layer_rule_test(module lib allow)
+vk_add_layer_rule_test(platform lib allow)
 vk_add_layer_rule_test(module platform reject)
 vk_add_layer_rule_test(driver module reject)
 vk_add_layer_rule_test(driver platform reject)

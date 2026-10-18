@@ -193,6 +193,8 @@ class LinkMonitor:
         self.reader = FrameReader()
         self.topics: dict[tuple[str, int], TopicStats] = {}
         self.time_sync: TimeSyncResult | None = None
+        # Called with (topic name, instance, message) for every decoded message.
+        self.listeners: list[Callable[[str, int, object], None]] = []
         self._next_time_sync = 0.0
 
     @property
@@ -261,6 +263,9 @@ class LinkMonitor:
         if key not in self.topics:
             self.topics[key] = TopicStats(peer.name, instance)
         self.topics[key].add(message)
+        if message is not None:
+            for listener in self.listeners:
+                listener(peer.name, instance, message)
 
     def latest(self, name: str) -> list[tuple[int, object]]:
         """The latest message of every instance of a topic that arrived, by instance."""

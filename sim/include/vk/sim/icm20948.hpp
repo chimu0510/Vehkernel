@@ -33,6 +33,24 @@ public:
         gyro_noise_ = gyro_rad_s;
     }
 
+    // Sets the outputs just before each sample is taken, for example from a
+    // motion profile; the values set on the model are used otherwise.
+    class OutputSource {
+    public:
+        OutputSource() = default;
+        OutputSource(const OutputSource&) = delete;
+        OutputSource& operator=(const OutputSource&) = delete;
+        OutputSource(OutputSource&&) = delete;
+        OutputSource& operator=(OutputSource&&) = delete;
+
+        virtual void update(Icm20948& imu) = 0;
+
+    protected:
+        ~OutputSource() = default;
+    };
+
+    void set_output_source(OutputSource* source) { source_ = source; }
+
     // A device that stops responding fails every transfer, as with a loose cable.
     void set_responding(bool responding) { responding_ = responding; }
 
@@ -67,6 +85,7 @@ private:
     float gyro_noise_ = 0.0F;
     std::uint32_t noise_state_ = 0x12345678;
     std::array<std::int16_t, 7> outputs_{};  // ACCEL X..Z, GYRO X..Z, TEMP
+    OutputSource* source_ = nullptr;
     bool responding_ = true;
     int resets_ = 0;
 };

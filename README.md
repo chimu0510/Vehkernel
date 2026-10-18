@@ -147,6 +147,21 @@ attitude name=vehicle_attitude instance=0 roll_deg=-0.01 pitch_deg=0.01 yaw_deg=
 
 Without a magnetometer, yaw is relative to the start and drifts slowly with the remaining gyro bias.
 
+SITL's simulated IMU follows a scripted motion chosen with `--motion`, and SITL publishes its true attitude on `vehicle_attitude_groundtruth`, which the Link also carries, so the monitor shows the estimate and the truth side by side. Each profile starts moving 3 s after boot, once the estimator has aligned, and ends by 10 s:
+
+| Profile | Motion |
+|---|---|
+| `still` | Level and at rest (the default) |
+| `tilt` | 20° of roll, then 20° of pitch, at 20°/s |
+| `rotate` | 90° turns about x, y and z in turn, at 45°/s |
+| `shake` | Level, with 0.5 s bursts of 6 m/s² forward acceleration every 1.5 s |
+
+```bash
+build/sitl/app/vehkernel-sitl --duration 0 --motion rotate
+```
+
+CI checks the estimate against the truth with `test/sitl/check_attitude.py` (the `sitl_attitude_tilt`, `sitl_attitude_rotate` and `sitl_attitude_shake` tests): the tilt error (roll and pitch) must stay within 2° and the whole attitude error, which bounds yaw, within 5°.
+
 UDP is SITL's default Link transport. To test a tool against a real serial API (termios, baud rate, framing) without hardware, start SITL with `--link pty` instead: it creates a pseudo-terminal, prints its path in the `link` line (`link transport=pty path=/dev/pts/3`), and the pty disappears when SITL exits. The monitor opens it like a board's serial port:
 
 ```bash

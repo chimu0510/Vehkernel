@@ -1,6 +1,7 @@
 // SITL entry point: the firmware on the FreeRTOS POSIX port (ADR-0018).
 //
 // Usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]
+//                       [--motion still|tilt|rotate|shake]
 //
 // The run stops by itself after the duration (default 1 s; 0 runs until
 // interrupted) and prints a report: one line per topic instance and per work
@@ -8,6 +9,8 @@
 // streams topics to the development host, over UDP by default
 // (127.0.0.1:15600, port 0 for any free port) or over a pty with --link pty.
 // Its line, with the port bound or the pty's path, is printed when it starts.
+// The simulated IMU follows a scripted motion (level and still by default),
+// and its true attitude is published on vehicle_attitude_groundtruth.
 #include <vk/config.h>
 #include <vk/core/bus.hpp>
 #include <vk/core/scheduler.hpp>
@@ -68,6 +71,7 @@ struct Options {
     std::string_view link = "udp";
     std::array<char, 64> udp_address{"127.0.0.1"};  // NUL-terminated
     std::uint16_t udp_port = 15600;
+    vk::sim::MotionProfile motion = vk::sim::MotionProfile::Still;
 };
 
 bool parse_address(const char* argument, Options& options)
@@ -112,6 +116,12 @@ bool parse_options(std::span<char*> args, Options& options)
                 return false;
             }
             options.link = value;
+        } else if (arg == "--motion") {
+            const auto profile = vk::sim::motion_profile(value);
+            if (!profile) {
+                return false;
+            }
+            options.motion = *profile;
         } else if (arg == "--udp") {
             if (!parse_address(value, options)) {
                 return false;
@@ -209,12 +219,14 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse_options(std::span(argv, static_cast<std::size_t>(argc)), options)) {
-        std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]\n",
+        std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]\n"
+                   "                      [--motion still|tilt|rotate|shake]\n",
                    stderr);
         return 2;
     }
-    vk::platform::init();
+    vk::platform::init(options.motion);
     start_imu();
+    vk::platform::start_ground_truth(vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
 #ifdef CONFIG_ESTIMATOR_MAHONY
     start_estimator();
 #endif

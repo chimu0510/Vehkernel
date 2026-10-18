@@ -6,7 +6,7 @@ The firmware must support several MCUs, SITL and unit tests, and switch vehicles
 
 Top to bottom: module layer → driver layer → interface layer → platform layer. Dependencies point downward only. A layer may skip the driver layer and use interface-layer capabilities directly, for example a Link transport using a UART or actuator control using `PwmOutput`; no layer may bypass the interface layer to reach the platform layer.
 
-Two shared parts sit outside the layering. Every layer, including the platform layer, may depend on `core/` (bus, work queues, parameter runtime, timing monitor); `core/` itself depends only on FreeRTOS and the interface layer, reaching hardware such as clocks and Flash through interface-layer contracts, never through the platform, driver or module layers. The math libraries in `lib/` depend on no layer and not on `core/` (ADR-0014).
+Two shared parts sit outside the layering. Every layer, including the platform layer, may depend on `core/` (bus, work queues, parameter runtime, timing monitor); `core/` itself depends only on FreeRTOS and the interface layer, reaching hardware such as clocks and Flash through interface-layer contracts, never through the platform, driver or module layers. The math libraries in `lib/` depend on no layer and not on `core/` (ADR-0014); every layer may use them, as SITL's simulated sensors do.
 
 **Forms of polymorphism**
 

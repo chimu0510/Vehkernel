@@ -96,6 +96,9 @@ void Icm20948::latch_outputs()
         outputs_.fill(0);
         return;
     }
+    if (source_ != nullptr) {
+        source_->update(*this);
+    }
     const auto accel_fs = static_cast<unsigned>((banks_[2][accel_config] >> 1U) & 0x3U);
     const auto gyro_fs = static_cast<unsigned>((banks_[2][gyro_config_1] >> 1U) & 0x3U);
     const float accel_lsb_per_g = 16384.0F / static_cast<float>(1U << accel_fs);

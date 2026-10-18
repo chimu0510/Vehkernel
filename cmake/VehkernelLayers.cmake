@@ -5,8 +5,8 @@
 # configure time instead of surfacing as a design drift in review.
 #
 #   module -> driver -> interface <- platform
-#   core/ and lib/ sit outside the layering: every layer may use core, core
-#   uses only the interface layer, and lib uses nothing.
+#   core/ and lib/ sit outside the layering: every layer may use core and
+#   lib, core uses only the interface layer, and lib uses nothing.
 #
 # Targets without a layer (third-party libraries, executables) are not checked.
 
@@ -15,7 +15,7 @@ set(VK_LAYERS module driver interface platform core lib)
 set(_vk_allowed_module    module driver interface core lib)
 set(_vk_allowed_driver    driver interface core lib)
 set(_vk_allowed_interface interface)
-set(_vk_allowed_platform  platform interface core)
+set(_vk_allowed_platform  platform interface core lib)
 set(_vk_allowed_core      core interface)
 set(_vk_allowed_lib       lib)
 

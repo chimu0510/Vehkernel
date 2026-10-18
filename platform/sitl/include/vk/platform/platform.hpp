@@ -1,7 +1,9 @@
 // Platform start-up for SITL (ADR-0009, ADR-0018).
 #pragma once
 
+#include <vk/core/work_queue.hpp>
 #include <vk/sim/i2c_bus.hpp>
+#include <vk/sim/motion.hpp>
 
 #include <cstdint>
 
@@ -15,9 +17,13 @@ inline constexpr std::uint32_t imu_rate_hz = 200;
 // The simulated I2C bus the IMU is attached to.
 sim::I2cBus& imu_bus();
 
-// Starts the microsecond clock and attaches the simulated devices. Call
-// once from the entry point, before anything else runs.
-void init();
+// Starts the microsecond clock and attaches the simulated devices, the IMU
+// following `motion`. Call once from the entry point, before anything else runs.
+void init(sim::MotionProfile motion = sim::MotionProfile::Still);
+
+// Publishes the simulated IMU's true attitude on vehicle_attitude_groundtruth
+// for every imu_sample, from a work item on `queue`.
+void start_ground_truth(core::WorkQueue& queue);
 
 // Stops the scheduler after the given run time, so a SITL run ends on its own.
 void stop_after(std::uint64_t duration_us);
