@@ -1,0 +1,4 @@
+/build/
+/.venv/
+# Vendor schematics, datasheets and firmware are kept locally and not redistributed.
+/vendor/

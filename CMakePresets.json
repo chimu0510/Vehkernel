@@ -1,0 +1,57 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": { "CMAKE_EXPORT_COMPILE_COMMANDS": "ON" }
+    },
+    {
+      "name": "c50c-v1_1",
+      "displayName": "C50C V1.1 firmware",
+      "inherits": "base",
+      "toolchainFile": "${sourceDir}/cmake/toolchain-arm-none-eabi.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "VK_PLATFORM": "stm32f4",
+        "VK_BOARD": "c50c-v1_1"
+      }
+    },
+    {
+      "name": "sitl",
+      "displayName": "SITL on the development host",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VK_PLATFORM": "sitl",
+        "VK_CLANG_TIDY": "ON"
+      }
+    },
+    {
+      "name": "test",
+      "displayName": "Host tests",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VK_PLATFORM": "sitl",
+        "VK_BUILD_TESTS": "ON",
+        "VK_CLANG_TIDY": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "c50c-v1_1", "configurePreset": "c50c-v1_1" },
+    { "name": "sitl", "configurePreset": "sitl" },
+    { "name": "test", "configurePreset": "test" }
+  ],
+  "testPresets": [
+    {
+      "name": "test",
+      "configurePreset": "test",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}

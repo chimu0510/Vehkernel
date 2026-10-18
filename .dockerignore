@@ -1,0 +1,5 @@
+# The image only needs the Python tool lock files.
+*
+!pyproject.toml
+!uv.lock
+!.python-version

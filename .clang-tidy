@@ -1,0 +1,11 @@
+# L0 static checks (ADR-0018). Any finding fails the build.
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  clang-analyzer-*,
+  performance-*,
+  modernize-*,
+  -modernize-use-trailing-return-type
+WarningsAsErrors: '*'
+HeaderFilterRegex: '^.*/(app|core|drivers|hal|lib|modules|platform|test)/.*'

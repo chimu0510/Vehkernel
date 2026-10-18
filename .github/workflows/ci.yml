@@ -1,0 +1,25 @@
+# Builds every preset inside the devcontainer image, so CI matches local builds (ADR-0018).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build devcontainer image
+        run: docker build -t vehkernel-dev -f .devcontainer/Dockerfile .
+
+      - name: Build presets, run L0 checks and host tests
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work vehkernel-dev bash -euo pipefail -c '
+            for preset in c50c-v1_1 sitl test; do
+              cmake --preset "$preset"
+              cmake --build --preset "$preset"
+            done
+            ctest --preset test
+          '

@@ -1,0 +1,16 @@
+{
+  "name": "Vehkernel",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "ubuntu",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cmake-tools",
+        "ms-vscode.cpptools"
+      ]
+    }
+  }
+}

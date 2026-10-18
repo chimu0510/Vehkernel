@@ -2,7 +2,7 @@
 
 **Vehkernel**（Vehicle + Kernel）是一套支援 ROS2 的開源 MCU 韌體系統，定位為任何載具的通用骨架：同一套系統可以驅動多種載具與 Frame。MCU 負責即時的狀態估計、低階控制與安全，沒有上位機也能獨立運作；全域定位與導航由上層的 ROS2 應用負責。首要測試平台是 UGV。
 
-**目前狀態：架構設計階段。** 所有決策都記錄在 [`docs/adr/`](docs/adr/)，用詞以 [`GLOSSARY.md`](GLOSSARY.md) 為準，還沒有可以執行的程式碼。
+**目前狀態：建置骨架階段。** 所有決策都記錄在 [`docs/adr/`](docs/adr/)，用詞以 [`GLOSSARY.md`](GLOSSARY.md) 為準。目前可以建置空的韌體、SITL 執行檔與主機測試，還沒有功能。
 
 ## 目標硬體
 
@@ -39,6 +39,23 @@
   - 日誌採用 ULog 格式，後端可以替換（[0019](docs/adr/0019-logging.md)）。
   - 內部 Flash 分成 bootloader、參數、事件日誌與韌體四區，armed 時只寫不擦（[0020](docs/adr/0020-internal-flash-layout-and-write-policy.md)）。
 
+## 建置
+
+開發環境是 [`.devcontainer/`](.devcontainer/)，所有會影響產出的工具都固定版本（[ADR-0016](docs/adr/0016-dependency-policy.md)）。用 VS Code 的 Dev Containers 或 `devcontainer` CLI 開啟 repo 後，每個建置目標一個 CMake preset：
+
+| Preset | 產出 |
+|---|---|
+| `c50c-v1_1` | C50C V1.1 的韌體映像（`.elf`、`.bin`、`.hex`） |
+| `sitl` | 開發主機上的 SITL 執行檔 |
+| `test` | 開發主機上的測試，用 `ctest --preset test` 執行 |
+
+```bash
+cmake --preset c50c-v1_1
+cmake --build --preset c50c-v1_1
+```
+
+`sitl` 與 `test` 會同時執行 clang-tidy，任何警告都視為錯誤。CI 在同一個 devcontainer 映像中建置所有 preset 並執行測試。
+
 ## 目錄結構
 
 以下是初始骨架，實作時可以調整。
@@ -57,6 +74,7 @@
 | `modules/` | 模組層：估測器、控制鏈、載具模型、Link、日誌 | 0002、0013、0014、0019 |
 | `lib/estimation/` | 估測數學元件：`models/`、`filters/`、`math/` | 0014 |
 | `tools/generators/` | Schema（含 ULog 格式定義）、板級、參數、日誌設定檔產生器 | 0006、0011、0012、0019 |
+| `app/` | 進入點：韌體映像與 SITL 執行檔 | — |
 | `bridge/` | 上位機端的 ROS2 Bridge | 0002、0003 |
 | `sim/` | 內建模擬器與外部模擬器介面 | 0018 |
 | `test/` | `unit/`（L1）、`replay/`（L2）、`sitl/`（L3）、`hardware/`（L4 實機測試）、`ros2/`（L5）；L0 靜態檢查由根目錄的設定檔與 CI 執行 | 0018 |
