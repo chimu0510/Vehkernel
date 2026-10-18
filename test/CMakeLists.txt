@@ -31,6 +31,10 @@ add_test(NAME bringup_runner
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/bringup/tests)
 add_test(NAME schema_generator
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/generators/tests/schema)
+add_test(NAME link_protocol
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/link/tests)
+set_tests_properties(link_protocol PROPERTIES ENVIRONMENT
+  "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/link")
 
 # Layer rules (ADR-0009): configure a scratch project that links one layer to
 # another and check that the rule helper accepts or rejects it.

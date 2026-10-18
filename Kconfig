@@ -87,6 +87,17 @@ config PARAM_STORAGE_FLASH
 
 endmenu
 
+menu "Links"
+
+config LINK
+	bool "Links with the custom protocol"
+	default y
+	help
+	  The custom protocol of ADR-0002: COBS and CRC16 framing, handshake
+	  with schema hashes, and time synchronization.
+
+endmenu
+
 menu "Testing"
 
 config BRINGUP_TESTS
