@@ -104,6 +104,15 @@ config LINK_UDP
 	  SITL's default Link transport (ADR-0018). The address and port are
 	  chosen on the command line, 127.0.0.1:15600 by default.
 
+config LINK_PTY
+	bool "Link over a pseudo-terminal"
+	depends on LINK && PLATFORM_SITL
+	default y
+	help
+	  An optional SITL Link transport, chosen with --link pty, for
+	  testing tools against a real serial API without hardware
+	  (ADR-0018).
+
 endmenu
 
 menu "Testing"

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Link monitor: watch the topics a Vehkernel Link sends (spec 0003).
 
-Connects over UDP (SITL), performs the handshake and time synchronization and
+Connects over UDP (SITL's default) or a serial port (a board's USB serial
+port, or SITL's pty), performs the handshake and time synchronization and
 reports topics whose schema hash differs from the local build. Without
 --check it shows a live view until interrupted: every topic's rate and latest
 values, the Link statistics of both ends and every work item's timing (the
@@ -11,6 +12,7 @@ non-zero when the handshake fails, a schema hash differs, frames are lost or
 an expected rate is not met.
 
     link_monitor.py --udp 127.0.0.1:15600
+    link_monitor.py --serial /dev/ttyACM0
     link_monitor.py --udp 127.0.0.1:15600 --check --duration 5 --expect-rate imu_sample:0=200
 """
 
@@ -24,7 +26,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from vklink.monitor import LinkMonitor, RateExpectation, UdpConnection, check, load_messages  # noqa: E402
+from vklink.monitor import (  # noqa: E402
+    LinkMonitor,
+    RateExpectation,
+    SerialConnection,
+    UdpConnection,
+    check,
+    load_messages,
+)
 from vklink.view import render  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -50,8 +59,11 @@ def parse_expectation(text: str) -> RateExpectation:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--udp", type=parse_address, default=("127.0.0.1", 15600), metavar="ADDRESS:PORT",
+    target = parser.add_mutually_exclusive_group()
+    target.add_argument("--udp", type=parse_address, default=("127.0.0.1", 15600), metavar="ADDRESS:PORT",
                         help="the Link's UDP address (default 127.0.0.1:15600)")
+    target.add_argument("--serial", metavar="PATH", help="the Link's serial port, such as /dev/ttyACM0 or a pty")
+    parser.add_argument("--baud", type=int, default=921600, help="serial baud rate (default 921600)")
     parser.add_argument("--msg-dir", default=os.environ.get("VK_MSG_PYTHON_DIR", DEFAULT_MSG_DIR),
                         help="directory of the generated vkmsg.py (default: the sitl build)")
     parser.add_argument("--handshake-timeout", type=float, default=5.0, help="seconds to wait for the MCU")
@@ -68,7 +80,16 @@ def main() -> int:
         print(f"error: {error}", file=sys.stderr)
         return 2
 
-    connection = UdpConnection(*args.udp)
+    try:
+        if args.serial:
+            connection = SerialConnection(args.serial, args.baud)
+            target = f"serial {args.serial} {args.baud} baud"
+        else:
+            connection = UdpConnection(*args.udp)
+            target = "udp {}:{}".format(*args.udp)
+    except (OSError, ValueError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
     monitor = LinkMonitor(connection, messages)
     try:
         if not monitor.handshake(args.handshake_timeout):
@@ -82,7 +103,6 @@ def main() -> int:
             for failure in result.failures:
                 print(f"FAIL: {failure}", file=sys.stderr)
             return 0 if result.passed else 1
-        target = "udp {}:{}".format(*args.udp)
         live = sys.stdout.isatty()
         if not live:
             for mismatch in monitor.mismatches:

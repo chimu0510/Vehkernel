@@ -47,7 +47,7 @@ The development environment is [`.devcontainer/`](.devcontainer/); every tool th
 | Preset | Output |
 |---|---|
 | `c50c-v1_1` | C50C V1.1 firmware: `vehkernel.elf`, `vehkernel.hex` (boot stub and firmware), `vehkernel-boot.bin` (S0) and `vehkernel.bin` (firmware only, from S4) |
-| `sitl` | SITL executable for the development host: `vehkernel-sitl [--duration <seconds>] [--udp <address>:<port>]` runs the firmware on the FreeRTOS POSIX port with a Link over UDP, stops after the duration (default 1 s, 0 runs until interrupted) and prints a report (see below) |
+| `sitl` | SITL executable for the development host: `vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]` runs the firmware on the FreeRTOS POSIX port with a Link over UDP (or a pty), stops after the duration (default 1 s, 0 runs until interrupted) and prints a report (see below) |
 | `test` | Host tests, run with `ctest --preset test` |
 
 ```bash
@@ -126,7 +126,14 @@ work_item name=icm20948 runs=1000 overruns=0 run_time_last_us=5 run_time_max_us=
 work_item name=link0 runs=1000 overruns=0 run_time_last_us=31 run_time_max_us=87 run_time_mean_us=19 jitter_max_us=1156
 ```
 
-`rate_hz` here follows the MCU's timestamps, so host scheduling does not skew it. The `link` line is the development host's side of the Link, `mcu_link` the MCU's: frames the transport could not take count as `drops`, frames missing from the peer's sequence as `lost`. The check also fails when the MCU dropped frames. CI runs SITL and the monitor's check together through `ctest` (the `sitl_link` test, `test/sitl/check_link.py`), which also fails when the Link work item overruns.
+UDP is SITL's default Link transport. To test a tool against a real serial API (termios, baud rate, framing) without hardware, start SITL with `--link pty` instead: it creates a pseudo-terminal, prints its path in the `link` line (`link transport=pty path=/dev/pts/3`), and the pty disappears when SITL exits. The monitor opens it like a board's serial port:
+
+```bash
+build/sitl/app/vehkernel-sitl --duration 0 --link pty
+tools/link/link_monitor.py --serial /dev/pts/3
+```
+
+`rate_hz` here follows the MCU's timestamps, so host scheduling does not skew it. The `link` line is the development host's side of the Link, `mcu_link` the MCU's: frames the transport could not take count as `drops`, frames missing from the peer's sequence as `lost`. The check also fails when the MCU dropped frames. CI runs SITL and the monitor's check together through `ctest` (the `sitl_link` and `sitl_link_pty` tests, `test/sitl/check_link.py`), which also fail when the Link work item overruns or the pty is left behind.
 
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 

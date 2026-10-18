@@ -8,9 +8,12 @@ topic instance's rate and latest values.
 from __future__ import annotations
 
 import importlib.util
+import os
 import select
 import socket
+import termios
 import time
+import tty
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -53,6 +56,52 @@ class UdpConnection:
 
     def close(self) -> None:
         self._socket.close()
+
+
+class SerialConnection:
+    """A Link over a serial port: a board's USB serial adapter, or SITL's pty."""
+
+    def __init__(self, path: str, baud: int = 921600):
+        speed = getattr(termios, f"B{baud}", None)
+        if speed is None:
+            raise ValueError(f"unsupported baud rate {baud}")
+        self._fd = os.open(path, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+        try:
+            # Raw 8N1: every byte passes unchanged, nothing is echoed.
+            tty.setraw(self._fd)
+            mode = termios.tcgetattr(self._fd)
+            mode[2] |= termios.CLOCAL | termios.CREAD
+            mode[4] = mode[5] = speed
+            termios.tcsetattr(self._fd, termios.TCSANOW, mode)
+            termios.tcflush(self._fd, termios.TCIOFLUSH)  # bytes from before we opened it
+        except BaseException:
+            os.close(self._fd)
+            raise
+
+    def send(self, data: bytes) -> None:
+        while data:
+            try:
+                data = data[os.write(self._fd, data):]
+            except BlockingIOError:
+                select.select([], [self._fd], [], 0.1)
+
+    def receive(self, timeout_s: float) -> bytes:
+        readable, _, _ = select.select([self._fd], [], [], max(timeout_s, 0.0))
+        if not readable:
+            return b""
+        chunks = []
+        while True:
+            try:
+                chunk = os.read(self._fd, 4096)
+            except BlockingIOError:
+                break
+            if not chunk:
+                break
+            chunks.append(chunk)
+        return b"".join(chunks)
+
+    def close(self) -> None:
+        os.close(self._fd)
 
 
 def load_messages(directory: str | Path) -> ModuleType:

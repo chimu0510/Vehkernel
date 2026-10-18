@@ -1,13 +1,13 @@
 // SITL entry point: the firmware on the FreeRTOS POSIX port (ADR-0018).
 //
-// Usage: vehkernel-sitl [--duration <seconds>] [--link udp] [--udp <address>:<port>]
+// Usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]
 //
 // The run stops by itself after the duration (default 1 s; 0 runs until
 // interrupted) and prints a report: one line per topic instance and per work
 // item, as space-separated key=value pairs, so scripts can parse it. A Link
 // streams topics to the development host, over UDP by default
-// (127.0.0.1:15600, port 0 for any free port); its line, with the port bound,
-// is printed when it starts.
+// (127.0.0.1:15600, port 0 for any free port) or over a pty with --link pty.
+// Its line, with the port bound or the pty's path, is printed when it starts.
 #include <vk/config.h>
 #include <vk/core/bus.hpp>
 #include <vk/core/scheduler.hpp>
@@ -18,10 +18,16 @@
 #include <vk/msg/registry.hpp>
 #include <vk/platform/platform.hpp>
 
-#ifdef CONFIG_LINK_UDP
+#ifdef CONFIG_LINK
+#include <vk/hal/transport.hpp>
 #include <vk/link/link.hpp>
 #include <vk/link/topic_map.hpp>
+#endif
+#ifdef CONFIG_LINK_UDP
 #include <vk/platform/udp_transport.hpp>
+#endif
+#ifdef CONFIG_LINK_PTY
+#include <vk/platform/pty_transport.hpp>
 #endif
 
 #include <array>
@@ -99,7 +105,7 @@ bool parse_options(std::span<char*> args, Options& options)
                 return false;
             }
         } else if (arg == "--link") {
-            if (std::string_view(value) != "udp") {
+            if (std::string_view(value) != "udp" && std::string_view(value) != "pty") {
                 return false;
             }
             options.link = value;
@@ -114,20 +120,49 @@ bool parse_options(std::span<char*> args, Options& options)
     return true;
 }
 
+#ifdef CONFIG_LINK
+vk::core::StaticInstance<vk::link::Link> host_link;
+#endif
 #ifdef CONFIG_LINK_UDP
 vk::platform::UdpTransport udp;
-vk::core::StaticInstance<vk::link::Link> host_link;
+#endif
+#ifdef CONFIG_LINK_PTY
+vk::platform::PtyTransport pty;
+#endif
 
+#ifdef CONFIG_LINK
+// Opens the chosen transport and starts the Link on it; false if it cannot.
 bool start_link(const Options& options)
 {
-    if (!udp.open(options.udp_address.data(), options.udp_port)) {
+    vk::hal::Transport* transport = nullptr;
+#ifdef CONFIG_LINK_UDP
+    if (options.link == "udp") {
+        if (!udp.open(options.udp_address.data(), options.udp_port)) {
+            return false;
+        }
+        std::printf("link transport=udp address=%s:%u\n", options.udp_address.data(), udp.port());
+        transport = &udp;
+    }
+#endif
+#ifdef CONFIG_LINK_PTY
+    if (options.link == "pty") {
+        if (!pty.open()) {
+            return false;
+        }
+        std::printf("link transport=pty path=%s\n", pty.path());
+        transport = &pty;
+    }
+#endif
+    if (transport == nullptr) {
+        std::fprintf(stderr, "link: transport '%.*s' is not built in\n", static_cast<int>(options.link.size()),
+                     options.link.data());
         return false;
     }
-    host_link.emplace("link0", udp, vk::link::default_topic_map(), vk::link::Link::Config{},
-                 vk::core::work_queue(vk::core::WorkQueueTier::Io));
-    host_link->start();
-    std::printf("link transport=udp address=%s:%u\n", options.udp_address.data(), udp.port());
+    // Tools wait for this line, so it leaves at once.
     std::fflush(stdout);
+    host_link.emplace("link0", *transport, vk::link::default_topic_map(), vk::link::Link::Config{},
+                      vk::core::work_queue(vk::core::WorkQueueTier::Io));
+    host_link->start();
     return true;
 }
 #endif
@@ -159,12 +194,13 @@ int main(int argc, char** argv)
 {
     Options options;
     if (!parse_options(std::span(argv, static_cast<std::size_t>(argc)), options)) {
-        std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp] [--udp <address>:<port>]\n", stderr);
+        std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]\n",
+                   stderr);
         return 2;
     }
     vk::platform::init();
     start_imu();
-#ifdef CONFIG_LINK_UDP
+#ifdef CONFIG_LINK
     if (!start_link(options)) {
         return 1;
     }
