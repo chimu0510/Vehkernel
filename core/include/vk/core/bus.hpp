@@ -19,6 +19,8 @@
 
 namespace vk::core {
 
+class WorkItem;
+
 // A snapshot of one topic instance for observability.
 struct TopicStatus {
     std::string_view name;
@@ -48,7 +50,15 @@ public:
                 .rate_hz = rate};
     }
 
+    // Runs `item` each time this topic instance is published (ADR-0008).
+    // Each work item listens to at most one topic.
+    void add_listener(WorkItem& item);
+    void remove_listener(WorkItem& item);
+
 protected:
+    // Schedules every listening work item. Called after the lock is released.
+    void notify_listeners();
+
     // Called with the critical section held.
     void record_publication(std::uint64_t timestamp)
     {
@@ -66,6 +76,7 @@ private:
     std::size_t instance_;
     std::uint64_t first_update_us_ = 0;
     std::uint64_t last_update_us_ = 0;
+    WorkItem* first_listener_ = nullptr;
 };
 
 template <class T>
@@ -78,9 +89,12 @@ public:
 
     void publish(const T& message)
     {
-        const CriticalSection lock;
-        buffer_[generation_ % depth] = message;
-        record_publication(message.timestamp);
+        {
+            const CriticalSection lock;
+            buffer_[generation_ % depth] = message;
+            record_publication(message.timestamp);
+        }
+        notify_listeners();
     }
 
     [[nodiscard]] std::uint64_t generation() const

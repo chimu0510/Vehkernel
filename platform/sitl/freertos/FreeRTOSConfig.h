@@ -24,6 +24,11 @@
 #define configSUPPORT_STATIC_ALLOCATION  1
 #define configSUPPORT_DYNAMIC_ALLOCATION 0
 
+/* Where core/ places task stacks: anywhere on the host. */
+#define vkconfigTASK_STACK_ATTRIBUTE
+/* Stack depth, in words, of each work queue task. */
+#define vkconfigWORK_QUEUE_STACK_SIZE configMINIMAL_STACK_SIZE
+
 /* Features. */
 #define configUSE_MUTEXES             1
 #define configUSE_RECURSIVE_MUTEXES   0

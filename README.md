@@ -47,7 +47,7 @@ The development environment is [`.devcontainer/`](.devcontainer/); every tool th
 | Preset | Output |
 |---|---|
 | `c50c-v1_1` | C50C V1.1 firmware: `vehkernel.elf`, `vehkernel.hex` (boot stub and firmware), `vehkernel-boot.bin` (S0) and `vehkernel.bin` (firmware only, from S4) |
-| `sitl` | SITL executable for the development host: `vehkernel-sitl [--duration <seconds>]` runs the firmware on the FreeRTOS POSIX port and stops after the duration (default 1 s) |
+| `sitl` | SITL executable for the development host: `vehkernel-sitl [--duration <seconds>]` runs the firmware on the FreeRTOS POSIX port, stops after the duration (default 1 s) and prints a report (see below) |
 | `test` | Host tests, run with `ctest --preset test` |
 
 ```bash
@@ -70,6 +70,16 @@ Kconfig decides what each build contains (ADR-0017). The layers are the MCU defa
 ```bash
 cmake --build --preset c50c-v1_1 --target menuconfig
 ```
+
+At the end of a run SITL prints one line per topic instance and per work item, as space-separated `key=value` pairs:
+
+```text
+report duration_s=3.000
+topic name=work_item_status instance=0 publications=3 rate_hz=1.00 last_update_us=3001115
+work_item name=timing_monitor queue=wq:slow runs=3 overruns=0 run_time_last_us=2 run_time_max_us=8 run_time_mean_us=3 jitter_max_us=1068
+```
+
+`test/sitl/check_report.py` runs SITL and checks the report; CI runs it through `ctest` (the `sitl_smoke` test), failing on any work item overrun.
 
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 

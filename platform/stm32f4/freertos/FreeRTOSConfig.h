@@ -23,6 +23,11 @@
 #define configSUPPORT_STATIC_ALLOCATION  1
 #define configSUPPORT_DYNAMIC_ALLOCATION 0
 
+/* Where core/ places task stacks: CCM, leaving normal SRAM for DMA (ADR-0008). */
+#define vkconfigTASK_STACK_ATTRIBUTE __attribute__((section(".ccm")))
+/* Stack depth, in words, of each work queue task. */
+#define vkconfigWORK_QUEUE_STACK_SIZE 1024
+
 /* Features. */
 #define configUSE_MUTEXES             1
 #define configUSE_RECURSIVE_MUTEXES   0
