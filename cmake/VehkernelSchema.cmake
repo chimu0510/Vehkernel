@@ -5,7 +5,7 @@
 # committed.
 
 # vk_generate_schema() creates the vk_msg target holding the typed topics
-# generated from schema/msg/*.msg.
+# generated from schema/msg/*.msg. Call it after core/ exists.
 function(vk_generate_schema)
   set(out_dir ${CMAKE_BINARY_DIR}/generated/schema)
   set(generator ${CMAKE_SOURCE_DIR}/tools/generators/generate_schema.py)
@@ -15,7 +15,7 @@ function(vk_generate_schema)
     ${CMAKE_SOURCE_DIR}/tools/generators/vkschema/*.py
     ${CMAKE_SOURCE_DIR}/tools/generators/vkboard/diagnostics.py)
 
-  set(headers "")
+  set(headers ${out_dir}/vk/msg/registry.hpp ${out_dir}/vk/msg/registry.cpp)
   foreach(message IN LISTS messages)
     get_filename_component(name ${message} NAME_WE)
     list(APPEND headers ${out_dir}/vk/msg/${name}.hpp)
@@ -31,10 +31,11 @@ function(vk_generate_schema)
     DEPENDS ${messages} ${generator} ${generator_sources}
     COMMENT "Generating topics from the schema"
     VERBATIM)
-  add_custom_target(vk_msg_generate DEPENDS ${headers})
 
-  # Topics are part of the bus, so they sit with core/ and every layer may use them.
-  vk_add_library(vk_msg LAYER core INTERFACE)
-  target_include_directories(vk_msg INTERFACE ${out_dir})
-  add_dependencies(vk_msg vk_msg_generate)
+  # Topics are part of the bus, so they sit with core/ and every layer may use
+  # them. The registry source holds the static storage of every topic instance.
+  vk_add_library(vk_msg LAYER core STATIC ${out_dir}/vk/msg/registry.cpp)
+  target_include_directories(vk_msg PUBLIC ${out_dir})
+  vk_target_link_libraries(vk_msg PUBLIC vk_core)
+  target_link_libraries(vk_msg PRIVATE vk_warnings vk_cxx_subset)
 endfunction()

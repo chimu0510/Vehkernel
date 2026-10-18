@@ -1,0 +1,1 @@
+registry.msg: error: message name 'registry' is reserved for generated code

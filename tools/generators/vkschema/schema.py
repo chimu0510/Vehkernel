@@ -58,6 +58,7 @@ NAME = re.compile(r"[a-z][a-z0-9_]*\Z")
 FIELD = re.compile(r"(?P<type>[a-z0-9]+)(?:\[(?P<len>[^\]]*)\])?\s+(?P<name>\S+)(?:\s+@unit\s+(?P<unit>\S+))?\Z")
 ANNOTATION = re.compile(r"@(?P<key>\S+)(?:\s+(?P<value>\S+))?\Z")
 MAX_QUEUE = 255
+RESERVED_MESSAGES = {"registry"}
 MAX_INSTANCES = 32
 
 
@@ -183,6 +184,8 @@ def parse_message(path: Path, display: str, diag: Diagnostics) -> Message | None
     message = Message(name=name, source=display)
     if not NAME.match(name):
         diag.error(f"message file name '{path.name}' must be lower_snake_case with the .msg suffix")
+    elif name in RESERVED_MESSAGES:
+        diag.error(f"message name '{name}' is reserved for generated code")
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError as error:
