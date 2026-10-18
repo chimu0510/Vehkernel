@@ -25,7 +25,7 @@ Tests are split into six layers, from static checks to ROS2 integration. SITL ru
 - Two kinds of simulator, modelled on PX4's SIH / `gz_bridge` and ArduPilot's `SIM_Rover` / `SIM_JSON`:
   - **Built-in lightweight simulator**: a physics model selected by vehicle type and frame class (surface and underwater thruster vehicles have different dynamics), running in the same process. CI uses it by default.
   - **External simulator interface**: a simulator-agnostic protocol with messages defined in the schema (ADR-0006), for Gazebo, Webots or a custom simulator.
-- SITL Links connect to the real Bridge over a pty or UDP, so the complete ROS2 stack runs without hardware.
+- SITL Links connect to the real Bridge, so the complete ROS2 stack runs without hardware. UDP is the default transport in SITL and CI: it needs no device files or permissions, leaves nothing behind when a process dies, and suits the Bridge and Nav2 running in separate processes or containers (L5). A pty transport is optional, for testing tools against a real serial API (termios, baud rate changes, framing errors) without hardware.
 
 **CI**
 
