@@ -3,6 +3,7 @@
 
 #include <string_view>
 
+#include <vk/hal/dma.hpp>
 #include <vk/hal/pin.hpp>
 
 namespace vk::board {
@@ -21,5 +22,10 @@ using BUTTON = vk::hal::GpioInput<vk::hal::Port::A, 2>;  // PA2 GPIO_INPUT
 
 using all = vk::hal::PinList<SERIAL1_TX, SERIAL1_RX, ENC_B_A, ENC_B_B, BATTERY_SENSE, STATUS_LED, BUTTON>;
 }  // namespace pins
+
+namespace dma {
+using USART1_RX = vk::hal::DmaStream<vk::hal::DmaController::Dma2, 2, 4, false>;
+using USART1_TX = vk::hal::DmaStream<vk::hal::DmaController::Dma2, 7, 4, false>;
+}  // namespace dma
 
 }  // namespace vk::board

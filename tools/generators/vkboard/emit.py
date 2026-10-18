@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from .board import Board, Pin
+from .dma import DmaAssignment
 
 GENERATOR = "tools/generators/generate_board.py"
 
@@ -27,6 +28,7 @@ def board_header(board: Board) -> str:
         "",
         "#include <string_view>",
         "",
+        "#include <vk/hal/dma.hpp>",
         "#include <vk/hal/pin.hpp>",
         "",
         "namespace vk::board {",
@@ -41,8 +43,49 @@ def board_header(board: Board) -> str:
     out.append("")
     roles = ", ".join(p.role for p in board.pins)
     out.append(f"using all = vk::hal::PinList<{roles}>;")
-    out += ["}  // namespace pins", "", "}  // namespace vk::board", ""]
+    out += ["}  // namespace pins", ""]
+    out += _dma_namespace(board.dma)
+    out += ["}  // namespace vk::board", ""]
     return "\n".join(out)
+
+
+def _dma_namespace(assignments: tuple[DmaAssignment, ...]) -> list[str]:
+    out = ["namespace dma {"]
+    for a in assignments:
+        if a.candidate is None:
+            out.append(f"// {a.request}: DMA disabled by the board definition")
+            continue
+        c = a.candidate
+        controller = "Dma1" if c.controller == "DMA1" else "Dma2"
+        shared = "true" if a.shared_with else "false"
+        out.append(f"using {a.request} = vk::hal::DmaStream<vk::hal::DmaController::{controller}, "
+                   f"{c.stream}, {c.channel}, {shared}>;")
+    out += ["}  // namespace dma", ""]
+    return out
+
+
+def dma_report(board: Board) -> str:
+    rows = [("request", "stream", "channel", "priority", "notes", "candidates")]
+    for a in board.dma:
+        candidates = ", ".join(map(str, a.candidates))
+        if a.candidate is None:
+            rows.append((a.request, "-", "-", str(a.priority), "DMA disabled", candidates))
+            continue
+        notes = []
+        if a.shared_with:
+            notes.append("shared with " + ", ".join(a.shared_with))
+        elif a.share:
+            notes.append("sharing allowed")
+        rows.append((a.request, f"{a.candidate.controller} S{a.candidate.stream}", str(a.candidate.channel),
+                     str(a.priority), "; ".join(notes) or "-", candidates))
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]) - 1)]
+    lines = [f"DMA assignment for board {board.name}, generated from {board.source}.", ""]
+    for row in rows:
+        cells = [cell.ljust(width) for cell, width in zip(row, widths)] + [row[-1]]
+        lines.append("  ".join(cells).rstrip())
+    if len(rows) == 1:
+        lines.append("(no DMA requests)")
+    return "\n".join(lines) + "\n"
 
 
 def board_json(board: Board) -> str:
@@ -54,10 +97,19 @@ def board_json(board: Board) -> str:
              "func": p.func, "kind": p.kind, "af": p.af}
             for p in board.pins
         ],
+        "dma": [
+            {"request": a.request,
+             "controller": a.candidate.controller if a.candidate else None,
+             "stream": a.candidate.stream if a.candidate else None,
+             "channel": a.candidate.channel if a.candidate else None,
+             "priority": a.priority, "share": a.share, "shared_with": list(a.shared_with)}
+            for a in board.dma
+        ],
     }
     return json.dumps(data, indent=2) + "\n"
 
 
 def outputs(board: Board) -> dict[str, str]:
     """Map of output file name to contents."""
-    return {"board.hpp": board_header(board), "board.json": board_json(board)}
+    return {"board.hpp": board_header(board), "board.json": board_json(board),
+            "dma_report.txt": dma_report(board)}

@@ -1,0 +1,5 @@
+DMA assignment for board demo, generated from board.toml.
+
+request   stream   channel  priority  notes                 candidates
+TIM2_UP   DMA1 S3  3        0         shared with TIM4_CH2  DMA1 S3 C3
+TIM4_CH2  DMA1 S3  2        0         shared with TIM2_UP   DMA1 S3 C2

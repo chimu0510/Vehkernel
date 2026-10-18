@@ -3,21 +3,187 @@
   "mcu": "TESTMCU",
   "family": "STM32F4",
   "package": "LQFP-TEST",
-  "source": {"project": "hand-written test fixture", "commit": "", "path": "", "chip": "", "package": ""},
-  "pins": ["PA0", "PA1", "PA2", "PA9", "PA10", "PB6", "PB7", "PD13"],
-  "af": {
-    "PA0": [{"function": "TIM2_CH1", "af": 1}],
-    "PA1": [{"function": "TIM2_CH2", "af": 1}],
-    "PA2": [{"function": "USART2_TX", "af": 7}],
-    "PA9": [{"function": "TIM1_CH2", "af": 1}, {"function": "USART1_TX", "af": 7}],
-    "PA10": [{"function": "TIM1_CH3", "af": 1}, {"function": "USART1_RX", "af": 7}],
-    "PB6": [{"function": "TIM4_CH1", "af": 2}, {"function": "I2C1_SCL", "af": 4}, {"function": "USART1_TX", "af": 7}],
-    "PB7": [{"function": "TIM4_CH2", "af": 2}, {"function": "I2C1_SDA", "af": 4}, {"function": "USART1_RX", "af": 7}],
-    "PD13": [{"function": "TIM4_CH2", "af": 2}]
+  "source": {
+    "project": "hand-written test fixture",
+    "commit": "",
+    "path": "",
+    "chip": "",
+    "package": ""
   },
-  "analog": {"PA0": ["ADC1_IN0"]},
-  "dma": {},
-  "flash": {"base": 134217728, "size": 65536, "write_size": 4, "erase_value": 255,
-            "sectors": [{"index": 0, "address": 134217728, "size": 65536}]},
-  "ram": [{"name": "SRAM", "address": 536870912, "size": 65536, "executable": true}]
+  "pins": [
+    "PA0",
+    "PA1",
+    "PA2",
+    "PA9",
+    "PA10",
+    "PB6",
+    "PB7",
+    "PD13"
+  ],
+  "af": {
+    "PA0": [
+      {
+        "function": "TIM2_CH1",
+        "af": 1
+      }
+    ],
+    "PA1": [
+      {
+        "function": "TIM2_CH2",
+        "af": 1
+      }
+    ],
+    "PA2": [
+      {
+        "function": "USART2_TX",
+        "af": 7
+      }
+    ],
+    "PA9": [
+      {
+        "function": "TIM1_CH2",
+        "af": 1
+      },
+      {
+        "function": "USART1_TX",
+        "af": 7
+      }
+    ],
+    "PA10": [
+      {
+        "function": "TIM1_CH3",
+        "af": 1
+      },
+      {
+        "function": "USART1_RX",
+        "af": 7
+      }
+    ],
+    "PB6": [
+      {
+        "function": "TIM4_CH1",
+        "af": 2
+      },
+      {
+        "function": "I2C1_SCL",
+        "af": 4
+      },
+      {
+        "function": "USART1_TX",
+        "af": 7
+      }
+    ],
+    "PB7": [
+      {
+        "function": "TIM4_CH2",
+        "af": 2
+      },
+      {
+        "function": "I2C1_SDA",
+        "af": 4
+      },
+      {
+        "function": "USART1_RX",
+        "af": 7
+      }
+    ],
+    "PD13": [
+      {
+        "function": "TIM4_CH2",
+        "af": 2
+      }
+    ]
+  },
+  "analog": {
+    "PA0": [
+      "ADC1_IN0"
+    ]
+  },
+  "dma": {
+    "ADC1_ADC1": [
+      {
+        "controller": "DMA2",
+        "stream": 0,
+        "channel": 0
+      },
+      {
+        "controller": "DMA2",
+        "stream": 4,
+        "channel": 0
+      }
+    ],
+    "SPI1_RX": [
+      {
+        "controller": "DMA2",
+        "stream": 0,
+        "channel": 3
+      },
+      {
+        "controller": "DMA2",
+        "stream": 2,
+        "channel": 3
+      }
+    ],
+    "TIM2_UP": [
+      {
+        "controller": "DMA1",
+        "stream": 3,
+        "channel": 3
+      }
+    ],
+    "TIM4_CH2": [
+      {
+        "controller": "DMA1",
+        "stream": 3,
+        "channel": 2
+      }
+    ],
+    "USART1_RX": [
+      {
+        "controller": "DMA2",
+        "stream": 2,
+        "channel": 4
+      },
+      {
+        "controller": "DMA2",
+        "stream": 5,
+        "channel": 4
+      }
+    ],
+    "USART1_TX": [
+      {
+        "controller": "DMA2",
+        "stream": 7,
+        "channel": 4
+      }
+    ],
+    "USART2_TX": [
+      {
+        "controller": "DMA1",
+        "stream": 6,
+        "channel": 4
+      }
+    ]
+  },
+  "flash": {
+    "base": 134217728,
+    "size": 65536,
+    "write_size": 4,
+    "erase_value": 255,
+    "sectors": [
+      {
+        "index": 0,
+        "address": 134217728,
+        "size": 65536
+      }
+    ]
+  },
+  "ram": [
+    {
+      "name": "SRAM",
+      "address": 536870912,
+      "size": 65536,
+      "executable": true
+    }
+  ]
 }

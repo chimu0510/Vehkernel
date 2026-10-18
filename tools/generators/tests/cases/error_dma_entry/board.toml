@@ -1,0 +1,12 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = []
+
+dma = [
+  { request = "DMA_DOES_NOT_EXIST" },
+  { request = "TIM2_UP", priority = -1 },
+  { request = "SPI1_RX", channel = 3 },
+  { request = "ADC1_ADC1" },
+  { request = "ADC1_ADC1", share = true },
+]

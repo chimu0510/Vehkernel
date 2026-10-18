@@ -9,16 +9,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .diagnostics import BoardError, Diagnostics
+from .dma import DmaAssignment, assign, collect_requests
 
 GPIO_FUNCTIONS = ("GPIO_INPUT", "GPIO_OUTPUT")
 PIN_KEYS = {"pin", "role", "func"}
-TOP_LEVEL_KEYS = {"name", "mcu", "pins"}
+TOP_LEVEL_KEYS = {"name", "mcu", "pins", "dma"}
 
 _ROLE_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _PIN_RE = re.compile(r"^P([A-K])(\d+)$")
-# One pin per line is guaranteed by TOML 1.0 inline tables, so the n-th
-# inline table holding a "pin" key is the n-th entry of the pins array.
-_PIN_LINE_RE = re.compile(r"\{[^}]*\bpin\s*=\s*\"")
 _TOML_POSITION_RE = re.compile(r"\s*\(at line (\d+), column \d+\)")
 
 
@@ -40,14 +38,22 @@ class Board:
     mcu: str
     source: str
     pins: tuple[Pin, ...]
+    dma: tuple[DmaAssignment, ...] = ()
 
 
-def _pin_lines(text: str) -> list[int]:
+def _entry_lines(text: str, key: str, count: int) -> list[int | None]:
+    """Line of each inline table holding ``key``, in order.
+
+    TOML 1.0 keeps an inline table on one line, so the n-th inline table with
+    ``key`` is the n-th entry of its array. Falls back to no line numbers if
+    the text does not match that shape.
+    """
+    pattern = re.compile(r"\{[^}]*\b" + key + r"\s*=")
     lines = []
     for number, line in enumerate(text.splitlines(), start=1):
         code = line.split("#", 1)[0]
-        lines.extend(number for _ in _PIN_LINE_RE.finditer(code))
-    return lines
+        lines.extend(number for _ in pattern.finditer(code))
+    return lines if len(lines) == count else [None] * count
 
 
 def load_mcu_database(mcu_root: Path, mcu: str) -> dict:
@@ -78,7 +84,11 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
     raw_pins = data.get("pins", [])
     if not isinstance(raw_pins, list):
         diag.error("'pins' must be an array of inline tables")
-    if not isinstance(name, str) or not isinstance(mcu, str) or not isinstance(raw_pins, list) or not mcu:
+    raw_dma = data.get("dma", [])
+    if not isinstance(raw_dma, list):
+        diag.error("'dma' must be an array of inline tables")
+    if not isinstance(name, str) or not isinstance(mcu, str) or not mcu \
+            or not isinstance(raw_pins, list) or not isinstance(raw_dma, list):
         raise BoardError(diag.errors)
 
     try:
@@ -87,15 +97,17 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
         diag.error(f"unknown MCU '{mcu}': the MCU root has no {mcu}/mcu.json")
         raise BoardError(diag.errors) from None
 
-    lines = _pin_lines(text)
-    if len(lines) != len(raw_pins):
-        lines = [None] * len(raw_pins)
-
+    lines = _entry_lines(text, "pin", len(raw_pins))
     pins = [p for p in (_check_pin(entry, line, database, diag) for entry, line in zip(raw_pins, lines)) if p]
     _check_unique(pins, diag)
+    requests = collect_requests(raw_dma, _entry_lines(text, "request", len(raw_dma)),
+                                [p.func for p in pins if p.kind == "af"], database["dma"], diag)
     if diag:
         raise BoardError(diag.errors)
-    return Board(name=name, mcu=mcu, source=shown, pins=tuple(pins))
+    dma = assign(requests, diag)
+    if diag:
+        raise BoardError(diag.errors)
+    return Board(name=name, mcu=mcu, source=shown, pins=tuple(pins), dma=tuple(dma))
 
 
 def _check_pin(entry: object, line: int | None, database: dict, diag: Diagnostics) -> Pin | None:

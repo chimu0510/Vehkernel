@@ -1,0 +1,62 @@
+{
+  "name": "demo",
+  "mcu": "testmcu",
+  "pins": [
+    {
+      "role": "SERIAL1_TX",
+      "pin": "PA9",
+      "port": "A",
+      "number": 9,
+      "func": "USART1_TX",
+      "kind": "af",
+      "af": 7
+    },
+    {
+      "role": "SERIAL1_RX",
+      "pin": "PA10",
+      "port": "A",
+      "number": 10,
+      "func": "USART1_RX",
+      "kind": "af",
+      "af": 7
+    }
+  ],
+  "dma": [
+    {
+      "request": "ADC1_ADC1",
+      "controller": "DMA2",
+      "stream": 4,
+      "channel": 0,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "SPI1_RX",
+      "controller": "DMA2",
+      "stream": 0,
+      "channel": 3,
+      "priority": 2,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART1_RX",
+      "controller": "DMA2",
+      "stream": 2,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART1_TX",
+      "controller": null,
+      "stream": null,
+      "channel": null,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    }
+  ]
+}

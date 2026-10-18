@@ -1,0 +1,1 @@
+board.toml:11: error: DMA requests TIM2_UP, TIM4_CH2 cannot all get a stream; they compete for DMA1 S3 (set 'share = true' on all of them, or 'dma = false' on one)

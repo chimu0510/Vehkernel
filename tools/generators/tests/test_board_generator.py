@@ -47,7 +47,8 @@ def test_case(case: Path, tmp_path: Path):
     else:
         assert result.returncode == 0, result.stderr
         produced = sorted(p.name for p in tmp_path.iterdir())
-        assert produced == ["board.hpp", "board.json"]
+        if not UPDATE:
+            assert produced == sorted(p.name for p in (case / "expected").iterdir())
         for name in produced:
             check_golden(case / "expected" / name, (tmp_path / name).read_text(encoding="utf-8"))
 
@@ -60,7 +61,9 @@ def test_output_is_deterministic(board_dir: Path, mcu_root: Path, tmp_path: Path
     first, second = tmp_path / "first", tmp_path / "second"
     assert generate(board_dir, first, mcu_root).returncode == 0
     assert generate(board_dir, second, mcu_root).returncode == 0
-    for name in ("board.hpp", "board.json"):
+    names = sorted(p.name for p in first.iterdir())
+    assert names == sorted(p.name for p in second.iterdir())
+    for name in names:
         assert (first / name).read_bytes() == (second / name).read_bytes()
 
 

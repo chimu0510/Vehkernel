@@ -65,5 +65,25 @@
       "kind": "gpio_input",
       "af": null
     }
+  ],
+  "dma": [
+    {
+      "request": "USART1_RX",
+      "controller": "DMA2",
+      "stream": 2,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART1_TX",
+      "controller": "DMA2",
+      "stream": 7,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    }
   ]
 }

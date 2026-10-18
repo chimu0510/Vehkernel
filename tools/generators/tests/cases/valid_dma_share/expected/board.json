@@ -1,0 +1,39 @@
+{
+  "name": "demo",
+  "mcu": "testmcu",
+  "pins": [
+    {
+      "role": "PWM_1",
+      "pin": "PB7",
+      "port": "B",
+      "number": 7,
+      "func": "TIM4_CH2",
+      "kind": "af",
+      "af": 2
+    }
+  ],
+  "dma": [
+    {
+      "request": "TIM2_UP",
+      "controller": "DMA1",
+      "stream": 3,
+      "channel": 3,
+      "priority": 0,
+      "share": true,
+      "shared_with": [
+        "TIM4_CH2"
+      ]
+    },
+    {
+      "request": "TIM4_CH2",
+      "controller": "DMA1",
+      "stream": 3,
+      "channel": 2,
+      "priority": 0,
+      "share": true,
+      "shared_with": [
+        "TIM2_UP"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA9",  role = "SERIAL1_TX", func = "USART1_TX" },
+  { pin = "PA10", role = "SERIAL1_RX", func = "USART1_RX" },
+]
+
+dma = [
+  { request = "TIM4_CH2" },
+  { request = "TIM2_UP" },
+]

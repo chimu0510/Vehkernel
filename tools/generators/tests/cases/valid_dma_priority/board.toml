@@ -1,0 +1,15 @@
+# Same requests as valid_dma_default, but SPI1_RX outranks ADC1_ADC1 and
+# USART1_TX gives up DMA, which changes the assignment.
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA9",  role = "SERIAL1_TX", func = "USART1_TX" },
+  { pin = "PA10", role = "SERIAL1_RX", func = "USART1_RX" },
+]
+
+dma = [
+  { request = "ADC1_ADC1" },
+  { request = "SPI1_RX",   priority = 2 },
+  { request = "USART1_TX", dma = false },
+]

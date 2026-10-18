@@ -1,0 +1,13 @@
+# Serial pins imply their DMA requests; ADC and SPI requests are listed explicitly.
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA9",  role = "SERIAL1_TX", func = "USART1_TX" },
+  { pin = "PA10", role = "SERIAL1_RX", func = "USART1_RX" },
+]
+
+dma = [
+  { request = "ADC1_ADC1" },
+  { request = "SPI1_RX" },
+]
