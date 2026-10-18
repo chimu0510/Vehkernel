@@ -70,6 +70,9 @@ public:
     // Whether topic data may be sent at `now_us`.
     [[nodiscard]] bool connected(std::uint64_t now_us) const;
 
+    // Whether a handshake has succeeded, even if the peer fell silent since.
+    [[nodiscard]] bool handshake_done() const { return handshake_done_; }
+
     // The negotiated protocol version, 0 before a successful handshake.
     [[nodiscard]] std::uint8_t version() const { return version_; }
 

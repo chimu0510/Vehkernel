@@ -1,0 +1,62 @@
+"""The Link monitor's live view: a terminal table refreshed in place (spec 0003)."""
+
+from __future__ import annotations
+
+from .monitor import HANDSHAKE_STATES, LinkMonitor, work_item_name
+
+# Topics shown in their own tables rather than by their raw values.
+STATUS_TOPICS = ("link_status", "work_item_status")
+
+
+def format_value(value: object) -> str:
+    if isinstance(value, float):
+        return f"{value:.3f}"
+    if isinstance(value, (tuple, list)):
+        return "(" + ", ".join(format_value(v) for v in value) + ")"
+    return str(value)
+
+
+def format_message(message: object | None) -> str:
+    if message is None:
+        return "-"
+    fields = [name for name in getattr(message, "FIELDS", ()) if name != "timestamp"]
+    return " ".join(f"{name}={format_value(getattr(message, name))}" for name in fields)
+
+
+def render(monitor: LinkMonitor, target: str, width: int = 120) -> list[str]:
+    """The live view as lines, each cut to `width` columns."""
+    stats = monitor.reader.stats
+    state = f"handshake ok, protocol {monitor.session.version}" if monitor.connected else "no handshake"
+    header = f"Vehkernel Link  {target}  {state}"
+    if monitor.time_sync is not None:
+        header += f"  rtt {monitor.time_sync.rtt_us / 1000:.1f} ms"
+    lines = [
+        header,
+        f"host received  frames {stats.frames}  crc_errors {stats.crc_errors}  "
+        f"malformed {stats.malformed}  lost {stats.lost}",
+    ]
+    for instance, status in monitor.latest("link_status"):
+        lines.append(
+            f"mcu link {instance}     sent {status.frames_sent} frames / {status.bytes_sent} B  "
+            f"received {status.frames_received} frames / {status.bytes_received} B  drops {status.drops}  "
+            f"crc_errors {status.crc_errors}  malformed {status.malformed}  lost {status.lost}  "
+            f"{HANDSHAKE_STATES.get(status.handshake_state, '?')}"
+        )
+    for mismatch in monitor.mismatches:
+        lines.append(f"MISMATCH       topic {mismatch.name}: schema hash differs from the local build")
+
+    lines += ["", f"{'Topic':<20} {'Inst':>4} {'Rate Hz':>9} {'Messages':>9}  Latest"]
+    for (name, instance), topic in sorted(monitor.topics.items()):
+        latest = "" if name in STATUS_TOPICS else format_message(topic.latest)
+        lines.append(f"{name:<20} {instance:>4} {topic.rate_hz:>9.2f} {topic.messages:>9}  {latest}")
+
+    work_items = monitor.latest("work_item_status")
+    if work_items:
+        lines += ["", f"{'Work item':<20} {'Runs':>9} {'Overruns':>9} {'Last us':>8} {'Mean us':>8} "
+                      f"{'Max us':>8} {'Jitter us':>10}"]
+        for _, status in work_items:
+            lines.append(
+                f"{work_item_name(status):<20} {status.runs:>9} {status.overruns:>9} {status.run_time_last_us:>8} "
+                f"{status.run_time_mean_us:>8} {status.run_time_max_us:>8} {status.jitter_max_us:>10}"
+            )
+    return [line[:width] for line in lines]

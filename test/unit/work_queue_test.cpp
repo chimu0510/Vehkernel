@@ -178,6 +178,9 @@ TEST_F(WorkQueueTest, TimingMonitorPublishesEachWorkItemOnItsOwnInstance)
     vk::msg::WorkItemStatus status{};
     ASSERT_TRUE(sub.copy(status));
     EXPECT_EQ(status.work_item, item.index());
+    const std::string_view name(reinterpret_cast<const char*>(status.name.data()), 6);
+    EXPECT_EQ(name, "worker");
+    EXPECT_EQ(status.name[6], 0);  // zero-padded
     EXPECT_EQ(status.runs, 1U);
     EXPECT_EQ(status.run_time_last_us, 120U);
     EXPECT_EQ(status.overruns, 0U);

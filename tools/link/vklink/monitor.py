@@ -95,6 +95,17 @@ class TopicStats:
         return (self.messages - 1) * 1e6 / (self.last_timestamp_us - self.first_timestamp_us)
 
 
+HANDSHAKE_STATES = {0: "waiting", 1: "connected", 2: "peer_silent"}
+
+
+def work_item_name(status: object) -> str:
+    """The name in a work_item_status message, or its index when it has none."""
+    raw = getattr(status, "name", None)
+    if raw is None:
+        return f"#{status.work_item}"
+    return bytes(raw).rstrip(b"\0").decode("ascii", errors="replace")
+
+
 @dataclass
 class Mismatch:
     name: str
@@ -186,6 +197,14 @@ class LinkMonitor:
             self.topics[key] = TopicStats(peer.name, instance)
         self.topics[key].add(message)
 
+    def latest(self, name: str) -> list[tuple[int, object]]:
+        """The latest message of every instance of a topic that arrived, by instance."""
+        return [
+            (instance, stats.latest)
+            for (topic, instance), stats in sorted(self.topics.items())
+            if topic == name and stats.latest is not None
+        ]
+
     def summary(self) -> list[str]:
         """The state of the Link as space-separated key=value lines."""
         stats = self.reader.stats
@@ -205,6 +224,20 @@ class LinkMonitor:
             f"topic name={t.name} instance={t.instance} messages={t.messages} rate_hz={t.rate_hz:.2f}"
             for _, t in sorted(self.topics.items())
         ]
+        # The MCU's own view of each Link, and every work item's timing.
+        for instance, status in self.latest("link_status"):
+            lines.append(
+                f"mcu_link instance={instance} frames_sent={status.frames_sent} bytes_sent={status.bytes_sent} "
+                f"frames_received={status.frames_received} bytes_received={status.bytes_received} "
+                f"drops={status.drops} crc_errors={status.crc_errors} malformed={status.malformed} "
+                f"lost={status.lost} handshake_state={HANDSHAKE_STATES.get(status.handshake_state, '?')}"
+            )
+        for _, status in self.latest("work_item_status"):
+            lines.append(
+                f"work_item name={work_item_name(status)} runs={status.runs} overruns={status.overruns} "
+                f"run_time_last_us={status.run_time_last_us} run_time_max_us={status.run_time_max_us} "
+                f"run_time_mean_us={status.run_time_mean_us} jitter_max_us={status.jitter_max_us}"
+            )
         return lines
 
 
@@ -246,6 +279,9 @@ def check(monitor: LinkMonitor, expectations: list[RateExpectation], tolerance: 
         result.failures.append(f"{stats.lost} frames lost")
     if stats.crc_errors:
         result.failures.append(f"{stats.crc_errors} frames with CRC errors")
+    for instance, status in monitor.latest("link_status"):
+        if status.drops:
+            result.failures.append(f"the MCU dropped {status.drops} frames on Link {instance}")
     for expected in expectations:
         topic = monitor.topics.get((expected.name, expected.instance))
         if topic is None:

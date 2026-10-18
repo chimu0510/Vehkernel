@@ -103,7 +103,7 @@ work_item name=timing_monitor queue=wq:slow runs=5 overruns=0 run_time_last_us=2
 
 ### Watching live data with the Link monitor
 
-SITL streams topics over a Link (ADR-0002): UDP on `127.0.0.1:15600` by default, or the address given with `--udp` (port 0 picks a free one; SITL prints a `link` line with the port it bound). The Link monitor on the development host connects, performs the handshake, compares every topic's schema hash with the local build and prints each topic's rate. Start SITL without a time limit in one terminal and the monitor in another:
+SITL streams topics over a Link (ADR-0002): UDP on `127.0.0.1:15600` by default, or the address given with `--udp` (port 0 picks a free one; SITL prints a `link` line with the port it bound). The Link monitor on the development host connects, performs the handshake and compares every topic's schema hash with the local build. In a terminal it then shows a live view, refreshed twice a second: every topic's rate and latest values, the Link statistics of both ends (the MCU's come from the `link_status` topic) and every work item's timing. Start SITL without a time limit in one terminal and the monitor in another:
 
 ```bash
 build/sitl/app/vehkernel-sitl --duration 0
@@ -119,10 +119,14 @@ tools/link/link_monitor.py --check --duration 5 --expect-rate imu_sample:0=200
 ```text
 link handshake=ok version=1 mismatches=0 frames=1032 crc_errors=0 malformed=0 lost=0 rtt_us=5132 clock_offset_us=-213339289143
 topic name=imu_sample instance=0 messages=1004 rate_hz=199.99
+topic name=link_status instance=0 messages=5 rate_hz=1.00
 topic name=work_item_status instance=0 messages=5 rate_hz=1.00
+mcu_link instance=0 frames_sent=1050 bytes_sent=50272 frames_received=12 bytes_received=182 drops=0 crc_errors=0 malformed=0 lost=0 handshake_state=connected
+work_item name=icm20948 runs=1000 overruns=0 run_time_last_us=5 run_time_max_us=11 run_time_mean_us=2 jitter_max_us=1166
+work_item name=link0 runs=1000 overruns=0 run_time_last_us=31 run_time_max_us=87 run_time_mean_us=19 jitter_max_us=1156
 ```
 
-`rate_hz` here follows the MCU's timestamps, so host scheduling does not skew it. CI runs SITL and the monitor's check together through `ctest` (the `sitl_link` test, `test/sitl/check_link.py`), which also fails when the Link work item overruns.
+`rate_hz` here follows the MCU's timestamps, so host scheduling does not skew it. The `link` line is the development host's side of the Link, `mcu_link` the MCU's: frames the transport could not take count as `drops`, frames missing from the peer's sequence as `lost`. The check also fails when the MCU dropped frames. CI runs SITL and the monitor's check together through `ctest` (the `sitl_link` test, `test/sitl/check_link.py`), which also fails when the Link work item overruns.
 
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 

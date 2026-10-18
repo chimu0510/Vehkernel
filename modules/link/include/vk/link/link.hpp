@@ -4,7 +4,8 @@
 // Each run drains the bytes the transport has received through the protocol,
 // which answers the handshake and time sync, then sends every topic map entry
 // that is due while the session is connected. A frame the transport cannot
-// take is dropped and counted; the Link never blocks its work queue.
+// take is dropped and counted; the Link never blocks its work queue. Once a
+// second it publishes its statistics on link_status.
 #pragma once
 
 #include <vk/core/work_queue.hpp>
@@ -12,12 +13,19 @@
 #include <vk/link/frame.hpp>
 #include <vk/link/session.hpp>
 #include <vk/link/topic_map.hpp>
+#include <vk/msg/link_status.hpp>
 
 #include <array>
 #include <cstdint>
 #include <string_view>
 
 namespace vk::link {
+
+enum class HandshakeState : std::uint8_t {
+    Waiting = 0,     // no handshake yet
+    Connected = 1,   // handshake done, peer heard within the timeout
+    PeerSilent = 2,  // handshake done, peer not heard within the timeout
+};
 
 // Statistics of one Link since boot.
 struct LinkStats {
@@ -29,14 +37,16 @@ struct LinkStats {
     std::uint32_t crc_errors;
     std::uint32_t malformed;        // invalid COBS, too short or too long
     std::uint32_t lost;             // frames missing from the peer's sequence
-    bool connected;
+    HandshakeState handshake_state;
 };
 
 class Link final : public core::WorkItem {
 public:
     static constexpr std::uint32_t default_interval_us = 5'000;
+    static constexpr std::uint32_t status_interval_us = 1'000'000;
 
     struct Config {
+        std::uint8_t instance = 0;                        // link_status instance
         std::uint32_t interval_us = default_interval_us;  // how often the Link runs
         std::uint64_t peer_timeout_us = Session::default_peer_timeout_us;
     };
@@ -48,7 +58,7 @@ public:
     void start();
 
     // From the Link's own work queue, or once the scheduler has stopped.
-    [[nodiscard]] LinkStats stats() const;
+    [[nodiscard]] LinkStats link_stats() const;
 
 protected:
     void run() override;
@@ -71,6 +81,7 @@ private:
 
     void receive(std::uint64_t now_us);
     void send_topics(std::uint64_t now_us);
+    void publish_status(std::uint64_t now_us);
 
     hal::Transport* transport_;
     TopicMap map_;
@@ -78,8 +89,10 @@ private:
     Session session_;
     FrameReader reader_;
     TransportSink sink_;
+    core::Publication<msg::LinkStatus> status_publication_;
     std::uint32_t bytes_received_ = 0;
-    bool connected_ = false;
+    HandshakeState handshake_state_ = HandshakeState::Waiting;
+    std::uint64_t next_status_us_ = 0;
     std::array<std::uint8_t, 2 * max_wire_size> receive_buffer_{};
 };
 

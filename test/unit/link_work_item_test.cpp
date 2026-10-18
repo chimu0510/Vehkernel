@@ -8,6 +8,7 @@
 #include <vk/link/frame.hpp>
 #include <vk/link/link.hpp>
 #include <vk/link/topic_map.hpp>
+#include <vk/msg/link_status.hpp>
 #include <vk/msg/wire.hpp>
 
 #include <gtest/gtest.h>
@@ -114,6 +115,28 @@ public:
                                     wire.begin() + static_cast<std::ptrdiff_t>(size));
     }
 
+    // A frame lost on the way: numbered, never delivered.
+    void lose_one()
+    {
+        std::array<std::uint8_t, vk::link::max_wire_size> wire{};
+        writer_.write(FrameType::TimeSyncRequest, std::array<std::uint8_t, 8>{}, wire);
+    }
+
+    // A time sync request with one byte changed on the way.
+    void send_corrupted()
+    {
+        std::array<std::uint8_t, vk::link::max_wire_size> wire{};
+        const std::size_t size = writer_.write(FrameType::TimeSyncRequest, std::array<std::uint8_t, 8>{}, wire);
+        wire[3] = wire[3] == 0x55 ? 0x56 : 0x55;  // never 0, so the frame keeps its length
+        transport_->incoming.insert(transport_->incoming.end(), wire.begin(),
+                                    wire.begin() + static_cast<std::ptrdiff_t>(size));
+    }
+
+    void send_time_sync()
+    {
+        send(FrameType::TimeSyncRequest, std::array<std::uint8_t, 8>{});
+    }
+
     void send_hello()
     {
         const std::array<std::uint8_t, 2> body{1, vk::link::protocol_version};
@@ -185,7 +208,7 @@ TEST_F(LinkTest, SendsNoTopicDataBeforeTheHandshake)
     vk::core::Publication<Topic>().publish({.timestamp = fake_now, .value = 1});
     step();
     EXPECT_TRUE(transport.written.empty());
-    EXPECT_FALSE(link.stats().connected);
+    EXPECT_EQ(link.link_stats().handshake_state, vk::link::HandshakeState::Waiting);
 }
 
 TEST_F(LinkTest, AnswersHelloToThePeerItCameFrom)
@@ -202,7 +225,7 @@ TEST_F(LinkTest, AnswersHelloToThePeerItCameFrom)
     ASSERT_FALSE(frames.empty());
     EXPECT_EQ(frames.front().type, FrameType::HelloReply);
     EXPECT_EQ(frames.size(), 1 + vk::link::schema_topics.size());
-    EXPECT_TRUE(link.stats().connected);
+    EXPECT_EQ(link.link_stats().handshake_state, vk::link::HandshakeState::Connected);
 }
 
 TEST_F(LinkTest, SendsEverySampleOfAQueuedTopicInOrder)
@@ -279,7 +302,69 @@ TEST_F(LinkTest, StopsSendingWhenThePeerFallsSilent)
     }
     // Sent until the timeout (20 ms, four runs), then nothing.
     EXPECT_EQ(host.receive_values(Topic::topic_id).size(), 4U);
-    EXPECT_FALSE(link.stats().connected);
+    EXPECT_EQ(link.link_stats().handshake_state, vk::link::HandshakeState::PeerSilent);
+}
+
+TEST_F(LinkTest, DropsAndCountsFramesTheTransportCannotTakeWithoutBlocking)
+{
+    using Topic = Sample<5, 4>;
+    TopicStreamOf<Topic> stream(vk::link::every_sample);
+    const std::array<TopicStream*, 1> map{&stream};
+    Link link("link_test", transport, map, {}, queue);
+    link.start();
+    host.send_hello();
+    step();
+    host.receive();
+
+    // The transport takes nothing: every frame is dropped, and the run returns.
+    vk::core::Publication<Topic> publication;
+    transport.space = 0;
+    for (std::uint32_t value = 1; value <= 3; ++value) {
+        publication.publish({.timestamp = fake_now, .value = value});
+    }
+    step();
+    EXPECT_TRUE(transport.written.empty());
+    EXPECT_EQ(link.link_stats().drops, 3U);
+    EXPECT_EQ(link.link_stats().frames_sent, 1 + vk::link::schema_topics.size());  // the handshake only
+    EXPECT_EQ(link.stats().overruns, 0U);
+
+    // Dropped frames give their sequence numbers back: the host loses none.
+    transport.space = std::numeric_limits<std::size_t>::max();
+    publication.publish({.timestamp = fake_now, .value = 4});
+    step();
+    EXPECT_EQ(host.receive_values(Topic::topic_id), std::vector<std::uint32_t>{4});
+    EXPECT_EQ(host.stats().lost, 0U);
+}
+
+TEST_F(LinkTest, CountsCrcErrorsAndSequenceGapsInLinkStatus)
+{
+    TopicStreamOf<Sample<6, 1>> stream(vk::link::every_sample);
+    const std::array<TopicStream*, 1> map{&stream};
+    Link link("link_test", transport, map, {.instance = 1}, queue);
+    link.start();
+    host.send_hello();
+    step();
+
+    host.send_corrupted();
+    host.lose_one();
+    host.send_time_sync();
+    step();
+    fake_now += Link::status_interval_us;  // the next link_status is due
+    step();
+
+    vk::core::Subscription<vk::msg::LinkStatus> subscription(1);
+    vk::msg::LinkStatus status{};
+    while (subscription.copy(status)) {
+        // The newest is the one that counts.
+    }
+    EXPECT_EQ(status.timestamp, fake_now);
+    EXPECT_EQ(status.crc_errors, 1U);
+    EXPECT_EQ(status.lost, 2U);  // the corrupted frame and the one lost on the way
+    EXPECT_EQ(status.frames_received, 2U);  // hello and the time sync request
+    EXPECT_EQ(status.handshake_state, static_cast<std::uint8_t>(vk::link::HandshakeState::Connected));
+    EXPECT_EQ(status.frames_sent, link.link_stats().frames_sent);
+    EXPECT_GT(status.bytes_sent, 0U);
+    EXPECT_GT(status.bytes_received, 0U);
 }
 
 }  // namespace

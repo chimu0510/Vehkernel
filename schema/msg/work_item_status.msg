@@ -4,6 +4,7 @@
 @rate 1
 uint64 timestamp
 uint8 work_item                          # index in the work item table
+uint8[16] name                           # work item name, ASCII, zero-padded
 uint32 runs                              # runs since boot
 uint32 overruns                          # runs that did not finish before the next was due
 uint32 run_time_last_us  @unit us

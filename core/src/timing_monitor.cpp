@@ -2,7 +2,9 @@
 
 #include <vk/msg/work_item_status.hpp>
 
+#include <algorithm>
 #include <cstdint>
+#include <string_view>
 
 namespace vk::core {
 
@@ -27,6 +29,8 @@ void TimingMonitor::publish_all()
         msg::WorkItemStatus status{};
         status.timestamp = now;
         status.work_item = static_cast<std::uint8_t>(item->index());
+        const std::string_view name = item->name().substr(0, status.name.size());
+        std::ranges::copy(name, status.name.begin());
         status.runs = stats.runs;
         status.overruns = stats.overruns;
         status.run_time_last_us = stats.run_time_last_us;

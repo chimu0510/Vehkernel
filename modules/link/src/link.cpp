@@ -14,7 +14,7 @@ constexpr int max_reads_per_run = 8;
 Link::Link(std::string_view name, hal::Transport& transport, TopicMap map, const Config& config,
            core::WorkQueue& queue)
     : WorkItem(name, queue), transport_(&transport), map_(map), config_(config),
-      session_(schema_topics, config.peer_timeout_us), sink_(transport)
+      session_(schema_topics, config.peer_timeout_us), sink_(transport), status_publication_(config.instance)
 {
 }
 
@@ -23,7 +23,7 @@ void Link::start()
     schedule_periodic(config_.interval_us);
 }
 
-LinkStats Link::stats() const
+LinkStats Link::link_stats() const
 {
     const ReaderStats& received = reader_.stats();
     return {.frames_sent = sink_.frames,
@@ -34,14 +34,41 @@ LinkStats Link::stats() const
             .crc_errors = received.crc_errors,
             .malformed = received.malformed,
             .lost = received.lost,
-            .connected = connected_};
+            .handshake_state = handshake_state_};
 }
 
 void Link::run()
 {
     const std::uint64_t now = queue().now_us();
     receive(now);
+    if (session_.connected(now)) {
+        handshake_state_ = HandshakeState::Connected;
+    } else {
+        handshake_state_ = session_.handshake_done() ? HandshakeState::PeerSilent : HandshakeState::Waiting;
+    }
+    publish_status(now);
     send_topics(now);
+}
+
+void Link::publish_status(std::uint64_t now_us)
+{
+    if (now_us < next_status_us_) {
+        return;
+    }
+    next_status_us_ = now_us + status_interval_us;
+    const LinkStats current = link_stats();
+    msg::LinkStatus status{};
+    status.timestamp = now_us;
+    status.frames_sent = current.frames_sent;
+    status.bytes_sent = current.bytes_sent;
+    status.frames_received = current.frames_received;
+    status.bytes_received = current.bytes_received;
+    status.drops = current.drops;
+    status.crc_errors = current.crc_errors;
+    status.malformed = current.malformed;
+    status.lost = current.lost;
+    status.handshake_state = static_cast<std::uint8_t>(current.handshake_state);
+    status_publication_.publish(status);
 }
 
 void Link::receive(std::uint64_t now_us)
@@ -64,8 +91,7 @@ void Link::receive(std::uint64_t now_us)
 
 void Link::send_topics(std::uint64_t now_us)
 {
-    connected_ = session_.connected(now_us);
-    if (!connected_) {
+    if (handshake_state_ != HandshakeState::Connected) {
         return;
     }
     std::array<std::uint8_t, max_message_size> message{};

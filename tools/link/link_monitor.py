@@ -3,7 +3,9 @@
 
 Connects over UDP (SITL), performs the handshake and time synchronization and
 reports topics whose schema hash differs from the local build. Without
---check it prints the Link's state every second until interrupted. With
+--check it shows a live view until interrupted: every topic's rate and latest
+values, the Link statistics of both ends and every work item's timing (the
+summary lines once a second when the output is not a terminal). With
 --check it runs for a fixed time, prints a parseable summary and exits
 non-zero when the handshake fails, a schema hash differs, frames are lost or
 an expected rate is not met.
@@ -16,14 +18,19 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from vklink.monitor import LinkMonitor, RateExpectation, UdpConnection, check, load_messages  # noqa: E402
+from vklink.view import render  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+REFRESH_S = 0.5
+# ANSI: cursor home, clear the screen.
+CLEAR = "\x1b[H\x1b[2J"
 DEFAULT_MSG_DIR = REPO_ROOT / "build" / "sitl" / "generated" / "schema" / "python"
 
 
@@ -75,11 +82,18 @@ def main() -> int:
             for failure in result.failures:
                 print(f"FAIL: {failure}", file=sys.stderr)
             return 0 if result.passed else 1
-        for mismatch in monitor.mismatches:
-            print(f"warning: topic {mismatch.name} has a different schema hash on the MCU", file=sys.stderr)
+        target = "udp {}:{}".format(*args.udp)
+        live = sys.stdout.isatty()
+        if not live:
+            for mismatch in monitor.mismatches:
+                print(f"warning: topic {mismatch.name} has a different schema hash on the MCU", file=sys.stderr)
         while True:
-            monitor.run(1.0)
-            print("\n".join(monitor.summary()), flush=True)
+            monitor.run(REFRESH_S if live else 1.0)
+            if live:
+                width = shutil.get_terminal_size().columns
+                print(CLEAR + "\n".join(render(monitor, target, width)), flush=True)
+            else:
+                print("\n".join(monitor.summary()), flush=True)
     except KeyboardInterrupt:
         return 0
     finally:

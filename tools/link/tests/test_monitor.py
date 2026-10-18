@@ -8,7 +8,8 @@ import types
 import pytest
 
 from vklink import FrameReader, McuSession, TopicDescription
-from vklink.monitor import LinkMonitor, RateExpectation, UdpConnection, check
+from vklink.monitor import LinkMonitor, RateExpectation, TopicStats, UdpConnection, check
+from vklink.view import render
 
 SAMPLE_HASH = 0x1122334455667788
 
@@ -145,3 +146,33 @@ def test_rate_expectation_syntax():
     assert RateExpectation.parse("imu_sample:0=200") == RateExpectation("imu_sample", 0, 200.0)
     with pytest.raises(ValueError):
         RateExpectation.parse("imu_sample=200")
+
+
+def test_summary_and_live_view_show_link_statistics_and_work_item_timing():
+    connection = types.SimpleNamespace(send=lambda data: None, receive=lambda timeout: b"", close=lambda: None)
+    monitor = LinkMonitor(connection, messages())
+    monitor.session.handshake_done = True
+    monitor.session.version = 1
+    link = types.SimpleNamespace(timestamp=1, frames_sent=100, bytes_sent=4000, frames_received=5,
+                                 bytes_received=80, drops=2, crc_errors=1, malformed=0, lost=3, handshake_state=1)
+    worker = types.SimpleNamespace(timestamp=1, work_item=0, name=tuple(b"icm20948".ljust(16, b"\0")), runs=1000,
+                                   overruns=0, run_time_last_us=4, run_time_max_us=12, run_time_mean_us=3,
+                                   jitter_max_us=900)
+    sample = Sample(timestamp=5, value=42)
+    sample.FIELDS = ("timestamp", "value")
+    for name, message in (("link_status", link), ("work_item_status", worker), ("sample", sample)):
+        monitor.topics[(name, 0)] = TopicStats(name, 0)
+        monitor.topics[(name, 0)].add(message)
+
+    summary = monitor.summary()
+    assert ("mcu_link instance=0 frames_sent=100 bytes_sent=4000 frames_received=5 bytes_received=80 drops=2 "
+            "crc_errors=1 malformed=0 lost=3 handshake_state=connected") in summary
+    assert any(line.startswith("work_item name=icm20948 runs=1000 overruns=0") for line in summary)
+    assert "the MCU dropped 2 frames on Link 0" in check(monitor, [], 0.05).failures
+
+    view = render(monitor, "udp 127.0.0.1:15600", width=200)
+    assert view[0] == "Vehkernel Link  udp 127.0.0.1:15600  handshake ok, protocol 1"
+    assert any(line.startswith("mcu link 0") and "drops 2" in line and "lost 3" in line for line in view)
+    assert any(line.startswith("sample") and "value=42" in line for line in view)
+    assert any(line.split()[:3] == ["icm20948", "1000", "0"] for line in view)
+    assert all(len(line) <= 40 for line in render(monitor, "udp", width=40))

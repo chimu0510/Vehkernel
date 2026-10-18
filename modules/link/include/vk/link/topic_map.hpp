@@ -90,8 +90,8 @@ private:
 // A Link's topic map.
 using TopicMap = std::span<TopicStream* const>;
 
-// The first topic map (spec 0003): imu_sample instance 0 at every sample, and
-// every work item's work_item_status at 1 Hz.
+// The first topic map (spec 0003): imu_sample instance 0 at every sample;
+// every instance of work_item_status and link_status at 1 Hz.
 TopicMap default_topic_map();
 
 }  // namespace vk::link
