@@ -1,0 +1,1 @@
+broken.msg:2: error: cannot parse 'float32'; expected '<type> <name>' or '<type>[<length>] <name>'

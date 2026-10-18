@@ -1,0 +1,1 @@
+narrow_timestamp.msg:1: error: the first field must be 'uint64 timestamp' (ADR-0006), got 'uint32 timestamp'

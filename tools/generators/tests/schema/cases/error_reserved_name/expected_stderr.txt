@@ -1,0 +1,2 @@
+keyword.msg:2: error: field name 'class' is a reserved word
+keyword.msg:3: error: field name 'lambda' is a reserved word

@@ -1,0 +1,1 @@
+b/same.msg: error: message 'same' is already defined in a/same.msg

@@ -1,0 +1,104 @@
+"""Schema generator tests, run through its command line.
+
+Each directory under ``cases/`` holds .msg files and the expected result:
+``expected/`` with the generated files for a valid schema, or
+``expected_stderr.txt`` with the diagnostics for an invalid one. Run with
+``VK_UPDATE_GOLDEN=1`` to rewrite the expected files after an intended
+change, then review the diff.
+"""
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[3]
+GENERATOR = REPO / "tools" / "generators" / "generate_schema.py"
+CASES = sorted(p for p in (HERE / "cases").iterdir() if p.is_dir())
+UPDATE = os.environ.get("VK_UPDATE_GOLDEN") == "1"
+
+
+def messages_in(directory: Path) -> list[str]:
+    return sorted(str(p.relative_to(directory)) for p in directory.rglob("*.msg"))
+
+
+def generate(schema_dir: Path, output_dir: Path):
+    # Run from the schema directory so diagnostics read "<file>.msg:<line>".
+    return subprocess.run(
+        [sys.executable, str(GENERATOR), *messages_in(schema_dir), "--output-dir", str(output_dir)],
+        cwd=schema_dir, capture_output=True, text=True, check=False)
+
+
+def files_in(directory: Path) -> list[str]:
+    return sorted(str(p.relative_to(directory)) for p in directory.rglob("*") if p.is_file())
+
+
+def check_golden(path: Path, actual: str):
+    if UPDATE:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(actual, encoding="utf-8")
+    assert path.exists(), f"missing golden file {path}; run with VK_UPDATE_GOLDEN=1"
+    assert actual == path.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("case", CASES, ids=[c.name for c in CASES])
+def test_case(case: Path, tmp_path: Path):
+    result = generate(case, tmp_path)
+    if case.name.startswith("error_"):
+        assert result.returncode == 1
+        assert not any(tmp_path.iterdir()), "no outputs may be written for an invalid schema"
+        check_golden(case / "expected_stderr.txt", result.stderr)
+    else:
+        assert result.returncode == 0, result.stderr
+        produced = files_in(tmp_path)
+        if not UPDATE:
+            assert produced == files_in(case / "expected")
+        for name in produced:
+            check_golden(case / "expected" / name, (tmp_path / name).read_text(encoding="utf-8"))
+
+
+def test_output_is_deterministic(tmp_path: Path):
+    schema = REPO / "schema" / "msg"
+    first, second = tmp_path / "first", tmp_path / "second"
+    assert generate(schema, first).returncode == 0
+    assert generate(schema, second).returncode == 0
+    assert files_in(first) == files_in(second)
+    for name in files_in(first):
+        assert (first / name).read_bytes() == (second / name).read_bytes()
+
+
+def test_unchanged_outputs_are_not_rewritten(tmp_path: Path):
+    case = HERE / "cases" / "valid_basic"
+    assert generate(case, tmp_path).returncode == 0
+    header = tmp_path / "vk" / "msg" / "all_types.hpp"
+    os.utime(header, (0, 0))
+    assert generate(case, tmp_path).returncode == 0
+    assert header.stat().st_mtime == 0
+
+
+def schema_hash(schema_dir: Path, tmp_path: Path, name: str) -> str:
+    assert generate(schema_dir, tmp_path).returncode == 0
+    text = (tmp_path / "vk" / "msg" / f"{name}.hpp").read_text(encoding="utf-8")
+    return next(line for line in text.splitlines() if "schema_hash" in line)
+
+
+def write(directory: Path, name: str, text: str) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / f"{name}.msg").write_text(text, encoding="utf-8")
+    return directory
+
+
+@pytest.mark.parametrize("changed, same", [
+    ("uint64 timestamp\nfloat64 value\n", False),       # field type
+    ("uint64 timestamp\nfloat32 speed\n", False),       # field name
+    ("uint64 timestamp\nfloat32[2] value\n", False),    # array length
+    ("uint64 timestamp\nfloat32 value\nuint8 x\n", False),  # added field
+    ("# Docs.\n@queue 3\n@rate 50\nuint64 timestamp\nfloat32 value  @unit m  # note\n", True),
+], ids=["type", "name", "array", "added", "comments-units-annotations"])
+def test_schema_hash_tracks_the_wire_definition(tmp_path: Path, changed: str, same: bool):
+    base = schema_hash(write(tmp_path / "a", "topic", "uint64 timestamp\nfloat32 value\n"), tmp_path / "out_a", "topic")
+    other = schema_hash(write(tmp_path / "b", "topic", changed), tmp_path / "out_b", "topic")
+    assert (base == other) is same

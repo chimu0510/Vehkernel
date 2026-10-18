@@ -1,0 +1,2 @@
+bad_array.msg:2: error: array length must be a positive integer, got '0'
+bad_array.msg:3: error: array length must be a positive integer, got 'n'

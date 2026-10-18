@@ -1,0 +1,1 @@
+twice.msg:3: error: field 'value' is already defined on line 2

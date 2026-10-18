@@ -1,0 +1,1 @@
+camel.msg:2: error: field name 'forwardSpeed' must be lower_snake_case

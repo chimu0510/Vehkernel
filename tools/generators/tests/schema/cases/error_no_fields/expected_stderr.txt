@@ -1,0 +1,1 @@
+empty.msg: error: message has no fields; the first field must be 'uint64 timestamp' (ADR-0006)

@@ -20,7 +20,9 @@ add_test(NAME flash_budget_smoke
 add_test(NAME mcudb
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/mcudb/tests)
 add_test(NAME board_generator
-  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/generators/tests)
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/generators/tests/test_board_generator.py)
+add_test(NAME schema_generator
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/generators/tests/schema)
 
 # Layer rules (ADR-0009): configure a scratch project that links one layer to
 # another and check that the rule helper accepts or rejects it.

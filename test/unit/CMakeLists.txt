@@ -2,8 +2,8 @@
 find_package(GTest CONFIG REQUIRED)
 include(GoogleTest)
 
-add_executable(vk_unit_tests smoke_test.cpp pin_test.cpp dma_test.cpp clock_test.cpp)
-target_link_libraries(vk_unit_tests PRIVATE GTest::gtest_main vk_hal vk_platform vk_core vk_warnings)
+add_executable(vk_unit_tests smoke_test.cpp pin_test.cpp dma_test.cpp clock_test.cpp schema_test.cpp)
+target_link_libraries(vk_unit_tests PRIVATE GTest::gtest_main vk_hal vk_msg vk_platform vk_core vk_warnings)
 # Hardware-free logic of the STM32F4 platform layer, tested on the host.
 target_include_directories(vk_unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/platform/stm32f4/include)
 gtest_discover_tests(vk_unit_tests)
@@ -24,4 +24,21 @@ foreach(header IN LISTS golden_headers)
   add_library(vk_golden_${case} OBJECT ${source})
   target_link_libraries(vk_golden_${case} PRIVATE vk_hal vk_warnings)
   set_target_properties(vk_golden_${case} PROPERTIES CXX_CLANG_TIDY "")
+endforeach()
+
+# Every golden output of the schema generator tests must compile: one
+# translation unit per case including all of its headers.
+file(GLOB schema_cases LIST_DIRECTORIES true ${CMAKE_SOURCE_DIR}/tools/generators/tests/schema/cases/valid_*)
+foreach(case_dir IN LISTS schema_cases)
+  get_filename_component(case ${case_dir} NAME)
+  file(GLOB_RECURSE case_headers ${case_dir}/expected/*.hpp)
+  set(source ${CMAKE_CURRENT_BINARY_DIR}/golden_schema_${case}.cpp)
+  set(text "")
+  foreach(header IN LISTS case_headers)
+    string(APPEND text "#include \"${header}\"\n")
+  endforeach()
+  file(WRITE ${source} "${text}")
+  add_library(vk_golden_schema_${case} OBJECT ${source})
+  target_link_libraries(vk_golden_schema_${case} PRIVATE vk_warnings)
+  set_target_properties(vk_golden_schema_${case} PROPERTIES CXX_CLANG_TIDY "")
 endforeach()

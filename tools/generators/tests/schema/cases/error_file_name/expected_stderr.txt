@@ -1,0 +1,1 @@
+BadName.msg: error: message file name 'BadName.msg' must be lower_snake_case with the .msg suffix
