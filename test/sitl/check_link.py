@@ -4,8 +4,12 @@
 Starts SITL with its UDP Link on a free port, or with --link pty on a pty,
 runs the Link monitor in --check mode against it, then checks SITL's report.
 Fails when the monitor's check fails (no handshake, a schema mismatch, lost
-frames or a missed rate), when a work item, the Link's included, overran or
+frames or a missed rate), when a work item, the Link's included, overran
+during the check (by the timing statistics the MCU sent over the Link) or
 never ran, or when the pty is left behind once SITL has exited.
+
+Overruns are judged over the check alone: SITL runs on a shared host, and a
+stall in the seconds around it says nothing about the Link.
 
     check_link.py build/test/app/vehkernel-sitl tools/link/link_monitor.py \\
         --msg-dir build/test/generated/schema/python --duration 5 --expect-rate imu_sample:0=200
@@ -81,15 +85,19 @@ def main() -> int:
     if sitl.returncode != 0:
         failures.append(f"vehkernel-sitl exited with {sitl.returncode}\n{errors}")
     _, work_items = parse_report(report)
-    if not any(item["name"].startswith("link") for item in work_items):
-        failures.append("no Link work item in the report")
-    if pty_path is not None and os.path.exists(pty_path):
-        failures.append(f"{pty_path} is left behind")
+    if not any(item["name"].startswith("link") and int(item["runs"]) > 0 for item in work_items):
+        failures.append("no Link work item ran")
     for item in work_items:
-        if int(item["overruns"]) != 0:
-            failures.append(f"work item {item['name']} overran {item['overruns']} times")
         if int(item["runs"]) == 0:
             failures.append(f"work item {item['name']} never ran")
+    _, reported = parse_report(monitor.stdout)
+    if not reported:
+        failures.append("the Link carried no work item timing")
+    for item in reported:
+        if int(item["overruns"]) != 0:
+            failures.append(f"work item {item['name']} overran {item['overruns']} times during the check")
+    if pty_path is not None and os.path.exists(pty_path):
+        failures.append(f"{pty_path} is left behind")
 
     for failure in failures:
         print(f"FAIL: {failure}", file=sys.stderr)

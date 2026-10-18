@@ -2,16 +2,26 @@
 // work queues, then hand over to FreeRTOS.
 #include <board.hpp>
 #include <vk/config.h>
+#include <vk/core/critical_section.hpp>
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
 #include <vk/platform/platform.hpp>
+
+#ifdef CONFIG_LINK_SERIAL
+#include <vk/hal/uart.hpp>
+#include <vk/link/link.hpp>
+#include <vk/link/topic_map.hpp>
+#include <vk/platform/dma_uart.hpp>
+#endif
 
 #ifdef CONFIG_DRIVER_ICM20948
 #include <vk/drivers/icm20948.hpp>
 #include <vk/hal/i2c.hpp>
 #include <vk/platform/soft_i2c.hpp>
 #endif
+
+#include <cstdint>
 
 #ifndef CONFIG_PLATFORM_STM32F4
 #error "the Kconfig layers must select the STM32F4 platform for firmware builds"
@@ -46,6 +56,32 @@ void start_imu()
 }
 #endif
 
+#ifdef CONFIG_LINK_SERIAL
+// The Link's serial port and baud rate, fixed until the parameter system
+// exists (spec 0003): SERIAL1, the Type-C port, at 921600 baud 8N1.
+using LinkPort = vk::board::ports::SERIAL1;
+static_assert(vk::board::defaults::SERIAL1_FUNCTION == "LINK", "SERIAL1 must be a Link port");
+constexpr std::uint32_t link_baud = 921'600;
+
+using LinkUart = vk::platform::DmaUart<LinkPort>;
+static_assert(vk::hal::Uart<LinkUart>);
+
+LinkUart link_uart;  // in .bss, normal SRAM, where the DMA reaches its buffers
+vk::core::StaticInstance<vk::hal::UartTransport> link_transport;
+vk::core::StaticInstance<vk::link::Link> serial_link;
+
+void start_link()
+{
+    if (!link_uart.configure(link_baud)) {
+        vk::core::fail("the Link's baud rate is out of the USART's reach");
+    }
+    link_transport.emplace(link_uart);
+    serial_link.emplace("link0", *link_transport, vk::link::default_topic_map(), vk::link::Link::Config{},
+                        vk::core::work_queue(vk::core::WorkQueueTier::Io));
+    serial_link->start();
+}
+#endif
+
 }  // namespace
 
 int main()
@@ -57,6 +93,9 @@ int main()
     vk::platform::init();
 #ifdef CONFIG_DRIVER_ICM20948
     start_imu();
+#endif
+#ifdef CONFIG_LINK_SERIAL
+    start_link();
 #endif
     vk::core::start_scheduler();  // Never returns.
 }

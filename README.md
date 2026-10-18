@@ -2,7 +2,7 @@
 
 **Vehkernel** (Vehicle + Kernel) is open-source MCU firmware with ROS2 support, built as a common core for any vehicle: one system drives many vehicles and frames. The MCU handles real-time state estimation, low-level control and safety, and keeps running without a companion computer; global localization and navigation are left to ROS2 applications above it. The first test platform is a UGV.
 
-**Status: first IMU sample.** Every decision is recorded in [`docs/adr/`](docs/adr/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary. The firmware runs FreeRTOS with the bus and rate-tiered work queues; on the C50C V1.1 the ICM20948 driver publishes IMU samples at 200 Hz over software I2C, and SITL runs the same driver against a simulated ICM20948. Estimation, control and Links come next.
+**Status: first Link.** Every decision is recorded in [`docs/adr/`](docs/adr/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary. The firmware runs FreeRTOS with the bus and rate-tiered work queues; on the C50C V1.1 the ICM20948 driver publishes IMU samples at 200 Hz over software I2C, and SITL runs the same driver against a simulated ICM20948. A Link with the custom protocol streams topics to the development host, over the Type-C port on the board and over UDP or a pty in SITL, where the Link monitor shows them live. Estimation and control come next.
 
 ## Target hardware
 
@@ -61,6 +61,19 @@ Flash the C50C over SWD with an ST-Link on header HDR2 (pin 4 GND, pin 6 PA13/SW
 
 ```bash
 openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program build/c50c-v1_1/app/vehkernel.elf verify reset exit"
+```
+
+The firmware runs a Link on SERIAL1, the Type-C port (USART3 to the CH9102F USB serial adapter), at 921600 baud 8N1 with DMA both ways; the port and baud rate are fixed until the parameter system exists. Plug a USB cable into the Type-C port and the adapter appears on the host as a serial device, usually `/dev/ttyACM0` (your user needs the `dialout` group). Run the Link monitor on the host, with the Python decoders of the firmware build:
+
+```bash
+tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/c50c-v1_1/generated/schema/python
+```
+
+The hardware check of the serial Link runs the monitor's check for a minute; it passes when `imu_sample` arrives at 200 Hz with no CRC errors and no lost frames:
+
+```bash
+tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/c50c-v1_1/generated/schema/python \
+    --check --duration 60 --expect-rate imu_sample:0=200
 ```
 
 The bring-up test build (L4, [ADR-0018](docs/adr/0018-test-layers-and-sitl.md)) runs the hardware bring-up cases at boot instead of the application: it reads the ICM20948's WHO_AM_I over software I2C and measures the IMU read rate. It never configures actuator outputs, so it is safe with motors connected. Build it in the devcontainer, then run the bring-up runner on the host, which flashes it over SWD, reads the result block back and exits non-zero if a case fails or no results arrive:

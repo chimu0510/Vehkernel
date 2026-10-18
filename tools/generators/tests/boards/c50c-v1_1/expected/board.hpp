@@ -223,22 +223,33 @@ struct usb_otg_fs {
 namespace ports {
 struct SERIAL1 {
     static constexpr std::string_view peripheral = "USART3";
+    using registers = peripherals::usart3;
     using tx = pins::SERIAL1_TX;
+    using tx_dma = dma::USART3_TX;
     using rx = pins::SERIAL1_RX;
+    using rx_dma = dma::USART3_RX;
 };
 struct SERIAL2 {
     static constexpr std::string_view peripheral = "USART1";
+    using registers = peripherals::usart1;
     using tx = pins::SERIAL2_TX;
+    using tx_dma = dma::USART1_TX;
     using rx = pins::SERIAL2_RX;
+    using rx_dma = dma::USART1_RX;
 };
 struct SERIAL3 {
     static constexpr std::string_view peripheral = "UART4";
+    using registers = peripherals::uart4;
     using tx = pins::SERIAL3_TX;
+    using tx_dma = dma::UART4_TX;
     using rx = pins::SERIAL3_RX;
+    using rx_dma = dma::UART4_RX;
 };
 struct SERIAL4 {
     static constexpr std::string_view peripheral = "UART5";
+    using registers = peripherals::uart5;
     using rx = pins::SBUS_RX;
+    using rx_dma = dma::UART5_RX;
 };
 }  // namespace ports
 

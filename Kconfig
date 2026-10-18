@@ -18,6 +18,9 @@ config BOARD_HAS_ICM20948
 config BOARD_IMU_BUS_SOFT_I2C
 	bool
 
+config BOARD_HAS_LINK_PORT
+	bool
+
 source "$(VK_BOARD_KCONFIG)"
 
 choice PLATFORM
@@ -95,6 +98,16 @@ config LINK
 	help
 	  The custom protocol of ADR-0002: COBS and CRC16 framing, handshake
 	  with schema hashes, and time synchronization.
+
+config LINK_SERIAL
+	bool "Link on a board serial port"
+	depends on LINK && PLATFORM_STM32F4 && BOARD_HAS_LINK_PORT
+	default y
+	help
+	  A Link on the board's first serial port whose function is LINK,
+	  SERIAL1 (the Type-C port) on the C50C V1.1, at 921600 baud 8N1
+	  until the parameter system exists. UART transmit and receive use
+	  DMA.
 
 config LINK_UDP
 	bool "Link over UDP"

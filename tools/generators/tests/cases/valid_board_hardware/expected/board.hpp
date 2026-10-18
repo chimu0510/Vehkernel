@@ -83,12 +83,17 @@ struct usart2 {
 namespace ports {
 struct SERIAL1 {
     static constexpr std::string_view peripheral = "USART1";
+    using registers = peripherals::usart1;
     using tx = pins::SERIAL1_TX;
+    using tx_dma = dma::USART1_TX;
     using rx = pins::SERIAL1_RX;
+    using rx_dma = dma::USART1_RX;
 };
 struct SERIAL2 {
     static constexpr std::string_view peripheral = "USART2";
+    using registers = peripherals::usart2;
     using tx = pins::SERIAL2_TX;
+    using tx_dma = dma::USART2_TX;
 };
 }  // namespace ports
 

@@ -92,3 +92,16 @@ def test_bringup_build_needs_an_icm20948_on_software_i2c(tmp_path):
     result = solve(tmp_path, ["CONFIG_PLATFORM_STM32F4=y\n", "CONFIG_BRINGUP_TESTS=y\n"], ["BOARD_HAS_ICM20948"])
     assert result.returncode == 1
     assert "CONFIG_BRINGUP_TESTS=y did not take effect" in result.stderr
+
+
+def test_serial_link_needs_a_board_serial_port_for_a_link(tmp_path):
+    result = solve(tmp_path, ["CONFIG_PLATFORM_STM32F4=y\n", "CONFIG_LINK_SERIAL=y\n"])
+    assert result.returncode == 1
+    assert "CONFIG_LINK_SERIAL=y did not take effect" in result.stderr
+    assert "BOARD_HAS_LINK_PORT" in result.stderr
+
+
+def test_serial_link_is_on_for_a_board_with_a_link_port(tmp_path):
+    result = solve(tmp_path, ["CONFIG_PLATFORM_STM32F4=y\n"], ["BOARD_HAS_LINK_PORT"])
+    assert result.returncode == 0, result.stderr
+    assert "CONFIG_LINK_SERIAL=y" in config(tmp_path)

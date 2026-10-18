@@ -25,6 +25,10 @@ config BOARD_HAS_ICM20948
 	bool
 	default y
 
+config BOARD_HAS_LINK_PORT
+	bool
+	default y
+
 config BOARD_HAS_SPI
 	bool
 	default y

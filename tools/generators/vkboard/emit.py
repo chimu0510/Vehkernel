@@ -145,14 +145,19 @@ def _ports_namespace(board: Board) -> list[str]:
     ports = board.hardware.serial
     if not ports:
         return []
+    solved = {a.request for a in board.dma if a.candidate is not None}
+    instances = {name for name, _ in board.peripherals}
     out = ["// Logical serial ports; SERIALn_FUNCTION picks their use at runtime.", "namespace ports {"]
     for p in ports:
         out.append(f"struct {p.port} {{")
         out.append(f'    static constexpr std::string_view peripheral = "{p.peripheral}";')
-        if p.tx:
-            out.append(f"    using tx = pins::{p.tx};")
-        if p.rx:
-            out.append(f"    using rx = pins::{p.rx};")
+        if p.peripheral in instances:
+            out.append(f"    using registers = peripherals::{p.peripheral.lower()};")
+        for direction in ("tx", "rx"):
+            if getattr(p, direction):
+                out.append(f"    using {direction} = pins::{getattr(p, direction)};")
+                if f"{p.peripheral}_{direction.upper()}" in solved:
+                    out.append(f"    using {direction}_dma = dma::{p.peripheral}_{direction.upper()};")
         out.append("};")
     return out + ["}  // namespace ports", ""]
 
@@ -254,6 +259,9 @@ def board_symbols(board: Board) -> list[str]:
         symbols.add(f"BOARD_{d.kind}_BUS_{d.bus}")
     for s in board.hardware.storage:
         symbols.add(f"BOARD_HAS_{s.storage}")
+    # A serial port with both lines whose default use is a Link (spec 0003).
+    if any(p.function == "LINK" and p.tx and p.rx for p in board.hardware.serial):
+        symbols.add("BOARD_HAS_LINK_PORT")
     return sorted(symbols)
 
 

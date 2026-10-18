@@ -19,6 +19,8 @@ def parse_report(text: str) -> tuple[dict[tuple[str, int], dict[str, str]], list
     topics: dict[tuple[str, int], dict[str, str]] = {}
     work_items: list[dict[str, str]] = []
     for line in text.splitlines():
+        if not line.strip():
+            continue
         kind, *pairs = line.split()
         fields = dict(pair.split("=", 1) for pair in pairs)
         if kind == "topic":
