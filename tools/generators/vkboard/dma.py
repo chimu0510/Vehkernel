@@ -10,6 +10,7 @@ Requests come from two places:
   peripheral that has a pin.
 - Listed in the board's ``dma`` array, which can add requests (timer, ADC, ...)
   and annotate any request with ``priority``, ``dma = false`` or ``share = true``.
+  A stream is shared only when every request on it has ``share = true``.
 """
 
 from __future__ import annotations
