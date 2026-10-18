@@ -96,6 +96,14 @@ config LINK
 	  The custom protocol of ADR-0002: COBS and CRC16 framing, handshake
 	  with schema hashes, and time synchronization.
 
+config LINK_UDP
+	bool "Link over UDP"
+	depends on LINK && PLATFORM_SITL
+	default y
+	help
+	  SITL's default Link transport (ADR-0018). The address and port are
+	  chosen on the command line, 127.0.0.1:15600 by default.
+
 endmenu
 
 menu "Testing"

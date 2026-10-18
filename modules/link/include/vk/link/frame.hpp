@@ -82,6 +82,10 @@ public:
     // body is too large or `out` too small.
     std::size_t write(FrameType type, std::span<const std::uint8_t> body, std::span<std::uint8_t> out);
 
+    // Gives back the number of the frame written last, which was never sent,
+    // so the peer counts as lost only frames lost on the way.
+    void retract() { --sequence_; }
+
     [[nodiscard]] std::uint16_t next_sequence() const { return sequence_; }
 
 private:

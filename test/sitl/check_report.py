@@ -46,7 +46,9 @@ def main() -> int:
     parser.add_argument("--tolerance", type=float, default=0.05, help="allowed relative rate error")
     args = parser.parse_args()
 
-    result = subprocess.run([args.sitl, "--duration", str(args.duration)], capture_output=True, text=True,
+    # Any free port for the Link, so the run never collides with another SITL.
+    result = subprocess.run([args.sitl, "--duration", str(args.duration), "--udp", "127.0.0.1:0"],
+                            capture_output=True, text=True,
                             timeout=args.duration + 30, check=False)
     print(result.stdout, end="")
     if result.returncode != 0:

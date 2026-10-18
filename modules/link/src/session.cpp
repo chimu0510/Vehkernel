@@ -95,7 +95,11 @@ bool Session::send(FrameType type, std::span<const std::uint8_t> body, FrameSink
 {
     std::array<std::uint8_t, max_wire_size> wire{};
     const std::size_t size = writer_.write(type, body, wire);
-    if (size == 0 || !sink.send(std::span(wire).first(size))) {
+    if (size == 0) {
+        return false;
+    }
+    if (!sink.send(std::span(wire).first(size))) {
+        writer_.retract();
         return false;
     }
     ++frames_sent_;

@@ -47,7 +47,7 @@ The development environment is [`.devcontainer/`](.devcontainer/); every tool th
 | Preset | Output |
 |---|---|
 | `c50c-v1_1` | C50C V1.1 firmware: `vehkernel.elf`, `vehkernel.hex` (boot stub and firmware), `vehkernel-boot.bin` (S0) and `vehkernel.bin` (firmware only, from S4) |
-| `sitl` | SITL executable for the development host: `vehkernel-sitl [--duration <seconds>]` runs the firmware on the FreeRTOS POSIX port, stops after the duration (default 1 s) and prints a report (see below) |
+| `sitl` | SITL executable for the development host: `vehkernel-sitl [--duration <seconds>] [--udp <address>:<port>]` runs the firmware on the FreeRTOS POSIX port with a Link over UDP, stops after the duration (default 1 s, 0 runs until interrupted) and prints a report (see below) |
 | `test` | Host tests, run with `ctest --preset test` |
 
 ```bash
@@ -90,14 +90,39 @@ build/sitl/app/vehkernel-sitl --duration 5
 At the end of a run SITL prints one line per topic instance and per work item, as space-separated `key=value` pairs (topics never published are listed too, with `publications=0`):
 
 ```text
+link transport=udp address=127.0.0.1:15600
 report duration_s=5.000
 topic name=imu_sample instance=0 publications=978 rate_hz=200.01 last_update_us=5000977
 topic name=work_item_status instance=0 publications=5 rate_hz=1.00 last_update_us=5000580
 work_item name=icm20948 queue=wq:ctrl runs=1000 overruns=0 run_time_last_us=4 run_time_max_us=12 run_time_mean_us=2 jitter_max_us=1137
+work_item name=link0 queue=wq:io runs=1000 overruns=0 run_time_last_us=5 run_time_max_us=227 run_time_mean_us=21 jitter_max_us=4447
 work_item name=timing_monitor queue=wq:slow runs=5 overruns=0 run_time_last_us=2 run_time_max_us=6 run_time_mean_us=3 jitter_max_us=809
 ```
 
 `rate_hz` is the average since the topic's first publication. `test/sitl/check_report.py` runs SITL and checks the report; CI runs it through `ctest` (the `sitl_smoke` test), failing when `imu_sample` is not published at 200 Hz within 5 % or any work item overruns.
+
+### Watching live data with the Link monitor
+
+SITL streams topics over a Link (ADR-0002): UDP on `127.0.0.1:15600` by default, or the address given with `--udp` (port 0 picks a free one; SITL prints a `link` line with the port it bound). The Link monitor on the development host connects, performs the handshake, compares every topic's schema hash with the local build and prints each topic's rate. Start SITL without a time limit in one terminal and the monitor in another:
+
+```bash
+build/sitl/app/vehkernel-sitl --duration 0
+tools/link/link_monitor.py --udp 127.0.0.1:15600
+```
+
+The monitor decodes topics with the Python module the schema generator writes into the build tree, `build/sitl/generated/schema/python` by default; pass `--msg-dir` for another build. With `--check` it runs for `--duration` seconds, prints a summary as `key=value` lines and exits non-zero when the handshake fails, a schema hash differs, frames are lost or a rate given with `--expect-rate` is missed:
+
+```bash
+tools/link/link_monitor.py --check --duration 5 --expect-rate imu_sample:0=200
+```
+
+```text
+link handshake=ok version=1 mismatches=0 frames=1032 crc_errors=0 malformed=0 lost=0 rtt_us=5132 clock_offset_us=-213339289143
+topic name=imu_sample instance=0 messages=1004 rate_hz=199.99
+topic name=work_item_status instance=0 messages=5 rate_hz=1.00
+```
+
+`rate_hz` here follows the MCU's timestamps, so host scheduling does not skew it. CI runs SITL and the monitor's check together through `ctest` (the `sitl_link` test, `test/sitl/check_link.py`), which also fails when the Link work item overruns.
 
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 

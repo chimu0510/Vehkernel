@@ -6,6 +6,15 @@ add_test(NAME sitl_smoke
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_report.py
     $<TARGET_FILE:vehkernel-sitl> --duration 5 --expect-rate imu_sample:0=200)
 
+# L3 SITL Link test (spec 0003): the Link monitor connects to SITL over UDP,
+# the handshake succeeds, imu_sample arrives at 200 Hz and no frame is lost.
+if(CONFIG_LINK_UDP)
+  add_test(NAME sitl_link
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_link.py
+      $<TARGET_FILE:vehkernel-sitl> ${CMAKE_SOURCE_DIR}/tools/link/link_monitor.py
+      --msg-dir ${VK_MSG_PYTHON_DIR} --duration 5 --expect-rate imu_sample:0=200)
+endif()
+
 # Kconfig smoke test (ADR-0017): a debug overlay that sets an option whose
 # dependencies are not met must fail configuration.
 add_test(NAME kconfig_overlay_smoke

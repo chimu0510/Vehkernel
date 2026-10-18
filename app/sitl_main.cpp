@@ -1,9 +1,13 @@
 // SITL entry point: the firmware on the FreeRTOS POSIX port (ADR-0018).
 //
-// Usage: vehkernel-sitl [--duration <seconds>]
-// The run stops by itself after the duration (default 1 s) and prints a
-// report: one line per topic instance and per work item, as space-separated
-// key=value pairs, so scripts can parse it.
+// Usage: vehkernel-sitl [--duration <seconds>] [--link udp] [--udp <address>:<port>]
+//
+// The run stops by itself after the duration (default 1 s; 0 runs until
+// interrupted) and prints a report: one line per topic instance and per work
+// item, as space-separated key=value pairs, so scripts can parse it. A Link
+// streams topics to the development host, over UDP by default
+// (127.0.0.1:15600, port 0 for any free port); its line, with the port bound,
+// is printed when it starts.
 #include <vk/config.h>
 #include <vk/core/bus.hpp>
 #include <vk/core/scheduler.hpp>
@@ -14,9 +18,17 @@
 #include <vk/msg/registry.hpp>
 #include <vk/platform/platform.hpp>
 
+#ifdef CONFIG_LINK_UDP
+#include <vk/link/link.hpp>
+#include <vk/link/topic_map.hpp>
+#include <vk/platform/udp_transport.hpp>
+#endif
+
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
 #include <span>
 #include <string_view>
 
@@ -42,14 +54,57 @@ void start_imu()
     imu->start();
 }
 
-bool parse_duration(std::span<char*> args, double& duration_s)
+struct Options {
+    double duration_s = default_duration_s;  // 0 runs until interrupted
+    std::string_view link = "udp";
+    std::array<char, 64> udp_address{"127.0.0.1"};  // NUL-terminated
+    std::uint16_t udp_port = 15600;
+};
+
+bool parse_address(const char* argument, Options& options)
+{
+    const std::string_view text = argument;
+    const auto colon = text.rfind(':');
+    if (colon == std::string_view::npos || colon == 0) {
+        return false;
+    }
+    const std::string_view address = text.substr(0, colon);
+    const char* port = std::next(argument, static_cast<std::ptrdiff_t>(colon + 1));
+    if (address.size() >= options.udp_address.size() || *port == '\0') {
+        return false;
+    }
+    char* end = nullptr;
+    const unsigned long value = std::strtoul(port, &end, 10);
+    if (*end != '\0' || value > 65535) {
+        return false;
+    }
+    options.udp_address.fill('\0');
+    address.copy(options.udp_address.data(), address.size());
+    options.udp_port = static_cast<std::uint16_t>(value);
+    return true;
+}
+
+bool parse_options(std::span<char*> args, Options& options)
 {
     for (std::size_t i = 1; i < args.size(); ++i) {
         const std::string_view arg = args[i];
-        if (arg == "--duration" && i + 1 < args.size()) {
+        if (i + 1 >= args.size()) {
+            return false;
+        }
+        const char* value = args[++i];
+        if (arg == "--duration") {
             char* end = nullptr;
-            duration_s = std::strtod(args[++i], &end);
-            if (*end != '\0' || duration_s <= 0.0) {
+            options.duration_s = std::strtod(value, &end);
+            if (*end != '\0' || options.duration_s < 0.0) {
+                return false;
+            }
+        } else if (arg == "--link") {
+            if (std::string_view(value) != "udp") {
+                return false;
+            }
+            options.link = value;
+        } else if (arg == "--udp") {
+            if (!parse_address(value, options)) {
                 return false;
             }
         } else {
@@ -58,6 +113,24 @@ bool parse_duration(std::span<char*> args, double& duration_s)
     }
     return true;
 }
+
+#ifdef CONFIG_LINK_UDP
+vk::platform::UdpTransport udp;
+vk::core::StaticInstance<vk::link::Link> host_link;
+
+bool start_link(const Options& options)
+{
+    if (!udp.open(options.udp_address.data(), options.udp_port)) {
+        return false;
+    }
+    host_link.emplace("link0", udp, vk::link::default_topic_map(), vk::link::Link::Config{},
+                 vk::core::work_queue(vk::core::WorkQueueTier::Io));
+    host_link->start();
+    std::printf("link transport=udp address=%s:%u\n", options.udp_address.data(), udp.port());
+    std::fflush(stdout);
+    return true;
+}
+#endif
 
 void print_report(double duration_s)
 {
@@ -84,15 +157,22 @@ void print_report(double duration_s)
 
 int main(int argc, char** argv)
 {
-    double duration_s = default_duration_s;
-    if (!parse_duration(std::span(argv, static_cast<std::size_t>(argc)), duration_s)) {
-        std::fputs("usage: vehkernel-sitl [--duration <seconds>]\n", stderr);
+    Options options;
+    if (!parse_options(std::span(argv, static_cast<std::size_t>(argc)), options)) {
+        std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp] [--udp <address>:<port>]\n", stderr);
         return 2;
     }
     vk::platform::init();
     start_imu();
-    vk::platform::stop_after(static_cast<std::uint64_t>(duration_s * 1e6));
+#ifdef CONFIG_LINK_UDP
+    if (!start_link(options)) {
+        return 1;
+    }
+#endif
+    if (options.duration_s > 0.0) {
+        vk::platform::stop_after(static_cast<std::uint64_t>(options.duration_s * 1e6));
+    }
     vk::core::start_scheduler();
-    print_report(duration_s);
+    print_report(options.duration_s);
     return 0;
 }
