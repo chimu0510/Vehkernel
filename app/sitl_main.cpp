@@ -14,6 +14,9 @@
 #include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
 #include <vk/drivers/icm20948.hpp>
+#ifdef CONFIG_ESTIMATOR_MAHONY
+#include <vk/estimation/attitude_estimator.hpp>
+#endif
 #include <vk/hal/i2c.hpp>
 #include <vk/msg/registry.hpp>
 #include <vk/platform/platform.hpp>
@@ -188,6 +191,18 @@ void print_report(double duration_s)
     }
 }
 
+#ifdef CONFIG_ESTIMATOR_MAHONY
+vk::core::StaticInstance<vk::estimation::AttitudeEstimator> attitude_estimator;
+
+// Right after the IMU on wq:ctrl, so each sample is estimated in the same pass (ADR-0008).
+void start_estimator()
+{
+    attitude_estimator.emplace(vk::estimation::AttitudeEstimator::Config{},
+                               vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    attitude_estimator->start();
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv)
@@ -200,6 +215,9 @@ int main(int argc, char** argv)
     }
     vk::platform::init();
     start_imu();
+#ifdef CONFIG_ESTIMATOR_MAHONY
+    start_estimator();
+#endif
 #ifdef CONFIG_LINK
     if (!start_link(options)) {
         return 1;

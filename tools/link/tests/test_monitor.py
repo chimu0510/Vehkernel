@@ -1,5 +1,6 @@
 """The Link monitor against a fake MCU over UDP on the loopback (spec 0003)."""
 
+import math
 import socket
 import struct
 import threading
@@ -8,7 +9,7 @@ import types
 import pytest
 
 from vklink import FrameReader, McuSession, TopicDescription
-from vklink.monitor import LinkMonitor, RateExpectation, TopicStats, UdpConnection, check
+from vklink.monitor import LinkMonitor, RateExpectation, TopicStats, UdpConnection, check, euler_degrees
 from vklink.view import render
 
 SAMPLE_HASH = 0x1122334455667788
@@ -176,3 +177,22 @@ def test_summary_and_live_view_show_link_statistics_and_work_item_timing():
     assert any(line.startswith("sample") and "value=42" in line for line in view)
     assert any(line.split()[:3] == ["icm20948", "1000", "0"] for line in view)
     assert all(len(line) <= 40 for line in render(monitor, "udp", width=40))
+
+
+def test_attitudes_show_as_roll_pitch_and_yaw_in_degrees():
+    half = math.sqrt(0.5)
+    assert euler_degrees((1.0, 0.0, 0.0, 0.0)) == pytest.approx((0.0, 0.0, 0.0))
+    assert euler_degrees((half, half, 0.0, 0.0)) == pytest.approx((90.0, 0.0, 0.0))
+    assert euler_degrees((half, 0.0, 0.0, -half)) == pytest.approx((0.0, 0.0, -90.0))
+    assert euler_degrees((half, 0.0, half, 0.0))[1] == pytest.approx(90.0)  # gimbal lock
+
+    connection = types.SimpleNamespace(send=lambda data: None, receive=lambda timeout: b"", close=lambda: None)
+    monitor = LinkMonitor(connection, messages())
+    attitude = types.SimpleNamespace(FIELDS=("timestamp", "q", "estimator_id"), timestamp=1,
+                                     q=(math.cos(0.25), math.sin(0.25), 0.0, 0.0), estimator_id=1)
+    monitor.topics[("vehicle_attitude", 0)] = TopicStats("vehicle_attitude", 0)
+    monitor.topics[("vehicle_attitude", 0)].add(attitude)
+    assert "attitude name=vehicle_attitude instance=0 roll_deg=28.65 pitch_deg=0.00 yaw_deg=0.00" in monitor.summary()
+    view = render(monitor, "udp", width=200)
+    assert any(line.startswith("vehicle_attitude") and "roll=28.6° pitch=0.0° yaw=0.0° estimator_id=1" in line
+               for line in view)

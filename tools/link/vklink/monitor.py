@@ -8,6 +8,7 @@ topic instance's rate and latest values.
 from __future__ import annotations
 
 import importlib.util
+import math
 import os
 import select
 import socket
@@ -147,6 +148,21 @@ class TopicStats:
 HANDSHAKE_STATES = {0: "waiting", 1: "connected", 2: "peer_silent"}
 
 
+def euler_degrees(q) -> tuple[float, float, float]:
+    """Roll, pitch and yaw in degrees of a body-to-level quaternion (w, x, y, z), ZYX convention."""
+    w, x, y, z = q
+    sin_pitch = max(-1.0, min(1.0, 2.0 * (w * y - z * x)))
+    if abs(sin_pitch) > 0.99999:
+        # Gimbal lock: roll and yaw turn about the same axis; yaw carries it.
+        roll, pitch, yaw = 0.0, math.copysign(math.pi / 2, sin_pitch), 2.0 * math.atan2(z, w)
+    else:
+        roll = math.atan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x * x + y * y))
+        pitch = math.asin(sin_pitch)
+        yaw = math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+    yaw = math.remainder(yaw, 2.0 * math.pi)
+    return math.degrees(roll), math.degrees(pitch), math.degrees(yaw)
+
+
 def work_item_name(status: object) -> str:
     """The name in a work_item_status message, or its index when it has none."""
     raw = getattr(status, "name", None)
@@ -273,7 +289,13 @@ class LinkMonitor:
             f"topic name={t.name} instance={t.instance} messages={t.messages} rate_hz={t.rate_hz:.2f}"
             for _, t in sorted(self.topics.items())
         ]
-        # The MCU's own view of each Link, and every work item's timing.
+        # Attitudes as angles, the MCU's own view of each Link, and every work item's timing.
+        for (name, instance), topic in sorted(self.topics.items()):
+            q = getattr(topic.latest, "q", None)
+            if q is not None:
+                roll, pitch, yaw = euler_degrees(q)
+                lines.append(f"attitude name={name} instance={instance} roll_deg={roll:.2f} "
+                             f"pitch_deg={pitch:.2f} yaw_deg={yaw:.2f}")
         for instance, status in self.latest("link_status"):
             lines.append(
                 f"mcu_link instance={instance} frames_sent={status.frames_sent} bytes_sent={status.bytes_sent} "

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .monitor import HANDSHAKE_STATES, LinkMonitor, work_item_name
+from .monitor import HANDSHAKE_STATES, LinkMonitor, euler_degrees, work_item_name
 
 # Topics shown in their own tables rather than by their raw values.
 STATUS_TOPICS = ("link_status", "work_item_status")
@@ -19,8 +19,17 @@ def format_value(value: object) -> str:
 def format_message(message: object | None) -> str:
     if message is None:
         return "-"
-    fields = [name for name in getattr(message, "FIELDS", ()) if name != "timestamp"]
-    return " ".join(f"{name}={format_value(getattr(message, name))}" for name in fields)
+    parts = []
+    for name in getattr(message, "FIELDS", ()):
+        if name.startswith("timestamp"):
+            continue
+        if name == "q":
+            # An attitude reads better as angles than as a quaternion.
+            roll, pitch, yaw = euler_degrees(message.q)
+            parts.append(f"roll={roll:.1f}° pitch={pitch:.1f}° yaw={yaw:.1f}°")
+        else:
+            parts.append(f"{name}={format_value(getattr(message, name))}")
+    return " ".join(parts)
 
 
 def render(monitor: LinkMonitor, target: str, width: int = 120) -> list[str]:

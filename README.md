@@ -139,6 +139,14 @@ work_item name=icm20948 runs=1000 overruns=0 run_time_last_us=5 run_time_max_us=
 work_item name=link0 runs=1000 overruns=0 run_time_last_us=31 run_time_max_us=87 run_time_mean_us=19 jitter_max_us=1156
 ```
 
+The attitude estimator (ADR-0014) runs on `wq:ctrl` right after the IMU: a Mahony filter that aligns roll and pitch from the accelerometer once the vehicle has been still for 1 s (yaw starts at 0, and the gyro bias is the mean gyro reading), then publishes `vehicle_attitude` for every IMU sample. The Link sends it at 50 Hz, and the monitor shows it as roll, pitch and yaw in degrees, in the live view and as an `attitude` line in the `--check` summary:
+
+```text
+attitude name=vehicle_attitude instance=0 roll_deg=-0.01 pitch_deg=0.01 yaw_deg=-0.02
+```
+
+Without a magnetometer, yaw is relative to the start and drifts slowly with the remaining gyro bias.
+
 UDP is SITL's default Link transport. To test a tool against a real serial API (termios, baud rate, framing) without hardware, start SITL with `--link pty` instead: it creates a pseudo-terminal, prints its path in the `link` line (`link transport=pty path=/dev/pts/3`), and the pty disappears when SITL exits. The monitor opens it like a board's serial port:
 
 ```bash

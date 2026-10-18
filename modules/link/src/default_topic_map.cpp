@@ -2,6 +2,7 @@
 
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/link_status.hpp>
+#include <vk/msg/vehicle_attitude.hpp>
 #include <vk/msg/work_item_status.hpp>
 
 #include <array>
@@ -28,11 +29,11 @@ auto make_status_streams()
 }
 
 template <class A, std::size_t... I, class B, std::size_t... J>
-std::array<TopicStream*, 1 + sizeof...(I) + sizeof...(J)> make_map(TopicStream& first, A& a,
+std::array<TopicStream*, 2 + sizeof...(I) + sizeof...(J)> make_map(TopicStream& first, TopicStream& second, A& a,
                                                                    std::index_sequence<I...> /*unused*/, B& b,
                                                                    std::index_sequence<J...> /*unused*/)
 {
-    return {&first, &a[I]..., &b[J]...};
+    return {&first, &second, &a[I]..., &b[J]...};
 }
 
 }  // namespace
@@ -41,9 +42,10 @@ TopicMap default_topic_map()
 {
     // Created on first use, after the bus storage is in place.
     static TopicStreamOf<msg::ImuSample> imu(every_sample, 0);
+    static TopicStreamOf<msg::VehicleAttitude> attitude(MaxRate{50.0F}, 0);
     static auto work_items = make_status_streams<msg::WorkItemStatus>();
     static auto links = make_status_streams<msg::LinkStatus>();
-    static const auto map = make_map(imu, work_items, std::make_index_sequence<std::tuple_size_v<decltype(work_items)>>{}, links,
+    static const auto map = make_map(imu, attitude, work_items, std::make_index_sequence<std::tuple_size_v<decltype(work_items)>>{}, links,
                                      std::make_index_sequence<std::tuple_size_v<decltype(links)>>{});
     return map;
 }

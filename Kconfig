@@ -52,8 +52,12 @@ menu "Estimators"
 
 config ESTIMATOR_MAHONY
 	bool "Mahony attitude estimator"
+	depends on DRIVER_ICM20948
 	default y
 	select MATH_QUATERNION
+	help
+	  Attitude from the IMU with the Mahony complementary filter
+	  (ADR-0014), published on vehicle_attitude.
 
 endmenu
 
