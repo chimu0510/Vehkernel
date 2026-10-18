@@ -124,5 +124,7 @@ flash = [
 # 8 MHz crystal Y1; the vendor firmware runs the same 168 MHz PLL setting.
 clock = { hse_hz = 8000000, sysclk_hz = 168000000 }
 
-# Provisional (ADR-0015): one software I2C IMU read busy-waits about 0.34 ms.
+# ADR-0015: one software I2C IMU read (accelerometer, gyroscope, temperature)
+# busy-waits 0.50 ms, measured at bring-up, so up to about 2 kHz is reachable;
+# 200 Hz keeps the CPU cost near 10 %.
 timing = { trigger = "TIMER", base_rate_hz = 200, sampling = "PER_SAMPLE" }

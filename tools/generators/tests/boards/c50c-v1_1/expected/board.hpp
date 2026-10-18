@@ -139,79 +139,80 @@ inline constexpr std::uint32_t apb2_timer_hz = 168000000;
 inline constexpr std::uint32_t flash_wait_states = 5;
 }  // namespace clock
 
-// Peripheral instances the board uses.
+// Peripheral instances the board uses, named in lower case because CMSIS
+// defines the upper-case names as macros.
 namespace peripherals {
-struct ADC1 {
+struct adc1 {
     static constexpr std::uint32_t address = 0x40012000;
     static constexpr std::string_view kind = "adc";
     static constexpr std::string_view bus_clock = "PCLK2";
 };
-struct CAN1 {
+struct can1 {
     static constexpr std::uint32_t address = 0x40006400;
     static constexpr std::string_view kind = "can";
     static constexpr std::string_view bus_clock = "PCLK1";
 };
-struct TIM1 {
+struct tim1 {
     static constexpr std::uint32_t address = 0x40010000;
     static constexpr std::string_view kind = "timer";
     static constexpr std::string_view bus_clock = "PCLK2";
 };
-struct TIM12 {
+struct tim12 {
     static constexpr std::uint32_t address = 0x40001800;
     static constexpr std::string_view kind = "timer";
     static constexpr std::string_view bus_clock = "PCLK1";
 };
-struct TIM2 {
+struct tim2 {
     static constexpr std::uint32_t address = 0x40000000;
     static constexpr std::string_view kind = "timer";
     static constexpr std::string_view bus_clock = "PCLK1";
 };
-struct TIM3 {
+struct tim3 {
     static constexpr std::uint32_t address = 0x40000400;
     static constexpr std::string_view kind = "timer";
     static constexpr std::string_view bus_clock = "PCLK1";
 };
-struct TIM4 {
+struct tim4 {
     static constexpr std::uint32_t address = 0x40000800;
     static constexpr std::string_view kind = "timer";
     static constexpr std::string_view bus_clock = "PCLK1";
 };
-struct TIM5 {
+struct tim5 {
     static constexpr std::uint32_t address = 0x40000C00;
     static constexpr std::string_view kind = "timer";
     static constexpr std::string_view bus_clock = "PCLK1";
 };
-struct TIM8 {
+struct tim8 {
     static constexpr std::uint32_t address = 0x40010400;
     static constexpr std::string_view kind = "timer";
     static constexpr std::string_view bus_clock = "PCLK2";
 };
-struct TIM9 {
+struct tim9 {
     static constexpr std::uint32_t address = 0x40014000;
     static constexpr std::string_view kind = "timer";
     static constexpr std::string_view bus_clock = "PCLK2";
 };
-struct UART4 {
+struct uart4 {
     static constexpr std::uint32_t address = 0x40004C00;
     static constexpr std::string_view kind = "usart";
     static constexpr std::string_view bus_clock = "PCLK1";
 };
-struct UART5 {
+struct uart5 {
     static constexpr std::uint32_t address = 0x40005000;
     static constexpr std::string_view kind = "usart";
     static constexpr std::string_view bus_clock = "PCLK1";
 };
-struct USART1 {
+struct usart1 {
     static constexpr std::uint32_t address = 0x40011000;
     static constexpr std::string_view kind = "usart";
     static constexpr std::string_view bus_clock = "PCLK2";
 };
-struct USART3 {
+struct usart3 {
     static constexpr std::uint32_t address = 0x40004800;
     static constexpr std::string_view kind = "usart";
     static constexpr std::string_view bus_clock = "PCLK1";
 };
-struct USB_OTG_FS {
+struct usb_otg_fs {
     static constexpr std::uint32_t address = 0x50000000;
     static constexpr std::string_view kind = "otg";
     static constexpr std::string_view bus_clock = "HCLK2";

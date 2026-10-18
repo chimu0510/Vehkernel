@@ -9,7 +9,8 @@ vk_add_library(vk_platform LAYER platform OBJECT
   src/platform.cpp)
 target_include_directories(vk_platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 vk_target_link_libraries(vk_platform PUBLIC vk_hal vk_core vk_board)
-target_link_libraries(vk_platform PRIVATE st_ll_f4 freertos_kernel vk_warnings vk_cxx_subset)
+target_link_libraries(vk_platform PUBLIC st_ll_f4)
+target_link_libraries(vk_platform PRIVATE freertos_kernel vk_warnings vk_cxx_subset)
 
 if(NOT EXISTS ${VK_BOARD_GENERATED_DIR}/memory.ld)
   message(FATAL_ERROR "Board ${VK_BOARD} has no Flash layout; STM32 builds need one (ADR-0020)")

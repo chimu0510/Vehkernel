@@ -126,10 +126,14 @@ def _clock_namespace(board: Board) -> list[str]:
 def _peripherals_namespace(board: Board) -> list[str]:
     if not board.peripherals:
         return []
-    out = ["// Peripheral instances the board uses.", "namespace peripherals {"]
+    # Lower case: the CMSIS device headers define the upper-case names (TIM3,
+    # USART1, ...) as macros, which would break any file including both.
+    out = ["// Peripheral instances the board uses, named in lower case because CMSIS",
+           "// defines the upper-case names as macros.",
+           "namespace peripherals {"]
     for name, info in board.peripherals:
         bus = f'"{info["bus_clock"]}"' if info["bus_clock"] else '""'
-        out += [f"struct {name} {{",
+        out += [f"struct {name.lower()} {{",
                 f"    static constexpr std::uint32_t address = 0x{info['address']:08X};",
                 f'    static constexpr std::string_view kind = "{info["kind"]}";',
                 f"    static constexpr std::string_view bus_clock = {bus};",

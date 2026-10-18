@@ -12,6 +12,12 @@ config BOARD_HAS_CAN
 config BOARD_HAS_FLASH_PARAMS
 	bool
 
+config BOARD_HAS_ICM20948
+	bool
+
+config BOARD_IMU_BUS_SOFT_I2C
+	bool
+
 source "$(VK_BOARD_KCONFIG)"
 
 choice PLATFORM
@@ -54,6 +60,14 @@ config DRIVER_CAN
 	bool "CAN bus"
 	depends on BOARD_HAS_CAN
 
+config SOFT_I2C
+	bool "Software I2C on two GPIO pins"
+	depends on BOARD_IMU_BUS_SOFT_I2C || PLATFORM_SITL
+	default y
+	help
+	  Bit-banged I2C with open-drain lines, for board devices wired to
+	  pins hardware I2C cannot use (ADR-0015).
+
 endmenu
 
 menu "Storage"
@@ -62,6 +76,18 @@ config PARAM_STORAGE_FLASH
 	bool "Parameters in internal Flash"
 	depends on BOARD_HAS_FLASH_PARAMS
 	default y
+
+endmenu
+
+menu "Testing"
+
+config BRINGUP_TESTS
+	bool "Bring-up test build (replaces the application)"
+	depends on PLATFORM_STM32F4 && SOFT_I2C && BOARD_HAS_ICM20948
+	help
+	  Builds a firmware that runs the L4 bring-up cases at boot, writes
+	  the results to a RAM block for the bring-up runner to read over SWD,
+	  then idles (ADR-0018). It never configures actuator outputs.
 
 endmenu
 

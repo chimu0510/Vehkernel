@@ -1,6 +1,11 @@
 # Entry points: the firmware image for STM32 boards, or the SITL executable.
 if(VK_PLATFORM STREQUAL "stm32f4")
-  add_executable(vehkernel firmware_main.cpp)
+  if(CONFIG_BRINGUP_TESTS)
+    # The bring-up test build replaces the application (ADR-0018).
+    add_executable(vehkernel ${CMAKE_SOURCE_DIR}/test/hardware/bringup_main.cpp)
+  else()
+    add_executable(vehkernel firmware_main.cpp)
+  endif()
   target_link_libraries(vehkernel PRIVATE vk_platform vk_core vk_board vk_config vk_modules vk_warnings vk_cxx_subset)
   set_target_properties(vehkernel PROPERTIES SUFFIX .elf)
   target_link_options(vehkernel PRIVATE

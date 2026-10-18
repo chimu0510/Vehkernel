@@ -31,19 +31,20 @@ using USART1_RX = vk::hal::DmaStream<vk::hal::DmaController::Dma2, 2, 4, false>;
 using USART1_TX = vk::hal::DmaStream<vk::hal::DmaController::Dma2, 7, 4, false>;
 }  // namespace dma
 
-// Peripheral instances the board uses.
+// Peripheral instances the board uses, named in lower case because CMSIS
+// defines the upper-case names as macros.
 namespace peripherals {
-struct ADC1 {
+struct adc1 {
     static constexpr std::uint32_t address = 0x40012000;
     static constexpr std::string_view kind = "adc";
     static constexpr std::string_view bus_clock = "PCLK2";
 };
-struct TIM4 {
+struct tim4 {
     static constexpr std::uint32_t address = 0x40000800;
     static constexpr std::string_view kind = "timer";
     static constexpr std::string_view bus_clock = "PCLK1";
 };
-struct USART1 {
+struct usart1 {
     static constexpr std::uint32_t address = 0x40011000;
     static constexpr std::string_view kind = "usart";
     static constexpr std::string_view bus_clock = "PCLK2";

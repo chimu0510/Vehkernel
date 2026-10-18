@@ -12,6 +12,11 @@ void init()
     NVIC_SetPriorityGrouping(0);
     detail::configure_clock_tree();
     detail::start_microsecond_clock();
+
+    // The cycle counter times short busy-waits such as software I2C bits.
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
 
 }  // namespace vk::platform

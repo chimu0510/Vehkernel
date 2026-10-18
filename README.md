@@ -63,6 +63,14 @@ Flash the C50C over SWD with an ST-Link on header HDR2 (pin 4 GND, pin 6 PA13/SW
 openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program build/c50c-v1_1/app/vehkernel.elf verify reset exit"
 ```
 
+The bring-up test build (L4, [ADR-0018](docs/adr/0018-test-layers-and-sitl.md)) runs the hardware bring-up cases at boot instead of the application: it reads the ICM20948's WHO_AM_I over software I2C and measures the IMU read rate. It never configures actuator outputs, so it is safe with motors connected. Build it in the devcontainer, then run the bring-up runner on the host, which flashes it over SWD, reads the result block back and exits non-zero if a case fails or no results arrive:
+
+```bash
+cmake --preset c50c-v1_1-bringup
+cmake --build --preset c50c-v1_1-bringup
+tools/bringup/run_bringup.py build/c50c-v1_1-bringup/app/vehkernel.elf
+```
+
 Only the boot stub (S0) and firmware (S4 onward) sectors are written; the parameter and event log sectors in between are left untouched. The STM32 built-in USB DFU is not practical on this board, because PA11/PA12 go to the USB gamepad port, not to a Type-C port.
 
 Kconfig decides what each build contains (ADR-0017). The layers are the MCU defaults (`mcu/<mcu>/defconfig`, or `platform/sitl/defconfig` for SITL), the board defaults (`boards/<board>/defconfig`), and a local debug overlay, `build/<preset>/debug.config`, which is never committed. Edit the overlay by hand or interactively; the next build reconfigures:

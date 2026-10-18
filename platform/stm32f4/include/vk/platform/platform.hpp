@@ -3,8 +3,8 @@
 
 namespace vk::platform {
 
-// Configures interrupt priorities, the clock tree from the board definition
-// and the microsecond clock. Call once from the entry point, before anything
+// Configures interrupt priorities, the clock tree from the board definition,
+// the microsecond clock and the cycle counter. Call once from the entry point, before anything
 // else runs.
 void init();
 
