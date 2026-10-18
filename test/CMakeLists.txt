@@ -1,9 +1,10 @@
 add_subdirectory(unit)
 
-# L3 SITL smoke test (ADR-0018): no work item may overrun.
+# L3 SITL smoke test (ADR-0018): the IMU sample topic is published at the
+# configured 200 Hz, and no work item overruns.
 add_test(NAME sitl_smoke
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_report.py
-    $<TARGET_FILE:vehkernel-sitl> --duration 3)
+    $<TARGET_FILE:vehkernel-sitl> --duration 5 --expect-rate imu_sample:0=200)
 
 # Kconfig smoke test (ADR-0017): a debug overlay that sets an option whose
 # dependencies are not met must fail configuration.

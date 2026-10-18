@@ -257,6 +257,17 @@ void WorkQueue::process()
 
 void WorkQueue::task_loop()
 {
+    {
+        // Periods start when the queue starts: time spent before the
+        // scheduler ran is neither jitter nor an overrun.
+        const std::uint64_t now = clock_();
+        const CriticalSection lock;
+        for (WorkItem* item = first_; item != nullptr; item = item->next_in_queue_) {
+            if (item->interval_us_ != 0 && item->next_due_us_ < now) {
+                item->next_due_us_ = now;
+            }
+        }
+    }
     for (;;) {
         TickType_t wait = portMAX_DELAY;
         const std::uint64_t due = next_due_us();

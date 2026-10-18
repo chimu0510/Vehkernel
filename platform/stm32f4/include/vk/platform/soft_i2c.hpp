@@ -191,4 +191,18 @@ private:
     }
 };
 
+namespace detail {
+template <class List>
+struct SoftI2cOnPins;
+template <class Scl, class Sda>
+struct SoftI2cOnPins<hal::PinList<Scl, Sda>> {
+    using type = SoftI2c<Scl, Sda>;
+};
+}  // namespace detail
+
+// The software I2C bus of a board device, from its pin list (SCL, SDA), e.g.
+// SoftI2cOn<vk::board::devices::IMU0::pins>.
+template <class Pins>
+using SoftI2cOn = typename detail::SoftI2cOnPins<Pins>::type;
+
 }  // namespace vk::platform

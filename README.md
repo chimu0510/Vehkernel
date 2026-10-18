@@ -2,7 +2,7 @@
 
 **Vehkernel** (Vehicle + Kernel) is open-source MCU firmware with ROS2 support, built as a common core for any vehicle: one system drives many vehicles and frames. The MCU handles real-time state estimation, low-level control and safety, and keeps running without a companion computer; global localization and navigation are left to ROS2 applications above it. The first test platform is a UGV.
 
-**Status: build skeleton.** Every decision is recorded in [`docs/adr/`](docs/adr/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary. The empty firmware image, the SITL executable and the host tests build; there is no functionality yet.
+**Status: first IMU sample.** Every decision is recorded in [`docs/adr/`](docs/adr/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary. The firmware runs FreeRTOS with the bus and rate-tiered work queues; on the C50C V1.1 the ICM20948 driver publishes IMU samples at 200 Hz over software I2C, and SITL runs the same driver against a simulated ICM20948. Estimation, control and Links come next.
 
 ## Target hardware
 
@@ -79,15 +79,25 @@ Kconfig decides what each build contains (ADR-0017). The layers are the MCU defa
 cmake --build --preset c50c-v1_1 --target menuconfig
 ```
 
-At the end of a run SITL prints one line per topic instance and per work item, as space-separated `key=value` pairs:
+SITL runs the firmware with the real ICM20948 driver reading a simulated ICM20948 on a simulated I2C bus. Run it in the devcontainer for a given time:
 
-```text
-report duration_s=3.000
-topic name=work_item_status instance=0 publications=3 rate_hz=1.00 last_update_us=3001115
-work_item name=timing_monitor queue=wq:slow runs=3 overruns=0 run_time_last_us=2 run_time_max_us=8 run_time_mean_us=3 jitter_max_us=1068
+```bash
+cmake --preset sitl
+cmake --build --preset sitl
+build/sitl/app/vehkernel-sitl --duration 5
 ```
 
-`test/sitl/check_report.py` runs SITL and checks the report; CI runs it through `ctest` (the `sitl_smoke` test), failing on any work item overrun.
+At the end of a run SITL prints one line per topic instance and per work item, as space-separated `key=value` pairs (topics never published are listed too, with `publications=0`):
+
+```text
+report duration_s=5.000
+topic name=imu_sample instance=0 publications=978 rate_hz=200.01 last_update_us=5000977
+topic name=work_item_status instance=0 publications=5 rate_hz=1.00 last_update_us=5000580
+work_item name=icm20948 queue=wq:ctrl runs=1000 overruns=0 run_time_last_us=4 run_time_max_us=12 run_time_mean_us=2 jitter_max_us=1137
+work_item name=timing_monitor queue=wq:slow runs=5 overruns=0 run_time_last_us=2 run_time_max_us=6 run_time_mean_us=3 jitter_max_us=809
+```
+
+`rate_hz` is the average since the topic's first publication. `test/sitl/check_report.py` runs SITL and checks the report; CI runs it through `ctest` (the `sitl_smoke` test), failing when `imu_sample` is not published at 200 Hz within 5 % or any work item overruns.
 
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 

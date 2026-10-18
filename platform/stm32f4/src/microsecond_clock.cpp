@@ -42,6 +42,9 @@ namespace vk::platform::detail {
 void start_microsecond_clock()
 {
     LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM7);
+    // Stop the clock while a debugger halts the core, as SysTick does, so a
+    // halt does not show up as run time, jitter or overruns.
+    DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM7_STOP;
     LL_TIM_SetPrescaler(TIM7, (vk::board::clock::apb1_timer_hz / counter_hz) - 1U);
     LL_TIM_SetAutoReload(TIM7, 0xFFFFU);
     LL_TIM_GenerateEvent_UPDATE(TIM7);  // Load the prescaler now.

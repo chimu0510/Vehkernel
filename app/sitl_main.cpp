@@ -7,7 +7,10 @@
 #include <vk/config.h>
 #include <vk/core/bus.hpp>
 #include <vk/core/scheduler.hpp>
+#include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
+#include <vk/drivers/icm20948.hpp>
+#include <vk/hal/i2c.hpp>
 #include <vk/msg/registry.hpp>
 #include <vk/platform/platform.hpp>
 
@@ -20,10 +23,24 @@
 #ifndef CONFIG_PLATFORM_SITL
 #error "the Kconfig layers must select the SITL platform for SITL builds"
 #endif
+#ifndef CONFIG_DRIVER_ICM20948
+#error "SITL simulates an ICM20948 and needs its driver"
+#endif
 
 namespace {
 
 constexpr double default_duration_s = 1.0;
+
+vk::core::StaticInstance<vk::drivers::Icm20948> imu;
+
+// The real driver, against the simulated IMU on the simulated I2C bus.
+void start_imu()
+{
+    imu.emplace(vk::hal::I2cDevice(vk::platform::imu_bus(), vk::platform::imu_address),
+                vk::drivers::Icm20948::Config{.instance = 0, .rate_hz = vk::platform::imu_rate_hz},
+                vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    imu->start();
+}
 
 bool parse_duration(std::span<char*> args, double& duration_s)
 {
@@ -73,6 +90,7 @@ int main(int argc, char** argv)
         return 2;
     }
     vk::platform::init();
+    start_imu();
     vk::platform::stop_after(static_cast<std::uint64_t>(duration_s * 1e6));
     vk::core::start_scheduler();
     print_report(duration_s);

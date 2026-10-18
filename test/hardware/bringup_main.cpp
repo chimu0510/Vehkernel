@@ -35,13 +35,7 @@ using Imu = board::devices::IMU0;
 
 static_assert(Imu::type == "ICM20948" && Imu::bus == "SOFT_I2C", "these cases are written for an ICM20948 on software I2C");
 
-template <class List>
-struct I2cPins;
-template <class Scl, class Sda>
-struct I2cPins<vk::hal::PinList<Scl, Sda>> {
-    using Bus = vk::platform::SoftI2c<Scl, Sda>;
-};
-using ImuBus = I2cPins<Imu::pins>::Bus;
+using ImuBus = vk::platform::SoftI2cOn<Imu::pins>;
 static_assert(vk::hal::I2cBus<ImuBus>);
 
 // ICM20948 registers in user bank 0 (datasheet DS-000189, section 7).

@@ -73,7 +73,40 @@ bool Icm20948::write(std::span<const std::uint8_t> data)
 
 bool Icm20948::read(std::span<std::uint8_t> data)
 {
-    return responding_ && RegisterDevice::read(data);
+    if (!responding_) {
+        return false;
+    }
+    latch_outputs();
+    return RegisterDevice::read(data);
+}
+
+float Icm20948::noise(float amplitude)
+{
+    // xorshift32: deterministic, so SITL runs repeat exactly.
+    noise_state_ ^= noise_state_ << 13U;
+    noise_state_ ^= noise_state_ >> 17U;
+    noise_state_ ^= noise_state_ << 5U;
+    const float unit = static_cast<float>(noise_state_) / 4294967295.0F;  // [0, 1]
+    return amplitude * (2.0F * unit - 1.0F);
+}
+
+void Icm20948::latch_outputs()
+{
+    if (sleeping()) {
+        outputs_.fill(0);
+        return;
+    }
+    const auto accel_fs = static_cast<unsigned>((banks_[2][accel_config] >> 1U) & 0x3U);
+    const auto gyro_fs = static_cast<unsigned>((banks_[2][gyro_config_1] >> 1U) & 0x3U);
+    const float accel_lsb_per_g = 16384.0F / static_cast<float>(1U << accel_fs);
+    const float gyro_lsb_per_dps = 131.0F / static_cast<float>(1U << gyro_fs);
+    for (std::size_t i = 0; i < 3; ++i) {
+        const float accel = accel_.at(i) + noise(accel_noise_);
+        const float gyro = gyro_.at(i) + noise(gyro_noise_);
+        outputs_.at(i) = saturate(accel / standard_gravity * accel_lsb_per_g);
+        outputs_.at(i + 3) = saturate(gyro * 180.0F / std::numbers::pi_v<float> * gyro_lsb_per_dps);
+    }
+    outputs_[6] = saturate((temperature_ - room_temp_offset_c) * temp_sensitivity);
 }
 
 void Icm20948::write_register(std::uint8_t reg, std::uint8_t value)
@@ -107,23 +140,8 @@ std::uint8_t Icm20948::read_register(std::uint8_t reg)
 
 std::uint8_t Icm20948::output_register(std::uint8_t reg) const
 {
-    if (sleeping()) {
-        return 0;
-    }
-    const auto accel_fs = static_cast<unsigned>((banks_[2][accel_config] >> 1U) & 0x3U);
-    const auto gyro_fs = static_cast<unsigned>((banks_[2][gyro_config_1] >> 1U) & 0x3U);
-    const float accel_lsb_per_g = 16384.0F / static_cast<float>(1U << accel_fs);
-    const float gyro_lsb_per_dps = 131.0F / static_cast<float>(1U << gyro_fs);
-
-    std::array<std::int16_t, 7> words{};
-    for (std::size_t i = 0; i < 3; ++i) {
-        words.at(i) = saturate(accel_.at(i) / standard_gravity * accel_lsb_per_g);
-        words.at(i + 3) = saturate(gyro_.at(i) * 180.0F / std::numbers::pi_v<float> * gyro_lsb_per_dps);
-    }
-    words[6] = saturate((temperature_ - room_temp_offset_c) * temp_sensitivity);
-
     const auto offset = static_cast<std::size_t>(reg - accel_xout_h);
-    const auto word = static_cast<std::uint16_t>(words.at(offset / 2));
+    const auto word = static_cast<std::uint16_t>(outputs_.at(offset / 2));
     return (offset % 2 == 0) ? static_cast<std::uint8_t>(word >> 8U) : static_cast<std::uint8_t>(word & 0xFFU);
 }
 

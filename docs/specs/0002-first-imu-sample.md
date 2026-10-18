@@ -1,8 +1,8 @@
 # Spec 0002: first IMU sample end to end
 
-**Status**: open. Issue: [#14](https://github.com/chimu0510/Vehkernel/issues/14).
+**Status**: done. Issue: [#14](https://github.com/chimu0510/Vehkernel/issues/14); tickets #15 to #22. The IMU wiring and read rate were confirmed on hardware in [#20](https://github.com/chimu0510/Vehkernel/issues/20), and IMU samples at 200 Hz on the C50C in [#22](https://github.com/chimu0510/Vehkernel/issues/22).
 
-This file and the issue carry the same spec; update both when the spec changes.
+This is the spec as written before implementation. Later decisions live in the ADRs and the code; where they differ, they win.
 
 ## Problem Statement
 

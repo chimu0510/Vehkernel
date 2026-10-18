@@ -25,6 +25,14 @@ public:
     void set_gyro(const std::array<float, 3>& rad_s) { gyro_ = rad_s; }
     void set_temperature(float celsius) { temperature_ = celsius; }
 
+    // Adds uniform noise of the given amplitude to every accelerometer and
+    // gyroscope reading, as a real sensor shows; off by default.
+    void set_noise(float accel_m_s2, float gyro_rad_s)
+    {
+        accel_noise_ = accel_m_s2;
+        gyro_noise_ = gyro_rad_s;
+    }
+
     // A device that stops responding fails every transfer, as with a loose cable.
     void set_responding(bool responding) { responding_ = responding; }
 
@@ -45,13 +53,20 @@ protected:
 private:
     void reset();
     [[nodiscard]] std::uint8_t bank() const;
+    // Samples the outputs once per read transfer, so a burst read is consistent.
+    void latch_outputs();
     [[nodiscard]] std::uint8_t output_register(std::uint8_t reg) const;
+    float noise(float amplitude);
 
     std::array<std::array<std::uint8_t, 128>, 4> banks_{};
     std::uint8_t bank_sel_ = 0;
     std::array<float, 3> accel_{0.0F, 0.0F, 9.80665F};
     std::array<float, 3> gyro_{};
     float temperature_ = 25.0F;
+    float accel_noise_ = 0.0F;
+    float gyro_noise_ = 0.0F;
+    std::uint32_t noise_state_ = 0x12345678;
+    std::array<std::int16_t, 7> outputs_{};  // ACCEL X..Z, GYRO X..Z, TEMP
     bool responding_ = true;
     int resets_ = 0;
 };
