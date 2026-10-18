@@ -72,6 +72,10 @@ _Avoid_: 主板、target
 同一款控制板的硬體修訂，以原廠韌體回報的名稱稱呼，例如 C50C V1.1。
 _Avoid_: V4.1
 
+**板級定義（Board Definition）**：
+描述一塊控制板硬體事實的 TOML 檔，包括腳位、周邊、板上裝置與 Flash 配置。
+_Avoid_: hwdef、board config
+
 **替代配置（Alt Config）**：
 板級定義中，一支腳位在特定 Frame 下的另一種用途。
 _Avoid_: AF、複用
@@ -113,7 +117,7 @@ _Avoid_: 指令、命令
 決定哪個來源有控制權、以及它能使用哪些 setpoint 層級的運作狀態。
 
 **Arming**：
-允許致動器輸出的狀態，分為 armed 與 disarmed。
+致動器是否允許輸出的狀態，分為 armed 與 disarmed。
 _Avoid_: 解鎖、上鎖
 
 **安全行為（Failsafe Action）**：
@@ -145,18 +149,18 @@ _Avoid_: FIFO topic
 _Avoid_: 設定、config
 
 **參數群組（Parameter Group）**：
-同一個模組的參數集合。
+同一個模組或驅動的參數集合。
 _Avoid_: PG
 
 **板級預設（Board Defaults）**：
 板級定義提供的參數與 Kconfig 預設值。
 
 **時序預設組（Timing Preset）**：
-觸發來源、基準頻率、分頻與取樣模式的一組預設值。
+觸發來源、基準頻率、分頻與取樣方式的一組預設值。
 _Avoid_: loop rate
 
 **Frame 預設組（Frame Preset）**：
-套用到特定 Frame 或車款的一組參數預設值。
+套用到某一種實際載具配置的一組參數預設值，包含載具類型、Frame 與尺寸。
 _Avoid_: airframe、車型參數
 
 ### 通訊

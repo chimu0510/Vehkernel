@@ -26,7 +26,7 @@
 - **執行環境**：FreeRTOS、C++20 子集，Work Queue 依頻率層級劃分（[0004](docs/adr/0004-freertos.md)、[0007](docs/adr/0007-cpp20-subset.md)、[0008](docs/adr/0008-bus-and-work-queues.md)）。
 - **硬體適配**：
   - 板級定義用 TOML 撰寫，產生器根據 MCU 資料庫驗證腳位、求解 DMA 分配（[0011](docs/adr/0011-toml-board-definition-toolchain.md)）。
-  - HAL 依「在什麼時候做選擇」決定多型的形式（[0009](docs/adr/0009-board-definition-and-hal.md)）。
+  - HAL 依「在什麼時候做選擇」決定多型的形式（[0009](docs/adr/0009-layered-hal.md)）。
 - **配置**：
   - Kconfig 決定韌體編進哪些功能，參數決定執行時啟用哪一個（[0017](docs/adr/0017-kconfig-build-configuration.md)、[0012](docs/adr/0012-parameter-system.md)）。
   - 第三方套件可以使用，但必須固定版本（[0016](docs/adr/0016-dependency-policy.md)）。

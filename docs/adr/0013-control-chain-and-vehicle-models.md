@@ -15,7 +15,7 @@ PX4 為每種 rover 各寫一個模組：`rover_differential`、`rover_mecanum`�
 
 - **Frame Class**：依分配的數學模型分類，不依載具外觀分類，例如 `WHEELED`、`ACKERMANN`、`THRUSTER`。它決定用哪個載具模型，以及控制鏈要啟用哪些層（深度層另由載具類型決定）。
 - **Frame Type**：該 Class 下的具名幾何配置，例如 `DIFF_2WD`、`SKID_4WD`、`MECANUM_4`、`OMNI_3`、`CUSTOM`。
-- **Frame 預設組**：實際車款的完整參數，等於載具類型 + Class + Type + 實際尺寸 + 致動器對應 + 調參值。
+- **Frame 預設組**：某一種實際載具配置的完整參數，等於載具類型 + Class + Type + 實際尺寸 + 致動器對應 + 調參值。
 
 **載具類型**
 
@@ -26,6 +26,8 @@ PX4 為每種 rover 各寫一個模組：`rover_differential`、`rover_mecanum`�
 - MAVLink 協議模組回報的 `MAV_TYPE`。
 
 例如雙推進器差速的 USV 是 `SURFACE` + `THRUSTER` + `DIFF_2`，同樣配置的 UUV 只差在 `UNDERWATER`。
+
+`VEHICLE_TYPE` 與 `FRAME_CLASS` 標為 `reboot_required`：開機時先解析這兩個參數，再依它們決定其他參數的預設值與要選用的載具模型（ADR-0012）。
 
 **載具模型**
 
