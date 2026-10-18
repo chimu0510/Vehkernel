@@ -1,6 +1,6 @@
-# 韌體系統
+# Vehkernel
 
-支援 ROS2 的開源 MCU 韌體，用同一套系統驅動多種載具與 frame。MCU 負責即時的狀態估計與低階控制，可脫離上位機獨立運作；全域定位與導航屬於上層 ROS2 應用。
+支援 ROS2 的開源 MCU 韌體，用同一套系統驅動多種載具與 frame。MCU 負責即時的狀態估計、低階控制與安全，可脫離上位機獨立運作；全域定位與導航屬於上層 ROS2 應用。
 
 ## 載具與硬體
 
@@ -61,14 +61,14 @@ _Avoid_: 離線模式
 送給 MCU 的控制目標，分為三個層級：車體速度、姿態/深度、致動器直出。
 _Avoid_: 指令、命令
 
-**指令仲裁（Command Arbitration）**：
+**Setpoint 仲裁（Setpoint Arbitration）**：
 MCU 依模式與安全狀態，決定哪個來源的 setpoint 有控制權。
-_Avoid_: 優先權切換
+_Avoid_: 指令仲裁、優先權切換
 
 ## 日誌
 
 **日誌後端（Log Sink）**：
-日誌寫入的目的地，例如 SD 卡、SPI Flash、串流到上位機、事件記錄器。
+日誌寫入的目的地，例如 SD 卡、SPI NOR Flash、串流到上位機、RAM 環形緩衝、序列埠記錄器。
 _Avoid_: logger device
 
 **日誌設定檔（Log Profile）**：

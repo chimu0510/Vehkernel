@@ -22,7 +22,7 @@
   - 訊息由單一份 Schema 定義，程式碼自動產生（[0006](docs/adr/0006-schema-and-wire-encoding.md)）。
 - **ROS2 介面**：
   - 提供載具級的 topic API，setpoint 分三個層級；ros2_control 是選配（[0003](docs/adr/0003-vehicle-level-ros2-api.md)）。
-  - 控制權由模式決定，遙控器隨時可以接管（[0005](docs/adr/0005-command-arbitration.md)）。
+  - 控制權由模式決定，遙控器隨時可以接管（[0005](docs/adr/0005-setpoint-arbitration.md)）。
 - **執行環境**：FreeRTOS、C++20 子集，Work Queue 依頻率層級劃分（[0004](docs/adr/0004-freertos.md)、[0007](docs/adr/0007-cpp20-subset.md)、[0008](docs/adr/0008-bus-and-work-queues.md)）。
 - **硬體適配**：
   - 板級定義用 TOML 撰寫，產生器根據 MCU 資料庫驗證腳位、求解 DMA 分配（[0011](docs/adr/0011-toml-board-definition-toolchain.md)）。
@@ -35,7 +35,7 @@
   - 估測器可以替換，數學元件拆成獨立的函式庫（[0014](docs/adr/0014-estimation-architecture.md)）。
   - 時序拆成幾個可以選擇的維度（[0015](docs/adr/0015-selectable-timing.md)）。
 - **品質與觀測**：
-  - 測試分五層，SITL 跑的是同一套 RTOS（[0018](docs/adr/0018-test-layers-and-sitl.md)）。
+  - 測試分六層，SITL 跑的是同一套 RTOS（[0018](docs/adr/0018-test-layers-and-sitl.md)）。
   - 日誌採用 ULog 格式，後端可以替換（[0019](docs/adr/0019-logging.md)）。
 
 ## 目錄結構
@@ -55,7 +55,7 @@
 | `core/` | 匯流排、Work Queue、參數執行時、時序監看 | 0008、0012、0015 |
 | `modules/` | L3 模組：估測器、控制鏈、載具模型、Link、日誌 | 0002、0013、0014、0019 |
 | `lib/estimation/` | 估測數學元件：`models/`、`filters/`、`math/` | 0014 |
-| `tools/generators/` | Schema、板級、參數產生器 | 0006、0011、0012 |
+| `tools/generators/` | Schema（含 ULog 格式定義）、板級、參數、日誌設定檔產生器 | 0006、0011、0012、0019 |
 | `bridge/` | 上位機端的 ROS2 Bridge | 0002、0003 |
 | `sim/` | 內建模擬器與外部模擬器介面 | 0018 |
 | `test/` | `unit/`、`replay/`、`sitl/`、`hil/` | 0018 |
