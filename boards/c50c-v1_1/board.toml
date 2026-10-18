@@ -1,0 +1,13 @@
+# C50C V1.1 board definition (ADR-0010, ADR-0011).
+#
+# Only the revision-ID pins confirmed by ADR-0010 are declared so far; the
+# complete definition, checked line by line against the schematic, follows
+# in a later ticket.
+name = "c50c-v1_1"
+mcu = "stm32f407vet6"
+
+pins = [
+  { pin = "PE2",  role = "REV_ID0", func = "GPIO_INPUT" },
+  { pin = "PE3",  role = "REV_ID1", func = "GPIO_INPUT" },
+  { pin = "PC13", role = "REV_ID2", func = "GPIO_INPUT" },
+]

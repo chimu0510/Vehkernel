@@ -1,0 +1,1 @@
+board.toml:7: error: pin PA9 is already assigned to role SERIAL1_TX (line 5)

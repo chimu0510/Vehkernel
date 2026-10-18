@@ -8,7 +8,7 @@ The build system is CMake + `CMakePresets.json` + Ninja, with one preset per bui
 - **Hardware facts live only in the board TOML.** The board generator exports hardware capabilities as Kconfig symbols such as `BOARD_HAS_CAN` and `BOARD_IMU_BUS_SOFT_I2C`, like the `DT_HAS_*` symbols Zephyr derives from devicetree. Drivers `depends on` these symbols.
 - **Three configuration layers**: MCU defaults → board defaults → debug overlay. Kconfig re-validates every constraint after each merge. Each board produces exactly one firmware image (ADR-0009) with every vehicle model the board supports compiled in and selected by parameters; there is no per-frame or per-product overlay layer.
 - **`select` only for helper libraries that have no dependencies of their own**, such as `MATH_QUATERNION`; everything else uses `depends on`, because `select` does not check the dependencies of what it selects.
-- All generators (schema, board, parameters, and the ULog format definitions and log profile bandwidth estimates of ADR-0019) run as CMake custom commands; generated code is never committed.
+- Generators (schema, parameters, and the ULog format definitions and log profile bandwidth estimates of ADR-0019) run as CMake custom commands. The board generator is the exception and runs at configure time: a wrong board definition must fail configuration, and Kconfig needs the board's symbols before the build starts. Generated code is never committed.
 - CMake target dependencies enforce the layering rules (ADR-0009).
 - Every build checks Flash, RAM and CCM usage and fails when the board budget is exceeded.
 

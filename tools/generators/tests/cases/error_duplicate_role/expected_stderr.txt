@@ -1,0 +1,1 @@
+board.toml:6: error: role LED is already defined (line 5)

@@ -1,0 +1,69 @@
+{
+  "name": "demo",
+  "mcu": "testmcu",
+  "pins": [
+    {
+      "role": "SERIAL1_TX",
+      "pin": "PA9",
+      "port": "A",
+      "number": 9,
+      "func": "USART1_TX",
+      "kind": "af",
+      "af": 7
+    },
+    {
+      "role": "SERIAL1_RX",
+      "pin": "PA10",
+      "port": "A",
+      "number": 10,
+      "func": "USART1_RX",
+      "kind": "af",
+      "af": 7
+    },
+    {
+      "role": "ENC_B_A",
+      "pin": "PB6",
+      "port": "B",
+      "number": 6,
+      "func": "TIM4_CH1",
+      "kind": "af",
+      "af": 2
+    },
+    {
+      "role": "ENC_B_B",
+      "pin": "PB7",
+      "port": "B",
+      "number": 7,
+      "func": "TIM4_CH2",
+      "kind": "af",
+      "af": 2
+    },
+    {
+      "role": "BATTERY_SENSE",
+      "pin": "PA0",
+      "port": "A",
+      "number": 0,
+      "func": "ADC1_IN0",
+      "kind": "analog",
+      "af": null
+    },
+    {
+      "role": "STATUS_LED",
+      "pin": "PA1",
+      "port": "A",
+      "number": 1,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null
+    },
+    {
+      "role": "BUTTON",
+      "pin": "PA2",
+      "port": "A",
+      "number": 2,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null
+    }
+  ]
+}

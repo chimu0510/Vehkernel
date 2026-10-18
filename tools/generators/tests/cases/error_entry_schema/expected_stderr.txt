@@ -1,0 +1,4 @@
+board.toml: error: unknown key 'vendor'
+board.toml:6: error: pin entry is missing 'func'
+board.toml:7: error: role 'button' must be upper case letters, digits and underscores
+board.toml:8: error: unknown key 'pull' in pin entry

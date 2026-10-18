@@ -1,0 +1,13 @@
+# Demonstration board covering every pin kind.
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA9",  role = "SERIAL1_TX",    func = "USART1_TX" },
+  { pin = "PA10", role = "SERIAL1_RX",    func = "USART1_RX" },
+  { pin = "PB6",  role = "ENC_B_A",       func = "TIM4_CH1" },
+  { pin = "PB7",  role = "ENC_B_B",       func = "TIM4_CH2" },
+  { pin = "PA0",  role = "BATTERY_SENSE", func = "ADC1_IN0" },
+  { pin = "PA1",  role = "STATUS_LED",    func = "GPIO_OUTPUT" },
+  { pin = "PA2",  role = "BUTTON",        func = "GPIO_INPUT" },
+]

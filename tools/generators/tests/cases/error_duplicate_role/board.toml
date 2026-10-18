@@ -1,0 +1,7 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA1", role = "LED", func = "GPIO_OUTPUT" },
+  { pin = "PA2", role = "LED", func = "GPIO_OUTPUT" },
+]

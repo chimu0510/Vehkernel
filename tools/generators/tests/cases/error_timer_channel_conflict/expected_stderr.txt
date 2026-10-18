@@ -1,0 +1,1 @@
+board.toml:6: error: signal TIM4_CH2 is already used by pin PB7 for role ENC_B_B (line 5)

@@ -1,0 +1,8 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA9", role = "SERIAL1_TX", func = "USART1_TX" },
+  { pin = "PA1", role = "STATUS_LED", func = "GPIO_OUTPUT" },
+  { pin = "PA9", role = "PWM_1",      func = "TIM1_CH2" },
+]

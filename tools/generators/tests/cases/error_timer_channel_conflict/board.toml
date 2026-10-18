@@ -1,0 +1,7 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PB7",  role = "ENC_B_B", func = "TIM4_CH2" },
+  { pin = "PD13", role = "SERVO_1", func = "TIM4_CH2" },
+]

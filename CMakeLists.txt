@@ -17,8 +17,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 include(VehkernelLayers)
+include(VehkernelBoard)
 
 # Warnings are errors for all Vehkernel code (L0, ADR-0018).
 add_library(vk_warnings INTERFACE)
