@@ -1,5 +1,10 @@
 add_subdirectory(unit)
 
+# Host tool tests (pytest), through each tool's command line.
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+add_test(NAME mcudb
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/mcudb/tests)
+
 # Layer rules (ADR-0009): configure a scratch project that links one layer to
 # another and check that the rule helper accepts or rejects it.
 set(_vk_layer_project ${CMAKE_CURRENT_SOURCE_DIR}/cmake/layer_rules)

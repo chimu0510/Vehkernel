@@ -74,6 +74,7 @@ This is the initial skeleton and may change during implementation.
 | `core/` | Bus, work queues, parameter runtime, timing monitor | 0008, 0012, 0015 |
 | `modules/` | Module layer: estimators, control chain, vehicle models, Links, logging | 0002, 0013, 0014, 0019 |
 | `lib/estimation/` | Estimation math components: `models/`, `filters/`, `math/` | 0014 |
+| `tools/mcudb/` | Offline converter that regenerates an MCU database from the stm32-data source committed under `mcu/<mcu>/source/` | 0011, 0016 |
 | `tools/generators/` | Schema (including ULog format definitions), board, parameter and log profile generators | 0006, 0011, 0012, 0019 |
 | `app/` | Entry points: firmware image and SITL executable | — |
 | `bridge/` | ROS2 Bridge for the companion computer | 0002, 0003 |
