@@ -6,6 +6,7 @@
 
 #include <vk/hal/dma.hpp>
 #include <vk/hal/pin.hpp>
+#include <vk/hal/rotation.hpp>
 
 namespace vk::board {
 
@@ -25,5 +26,14 @@ namespace dma {
 using USART1_RX = vk::hal::DmaStream<vk::hal::DmaController::Dma2, 2, 4, false>;
 // USART1_TX: DMA disabled by the board definition
 }  // namespace dma
+
+// Peripheral instances the board uses.
+namespace peripherals {
+struct USART1 {
+    static constexpr std::uint32_t address = 0x40011000;
+    static constexpr std::string_view kind = "usart";
+    static constexpr std::string_view bus_clock = "PCLK2";
+};
+}  // namespace peripherals
 
 }  // namespace vk::board

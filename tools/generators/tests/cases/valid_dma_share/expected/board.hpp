@@ -6,6 +6,7 @@
 
 #include <vk/hal/dma.hpp>
 #include <vk/hal/pin.hpp>
+#include <vk/hal/rotation.hpp>
 
 namespace vk::board {
 
@@ -22,5 +23,14 @@ namespace dma {
 using TIM2_UP = vk::hal::DmaStream<vk::hal::DmaController::Dma1, 3, 3, true>;
 using TIM4_CH2 = vk::hal::DmaStream<vk::hal::DmaController::Dma1, 3, 2, true>;
 }  // namespace dma
+
+// Peripheral instances the board uses.
+namespace peripherals {
+struct TIM4 {
+    static constexpr std::uint32_t address = 0x40000800;
+    static constexpr std::string_view kind = "timer";
+    static constexpr std::string_view bus_clock = "PCLK1";
+};
+}  // namespace peripherals
 
 }  // namespace vk::board

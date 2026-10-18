@@ -2343,5 +2343,337 @@
       "size": 16384,
       "executable": true
     }
-  ]
+  ],
+  "peripherals": {
+    "ADC1": {
+      "address": 1073815552,
+      "kind": "adc",
+      "bus_clock": "PCLK2"
+    },
+    "ADC123_COMMON": {
+      "address": 1073816320,
+      "kind": "adccommon",
+      "bus_clock": null
+    },
+    "ADC2": {
+      "address": 1073815808,
+      "kind": "adc",
+      "bus_clock": "PCLK2"
+    },
+    "ADC3": {
+      "address": 1073816064,
+      "kind": "adc",
+      "bus_clock": "PCLK2"
+    },
+    "CAN1": {
+      "address": 1073767424,
+      "kind": "can",
+      "bus_clock": "PCLK1"
+    },
+    "CAN2": {
+      "address": 1073768448,
+      "kind": "can",
+      "bus_clock": "PCLK1"
+    },
+    "CRC": {
+      "address": 1073885184,
+      "kind": "crc",
+      "bus_clock": "HCLK1"
+    },
+    "DAC1": {
+      "address": 1073771520,
+      "kind": "dac",
+      "bus_clock": "PCLK1"
+    },
+    "DBGMCU": {
+      "address": 3758366720,
+      "kind": "dbgmcu",
+      "bus_clock": null
+    },
+    "DCMI": {
+      "address": 1342504960,
+      "kind": "dcmi",
+      "bus_clock": "HCLK2"
+    },
+    "DMA1": {
+      "address": 1073897472,
+      "kind": "dma",
+      "bus_clock": "HCLK1"
+    },
+    "DMA2": {
+      "address": 1073898496,
+      "kind": "dma",
+      "bus_clock": "HCLK1"
+    },
+    "ETH": {
+      "address": 1073905664,
+      "kind": "eth",
+      "bus_clock": "HCLK1"
+    },
+    "EXTI": {
+      "address": 1073822720,
+      "kind": "exti",
+      "bus_clock": null
+    },
+    "FLASH": {
+      "address": 1073888256,
+      "kind": "flash",
+      "bus_clock": null
+    },
+    "FSMC": {
+      "address": 2684354560,
+      "kind": "fsmc",
+      "bus_clock": "HCLK3"
+    },
+    "GPIOA": {
+      "address": 1073872896,
+      "kind": "gpio",
+      "bus_clock": "HCLK1"
+    },
+    "GPIOB": {
+      "address": 1073873920,
+      "kind": "gpio",
+      "bus_clock": "HCLK1"
+    },
+    "GPIOC": {
+      "address": 1073874944,
+      "kind": "gpio",
+      "bus_clock": "HCLK1"
+    },
+    "GPIOD": {
+      "address": 1073875968,
+      "kind": "gpio",
+      "bus_clock": "HCLK1"
+    },
+    "GPIOE": {
+      "address": 1073876992,
+      "kind": "gpio",
+      "bus_clock": "HCLK1"
+    },
+    "GPIOF": {
+      "address": 1073878016,
+      "kind": "gpio",
+      "bus_clock": "HCLK1"
+    },
+    "GPIOG": {
+      "address": 1073879040,
+      "kind": "gpio",
+      "bus_clock": "HCLK1"
+    },
+    "GPIOH": {
+      "address": 1073880064,
+      "kind": "gpio",
+      "bus_clock": "HCLK1"
+    },
+    "GPIOI": {
+      "address": 1073881088,
+      "kind": "gpio",
+      "bus_clock": "HCLK1"
+    },
+    "I2C1": {
+      "address": 1073763328,
+      "kind": "i2c",
+      "bus_clock": "PCLK1"
+    },
+    "I2C2": {
+      "address": 1073764352,
+      "kind": "i2c",
+      "bus_clock": "PCLK1"
+    },
+    "I2C3": {
+      "address": 1073765376,
+      "kind": "i2c",
+      "bus_clock": "PCLK1"
+    },
+    "I2S2": {
+      "address": 1073755136,
+      "kind": "spi",
+      "bus_clock": null
+    },
+    "I2S3": {
+      "address": 1073758208,
+      "kind": "spi",
+      "bus_clock": null
+    },
+    "IWDG": {
+      "address": 1073754112,
+      "kind": "iwdg",
+      "bus_clock": null
+    },
+    "PWR": {
+      "address": 1073770496,
+      "kind": "pwr",
+      "bus_clock": "PCLK1"
+    },
+    "RCC": {
+      "address": 1073887232,
+      "kind": "rcc",
+      "bus_clock": null
+    },
+    "RNG": {
+      "address": 1342572544,
+      "kind": "rng",
+      "bus_clock": "HCLK2"
+    },
+    "RTC": {
+      "address": 1073752064,
+      "kind": "rtc",
+      "bus_clock": "PCLK1"
+    },
+    "SDIO": {
+      "address": 1073818624,
+      "kind": "sdmmc",
+      "bus_clock": "PCLK2"
+    },
+    "SPI1": {
+      "address": 1073819648,
+      "kind": "spi",
+      "bus_clock": "PCLK2"
+    },
+    "SPI2": {
+      "address": 1073756160,
+      "kind": "spi",
+      "bus_clock": "PCLK1"
+    },
+    "SPI3": {
+      "address": 1073757184,
+      "kind": "spi",
+      "bus_clock": "PCLK1"
+    },
+    "SYSCFG": {
+      "address": 1073821696,
+      "kind": "syscfg",
+      "bus_clock": "PCLK2"
+    },
+    "TIM1": {
+      "address": 1073807360,
+      "kind": "timer",
+      "bus_clock": "PCLK2"
+    },
+    "TIM10": {
+      "address": 1073824768,
+      "kind": "timer",
+      "bus_clock": "PCLK2"
+    },
+    "TIM11": {
+      "address": 1073825792,
+      "kind": "timer",
+      "bus_clock": "PCLK2"
+    },
+    "TIM12": {
+      "address": 1073747968,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    "TIM13": {
+      "address": 1073748992,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    "TIM14": {
+      "address": 1073750016,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    "TIM2": {
+      "address": 1073741824,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    "TIM3": {
+      "address": 1073742848,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    "TIM4": {
+      "address": 1073743872,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    "TIM5": {
+      "address": 1073744896,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    "TIM6": {
+      "address": 1073745920,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    "TIM7": {
+      "address": 1073746944,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    "TIM8": {
+      "address": 1073808384,
+      "kind": "timer",
+      "bus_clock": "PCLK2"
+    },
+    "TIM9": {
+      "address": 1073823744,
+      "kind": "timer",
+      "bus_clock": "PCLK2"
+    },
+    "TS_CAL1": {
+      "address": 536836652,
+      "kind": "tscal",
+      "bus_clock": null
+    },
+    "TS_CAL2": {
+      "address": 536836654,
+      "kind": "tscal",
+      "bus_clock": null
+    },
+    "UART4": {
+      "address": 1073761280,
+      "kind": "usart",
+      "bus_clock": "PCLK1"
+    },
+    "UART5": {
+      "address": 1073762304,
+      "kind": "usart",
+      "bus_clock": "PCLK1"
+    },
+    "UID": {
+      "address": 536836624,
+      "kind": "uid",
+      "bus_clock": null
+    },
+    "USART1": {
+      "address": 1073811456,
+      "kind": "usart",
+      "bus_clock": "PCLK2"
+    },
+    "USART2": {
+      "address": 1073759232,
+      "kind": "usart",
+      "bus_clock": "PCLK1"
+    },
+    "USART3": {
+      "address": 1073760256,
+      "kind": "usart",
+      "bus_clock": "PCLK1"
+    },
+    "USART6": {
+      "address": 1073812480,
+      "kind": "usart",
+      "bus_clock": "PCLK2"
+    },
+    "USB_OTG_FS": {
+      "address": 1342177280,
+      "kind": "otg",
+      "bus_clock": "HCLK2"
+    },
+    "USB_OTG_HS": {
+      "address": 1074003968,
+      "kind": "otg",
+      "bus_clock": "HCLK1"
+    },
+    "WWDG": {
+      "address": 1073753088,
+      "kind": "wwdg",
+      "bus_clock": "PCLK1"
+    }
+  }
 }

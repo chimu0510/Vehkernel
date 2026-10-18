@@ -1,0 +1,1 @@
+board.toml:4: error: no PLL setting gives exactly 100000000 Hz system clock and a 48 MHz USB clock from a 8000000 Hz crystal

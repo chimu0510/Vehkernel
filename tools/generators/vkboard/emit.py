@@ -32,6 +32,7 @@ def board_header(board: Board) -> str:
         "",
         "#include <vk/hal/dma.hpp>",
         "#include <vk/hal/pin.hpp>",
+        "#include <vk/hal/rotation.hpp>",
         "",
         "namespace vk::board {",
         "",
@@ -64,6 +65,10 @@ def board_header(board: Board) -> str:
                 f"inline constexpr unsigned alt_config_count = {len(board.alt_configs)};", ""]
     out += _dma_namespace(board.dma)
     out += _flash_namespace(board)
+    out += _clock_namespace(board)
+    out += _peripherals_namespace(board)
+    out += _ports_namespace(board)
+    out += _devices_namespace(board)
     out += ["}  // namespace vk::board", ""]
     return "\n".join(out)
 
@@ -96,6 +101,78 @@ def _flash_namespace(board: Board) -> list[str]:
                 "};"]
     out += ["}  // namespace flash", ""]
     return out
+
+
+def _camel(name: str) -> str:
+    return "".join(w if w.isdigit() else w.capitalize() for w in name.split("_"))
+
+
+def _clock_namespace(board: Board) -> list[str]:
+    c = board.clock
+    if c is None:
+        return []
+    values = [("hse_hz", c.hse_hz), ("sysclk_hz", c.sysclk_hz), ("pll_m", c.pll_m), ("pll_n", c.pll_n),
+              ("pll_p", c.pll_p), ("pll_q", c.pll_q), ("apb1_div", c.apb1_div), ("apb2_div", c.apb2_div),
+              ("apb1_hz", c.apb1_hz), ("apb2_hz", c.apb2_hz), ("apb1_timer_hz", c.apb1_timer_hz),
+              ("apb2_timer_hz", c.apb2_timer_hz), ("flash_wait_states", c.flash_wait_states)]
+    out = ["// Clock tree solved from the crystal and target system clock; USB gets exactly 48 MHz.",
+           "namespace clock {"]
+    out += [f"inline constexpr std::uint32_t {name} = {value};" for name, value in values]
+    return out + ["}  // namespace clock", ""]
+
+
+def _peripherals_namespace(board: Board) -> list[str]:
+    if not board.peripherals:
+        return []
+    out = ["// Peripheral instances the board uses.", "namespace peripherals {"]
+    for name, info in board.peripherals:
+        bus = f'"{info["bus_clock"]}"' if info["bus_clock"] else '""'
+        out += [f"struct {name} {{",
+                f"    static constexpr std::uint32_t address = 0x{info['address']:08X};",
+                f'    static constexpr std::string_view kind = "{info["kind"]}";',
+                f"    static constexpr std::string_view bus_clock = {bus};",
+                "};"]
+    return out + ["}  // namespace peripherals", ""]
+
+
+def _ports_namespace(board: Board) -> list[str]:
+    ports = board.hardware.serial
+    if not ports:
+        return []
+    out = ["// Logical serial ports; SERIALn_FUNCTION picks their use at runtime.", "namespace ports {"]
+    for p in ports:
+        out.append(f"struct {p.port} {{")
+        out.append(f'    static constexpr std::string_view peripheral = "{p.peripheral}";')
+        if p.tx:
+            out.append(f"    using tx = pins::{p.tx};")
+        if p.rx:
+            out.append(f"    using rx = pins::{p.rx};")
+        out.append("};")
+    return out + ["}  // namespace ports", ""]
+
+
+def _devices_namespace(board: Board) -> list[str]:
+    devices = board.hardware.devices
+    if not devices:
+        return []
+    out = ["namespace devices {"]
+    for d in devices:
+        out += [f"struct {d.device} {{",
+                f'    static constexpr std::string_view kind = "{d.kind}";',
+                f'    static constexpr std::string_view type = "{d.type}";',
+                f'    static constexpr std::string_view bus = "{d.bus}";']
+        if d.peripheral:
+            out.append(f'    static constexpr std::string_view peripheral = "{d.peripheral}";')
+        if d.address is not None:
+            out.append(f"    static constexpr std::uint8_t address = 0x{d.address:02X};")
+        out.append(f"    static constexpr vk::hal::Rotation rotation = vk::hal::Rotation::{_camel(d.rotation)};")
+        out.append(f"    using pins = vk::hal::PinList<{', '.join(f'pins::{r}' for r in d.pins)}>;")
+        out.append("};")
+    return out + ["}  // namespace devices", ""]
+
+
+def board_defaults_json(board: Board) -> str:
+    return json.dumps(dict(board.hardware.defaults), indent=2) + "\n"
 
 
 def _size(size: int) -> str:
@@ -131,6 +208,11 @@ def board_symbols(board: Board) -> list[str]:
     for r in board.flash:
         if r.name in ("PARAMS", "EVENTLOG"):
             symbols.add(f"BOARD_HAS_FLASH_{r.name}")
+    for d in board.hardware.devices:
+        symbols.add(f"BOARD_HAS_{d.type}")
+        symbols.add(f"BOARD_{d.kind}_BUS_{d.bus}")
+    for s in board.hardware.storage:
+        symbols.add(f"BOARD_HAS_{s.storage}")
     return sorted(symbols)
 
 
@@ -181,6 +263,18 @@ def board_json(board: Board) -> str:
         "flash": [{"region": r.name, "start": r.start, "size": r.size,
                    "first_sector": r.first_sector, "last_sector": r.last_sector} for r in board.flash],
         "ram": [{"region": r.name, "start": r.start, "size": r.size} for r in board.ram],
+        "serial": [{"port": p.port, "peripheral": p.peripheral, "tx": p.tx, "rx": p.rx, "function": p.function}
+                   for p in board.hardware.serial],
+        "devices": [{"device": d.device, "kind": d.kind, "type": d.type, "bus": d.bus,
+                     "peripheral": d.peripheral, "pins": list(d.pins), "address": d.address,
+                     "rotation": d.rotation} for d in board.hardware.devices],
+        "storage": [{"storage": s.storage, "bus": s.bus} for s in board.hardware.storage],
+        "clock": None if board.clock is None else {
+            "hse_hz": board.clock.hse_hz, "sysclk_hz": board.clock.sysclk_hz, "pll_m": board.clock.pll_m,
+            "pll_n": board.clock.pll_n, "pll_p": board.clock.pll_p, "pll_q": board.clock.pll_q,
+            "apb1_div": board.clock.apb1_div, "apb2_div": board.clock.apb2_div,
+            "flash_wait_states": board.clock.flash_wait_states},
+        "peripherals": [{"name": name, **info} for name, info in board.peripherals],
         "dma": [
             {"request": a.request,
              "controller": a.candidate.controller if a.candidate else None,
@@ -196,7 +290,8 @@ def board_json(board: Board) -> str:
 def outputs(board: Board) -> dict[str, str]:
     """Map of output file name to contents."""
     files = {"board.hpp": board_header(board), "board.json": board_json(board),
-             "dma_report.txt": dma_report(board), "Kconfig.board": kconfig_board(board)}
+             "dma_report.txt": dma_report(board), "Kconfig.board": kconfig_board(board),
+             "board_defaults.json": board_defaults_json(board)}
     if board.flash:
         files["memory.ld"] = memory_ld(board)
     return files

@@ -1,0 +1,1 @@
+board.toml:4: error: sysclk_hz 170000000 is above the 168 MHz maximum

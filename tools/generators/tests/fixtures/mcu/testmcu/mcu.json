@@ -14,6 +14,9 @@
     "PA0",
     "PA1",
     "PA2",
+    "PA5",
+    "PA6",
+    "PA7",
     "PA9",
     "PA10",
     "PB6",
@@ -37,6 +40,24 @@
       {
         "function": "USART2_TX",
         "af": 7
+      }
+    ],
+    "PA5": [
+      {
+        "function": "SPI1_SCK",
+        "af": 5
+      }
+    ],
+    "PA6": [
+      {
+        "function": "SPI1_MISO",
+        "af": 5
+      }
+    ],
+    "PA7": [
+      {
+        "function": "SPI1_MOSI",
+        "af": 5
       }
     ],
     "PA9": [
@@ -217,5 +238,47 @@
       "size": 16384,
       "executable": true
     }
-  ]
+  ],
+  "peripherals": {
+    "ADC1": {
+      "address": 1073815552,
+      "kind": "adc",
+      "bus_clock": "PCLK2"
+    },
+    "I2C1": {
+      "address": 1073763328,
+      "kind": "i2c",
+      "bus_clock": "PCLK1"
+    },
+    "SPI1": {
+      "address": 1073819648,
+      "kind": "spi",
+      "bus_clock": "PCLK2"
+    },
+    "TIM1": {
+      "address": 1073807360,
+      "kind": "timer",
+      "bus_clock": "PCLK2"
+    },
+    "TIM2": {
+      "address": 1073741824,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    "TIM4": {
+      "address": 1073743872,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    "USART1": {
+      "address": 1073811456,
+      "kind": "usart",
+      "bus_clock": "PCLK2"
+    },
+    "USART2": {
+      "address": 1073759232,
+      "kind": "usart",
+      "bus_clock": "PCLK1"
+    }
+  }
 }

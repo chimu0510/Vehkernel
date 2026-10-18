@@ -118,3 +118,9 @@ def test_ram_regions_include_non_executable_ccm(database):
     ram = {region["name"]: region for region in database["ram"]}
     assert ram["CCMRAM"] == {"name": "CCMRAM", "address": 0x10000000, "size": 64 * 1024, "executable": False}
     assert ram["SRAM"]["size"] + ram["SRAM2"]["size"] == 128 * 1024
+
+
+def test_peripheral_instances_carry_address_kind_and_bus_clock(database):
+    assert database["peripherals"]["USART1"] == {"address": 0x40011000, "kind": "usart", "bus_clock": "PCLK2"}
+    assert database["peripherals"]["TIM4"]["address"] == 0x40000800
+    assert database["peripherals"]["I2C1"]["bus_clock"] == "PCLK1"

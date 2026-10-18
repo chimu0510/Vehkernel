@@ -27,6 +27,18 @@
       "size": 65536
     }
   ],
+  "serial": [],
+  "devices": [],
+  "storage": [],
+  "clock": null,
+  "peripherals": [
+    {
+      "name": "TIM4",
+      "address": 1073743872,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    }
+  ],
   "dma": [
     {
       "request": "TIM2_UP",

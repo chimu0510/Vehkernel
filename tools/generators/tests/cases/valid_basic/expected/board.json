@@ -87,6 +87,30 @@
       "size": 65536
     }
   ],
+  "serial": [],
+  "devices": [],
+  "storage": [],
+  "clock": null,
+  "peripherals": [
+    {
+      "name": "ADC1",
+      "address": 1073815552,
+      "kind": "adc",
+      "bus_clock": "PCLK2"
+    },
+    {
+      "name": "TIM4",
+      "address": 1073743872,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "USART1",
+      "address": 1073811456,
+      "kind": "usart",
+      "bus_clock": "PCLK2"
+    }
+  ],
   "dma": [
     {
       "request": "USART1_RX",

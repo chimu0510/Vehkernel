@@ -20,12 +20,18 @@ from pathlib import Path
 
 from .diagnostics import BoardError, Diagnostics, Loc
 from .dma import DmaAssignment, assign, collect_requests
+from .clock import CLOCK_KEYS, Clock, solve_clock
 from .flash import FlashRegion, RamRegion, check_layout, ram_regions
+from .hardware import Hardware, check_hardware
 
 GPIO_FUNCTIONS = ("GPIO_INPUT", "GPIO_OUTPUT")
 PIN_KEYS = {"pin", "role", "func", "alt"}
 ALT_KEYS = {"config", "role", "func"}
-TOP_LEVEL_KEYS = {"name", "mcu", "extends", "remove", "pins", "dma", "flash"}
+TOP_LEVEL_KEYS = {"name", "mcu", "extends", "remove", "pins", "dma", "flash",
+                  "serial", "devices", "storage", "clock", "timing", "defaults"}
+ARRAY_SECTIONS = {"pins": "pin", "dma": "request", "flash": "region", "serial": "port",
+                  "devices": "device", "storage": "storage"}
+TABLE_SECTIONS = ("clock", "timing", "defaults")
 
 _ROLE_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _PIN_RE = re.compile(r"^P([A-K])(\d+)$")
@@ -71,6 +77,9 @@ class Board:
     alt_configs: tuple[int, ...] = field(default=())
     flash: tuple[FlashRegion, ...] = ()
     ram: tuple[RamRegion, ...] = ()
+    hardware: Hardware = Hardware()
+    clock: Clock | None = None
+    peripherals: tuple[tuple[str, dict], ...] = ()  # (instance, MCU database entry), sorted
 
 
 @dataclass
@@ -83,9 +92,8 @@ class _Entry:
 class _Resolved:
     name: object
     mcu: object
-    pins: list[_Entry]
-    dma: list[_Entry]
-    flash: list[_Entry]
+    arrays: dict[str, list[_Entry]]  # by section name, see ARRAY_SECTIONS
+    tables: dict[str, _Entry]  # clock, timing, defaults
 
 
 def _entry_lines(text: str, key: str, count: int) -> list[int | None]:
@@ -132,24 +140,22 @@ def _resolve(path: Path, shown: str, diag: Diagnostics,
     top = Loc(shown)
     for key in sorted(set(data) - TOP_LEVEL_KEYS):
         diag.error(f"unknown key '{key}'", top)
-    for key in ("pins", "dma", "flash", "remove"):
+    for key in (*ARRAY_SECTIONS, "remove"):
         if not isinstance(data.get(key, []), list):
             diag.error(f"'{key}' must be an array", top)
             return None
-
-    pins = [_Entry(e, Loc(shown, line)) for e, line in
-            zip(data.get("pins", []), _entry_lines(text, "pin", len(data.get("pins", []))))]
-    dma = [_Entry(e, Loc(shown, line)) for e, line in
-           zip(data.get("dma", []), _entry_lines(text, "request", len(data.get("dma", []))))]
-    flash = [_Entry(e, Loc(shown, line)) for e, line in
-             zip(data.get("flash", []), _entry_lines(text, "region", len(data.get("flash", []))))]
+    arrays = {section: [_Entry(e, Loc(shown, line)) for e, line in
+                        zip(data.get(section, []), _entry_lines(text, key, len(data.get(section, []))))]
+              for section, key in ARRAY_SECTIONS.items()}
+    tables = {section: _Entry(data[section], Loc(shown, _key_line(text, section)))
+              for section in TABLE_SECTIONS if section in data}
     removed = data.get("remove", [])
 
     base_name = data.get("extends")
     if base_name is None:
         if removed:
             diag.error("'remove' needs 'extends'", top)
-        return _Resolved(data.get("name"), data.get("mcu"), pins, dma, flash)
+        return _Resolved(data.get("name"), data.get("mcu"), arrays, tables)
 
     if not isinstance(base_name, str) or not _BOARD_NAME_RE.match(base_name):
         diag.error("'extends' must name a board directory", top)
@@ -165,29 +171,45 @@ def _resolve(path: Path, shown: str, diag: Diagnostics,
     if base is None:
         return None
 
-    def pin_of(entry: _Entry) -> object:
-        return entry.data.get("pin") if isinstance(entry.data, dict) else None
+    def key_of(entry: _Entry, key: str) -> object:
+        return entry.data.get(key) if isinstance(entry.data, dict) else None
 
-    base_pins = {pin_of(e) for e in base.pins}
+    base_pins = {key_of(e, "pin") for e in base.arrays["pins"]}
     for pin in removed:
         if pin not in base_pins:
             diag.error(f"cannot remove pin {pin}: {base_shown} does not define it", top)
-    merged = [e for e in base.pins if pin_of(e) not in removed]
-    for entry in pins:
-        index = next((i for i, e in enumerate(merged)
-                      if pin_of(e) == pin_of(entry) and e.loc.path != shown), None)
+    merged = {}
+    # Pins: child entries replace base entries for the same pin, in place.
+    pins = [e for e in base.arrays["pins"] if key_of(e, "pin") not in removed]
+    for entry in arrays["pins"]:
+        index = next((i for i, e in enumerate(pins)
+                      if key_of(e, "pin") == key_of(entry, "pin") and e.loc.path != shown), None)
         if index is None:
-            merged.append(entry)
+            pins.append(entry)
         else:
-            merged[index] = entry
-
-    def request_of(entry: _Entry) -> object:
-        return entry.data.get("request") if isinstance(entry.data, dict) else None
-
-    child_requests = {request_of(e) for e in dma}
-    merged_dma = [e for e in base.dma if request_of(e) not in child_requests] + dma
+            pins[index] = entry
+    merged["pins"] = pins
     # A Flash layout is replaced as a whole, never merged region by region.
-    return _Resolved(data.get("name"), data.get("mcu", base.mcu), merged, merged_dma, flash or base.flash)
+    merged["flash"] = arrays["flash"] or base.arrays["flash"]
+    # Other arrays: child entries replace base entries with the same key.
+    for section in ("dma", "serial", "devices", "storage"):
+        key = ARRAY_SECTIONS[section]
+        child_keys = {key_of(e, key) for e in arrays[section]}
+        merged[section] = [e for e in base.arrays[section] if key_of(e, key) not in child_keys] + arrays[section]
+
+    merged_tables = dict(base.tables)
+    for section, entry in tables.items():
+        if section == "defaults" and "defaults" in base.tables \
+                and isinstance(entry.data, dict) and isinstance(base.tables["defaults"].data, dict):
+            merged_tables[section] = _Entry({**base.tables["defaults"].data, **entry.data}, entry.loc)
+        else:
+            merged_tables[section] = entry
+    return _Resolved(data.get("name"), data.get("mcu", base.mcu), merged, merged_tables)
+
+
+def _key_line(text: str, key: str) -> int | None:
+    pattern = re.compile(r"^\s*" + key + r"\s*=")
+    return next((n for n, line in enumerate(text.splitlines(), start=1) if pattern.match(line)), None)
 
 
 def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> Board:
@@ -211,9 +233,10 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
         diag.error(f"unknown MCU '{mcu}': the MCU root has no {mcu}/mcu.json")
         raise BoardError(diag.errors) from None
 
-    flash = check_layout([e.data for e in resolved.flash], [e.loc for e in resolved.flash],
+    arrays, tables = resolved.arrays, resolved.tables
+    flash = check_layout([e.data for e in arrays["flash"]], [e.loc for e in arrays["flash"]],
                          database["flash"], Loc(shown), diag)
-    pins = [p for p in (_check_pin(e.data, e.loc, database, diag) for e in resolved.pins) if p]
+    pins = [p for p in (_check_pin(e.data, e.loc, database, diag) for e in arrays["pins"]) if p]
     configs = sorted({config for p in pins for config, _ in p.alt})
     _check_unique(pins, diag)
     for config in configs:
@@ -221,15 +244,50 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
 
     # DMA covers the functions of every alt config, so any selection works at boot.
     funcs = sorted({f.func for p in pins for f in (p.default, *(fn for _, fn in p.alt)) if f.kind == "af"})
-    requests = collect_requests([e.data for e in resolved.dma], [e.loc for e in resolved.dma],
+    requests = collect_requests([e.data for e in arrays["dma"]], [e.loc for e in arrays["dma"]],
                                 funcs, database["dma"], diag)
+
+    def table(section: str) -> _Entry:
+        return tables.get(section, _Entry(None, Loc(shown)))
+
+    hardware = check_hardware([(e.data, e.loc) for e in arrays["serial"]],
+                              [(e.data, e.loc) for e in arrays["devices"]],
+                              [(e.data, e.loc) for e in arrays["storage"]],
+                              table("timing").data, table("defaults").data or {},
+                              {p.role: p for p in pins}, Loc(shown), table("timing").loc,
+                              table("defaults").loc, diag)
+    clock = _check_clock(table("clock"), database, diag)
+    used = {f.func.rsplit("_", 1)[0] for p in pins for f in (p.default, *(fn for _, fn in p.alt))
+            if f.kind in ("af", "analog")}
+    used.update(d.peripheral for d in hardware.devices if d.peripheral)
+    peripherals = tuple((name, database["peripherals"][name]) for name in sorted(used)
+                        if name in database.get("peripherals", {}))
     if diag:
         raise BoardError(diag.errors)
     dma = assign(requests, diag)
     if diag:
         raise BoardError(diag.errors)
     return Board(name=name, mcu=mcu, source=shown, pins=tuple(pins), dma=tuple(dma),
-                 alt_configs=tuple(configs), flash=flash, ram=ram_regions(database))
+                 alt_configs=tuple(configs), flash=flash, ram=ram_regions(database),
+                 hardware=hardware, clock=clock, peripherals=peripherals)
+
+
+def _check_clock(entry: _Entry, database: dict, diag: Diagnostics) -> Clock | None:
+    if entry.data is None:
+        return None
+    data = entry.data
+    if not isinstance(data, dict) or set(data) != CLOCK_KEYS \
+            or not all(isinstance(v, int) and not isinstance(v, bool) for v in data.values()):
+        diag.error("'clock' needs exactly integer 'hse_hz' and 'sysclk_hz'", entry.loc)
+        return None
+    if database["family"] != "STM32F4":
+        diag.error(f"clock solving supports STM32F4 only, not {database['family']}", entry.loc)
+        return None
+    result = solve_clock(data["hse_hz"], data["sysclk_hz"])
+    if isinstance(result, str):
+        diag.error(result, entry.loc)
+        return None
+    return result
 
 
 def _function(pin: str, role: object, func: object, loc: Loc, database: dict,

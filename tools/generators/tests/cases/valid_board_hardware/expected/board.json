@@ -1,0 +1,270 @@
+{
+  "name": "demo",
+  "mcu": "testmcu",
+  "pins": [
+    {
+      "role": "SERIAL1_TX",
+      "pin": "PA9",
+      "port": "A",
+      "number": 9,
+      "func": "USART1_TX",
+      "kind": "af",
+      "af": 7,
+      "alt": []
+    },
+    {
+      "role": "SERIAL1_RX",
+      "pin": "PA10",
+      "port": "A",
+      "number": 10,
+      "func": "USART1_RX",
+      "kind": "af",
+      "af": 7,
+      "alt": []
+    },
+    {
+      "role": "SERIAL2_TX",
+      "pin": "PA2",
+      "port": "A",
+      "number": 2,
+      "func": "USART2_TX",
+      "kind": "af",
+      "af": 7,
+      "alt": []
+    },
+    {
+      "role": "I2C1_SCL",
+      "pin": "PB6",
+      "port": "B",
+      "number": 6,
+      "func": "I2C1_SCL",
+      "kind": "af",
+      "af": 4,
+      "alt": []
+    },
+    {
+      "role": "I2C1_SDA",
+      "pin": "PB7",
+      "port": "B",
+      "number": 7,
+      "func": "I2C1_SDA",
+      "kind": "af",
+      "af": 4,
+      "alt": []
+    },
+    {
+      "role": "IMU_SCL",
+      "pin": "PA1",
+      "port": "A",
+      "number": 1,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "IMU_SDA",
+      "pin": "PD13",
+      "port": "D",
+      "number": 13,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "FLASH_SCK",
+      "pin": "PA5",
+      "port": "A",
+      "number": 5,
+      "func": "SPI1_SCK",
+      "kind": "af",
+      "af": 5,
+      "alt": []
+    },
+    {
+      "role": "FLASH_MISO",
+      "pin": "PA6",
+      "port": "A",
+      "number": 6,
+      "func": "SPI1_MISO",
+      "kind": "af",
+      "af": 5,
+      "alt": []
+    },
+    {
+      "role": "FLASH_MOSI",
+      "pin": "PA7",
+      "port": "A",
+      "number": 7,
+      "func": "SPI1_MOSI",
+      "kind": "af",
+      "af": 5,
+      "alt": []
+    },
+    {
+      "role": "FLASH_CS",
+      "pin": "PA0",
+      "port": "A",
+      "number": 0,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    }
+  ],
+  "alt_configs": [],
+  "flash": [],
+  "ram": [
+    {
+      "region": "CCM",
+      "start": 268435456,
+      "size": 16384
+    },
+    {
+      "region": "RAM",
+      "start": 536870912,
+      "size": 65536
+    }
+  ],
+  "serial": [
+    {
+      "port": "SERIAL1",
+      "peripheral": "USART1",
+      "tx": "SERIAL1_TX",
+      "rx": "SERIAL1_RX",
+      "function": "LINK"
+    },
+    {
+      "port": "SERIAL2",
+      "peripheral": "USART2",
+      "tx": "SERIAL2_TX",
+      "rx": null,
+      "function": "LOG"
+    }
+  ],
+  "devices": [
+    {
+      "device": "IMU0",
+      "kind": "IMU",
+      "type": "ICM20948",
+      "bus": "SOFT_I2C",
+      "peripheral": null,
+      "pins": [
+        "IMU_SCL",
+        "IMU_SDA"
+      ],
+      "address": 104,
+      "rotation": "YAW_90"
+    },
+    {
+      "device": "BARO0",
+      "kind": "BARO",
+      "type": "BMP280",
+      "bus": "I2C",
+      "peripheral": "I2C1",
+      "pins": [
+        "I2C1_SCL",
+        "I2C1_SDA"
+      ],
+      "address": 118,
+      "rotation": "NONE"
+    },
+    {
+      "device": "FLASH0",
+      "kind": "FLASH",
+      "type": "W25Q128",
+      "bus": "SPI",
+      "peripheral": "SPI1",
+      "pins": [
+        "FLASH_SCK",
+        "FLASH_MISO",
+        "FLASH_MOSI",
+        "FLASH_CS"
+      ],
+      "address": null,
+      "rotation": "NONE"
+    }
+  ],
+  "storage": [
+    {
+      "storage": "SPI_NOR_FLASH",
+      "bus": "SPI"
+    }
+  ],
+  "clock": {
+    "hse_hz": 8000000,
+    "sysclk_hz": 168000000,
+    "pll_m": 4,
+    "pll_n": 168,
+    "pll_p": 2,
+    "pll_q": 7,
+    "apb1_div": 4,
+    "apb2_div": 2,
+    "flash_wait_states": 5
+  },
+  "peripherals": [
+    {
+      "name": "I2C1",
+      "address": 1073763328,
+      "kind": "i2c",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "SPI1",
+      "address": 1073819648,
+      "kind": "spi",
+      "bus_clock": "PCLK2"
+    },
+    {
+      "name": "USART1",
+      "address": 1073811456,
+      "kind": "usart",
+      "bus_clock": "PCLK2"
+    },
+    {
+      "name": "USART2",
+      "address": 1073759232,
+      "kind": "usart",
+      "bus_clock": "PCLK1"
+    }
+  ],
+  "dma": [
+    {
+      "request": "SPI1_RX",
+      "controller": "DMA2",
+      "stream": 0,
+      "channel": 3,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART1_RX",
+      "controller": "DMA2",
+      "stream": 2,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART1_TX",
+      "controller": "DMA2",
+      "stream": 7,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART2_TX",
+      "controller": "DMA1",
+      "stream": 6,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    }
+  ]
+}

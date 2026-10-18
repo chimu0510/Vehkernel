@@ -1,0 +1,30 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA9",  role = "SERIAL1_TX", func = "USART1_TX" },
+  { pin = "PA2",  role = "SERIAL2_TX", func = "USART2_TX" },
+  { pin = "PB6",  role = "I2C1_SCL",   func = "I2C1_SCL" },
+  { pin = "PB7",  role = "I2C1_SDA",   func = "I2C1_SDA" },
+  { pin = "PA1",  role = "LED",        func = "GPIO_OUTPUT" },
+]
+
+serial = [
+  { port = "SERIAL1", tx = "SERIAL1_TX", rx = "SERIAL2_TX", function = "LINK" },
+  { port = "UART7",   tx = "SERIAL2_TX", function = "LINK" },
+  { port = "SERIAL3", tx = "SERIAL2_TX", function = "GPS" },
+]
+
+devices = [
+  { device = "BARO0", kind = "BARO", type = "BMP280", bus = "I2C", pins = ["I2C1_SDA", "I2C1_SCL"], address = 0x76 },
+  { device = "MAG0",  kind = "MAG",  type = "QMC5883", bus = "I2C", pins = ["I2C1_SCL", "I2C1_SDA"] },
+  { device = "IMU0",  kind = "IMU",  type = "ICM20948", bus = "SOFT_I2C", pins = ["LED", "MISSING"], address = 0x68 },
+  { device = "IMU1",  kind = "IMU",  type = "ICM20948", bus = "I2C", pins = ["I2C1_SCL", "I2C1_SDA"], address = 0x69, rotation = "UPSIDE_DOWN" },
+]
+
+storage = [
+  { storage = "SD_CARD", bus = "QSPI" },
+]
+
+timing = { trigger = "ALWAYS", base_rate_hz = 0 }
+defaults = { SERIAL1_FUNCTION = "NONE", "a long lower name" = 1 }

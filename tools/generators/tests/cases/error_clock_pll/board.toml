@@ -1,0 +1,4 @@
+name = "demo"
+mcu = "testmcu"
+pins = []
+clock = { hse_hz = 8000000, sysclk_hz = 100000000 }

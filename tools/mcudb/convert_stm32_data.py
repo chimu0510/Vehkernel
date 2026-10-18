@@ -18,6 +18,8 @@ The MCU database holds what the board generator validates against:
   reference manual's terms.
 - ``flash``: the Flash sector table.
 - ``ram``: RAM regions, including CCM.
+- ``peripherals``: base address, register block kind and RCC bus clock of
+  each peripheral instance.
 
 Output is deterministic: identical input gives byte-identical output.
 """
@@ -114,6 +116,19 @@ def _ram_regions(memory: list[dict]) -> list[dict]:
     return regions
 
 
+def _peripherals(peripherals: list[dict]) -> dict:
+    table = {}
+    for p in sorted(peripherals, key=lambda p: p["name"]):
+        if "registers" not in p:
+            continue
+        table[p["name"]] = {
+            "address": p["address"],
+            "kind": p["registers"]["kind"],
+            "bus_clock": p.get("rcc", {}).get("bus_clock"),
+        }
+    return table
+
+
 def convert(chip: dict, *, mcu: str, package_name: str, commit: str, source_path: str) -> dict:
     package = _find_package(chip, package_name)
     gpios = _package_gpios(package)
@@ -175,6 +190,7 @@ def convert(chip: dict, *, mcu: str, package_name: str, commit: str, source_path
         "dma": {request: sort_dma(dma[request]) for request in sorted(dma)},
         "flash": _flash_sectors(memory),
         "ram": _ram_regions(memory),
+        "peripherals": _peripherals(core["peripherals"]),
     }
 
 
