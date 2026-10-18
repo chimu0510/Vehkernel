@@ -1,9 +1,11 @@
 # 日誌採 ULog，後端可替換，反壓在日誌端完成
 
+日誌採用 ULog 格式，因為現成工具都能直接開啟，它緊密排列的 little-endian 編碼也和我們的 Schema 一致。後端透過 `LogSink` 介面替換，可以同時啟用多個；資料太多時由日誌模組自己降級，產生資料的模組完全不知道日誌存在。
+
 **格式：ULog**
 
 - 不必自己寫工具：pyulog、PlotJuggler、Lichtblick 都能直接開啟 `.ulg`。
-- 與既有決策吻合：每則訊息的第一個欄位是 `timestamp`（ADR 0008），資料採緊密排列的 little-endian（ADR 0006），所以日誌可以直接寫入 Link 的 payload，不必重新編碼。產生器從 Schema 產生 ULog 的格式定義。
+- 與既有決策吻合：每則訊息的第一個欄位是 `timestamp`（ADR-0008），資料採緊密排列的 little-endian（ADR-0006），所以日誌可以直接寫入 Link 的 payload，不必重新編碼。產生器從 Schema 產生 ULog 的格式定義。
 - 會用到的訊息類型：`P`（參數）、`I`（板子、硬體版本、韌體版本、Schema 雜湊）、`L`（文字訊息，同時轉送到 ROS2 的 `/rosout`）、`O`（掉資料）、`S`（同步）。
 - 要記錄的 Topic 必須是固定長度。
 - Bridge 會記錄 MCU 與上位機之間的時鐘偏差，讓 ULog 可以和 rosbag2 錄下的 MCAP 在 Lichtblick 中對齊。
@@ -15,7 +17,7 @@
 - SD 卡：FatFs，每個工作階段一個 `.ulg` 檔。
 - SPI NOR Flash：以區塊附加寫入，不建檔案系統。
 - 串流到上位機：由 Bridge 存檔。
-- RAM 環形緩衝：只在事件發生時，分批寫入內部 Flash 的事件日誌磁區（ADR 0020）。
+- RAM 環形緩衝：只在事件發生時，分批寫入內部 Flash 的事件日誌磁區（ADR-0020）。
 - 序列埠記錄器。
 
 板級 TOML 宣告儲存裝置，產生 `BOARD_HAS_*` Kconfig 符號，所以要編進哪些後端由 Kconfig 決定。實際啟用哪些由 bitmask 參數 `LOG_BACKEND` 決定，預設值來自板級定義。C50C 沒有板載儲存，所以預設用串流，但這只是它的板級預設值。

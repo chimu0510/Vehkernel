@@ -1,10 +1,6 @@
----
-status: 控制路徑的觸發方式已由 ADR 0015 改為可選（IMU 事件或固定頻率，可分頻），本文的 IMU 事件鏈只是其中一種；其餘仍然有效
----
-
 # 匯流排語意與依頻率層級分的 Work Queue 執行模型
 
-匯流排沿用 PX4 uORB 的思路，依 STM32F407 的資源簡化：
+匯流排沿用 PX4 uORB 的思路，但為了 STM32F407 有限的 RAM，全部改成編譯時靜態配置；執行模型也依頻率層級分成少數幾個 Work Queue，而不是每個模組一個 task。匯流排的規則如下：
 
 - **語意**：每個 Topic 預設只保留最新值。訂閱者以世代計數器判斷 `updated()`，再用 `copy()` 取值。需要時可以在 Schema 以 `@queue N` 註解改成佇列。
 - **配置**：所有 Topic 與緩衝區由產生器在編譯時靜態產生，支援多實例（例如多顆 IMU），執行時不呼叫 `malloc`。
@@ -12,7 +8,7 @@ status: 控制路徑的觸發方式已由 ADR 0015 改為可選（IMU 事件或�
 - **時間戳**：每則訊息帶 64 位元單調遞增的微秒 `timestamp`。
 - **可觀測性**：匯流排可列出所有 Topic、發布頻率與最後更新時間，並透過 Link 對外。
 
-執行模型不是每個模組一個 task，而是依頻率層級分成幾個 Work Queue，每個 Work Queue 是一個 FreeRTOS task。模組是掛在 Work Queue 上的工作項目，由計時器或 Topic 發布觸發。以 `IMU_EVENT` 觸發時（觸發來源可選，見 ADR 0015），控制路徑走事件鏈：IMU 驅動發布後喚醒估測器，估測器發布後喚醒控制器，再到控制分配與輸出，全部在最高優先級的 `wq:ctrl` 上完成。這樣能落實 ADR 0001 的分頻率排程，也節省 F407 有限的 RAM。Stack 與匯流排緩衝區優先放在 CCM，一般 SRAM 留給 DMA。
+執行模型不是每個模組一個 task，而是依頻率層級分成幾個 Work Queue，每個 Work Queue 是一個 FreeRTOS task。模組是掛在 Work Queue 上的工作項目，由計時器或 Topic 發布觸發。以 `IMU_EVENT` 觸發時（觸發來源可選，見 ADR-0015），控制路徑走事件鏈：IMU 驅動發布後喚醒估測器，估測器發布後喚醒控制器，再到控制分配與輸出，全部在最高優先級的 `wq:ctrl` 上完成。這樣能落實 ADR-0001 的分頻率排程，也節省 F407 有限的 RAM。Stack 與匯流排緩衝區優先放在 CCM，一般 SRAM 留給 DMA。
 
 ## Considered Options
 
