@@ -3,8 +3,9 @@
 //
 // Each run drains the bytes the transport has received through the protocol,
 // which answers the handshake, time sync and parameter requests, then sends
-// a few frames of a parameter list in progress and every topic map entry
-// that is due while the session is connected. A frame the transport cannot
+// a few frames of the handshake's topic_info frames or of a parameter list in
+// progress, and every topic map entry that is due once the session is
+// connected and every topic has been described. A frame the transport cannot
 // take is dropped and counted; the Link never blocks its work queue. Once a
 // second it publishes its statistics on link_status.
 #pragma once
@@ -54,8 +55,10 @@ public:
         ParameterAccess parameters{};                     // what the peer may read and change
     };
 
-    // Parameter list frames sent per run: at the default interval, 800 per second.
-    static constexpr std::size_t param_frames_per_run = 4;
+    // topic_info and parameter list frames sent per run: at the default
+    // interval, 800 per second. With hello_reply, a handshake's run writes at
+    // most five frames, well within a 1 KiB transmit buffer.
+    static constexpr std::size_t paced_frames_per_run = 4;
 
     Link(std::string_view name, hal::Transport& transport, TopicMap map, const Config& config,
          core::WorkQueue& queue);

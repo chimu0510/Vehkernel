@@ -76,6 +76,7 @@ public:
     std::size_t write(std::span<const std::uint8_t> data) override
     {
         const std::size_t taken = std::min(space, data.size());
+        space -= taken;
         written.insert(written.end(), data.begin(), data.begin() + static_cast<std::ptrdiff_t>(taken));
         return taken;
     }
@@ -192,6 +193,17 @@ protected:
         queue.process();
     }
 
+    // Says hello and runs the Link until it has described every topic.
+    void connect()
+    {
+        host.send_hello();
+        const std::size_t topics = vk::link::schema_topics.size();
+        for (std::size_t run = 0; run < (topics + Link::paced_frames_per_run - 1) / Link::paced_frames_per_run; ++run) {
+            step();
+        }
+        host.receive();
+    }
+
     vk::core::WorkQueue queue{"wq:test", 1, &fake_clock};
     FakeTransport transport;
     Host host{transport};
@@ -221,11 +233,48 @@ TEST_F(LinkTest, AnswersHelloToThePeerItCameFrom)
     host.send_hello();
     step();
     EXPECT_TRUE(transport.peer_selected);
-    const auto frames = host.receive();
+    auto frames = host.receive();
     ASSERT_FALSE(frames.empty());
     EXPECT_EQ(frames.front().type, FrameType::HelloReply);
-    EXPECT_EQ(frames.size(), 1 + vk::link::schema_topics.size());
+    EXPECT_EQ(frames.size(), 1 + Link::paced_frames_per_run);  // the topic_info frames are paced
     EXPECT_EQ(link.link_stats().handshake_state, vk::link::HandshakeState::Connected);
+    while (frames.size() < 1 + vk::link::schema_topics.size()) {
+        step();
+        const auto more = host.receive();
+        frames.insert(frames.end(), more.begin(), more.end());
+    }
+    EXPECT_EQ(frames.size(), 1 + vk::link::schema_topics.size());
+}
+
+TEST_F(LinkTest, HandshakeThroughASmallTransmitBufferDropsNothing)
+{
+    // A topic due every run, and a transmit buffer that takes a few frames per run.
+    using Topic = Sample<7, 1>;
+    TopicStreamOf<Topic> stream(vk::link::every_sample);
+    const std::array<TopicStream*, 1> map{&stream};
+    Link link("link_test", transport, map, {}, queue);
+    link.start();
+    vk::core::Publication<Topic> publication;
+
+    host.send_hello();
+    std::vector<ReceivedFrame> frames;
+    for (int run = 0; run < 10; ++run) {
+        transport.space = 256;  // what the wire drained since the last run
+        publication.publish({.timestamp = fake_now, .value = 1});
+        step();
+        const auto more = host.receive();
+        frames.insert(frames.end(), more.begin(), more.end());
+    }
+    EXPECT_EQ(link.link_stats().drops, 0U);
+    EXPECT_EQ(host.stats().lost, 0U);
+
+    // hello_reply, every topic_info, and only then topic data.
+    ASSERT_GT(frames.size(), 1 + vk::link::schema_topics.size());
+    EXPECT_EQ(frames.front().type, FrameType::HelloReply);
+    for (std::size_t i = 1; i < frames.size(); ++i) {
+        const FrameType expected = i <= vk::link::schema_topics.size() ? FrameType::TopicInfo : FrameType::TopicData;
+        EXPECT_EQ(frames[i].type, expected) << i;
+    }
 }
 
 TEST_F(LinkTest, SendsEverySampleOfAQueuedTopicInOrder)
@@ -235,9 +284,7 @@ TEST_F(LinkTest, SendsEverySampleOfAQueuedTopicInOrder)
     const std::array<TopicStream*, 1> map{&stream};
     Link link("link_test", transport, map, {}, queue);
     link.start();
-    host.send_hello();
-    step();
-    host.receive();
+    connect();
 
     vk::core::Publication<Topic> publication;
     std::vector<std::uint32_t> received;
@@ -265,9 +312,7 @@ TEST_F(LinkTest, SendsALatestValueTopicAtMostAtItsRate)
     const std::array<TopicStream*, 1> map{&stream};
     Link link("link_test", transport, map, {}, queue);
     link.start();
-    host.send_hello();
-    step();
-    host.receive();
+    connect();
 
     // Published at 200 Hz for one second, sent at 10 Hz: the newest each time.
     vk::core::Publication<Topic> publication;
@@ -291,17 +336,16 @@ TEST_F(LinkTest, StopsSendingWhenThePeerFallsSilent)
     const std::array<TopicStream*, 1> map{&stream};
     Link link("link_test", transport, map, {.peer_timeout_us = 20'000}, queue);
     link.start();
-    host.send_hello();
-    step();
-    host.receive();
+    connect();
+    host.send_time_sync();  // heard in the first run below
 
     vk::core::Publication<Topic> publication;
     for (int i = 0; i < 10; ++i) {
         publication.publish({.timestamp = fake_now, .value = 7});
         step();
     }
-    // Sent until the timeout (20 ms, four runs), then nothing.
-    EXPECT_EQ(host.receive_values(Topic::topic_id).size(), 4U);
+    // Sent in the run the peer was heard and until the timeout (20 ms, four runs), then nothing.
+    EXPECT_EQ(host.receive_values(Topic::topic_id).size(), 5U);
     EXPECT_EQ(link.link_stats().handshake_state, vk::link::HandshakeState::PeerSilent);
 }
 
@@ -312,9 +356,7 @@ TEST_F(LinkTest, DropsAndCountsFramesTheTransportCannotTakeWithoutBlocking)
     const std::array<TopicStream*, 1> map{&stream};
     Link link("link_test", transport, map, {}, queue);
     link.start();
-    host.send_hello();
-    step();
-    host.receive();
+    connect();
 
     // The transport takes nothing: every frame is dropped, and the run returns.
     vk::core::Publication<Topic> publication;

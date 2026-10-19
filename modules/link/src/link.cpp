@@ -47,7 +47,7 @@ void Link::run()
         handshake_state_ = session_.handshake_done() ? HandshakeState::PeerSilent : HandshakeState::Waiting;
     }
     publish_status(now);
-    session_.send_pending(now, sink_, param_frames_per_run);
+    session_.send_pending(now, sink_, paced_frames_per_run);
     send_topics(now);
 }
 
@@ -92,7 +92,8 @@ void Link::receive(std::uint64_t now_us)
 
 void Link::send_topics(std::uint64_t now_us)
 {
-    if (handshake_state_ != HandshakeState::Connected) {
+    // Held back, not drained, until the host knows every topic.
+    if (handshake_state_ != HandshakeState::Connected || session_.describing()) {
         return;
     }
     std::array<std::uint8_t, max_message_size> message{};

@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -358,6 +359,14 @@ TEST(Session, HandshakeAcceptsThePeerOfferingItsVersionAndSendsTopicInfo)
     EXPECT_TRUE(session.connected(1000));
     EXPECT_EQ(session.version(), protocol_version);
 
+    // hello_reply at once; the topic_info frames are paced, one per frame allowed.
+    ASSERT_EQ(sink.sent.size(), 1U);
+    EXPECT_TRUE(session.describing());
+    session.send_pending(1000, sink, 1);
+    EXPECT_EQ(sink.sent.size(), 2U);
+    session.send_pending(1000, sink, 4);
+    EXPECT_FALSE(session.describing());
+
     // Expect 3 frames in sink: 1 HelloReply + 2 TopicInfo.
     ASSERT_EQ(sink.sent.size(), 3U);
 
@@ -484,9 +493,11 @@ TEST(Session, TopicDataGatedByHandshakeAndPeerTimeout)
     EXPECT_FALSE(session.send_topic(1, 0, sample, 100, sink));
     EXPECT_TRUE(sink.sent.empty());
 
-    // 2. Perform handshake at t = 100.
+    // 2. Perform handshake at t = 100; no topic data until every topic is described.
     std::array<std::uint8_t, 2> hello_body = {1, protocol_version};
     session.handle({.version = 1, .type = FrameType::Hello, .sequence = 0, .body = hello_body}, 100, sink);
+    EXPECT_FALSE(session.send_topic(1, 0, sample, 100, sink));
+    session.send_pending(100, sink, schema_topics.size());
     sink.sent.clear();
 
     // 3. Topic data succeeds while connected within timeout.
@@ -511,6 +522,95 @@ TEST(Session, TopicDataGatedByHandshakeAndPeerTimeout)
     EXPECT_TRUE(session.connected(2'000'000ULL));
     EXPECT_TRUE(session.send_topic(1, 0, sample, 2'500'000ULL, sink));
     EXPECT_EQ(sink.sent.size(), 1U);
+}
+
+// A transmit buffer of `capacity` bytes that the wire drains by `drain` bytes per run.
+class BufferedSink : public FrameSink {
+public:
+    BufferedSink(std::size_t capacity, std::size_t drain) : capacity_(capacity), drain_(drain) {}
+
+    bool send(std::span<const std::uint8_t> wire) override
+    {
+        if (capacity_ - held_ < wire.size()) {
+            ++drops;
+            return false;
+        }
+        held_ += wire.size();
+        sent.emplace_back(wire.begin(), wire.end());
+        return true;
+    }
+
+    void drain() { held_ -= std::min(held_, drain_); }
+
+    std::vector<std::vector<std::uint8_t>> sent;
+    std::uint32_t drops = 0;
+
+private:
+    std::size_t capacity_;
+    std::size_t drain_;
+    std::size_t held_ = 0;
+};
+
+TEST(Session, HandshakeOverASmallBufferDropsNothingAndDescribesTopicsBeforeTheirData)
+{
+    // Room for about four topic_info frames, and topic data due every run.
+    BufferedSink sink(256, 128);
+    Session session;
+    const std::array<std::uint8_t, 2> hello = {1, protocol_version};
+    const std::array<std::uint8_t, 32> sample{};
+    for (std::uint64_t now = 1000; now < 1000 + 20 * 5000; now += 5000) {
+        if (now == 1000) {
+            session.handle({.version = 1, .type = FrameType::Hello, .sequence = 0, .body = hello}, now, sink);
+        }
+        session.send_pending(now, sink, 4);
+        if (!session.describing()) {
+            session.send_topic(schema_topics[0].id, 0, sample, now, sink);
+        }
+        sink.drain();
+    }
+    EXPECT_EQ(sink.drops, 0U);
+
+    FrameReader reader;
+    std::vector<FrameType> types;
+    for (const auto& wire : sink.sent) {
+        reader.feed(wire, [&](const Frame& f) { types.push_back(f.type); });
+    }
+    ASSERT_GT(types.size(), 1 + schema_topics.size());
+    EXPECT_EQ(types.front(), FrameType::HelloReply);
+    for (std::size_t i = 1; i <= schema_topics.size(); ++i) {
+        EXPECT_EQ(types[i], FrameType::TopicInfo) << i;
+    }
+    EXPECT_EQ(std::count(types.begin(), types.end(), FrameType::TopicInfo),
+              static_cast<std::ptrdiff_t>(schema_topics.size()));
+    EXPECT_EQ(reader.stats().lost, 0U);
+}
+
+TEST(Session, ResendsATopicInfoTheSinkDroppedAndHoldsDataUntilEveryTopicIsDescribed)
+{
+    BufferedSink full(0, 0);
+    MockSink sink;
+    Session session;
+    const std::array<std::uint8_t, 2> hello = {1, protocol_version};
+    const std::array<std::uint8_t, 4> sample = {1, 2, 3, 4};
+    session.handle({.version = 1, .type = FrameType::Hello, .sequence = 0, .body = hello}, 1000, sink);
+    session.send_pending(1000, full, 4);  // dropped: the first topic waits
+    EXPECT_EQ(full.drops, 1U);
+    EXPECT_TRUE(session.describing());
+    EXPECT_FALSE(session.send_topic(schema_topics[0].id, 0, sample, 1000, sink));
+
+    session.send_pending(1000, sink, schema_topics.size());
+    EXPECT_FALSE(session.describing());
+    ASSERT_EQ(sink.sent.size(), 1 + schema_topics.size());
+    FrameReader reader;
+    std::vector<std::uint16_t> ids;
+    for (std::size_t i = 1; i < sink.sent.size(); ++i) {
+        reader.feed(sink.sent[i], [&](const Frame& f) { ids.push_back(BodyReader(f.body).u16()); });
+    }
+    ASSERT_EQ(ids.size(), schema_topics.size());
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+        EXPECT_EQ(ids[i], schema_topics[i].id) << i;
+    }
+    EXPECT_TRUE(session.send_topic(schema_topics[0].id, 0, sample, 1000, sink));
 }
 
 // --- Parameter access (protocol version 2, ADR-0012) ---

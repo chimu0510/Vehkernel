@@ -6,14 +6,18 @@
 // the MCU's protocol version and answers with hello_reply, carrying the
 // parameter set hash and count, then one topic_info frame per schema topic
 // with its ID, name and schema hash; the host compares the hashes with its
-// own schema. Topic data may flow only while the session is connected: after
-// a successful handshake and as long as the peer was heard within the
-// timeout. The host keeps the session alive with time sync requests.
+// own schema. The topic_info frames are paced by send_pending(), so a
+// handshake never asks the transport for more than a few frames at once.
+// Topic data may flow only while the session is connected, after a
+// successful handshake and as long as the peer was heard within the
+// timeout, and once every topic_info has gone out, so the host never sees
+// data for a topic it has not been told about. The host keeps the session
+// alive with time sync requests.
 //
 // Parameters (ADR-0012) are read and changed through the parameter runtime:
 // param_get and param_set are answered at once with param_value or
 // param_reject, and param_list_request starts a stream of param_value frames
-// that send_pending() paces.
+// that send_pending() paces after the topic_info frames.
 #pragma once
 
 #include <vk/core/parameter_storage.hpp>
@@ -92,13 +96,18 @@ public:
     // The negotiated protocol version, 0 before a successful handshake.
     [[nodiscard]] std::uint8_t version() const { return version_; }
 
-    // Sends one topic data frame; false if it did not fit, was dropped, or the session is not connected.
+    // Sends one topic data frame; false if it did not fit, was dropped, the
+    // session is not connected or topic_info frames are still to go out.
     bool send_topic(std::uint16_t topic_id, std::uint8_t instance, std::span<const std::uint8_t> message,
                     std::uint64_t now_us, FrameSink& sink);
 
-    // Sends up to `max_frames` frames of a parameter list in progress. A frame
-    // the sink drops is sent again on the next call.
+    // Sends up to `max_frames` frames of the handshake's topic_info frames,
+    // then of a parameter list in progress. A frame the sink drops is sent
+    // again on the next call.
     void send_pending(std::uint64_t now_us, FrameSink& sink, std::size_t max_frames);
+
+    // Whether topic_info frames of the handshake are still to be sent.
+    [[nodiscard]] bool describing() const { return info_next_ < topics_.size(); }
 
     // Whether a parameter list is still being sent.
     [[nodiscard]] bool listing() const { return list_next_ < parameter_count(); }
@@ -109,6 +118,7 @@ private:
     void on_hello(BodyReader body, FrameSink& sink);
     void on_time_sync(BodyReader body, std::uint64_t now_us, FrameSink& sink);
     void on_param_list(BodyReader body);
+    bool send_topic_info(const TopicDescription& topic, FrameSink& sink);
     void on_param_get(BodyReader body, FrameSink& sink);
     void on_param_set(BodyReader body, FrameSink& sink);
     bool send_param_value(std::size_t index, FrameSink& sink);
@@ -122,6 +132,8 @@ private:
     std::span<const TopicDescription> topics_;
     std::uint64_t peer_timeout_us_;
     ParameterAccess parameters_;
+    // Next topic to describe with topic_info; none at or past the topic count.
+    std::size_t info_next_ = std::numeric_limits<std::size_t>::max();
     // Next parameter of the list being sent; none at or past the count.
     std::size_t list_next_ = std::numeric_limits<std::size_t>::max();
     FrameWriter writer_;
