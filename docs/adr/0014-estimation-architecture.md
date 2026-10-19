@@ -2,7 +2,7 @@
 
 Estimation has two levels: replaceable estimator modules that can run side by side, and a math component library that depends on neither the bus nor the HAL. Algorithms can then be compared, back each other up, and be tested on the development host. The MCU does only local estimation (ADR-0001):
 
-- IMU processing: reading with the sampling method of ADR-0015 (per sample or batched FIFO), calibration, rotation by the mounting orientation from the board definition, filtering.
+- IMU processing: reading with the sampling method of ADR-0015 (per sample or batched FIFO), calibration, rotation by the mounting rotation from the board definition and then by the board orientation parameter, filtering. The mounting rotation is a hardware fact (ADR-0011); how the board sits in the vehicle is not, so it is a parameter. The IMU driver composes both at boot and applies them, so `imu_sample` is always in the body frame and no estimator rotates again. The board orientation is `SENS_BOARD_ROT`, `reboot_required`, numbered as ArduPilot's and PX4's rotation table.
 - Attitude estimation.
 - Local odometry: dead reckoning from body velocity measurements and the heading from attitude estimation. The heading comes from attitude estimation (gyro integration, fused with the magnetometer when enabled), never from the left/right wheel speed difference.
 

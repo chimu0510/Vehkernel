@@ -76,6 +76,14 @@ _Avoid_: V4.1
 The TOML file holding a board's hardware facts: pins, peripherals, board devices and Flash layout.
 _Avoid_: hwdef, board config
 
+**Mounting Rotation**:
+The rotation of a board device's axes relative to the board, a hardware fact declared in the board definition.
+_Avoid_: IMU orientation, sensor rotation
+
+**Board Orientation**:
+The rotation of the board relative to the vehicle's body frame, set by parameter for each installation.
+_Avoid_: board rotation, AHRS orientation
+
 **Alt Config**:
 An alternative use of a pin under a particular frame, declared in the board definition.
 _Avoid_: AF, pin mux
