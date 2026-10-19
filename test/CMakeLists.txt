@@ -1,10 +1,15 @@
 add_subdirectory(unit)
 
 # L3 SITL smoke test (ADR-0018): the IMU sample topic is published at the
-# configured 200 Hz, and no work item overruns.
+# configured 200 Hz, and no work item overruns. With the UDP Link, overruns
+# are judged over a check window after start-up, by the MCU's own timing.
+set(sitl_smoke_link_args)
+if(CONFIG_LINK_UDP)
+  set(sitl_smoke_link_args --msg-dir ${VK_MSG_PYTHON_DIR})
+endif()
 add_test(NAME sitl_smoke
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_report.py
-    $<TARGET_FILE:vehkernel-sitl> --duration 5 --expect-rate imu_sample:0=200)
+    $<TARGET_FILE:vehkernel-sitl> --duration 5 ${sitl_smoke_link_args} --expect-rate imu_sample:0=200)
 
 # L3 SITL Link test (spec 0003): the Link monitor connects to SITL over UDP,
 # the handshake succeeds, imu_sample arrives at 200 Hz and no frame is lost.
