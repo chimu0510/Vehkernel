@@ -101,7 +101,8 @@ config LINK
 	default y
 	help
 	  The custom protocol of ADR-0002: COBS and CRC16 framing, handshake
-	  with schema hashes, and time synchronization.
+	  with schema hashes, time synchronization, and parameter access
+	  (ADR-0012).
 
 config LINK_SERIAL
 	bool "Link on a board serial port"

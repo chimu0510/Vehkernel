@@ -28,6 +28,7 @@
 #include <vk/hal/transport.hpp>
 #include <vk/link/link.hpp>
 #include <vk/link/topic_map.hpp>
+#include <vk/params/params.hpp>
 #endif
 #ifdef CONFIG_LINK_UDP
 #include <vk/platform/udp_transport.hpp>
@@ -173,7 +174,9 @@ bool start_link(const Options& options)
     }
     // Tools wait for this line, so it leaves at once.
     std::fflush(stdout);
-    host_link.emplace("link0", *transport, vk::link::default_topic_map(), vk::link::Link::Config{},
+    host_link.emplace("link0", *transport, vk::link::default_topic_map(),
+                      vk::link::Link::Config{.parameters = {.parameters = &vk::params::parameters(),
+                                                            .set_hash = vk::params::set_hash}},
                       vk::core::work_queue(vk::core::WorkQueueTier::Io));
     host_link->start();
     return true;

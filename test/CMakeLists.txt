@@ -38,6 +38,15 @@ if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_LINK_UDP)
   endforeach()
 endif()
 
+# L3 SITL parameter test (spec 0005): list, read, set and refusals through the
+# Link monitor's param command, and a gain changed while the estimator runs.
+if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_LINK_UDP)
+  add_test(NAME sitl_params
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_params.py
+      $<TARGET_FILE:vehkernel-sitl> ${CMAKE_SOURCE_DIR}/tools/link/link_monitor.py
+      --msg-dir ${VK_MSG_PYTHON_DIR} --param-meta ${VK_PARAM_METADATA})
+endif()
+
 # Kconfig smoke test (ADR-0017): a debug overlay that sets an option whose
 # dependencies are not met must fail configuration.
 add_test(NAME kconfig_overlay_smoke

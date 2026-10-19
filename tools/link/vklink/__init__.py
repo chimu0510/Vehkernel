@@ -16,8 +16,13 @@ from .frame import (
     ReaderStats,
 )
 from .session import (
+    REJECT_REASONS,
     HostSession,
+    McuParam,
     McuSession,
+    ParamReject,
+    ParamType,
+    ParamValue,
     TimeSyncResult,
     TopicDescription,
 )
@@ -42,4 +47,9 @@ __all__ = [
     "TimeSyncResult",
     "HostSession",
     "McuSession",
+    "McuParam",
+    "ParamType",
+    "ParamValue",
+    "ParamReject",
+    "REJECT_REASONS",
 ]

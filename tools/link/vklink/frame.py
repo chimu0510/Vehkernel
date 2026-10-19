@@ -11,7 +11,8 @@ from dataclasses import dataclass
 from .cobs import cobs_decode, cobs_encode, cobs_max_encoded_size
 from .crc16 import crc16
 
-PROTOCOL_VERSION = 1
+# Version 2 added parameter access (ADR-0012); the MCU offers only its current version.
+PROTOCOL_VERSION = 2
 
 HEADER_SIZE = 4
 CRC_SIZE = 2
@@ -28,6 +29,11 @@ class FrameType(enum.IntEnum):
     TOPIC_INFO = 0x12
     TIME_SYNC_REQUEST = 0x20
     TIME_SYNC_REPLY = 0x21
+    PARAM_LIST_REQUEST = 0x30
+    PARAM_GET = 0x31
+    PARAM_SET = 0x32
+    PARAM_VALUE = 0x33
+    PARAM_REJECT = 0x34
 
 
 @dataclass(frozen=True)

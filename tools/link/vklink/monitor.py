@@ -2,12 +2,15 @@
 
 Connects to a Link, performs the handshake and time synchronization, decodes
 every topic with the Python module generated from the schema, and keeps each
-topic instance's rate and latest values.
+topic instance's rate and latest values. It also lists, reads and sets
+parameters (spec 0005), described by the metadata file the parameter
+generator writes into the build tree.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import json
 import math
 import os
 import select
@@ -21,7 +24,7 @@ from types import ModuleType
 from typing import Callable, Protocol
 
 from .frame import Frame, FrameReader, FrameType
-from .session import HostSession, TimeSyncResult
+from .session import HostSession, ParamReject, ParamType, ParamValue, TimeSyncResult
 
 
 class Connection(Protocol):
@@ -116,6 +119,57 @@ def load_messages(directory: str | Path) -> ModuleType:
     return module
 
 
+@dataclass(frozen=True)
+class ParamMetadata:
+    """The parameter generator's metadata file (ADR-0012)."""
+
+    set_hash: int
+    by_name: dict[str, dict]
+
+
+def load_param_metadata(path: str | Path) -> ParamMetadata:
+    document = json.loads(Path(path).read_text(encoding="utf-8"))
+    return ParamMetadata(int(document["set_hash"], 16), {p["name"]: p for p in document["parameters"]})
+
+
+def parse_param_text(text: str, param_type: int, meta: dict | None) -> int | float:
+    """A value typed by a user: an enum value name, or a number of the parameter's type."""
+    for value in (meta or {}).get("values", []):
+        if value["name"] == text:
+            return value["value"]
+    if param_type == ParamType.FLOAT:
+        return float(text)
+    try:
+        return int(text, 0)
+    except ValueError:
+        names = ", ".join(v["name"] for v in (meta or {}).get("values", []))
+        raise ValueError(f"expected an integer{' or one of ' + names if names else ''}, got '{text}'") from None
+
+
+def format_number(value: int | float) -> str:
+    return f"{value:.7g}" if isinstance(value, float) else str(value)
+
+
+def format_param(param: ParamValue, meta: dict | None) -> str:
+    """One parameter as a space-separated key=value line; the description, quoted, comes last."""
+    line = f"param name={param.name} value={format_number(param.value)}"
+    names = {v["value"]: v["name"] for v in (meta or {}).get("values", [])}
+    if param.value in names:
+        line += f" value_name={names[param.value]}"
+    line += f" type={ParamType(param.type).name if param.type in (1, 2) else param.type}"
+    if meta is not None:
+        if meta.get("unit"):
+            line += f" unit={meta['unit']}"
+        line += f" default={format_number(meta['default'])} min={format_number(meta['min'])} " \
+                f"max={format_number(meta['max'])}"
+        if meta.get("reboot_required"):
+            line += " reboot_required=1"
+        if meta.get("locked_when_armed"):
+            line += " locked_when_armed=1"
+        line += f" description={json.dumps(meta['description'])}"
+    return line
+
+
 @dataclass
 class TopicStats:
     """What arrived of one topic instance."""
@@ -196,6 +250,9 @@ class LinkMonitor:
         # Called with (topic name, instance, message) for every decoded message.
         self.listeners: list[Callable[[str, int, object], None]] = []
         self._next_time_sync = 0.0
+        # Parameter replies, as they arrive.
+        self.params: dict[str, ParamValue] = {}
+        self.param_rejects: list[ParamReject] = []
 
     @property
     def connected(self) -> bool:
@@ -244,6 +301,14 @@ class LinkMonitor:
             self._on_topic_data(frame.body)
         elif frame.type == FrameType.TIME_SYNC_REPLY:
             self.time_sync = HostSession.parse_time_sync(frame, int(self.clock() * 1e6))
+        elif frame.type == FrameType.PARAM_VALUE:
+            value = ParamValue.parse(frame.body)
+            if value is not None:
+                self.params[value.name] = value
+        elif frame.type == FrameType.PARAM_REJECT:
+            reject = ParamReject.parse(frame.body)
+            if reject is not None:
+                self.param_rejects.append(reject)
         else:
             self.session.handle_frame(frame)
 
@@ -267,6 +332,58 @@ class LinkMonitor:
             for listener in self.listeners:
                 listener(peer.name, instance, message)
 
+    REQUEST_INTERVAL_S = 0.5
+
+    def list_params(self, timeout_s: float) -> list[ParamValue] | None:
+        """Every parameter of the MCU, by index; None when some did not arrive in time.
+
+        Asks again from the first missing index, so a frame lost on the way
+        costs a retry, not the list.
+        """
+        count = self.session.param_count
+        deadline = self.clock() + timeout_s
+        next_request = 0.0
+        while True:
+            by_index = {p.index: p for p in self.params.values() if p.count == count}
+            missing = [i for i in range(count) if i not in by_index]
+            if not missing:
+                return [by_index[i] for i in range(count)]
+            now = self.clock()
+            if now >= deadline:
+                return None
+            if now >= next_request:
+                self.connection.send(self.session.make_param_list_request(missing[0]))
+                next_request = now + self.REQUEST_INTERVAL_S
+            self.poll(min(0.05, deadline - now))
+
+    def _await_param(self, name: str, request: Callable[[], bytes], timeout_s: float) -> ParamValue | ParamReject | None:
+        self.params.pop(name, None)
+        rejects = len(self.param_rejects)
+        deadline = self.clock() + timeout_s
+        next_request = 0.0
+        while True:
+            if name in self.params:
+                return self.params[name]
+            for reject in self.param_rejects[rejects:]:
+                if reject.name == name:
+                    return reject
+            now = self.clock()
+            if now >= deadline:
+                return None
+            if now >= next_request:
+                self.connection.send(request())
+                next_request = now + self.REQUEST_INTERVAL_S
+            self.poll(min(0.05, deadline - now))
+
+    def get_param(self, name: str, timeout_s: float) -> ParamValue | ParamReject | None:
+        """A parameter's value, the MCU's refusal, or None when nothing came back in time."""
+        return self._await_param(name, lambda: self.session.make_param_get(name), timeout_s)
+
+    def set_param(self, name: str, param_type: ParamType, value: int | float,
+                  timeout_s: float) -> ParamValue | ParamReject | None:
+        """Changes a parameter; the reply holds the value now in effect, or why it was refused."""
+        return self._await_param(name, lambda: self.session.make_param_set(name, param_type, value), timeout_s)
+
     def latest(self, name: str) -> list[tuple[int, object]]:
         """The latest message of every instance of a topic that arrived, by instance."""
         return [
@@ -280,7 +397,8 @@ class LinkMonitor:
         stats = self.reader.stats
         link = (
             f"link handshake={'ok' if self.connected else 'failed'} version={self.session.version} "
-            f"mismatches={len(self.session.mismatched_topics)} frames={stats.frames} "
+            f"mismatches={len(self.session.mismatched_topics)} params={self.session.param_count} "
+            f"param_set_hash=0x{self.session.param_set_hash:016X} frames={stats.frames} "
             f"crc_errors={stats.crc_errors} malformed={stats.malformed} lost={stats.lost}"
         )
         if self.time_sync is not None:

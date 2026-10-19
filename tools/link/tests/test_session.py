@@ -47,7 +47,7 @@ def test_handshake_picks_highest_shared_version():
 
 def test_handshake_refuses_incompatible_peer():
     mcu = McuSession()
-    host = HostSession(supported_versions=[2, 3])  # MCU only supports 1
+    host = HostSession(supported_versions=[1])  # before parameter access; the MCU offers only its version
 
     hello_wire = host.make_hello()
     mcu_frames = FrameReader().feed(hello_wire)

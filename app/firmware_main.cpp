@@ -12,6 +12,7 @@
 #include <vk/hal/uart.hpp>
 #include <vk/link/link.hpp>
 #include <vk/link/topic_map.hpp>
+#include <vk/params/params.hpp>
 #include <vk/platform/dma_uart.hpp>
 #endif
 
@@ -80,7 +81,9 @@ void start_link()
         vk::core::fail("the Link's baud rate is out of the USART's reach");
     }
     link_transport.emplace(link_uart);
-    serial_link.emplace("link0", *link_transport, vk::link::default_topic_map(), vk::link::Link::Config{},
+    serial_link.emplace("link0", *link_transport, vk::link::default_topic_map(),
+                        vk::link::Link::Config{.parameters = {.parameters = &vk::params::parameters(),
+                                                              .set_hash = vk::params::set_hash}},
                         vk::core::work_queue(vk::core::WorkQueueTier::Io));
     serial_link->start();
 }

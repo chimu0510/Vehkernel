@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""L3 SITL parameter test (ADR-0018, spec 0005): parameters over the Link.
+
+First, with SITL at rest, the Link monitor's param command lists every
+parameter with its metadata and a matching parameter set hash, reads and sets
+one, and is refused, with the reason, a value out of range and an unknown
+name. Then, with SITL under the shake profile and the accelerometer rejection
+turned off through ATT_ACC_REJ, the estimate follows the linear acceleration
+bursts barely at a small ATT_KP and far at a large one set in between: the
+gain reaches the running filter.
+
+    check_params.py build/test/app/vehkernel-sitl tools/link/link_monitor.py \\
+        --msg-dir build/test/generated/schema/python --param-meta build/test/generated/params/params.json
+"""
+
+from __future__ import annotations
+
+import argparse
+import bisect
+import subprocess
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "tools" / "link"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from check_attitude import free_udp_port, from_rotation_vector, multiply, tilt_between  # noqa: E402
+from vklink.monitor import LinkMonitor, UdpConnection, load_messages, load_param_metadata, work_item_name  # noqa: E402
+from vklink.session import ParamType, ParamValue  # noqa: E402
+
+HANDSHAKE_S = 4.0
+# The shake profile's bursts: 0.5 s every 1.5 s from 3 s to 10 s after boot.
+SMALL_GAIN_WINDOW_S = (3.0, 5.5)
+LARGE_GAIN_AT_S = 5.6
+LARGE_GAIN_WINDOW_S = (6.0, 10.0)
+SMALL_KP, LARGE_KP = 0.2, 8.0
+
+
+def param_cli(args, address: str, *command: str) -> subprocess.CompletedProcess:
+    result = subprocess.run(
+        [sys.executable, args.monitor, "--udp", address, "--msg-dir", args.msg_dir, "--param-meta", args.param_meta,
+         "--handshake-timeout", str(HANDSHAKE_S), "param", *command],
+        capture_output=True, text=True, timeout=30, check=False)
+    # Quoted, so the refusals the check expects do not read as its own failures.
+    print(f"$ param {' '.join(command)}  (exit {result.returncode})")
+    for line in (result.stdout + result.stderr).splitlines():
+        print(f"| {line}")
+    return result
+
+
+def check_cli(args) -> list[str]:
+    """The param command against SITL at rest."""
+    failures = []
+    address = f"127.0.0.1:{free_udp_port()}"
+    sitl = subprocess.Popen([args.sitl, "--duration", "0", "--udp", address],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    print(sitl.stdout.readline(), end="")  # the link line
+    try:
+        metadata = load_param_metadata(args.param_meta)
+        listed = param_cli(args, address, "list")
+        names = [line.split()[1].removeprefix("name=") for line in listed.stdout.splitlines()]
+        if listed.returncode != 0 or names != sorted(metadata.by_name):
+            failures.append(f"param list returned {names}, expected {sorted(metadata.by_name)}")
+        if "warning" in listed.stderr:
+            failures.append("the parameter set hash does not match the build's metadata")
+        if not all("description=" in line for line in listed.stdout.splitlines()):
+            failures.append("param list shows parameters without their metadata")
+
+        got = param_cli(args, address, "get", "ATT_KP")
+        if got.returncode != 0 or " value=1 " not in got.stdout:
+            failures.append("param get ATT_KP did not return the default 1")
+        changed = param_cli(args, address, "set", "ATT_KP", "2.5")
+        if changed.returncode != 0 or " value=2.5 " not in changed.stdout:
+            failures.append("param set ATT_KP 2.5 did not take")
+        got = param_cli(args, address, "get", "ATT_KP")
+        if " value=2.5 " not in got.stdout:
+            failures.append("param get ATT_KP did not return the new value 2.5")
+
+        for command, reason in ((("set", "ATT_KP", "50"), "out of range"), (("set", "ATT_NONE", "1"), "unknown name"),
+                                (("get", "ATT_NONE"), "unknown name")):
+            refused = param_cli(args, address, *command)
+            if refused.returncode != 1 or f"rejected: {reason}" not in refused.stderr:
+                failures.append(f"param {' '.join(command)} was not refused as {reason}")
+    finally:
+        sitl.terminate()
+        sitl.communicate(timeout=30)
+    return failures
+
+
+def check_gain(args) -> list[str]:
+    """ATT_KP changed while the estimator runs under the shake profile."""
+    failures = []
+    port = free_udp_port()
+    sitl = subprocess.Popen([args.sitl, "--duration", "14", "--udp", f"127.0.0.1:{port}", "--motion", "shake"],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    print(sitl.stdout.readline(), end="")
+
+    truth_times: list[int] = []
+    truths: list[tuple] = []
+    estimates: list[tuple[int, tuple]] = []
+    # Overruns per work item, first and last seen: only those during the check count,
+    # since SITL shares the host and start-up stalls say nothing about parameters.
+    overruns: dict[str, list[int]] = {}
+
+    def record(name: str, instance: int, message) -> None:
+        if name == "work_item_status":
+            seen = overruns.setdefault(work_item_name(message), [message.overruns, message.overruns])
+            seen[1] = message.overruns
+            return
+        if instance != 0:
+            return
+        if name == "vehicle_attitude_groundtruth":
+            truth_times.append(message.timestamp)
+            truths.append((tuple(message.q), tuple(message.angular_velocity)))
+        elif name == "vehicle_attitude":
+            estimates.append((message.timestamp_sample, tuple(message.q)))
+
+    def run_until(t_s: float) -> None:
+        while not truth_times or truth_times[-1] < t_s * 1e6:
+            monitor.poll(0.05)
+
+    def set_float(name: str, value: float) -> None:
+        reply = monitor.set_param(name, ParamType.FLOAT, value, 3.0)
+        if not isinstance(reply, ParamValue):
+            failures.append(f"setting {name} to {value:g} failed: {reply}")
+
+    connection = UdpConnection("127.0.0.1", port)
+    monitor = LinkMonitor(connection, load_messages(args.msg_dir))
+    monitor.listeners.append(record)
+    try:
+        if not monitor.handshake(HANDSHAKE_S):
+            failures.append("no handshake with SITL")
+        else:
+            set_float("ATT_ACC_REJ", 1.0)  # the bursts no longer count as acceleration
+            set_float("ATT_KP", SMALL_KP)
+            run_until(LARGE_GAIN_AT_S)
+            set_float("ATT_KP", LARGE_KP)
+            run_until(LARGE_GAIN_WINDOW_S[1])
+    finally:
+        connection.close()
+    _, errors = sitl.communicate(timeout=60)
+    if sitl.returncode != 0:
+        failures.append(f"vehkernel-sitl exited with {sitl.returncode}\n{errors}")
+
+    def worst_tilt(window: tuple[float, float]) -> tuple[float, int]:
+        worst, compared = 0.0, 0
+        for timestamp, estimate in estimates:
+            if not window[0] * 1e6 <= timestamp < window[1] * 1e6:
+                continue
+            i = bisect.bisect_left(truth_times, timestamp)
+            candidates = [j for j in (i - 1, i) if 0 <= j < len(truths)]
+            if not candidates:
+                continue
+            j = min(candidates, key=lambda k: abs(truth_times[k] - timestamp))
+            q, rate = truths[j]
+            dt = (timestamp - truth_times[j]) * 1e-6
+            truth = multiply(q, from_rotation_vector(tuple(r * dt for r in rate)))
+            worst = max(worst, tilt_between(truth, estimate))
+            compared += 1
+        return worst, compared
+
+    small, small_count = worst_tilt(SMALL_GAIN_WINDOW_S)
+    large, large_count = worst_tilt(LARGE_GAIN_WINDOW_S)
+    print(f"gain_check small_kp={SMALL_KP:g} max_tilt_deg={small:.2f} estimates={small_count} "
+          f"large_kp={LARGE_KP:g} max_tilt_deg={large:.2f} estimates={large_count}")
+    if min(small_count, large_count) < 100:
+        failures.append("too few estimates to compare with the truth")
+    elif not (large > 2 * small and large > 5.0):
+        failures.append(f"ATT_KP {LARGE_KP:g} tilted the estimate {large:.2f} deg, not clearly more than "
+                        f"{small:.2f} deg at ATT_KP {SMALL_KP:g}")
+    if not overruns:
+        failures.append("the Link carried no work item timing")
+    for name, (first, last) in sorted(overruns.items()):
+        if last != first:
+            failures.append(f"work item {name} overran {last - first} times during the check")
+    return failures
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("sitl", help="the vehkernel-sitl executable")
+    parser.add_argument("monitor", help="tools/link/link_monitor.py")
+    parser.add_argument("--msg-dir", required=True, help="directory of the generated vkmsg.py")
+    parser.add_argument("--param-meta", required=True, help="the build's parameter metadata file")
+    args = parser.parse_args()
+
+    failures = check_cli(args) + check_gain(args)
+    for failure in failures:
+        print(f"FAIL: {failure}", file=sys.stderr)
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -9,10 +9,19 @@
 //
 //   topic_data          u16 topic ID, u8 instance, encoded message
 //   hello               u8 count, u8 protocol versions[count]
-//   hello_reply         u8 chosen version (0: no shared version), u16 topic count
+//   hello_reply         u8 chosen version (0: no shared version), u16 topic count,
+//                       u64 parameter set hash, u16 parameter count
 //   topic_info          u16 topic ID, u8 instances, u64 schema hash, u8 name length, name
 //   time_sync_request   u64 host send time (opaque to the MCU)
 //   time_sync_reply     u64 host send time, u64 MCU receive time [us], u64 MCU send time [us]
+//   param_list_request  u16 first index
+//   param_get           u8 name length, name
+//   param_set           u8 name length, name, u8 type, u32 value
+//   param_value         u16 index, u16 count, u8 type, u32 value, u8 flags, u8 name length, name
+//   param_reject        u8 reason, u8 name length, name
+//
+// Parameter values travel as their 32 bits with the type: 1 int32, 2 float32
+// (ADR-0012). Reject reasons are those of vk::core::ParamResult.
 #pragma once
 
 #include <vk/link/cobs.hpp>
@@ -25,8 +34,9 @@
 
 namespace vk::link {
 
-// Frame layout version; peers negotiate it with hello (ADR-0002).
-inline constexpr std::uint8_t protocol_version = 1;
+// Protocol version; peers negotiate it with hello (ADR-0002). Version 2 added
+// parameter access; the MCU offers only the current version.
+inline constexpr std::uint8_t protocol_version = 2;
 
 enum class FrameType : std::uint8_t {
     TopicData = 0x01,
@@ -35,6 +45,11 @@ enum class FrameType : std::uint8_t {
     TopicInfo = 0x12,
     TimeSyncRequest = 0x20,
     TimeSyncReply = 0x21,
+    ParamListRequest = 0x30,
+    ParamGet = 0x31,
+    ParamSet = 0x32,
+    ParamValue = 0x33,
+    ParamReject = 0x34,
 };
 
 constexpr std::optional<FrameType> to_frame_type(std::uint8_t raw)
@@ -52,6 +67,16 @@ constexpr std::optional<FrameType> to_frame_type(std::uint8_t raw)
         return FrameType::TimeSyncRequest;
     case static_cast<std::uint8_t>(FrameType::TimeSyncReply):
         return FrameType::TimeSyncReply;
+    case static_cast<std::uint8_t>(FrameType::ParamListRequest):
+        return FrameType::ParamListRequest;
+    case static_cast<std::uint8_t>(FrameType::ParamGet):
+        return FrameType::ParamGet;
+    case static_cast<std::uint8_t>(FrameType::ParamSet):
+        return FrameType::ParamSet;
+    case static_cast<std::uint8_t>(FrameType::ParamValue):
+        return FrameType::ParamValue;
+    case static_cast<std::uint8_t>(FrameType::ParamReject):
+        return FrameType::ParamReject;
     default:
         return std::nullopt;
     }
@@ -146,6 +171,7 @@ public:
 
     void u8(std::uint8_t value) { put(value, 1); }
     void u16(std::uint16_t value) { put(value, 2); }
+    void u32(std::uint32_t value) { put(value, 4); }
     void u64(std::uint64_t value) { put(value, 8); }
     void bytes(std::span<const std::uint8_t> data);
 
@@ -167,6 +193,7 @@ public:
 
     std::uint8_t u8() { return static_cast<std::uint8_t>(get(1)); }
     std::uint16_t u16() { return static_cast<std::uint16_t>(get(2)); }
+    std::uint32_t u32() { return static_cast<std::uint32_t>(get(4)); }
     std::uint64_t u64() { return get(8); }
     std::span<const std::uint8_t> bytes(std::size_t size);
     std::span<const std::uint8_t> rest();

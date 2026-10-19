@@ -3,10 +3,88 @@
 Implements both Host-side Link session and MCU-side Link session for tools and tests.
 """
 
+import enum
 import struct
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .frame import PROTOCOL_VERSION, Frame, FrameType, FrameWriter
+
+
+class ParamType(enum.IntEnum):
+    """Parameter types on the wire (ADR-0012)."""
+
+    INT32 = 1
+    FLOAT = 2
+
+
+# Why the MCU refused a parameter request; vk::core::ParamResult.
+REJECT_REASONS = {
+    1: "unknown name",
+    2: "wrong type",
+    3: "out of range",
+    4: "locked while armed",
+}
+
+
+def encode_param(param_type: ParamType, value: int | float) -> int:
+    """The 32 bits of a value as the MCU stores it."""
+    if param_type == ParamType.FLOAT:
+        return struct.unpack("<I", struct.pack("<f", value))[0]
+    return struct.unpack("<I", struct.pack("<i", int(value)))[0]
+
+
+def decode_param(param_type: int, bits: int) -> int | float:
+    if param_type == ParamType.FLOAT:
+        return struct.unpack("<f", struct.pack("<I", bits))[0]
+    return struct.unpack("<i", struct.pack("<I", bits))[0]
+
+
+@dataclass(frozen=True)
+class ParamValue:
+    """A param_value frame: one parameter's current value."""
+
+    index: int
+    count: int
+    type: int
+    bits: int
+    flags: int
+    name: str
+
+    @property
+    def value(self) -> int | float:
+        return decode_param(self.type, self.bits)
+
+    @classmethod
+    def parse(cls, body: bytes) -> "ParamValue | None":
+        if len(body) < 11:
+            return None
+        index, count, param_type, bits, flags, name_len = struct.unpack("<HHBIBB", body[:11])
+        if len(body) < 11 + name_len:
+            return None
+        return cls(index, count, param_type, bits, flags, body[11:11 + name_len].decode("ascii", errors="replace"))
+
+
+@dataclass(frozen=True)
+class ParamReject:
+    """A param_reject frame: the MCU refused a request about one parameter."""
+
+    reason: int
+    name: str
+
+    @property
+    def reason_text(self) -> str:
+        return REJECT_REASONS.get(self.reason, f"reason {self.reason}")
+
+    @classmethod
+    def parse(cls, body: bytes) -> "ParamReject | None":
+        if len(body) < 2 or len(body) < 2 + body[1]:
+            return None
+        return cls(body[0], body[2:2 + body[1]].decode("ascii", errors="replace"))
+
+
+def _name(name: str) -> bytes:
+    raw = name.encode("ascii")
+    return struct.pack("<B", len(raw)) + raw
 
 
 @dataclass(frozen=True)
@@ -47,6 +125,8 @@ class HostSession:
         self.peer_topics: dict[int, TopicDescription] = {}
         self.peer_topics_by_name: dict[str, TopicDescription] = {}
         self.mismatched_topics: list[str] = []
+        self.param_set_hash = 0
+        self.param_count = 0
 
     def make_hello(self) -> bytes:
         """Encodes a Hello wire frame proposing supported protocol versions."""
@@ -60,18 +140,30 @@ class HostSession:
         body = struct.pack("<Q", host_send_time_us)
         return self.writer.write(FrameType.TIME_SYNC_REQUEST, body)
 
+    def make_param_list_request(self, first: int = 0) -> bytes:
+        """Asks for every parameter from index `first` on, as param_value frames."""
+        return self.writer.write(FrameType.PARAM_LIST_REQUEST, struct.pack("<H", first))
+
+    def make_param_get(self, name: str) -> bytes:
+        return self.writer.write(FrameType.PARAM_GET, _name(name))
+
+    def make_param_set(self, name: str, param_type: ParamType, value: int | float) -> bytes:
+        body = _name(name) + struct.pack("<BI", int(param_type), encode_param(param_type, value))
+        return self.writer.write(FrameType.PARAM_SET, body)
+
     def handle_frame(self, frame: Frame) -> None:
         """Consumes one frame received from the MCU."""
         if frame.type == FrameType.HELLO_REPLY:
             if len(frame.body) < 3:
                 return
             chosen, topic_count = struct.unpack("<BH", frame.body[:3])
-            if chosen == 0 or chosen not in self.supported_versions:
+            if chosen == 0 or chosen not in self.supported_versions or len(frame.body) < 13:
                 self.handshake_done = False
                 self.version = 0
                 return
             self.version = chosen
             self.expected_topic_count = topic_count
+            self.param_set_hash, self.param_count = struct.unpack("<QH", frame.body[3:13])
             self.peer_topics.clear()
             self.peer_topics_by_name.clear()
             self.mismatched_topics.clear()
@@ -115,10 +207,22 @@ class HostSession:
         )
 
 
+@dataclass
+class McuParam:
+    """A parameter a McuSession offers: an int32 or float range check, as the MCU does."""
+
+    name: str
+    type: ParamType
+    value: int | float
+    minimum: int | float
+    maximum: int | float
+
+
 class McuSession:
     """MCU side of a Link session (ADR-0002).
 
-    Mirrors vk::link::Session in C++.
+    Mirrors vk::link::Session in C++, parameters included, except that a
+    parameter list is answered at once rather than paced.
     """
 
     DEFAULT_PEER_TIMEOUT_US = 3_000_000
@@ -127,8 +231,12 @@ class McuSession:
         self,
         topics: list[TopicDescription] | None = None,
         peer_timeout_us: int = DEFAULT_PEER_TIMEOUT_US,
+        param_set_hash: int = 0,
+        params: list[McuParam] | None = None,
     ):
         self.topics = topics or []
+        self.param_set_hash = param_set_hash
+        self.params = sorted(params or [], key=lambda p: p.name)
         self.peer_timeout_us = peer_timeout_us
         self.writer = FrameWriter()
         self.version = 0
@@ -150,6 +258,11 @@ class McuSession:
         self.last_heard_us = now_us
         if frame.type == FrameType.TIME_SYNC_REQUEST:
             return self._on_time_sync(frame.body, now_us)
+        if frame.type == FrameType.PARAM_LIST_REQUEST and len(frame.body) >= 2:
+            first = struct.unpack("<H", frame.body[:2])[0]
+            return [self._param_value(i) for i in range(first, len(self.params))]
+        if frame.type in (FrameType.PARAM_GET, FrameType.PARAM_SET) and frame.body:
+            return [self._on_param(frame)]
         return []
 
     def connected(self, now_us: int) -> bool:
@@ -172,16 +285,15 @@ class McuSession:
             return []
         count = body[0]
         offered_versions = body[1 : 1 + count]
-        chosen = 0
-        for offered in offered_versions:
-            if offered <= PROTOCOL_VERSION:
-                chosen = max(chosen, offered)
+        chosen = PROTOCOL_VERSION if PROTOCOL_VERSION in offered_versions else 0
 
         self.version = chosen
         self.handshake_done = chosen != 0
 
         out = []
-        reply_body = struct.pack("<BH", chosen, len(self.topics) if self.handshake_done else 0)
+        reply_body = struct.pack("<BHQH", chosen, len(self.topics) if self.handshake_done else 0,
+                                 self.param_set_hash if self.handshake_done else 0,
+                                 len(self.params) if self.handshake_done else 0)
         out.append(self.writer.write(FrameType.HELLO_REPLY, reply_body))
         self.frames_sent += 1
 
@@ -206,3 +318,31 @@ class McuSession:
         wire = self.writer.write(FrameType.TIME_SYNC_REPLY, reply_body)
         self.frames_sent += 1
         return [wire]
+
+    def _param_value(self, index: int) -> bytes:
+        param = self.params[index]
+        body = struct.pack("<HHBIB", index, len(self.params), int(param.type),
+                           encode_param(param.type, param.value), 0) + _name(param.name)
+        self.frames_sent += 1
+        return self.writer.write(FrameType.PARAM_VALUE, body)
+
+    def _reject(self, reason: int, name: str) -> bytes:
+        self.frames_sent += 1
+        return self.writer.write(FrameType.PARAM_REJECT, struct.pack("<B", reason) + _name(name))
+
+    def _on_param(self, frame: Frame) -> bytes:
+        name = frame.body[1:1 + frame.body[0]].decode("ascii", errors="replace")
+        index = next((i for i, p in enumerate(self.params) if p.name == name), None)
+        if index is None:
+            return self._reject(1, name)
+        if frame.type == FrameType.PARAM_SET:
+            rest = frame.body[1 + frame.body[0]:]
+            param_type, bits = struct.unpack("<BI", rest[:5])
+            param = self.params[index]
+            if param_type != param.type:
+                return self._reject(2, name)
+            value = decode_param(param_type, bits)
+            if not param.minimum <= value <= param.maximum:
+                return self._reject(3, name)
+            param.value = value
+        return self._param_value(index)

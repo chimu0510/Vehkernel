@@ -11,9 +11,16 @@ summary lines once a second when the output is not a terminal). With
 non-zero when the handshake fails, a schema hash differs, frames are lost or
 an expected rate is not met.
 
+The param command lists, reads or sets parameters (spec 0005) instead,
+describing them from the metadata file the parameter generator writes into
+the build tree. It warns when that metadata does not match the MCU's
+parameter set hash, and exits non-zero when the MCU refuses a request.
+
     link_monitor.py --udp 127.0.0.1:15600
     link_monitor.py --serial /dev/ttyACM0
     link_monitor.py --udp 127.0.0.1:15600 --check --duration 5 --expect-rate imu_sample:0=200
+    link_monitor.py --udp 127.0.0.1:15600 param list
+    link_monitor.py --udp 127.0.0.1:15600 param set ATT_KP 2.5
 """
 
 from __future__ import annotations
@@ -28,12 +35,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from vklink.monitor import (  # noqa: E402
     LinkMonitor,
+    ParamMetadata,
     RateExpectation,
     SerialConnection,
     UdpConnection,
     check,
+    format_param,
     load_messages,
+    load_param_metadata,
+    parse_param_text,
 )
+from vklink.session import ParamReject, ParamType, ParamValue  # noqa: E402
 from vklink.view import render  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -41,6 +53,9 @@ REFRESH_S = 0.5
 # ANSI: cursor home, clear the screen.
 CLEAR = "\x1b[H\x1b[2J"
 DEFAULT_MSG_DIR = REPO_ROOT / "build" / "sitl" / "generated" / "schema" / "python"
+DEFAULT_PARAM_META = REPO_ROOT / "build" / "sitl" / "generated" / "params" / "params.json"
+# Seconds to wait for the MCU to answer a parameter request.
+PARAM_TIMEOUT_S = 3.0
 
 
 def parse_address(text: str) -> tuple[str, int]:
@@ -55,6 +70,55 @@ def parse_expectation(text: str) -> RateExpectation:
         return RateExpectation.parse(text)
     except ValueError as error:
         raise argparse.ArgumentTypeError(str(error)) from None
+
+
+def refused(name: str, reply: ParamReject | None) -> int:
+    """Reports a request the MCU refused or never answered; the exit code."""
+    if reply is None:
+        print(f"FAIL: no reply from the MCU about {name}", file=sys.stderr)
+    else:
+        print(f"FAIL: {reply.name} rejected: {reply.reason_text}", file=sys.stderr)
+    return 1
+
+
+def run_param(monitor: LinkMonitor, args: argparse.Namespace, metadata: ParamMetadata | None) -> int:
+    """The param command, once the handshake is done."""
+    if metadata is not None and metadata.set_hash != monitor.session.param_set_hash:
+        print(f"warning: the MCU's parameter set hash 0x{monitor.session.param_set_hash:016X} differs from "
+              f"0x{metadata.set_hash:016X} in {args.param_meta}; descriptions and ranges may be wrong",
+              file=sys.stderr)
+    meta = metadata.by_name if metadata is not None else {}
+
+    if args.action == "list":
+        params = monitor.list_params(PARAM_TIMEOUT_S)
+        if params is None:
+            print("FAIL: the parameter list did not arrive", file=sys.stderr)
+            return 1
+        for param in params:
+            print(format_param(param, meta.get(param.name)))
+        return 0
+
+    if args.action == "set":
+        if args.name in meta:
+            kind = ParamType[meta[args.name]["type"]]
+        else:
+            # Not in the metadata: the MCU says what type it is.
+            current = monitor.get_param(args.name, PARAM_TIMEOUT_S)
+            if not isinstance(current, ParamValue):
+                return refused(args.name, current)
+            kind = ParamType(current.type)
+        try:
+            value = parse_param_text(args.value, kind, meta.get(args.name))
+        except ValueError as error:
+            print(f"error: {args.name}: {error}", file=sys.stderr)
+            return 2
+        reply = monitor.set_param(args.name, kind, value, PARAM_TIMEOUT_S)
+    else:
+        reply = monitor.get_param(args.name, PARAM_TIMEOUT_S)
+    if not isinstance(reply, ParamValue):
+        return refused(args.name, reply)
+    print(format_param(reply, meta.get(reply.name)))
+    return 0
 
 
 def main() -> int:
@@ -72,7 +136,26 @@ def main() -> int:
     parser.add_argument("--expect-rate", type=parse_expectation, action="append", default=[],
                         metavar="TOPIC:INSTANCE=HZ", help="required rate of a topic instance, with --check")
     parser.add_argument("--tolerance", type=float, default=0.05, help="allowed relative rate error")
+    parser.add_argument("--param-meta", default=os.environ.get("VK_PARAM_METADATA", DEFAULT_PARAM_META),
+                        help="the parameter metadata file (default: the sitl build's)")
+    commands = parser.add_subparsers(dest="command")
+    param = commands.add_parser("param", help="list, read or set parameters")
+    actions = param.add_subparsers(dest="action", required=True)
+    actions.add_parser("list", help="every parameter with its value")
+    get = actions.add_parser("get", help="one parameter's value")
+    get.add_argument("name")
+    set_ = actions.add_parser("set", help="change a parameter; enum values may be given by name")
+    set_.add_argument("name")
+    set_.add_argument("value")
     args = parser.parse_args()
+
+    metadata = None
+    if args.command == "param":
+        try:
+            metadata = load_param_metadata(args.param_meta)
+        except FileNotFoundError:
+            print(f"warning: no parameter metadata at {args.param_meta}; showing names and values only",
+                  file=sys.stderr)
 
     try:
         messages = load_messages(args.msg_dir)
@@ -96,6 +179,8 @@ def main() -> int:
             print("\n".join(monitor.summary()))
             print(f"FAIL: no handshake with the MCU within {args.handshake_timeout:g} s", file=sys.stderr)
             return 1
+        if args.command == "param":
+            return run_param(monitor, args, metadata)
         if args.check:
             monitor.run(args.duration)
             print("\n".join(monitor.summary()))

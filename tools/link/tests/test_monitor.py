@@ -43,12 +43,13 @@ def messages(schema_hash=SAMPLE_HASH):
 class FakeMcu:
     """Answers the handshake and time sync, and sends `sample` every 10 ms of MCU time."""
 
-    def __init__(self, skip_sequence: bool = False):
+    def __init__(self, skip_sequence: bool = False, params=None, param_set_hash: int = 0):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind(("127.0.0.1", 0))
         self.socket.settimeout(0.002)
         self.port = self.socket.getsockname()[1]
-        self.session = McuSession([TopicDescription(0, 1, SAMPLE_HASH, "sample")])
+        self.session = McuSession([TopicDescription(0, 1, SAMPLE_HASH, "sample")], params=params,
+                                  param_set_hash=param_set_hash)
         self.reader = FrameReader()
         self.skip_sequence = skip_sequence
         self.peer = None
@@ -104,7 +105,7 @@ def test_handshake_and_rate_check_pass():
     assert result.passed, result.failures
     assert monitor.topics[("sample", 0)].messages > 10
     summary = monitor.summary()
-    assert summary[0].startswith("link handshake=ok version=1 mismatches=0")
+    assert summary[0].startswith("link handshake=ok version=2 mismatches=0")
     assert any(line.startswith("topic name=sample instance=0") and "rate_hz=100.00" in line for line in summary)
     assert monitor.time_sync is not None
 

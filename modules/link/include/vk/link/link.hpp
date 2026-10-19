@@ -2,7 +2,8 @@
 // one work item on wq:io (ADR-0008).
 //
 // Each run drains the bytes the transport has received through the protocol,
-// which answers the handshake and time sync, then sends every topic map entry
+// which answers the handshake, time sync and parameter requests, then sends
+// a few frames of a parameter list in progress and every topic map entry
 // that is due while the session is connected. A frame the transport cannot
 // take is dropped and counted; the Link never blocks its work queue. Once a
 // second it publishes its statistics on link_status.
@@ -16,6 +17,7 @@
 #include <vk/msg/link_status.hpp>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
 
@@ -49,7 +51,11 @@ public:
         std::uint8_t instance = 0;                        // link_status instance
         std::uint32_t interval_us = default_interval_us;  // how often the Link runs
         std::uint64_t peer_timeout_us = Session::default_peer_timeout_us;
+        ParameterAccess parameters{};                     // what the peer may read and change
     };
+
+    // Parameter list frames sent per run: at the default interval, 800 per second.
+    static constexpr std::size_t param_frames_per_run = 4;
 
     Link(std::string_view name, hal::Transport& transport, TopicMap map, const Config& config,
          core::WorkQueue& queue);

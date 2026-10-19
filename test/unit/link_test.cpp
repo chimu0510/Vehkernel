@@ -3,11 +3,14 @@
 #include <vk/link/crc16.hpp>
 #include <vk/link/frame.hpp>
 #include <vk/link/session.hpp>
+#include <vk/msg/arming_state.hpp>
 
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -313,7 +316,7 @@ public:
     std::vector<std::vector<std::uint8_t>> sent;
 };
 
-TEST(Session, HandshakePicksHighestSharedVersionAndSendsTopicInfo)
+TEST(Session, HandshakeAcceptsThePeerOfferingItsVersionAndSendsTopicInfo)
 {
     const std::array<TopicDescription, 2> topics = {
         TopicDescription{
@@ -335,12 +338,13 @@ TEST(Session, HandshakePicksHighestSharedVersionAndSendsTopicInfo)
     EXPECT_FALSE(session.connected(1000));
     EXPECT_EQ(session.version(), 0U);
 
-    // Peer sends Hello offering version 1 and 2.
-    std::array<std::uint8_t, 3> hello_body{};
+    // Peer sends Hello offering version 1, the current version and 3.
+    std::array<std::uint8_t, 4> hello_body{};
     BodyWriter bw(hello_body);
-    bw.u8(2);  // count
-    bw.u8(1);  // version 1
-    bw.u8(2);  // version 2 (higher than MCU supports)
+    bw.u8(3);  // count
+    bw.u8(1);
+    bw.u8(protocol_version);
+    bw.u8(3);  // a later version the MCU does not know
 
     Frame hello_frame{
         .version = 1,
@@ -374,7 +378,7 @@ TEST(Session, HandshakePicksHighestSharedVersionAndSendsTopicInfo)
     }
 
     EXPECT_EQ(types, (std::vector<FrameType>{FrameType::HelloReply, FrameType::TopicInfo, FrameType::TopicInfo}));
-    EXPECT_EQ(chosen_ver, 1U);
+    EXPECT_EQ(chosen_ver, protocol_version);
     EXPECT_EQ(topic_count, 2U);
 }
 
@@ -383,11 +387,11 @@ TEST(Session, HandshakeRejectsPeerWithNoSharedVersion)
     Session session;
     MockSink sink;
 
-    // Peer offers version 2 only.
+    // Peer offers version 1 only, which had no parameter access; the MCU offers only the current version.
     std::array<std::uint8_t, 2> hello_body{};
     BodyWriter bw(hello_body);
     bw.u8(1);  // count
-    bw.u8(2);  // version 2 (MCU only supports 1)
+    bw.u8(1);
 
     Frame hello_frame{
         .version = 2,
@@ -439,7 +443,7 @@ TEST(Session, TimeSyncRepliesWithHostAndMcuTimes)
     MockSink sink;
 
     // Complete handshake first.
-    std::array<std::uint8_t, 2> hello_body = {1, 1};
+    std::array<std::uint8_t, 2> hello_body = {1, protocol_version};
     session.handle({.version = 1, .type = FrameType::Hello, .sequence = 0, .body = hello_body}, 1000, sink);
     sink.sent.clear();
 
@@ -481,7 +485,7 @@ TEST(Session, TopicDataGatedByHandshakeAndPeerTimeout)
     EXPECT_TRUE(sink.sent.empty());
 
     // 2. Perform handshake at t = 100.
-    std::array<std::uint8_t, 2> hello_body = {1, 1};
+    std::array<std::uint8_t, 2> hello_body = {1, protocol_version};
     session.handle({.version = 1, .type = FrameType::Hello, .sequence = 0, .body = hello_body}, 100, sink);
     sink.sent.clear();
 
@@ -507,6 +511,247 @@ TEST(Session, TopicDataGatedByHandshakeAndPeerTimeout)
     EXPECT_TRUE(session.connected(2'000'000ULL));
     EXPECT_TRUE(session.send_topic(1, 0, sample, 2'500'000ULL, sink));
     EXPECT_EQ(sink.sent.size(), 1U);
+}
+
+// --- Parameter access (protocol version 2, ADR-0012) ---
+
+using vk::core::ParamInfo;
+using vk::core::ParamResult;
+using vk::core::ParamType;
+using vk::core::ParamValue;
+
+std::int32_t param_count_value = 3;
+float param_gain_value = 0.5F;
+std::int32_t param_lock_value = 0;
+constexpr std::array<std::int32_t, 2> param_lock_values{0, 1};
+
+std::array<ParamInfo, 3> make_param_table()
+{
+    return {{
+        {.name = "T_COUNT", .hash = vk::core::param_hash("T_COUNT"), .type = ParamType::Int32, .flags = 0,
+         .default_value = ParamValue::from_int(3), .min = ParamValue::from_int(0), .max = ParamValue::from_int(10),
+         .enum_values = {}, .bitmask = 0, .int_value = &param_count_value, .float_value = nullptr},
+        {.name = "T_GAIN", .hash = vk::core::param_hash("T_GAIN"), .type = ParamType::Float, .flags = 0,
+         .default_value = ParamValue::from_float(0.5F), .min = ParamValue::from_float(0.0F),
+         .max = ParamValue::from_float(2.0F), .enum_values = {}, .bitmask = 0, .int_value = nullptr,
+         .float_value = &param_gain_value},
+        {.name = "T_LOCK", .hash = vk::core::param_hash("T_LOCK"), .type = ParamType::Int32,
+         .flags = vk::core::param_flags::locked_when_armed, .default_value = ParamValue::from_int(0),
+         .min = ParamValue::from_int(0), .max = ParamValue::from_int(1), .enum_values = param_lock_values,
+         .bitmask = 0, .int_value = &param_lock_value, .float_value = nullptr},
+    }};
+}
+
+// A received param_value or param_reject.
+struct ParamReply {
+    FrameType type{};
+    std::uint16_t index = 0;
+    std::uint16_t count = 0;
+    std::uint8_t value_type = 0;
+    std::uint32_t bits = 0;
+    std::uint8_t flags = 0;
+    std::uint8_t reason = 0;
+    std::string name;
+};
+
+std::vector<ParamReply> param_replies(const std::vector<std::vector<std::uint8_t>>& wires)
+{
+    std::vector<ParamReply> replies;
+    FrameReader reader;
+    for (const auto& wire : wires) {
+        reader.feed(wire, [&](const Frame& f) {
+            BodyReader body(f.body);
+            ParamReply reply;
+            reply.type = f.type;
+            if (f.type == FrameType::ParamValue) {
+                reply.index = body.u16();
+                reply.count = body.u16();
+                reply.value_type = body.u8();
+                reply.bits = body.u32();
+                reply.flags = body.u8();
+            } else if (f.type == FrameType::ParamReject) {
+                reply.reason = body.u8();
+            } else {
+                return;
+            }
+            const auto name = body.bytes(body.u8());
+            reply.name.assign(name.begin(), name.end());
+            EXPECT_TRUE(body.ok());
+            replies.push_back(reply);
+        });
+    }
+    return replies;
+}
+
+class SessionParameters : public ::testing::Test {
+protected:
+    void SetUp() override
+    {
+        param_count_value = 3;
+        param_gain_value = 0.5F;
+        param_lock_value = 0;
+        arm(false);
+        const std::array<std::uint8_t, 2> hello = {1, protocol_version};
+        session.handle({.version = protocol_version, .type = FrameType::Hello, .sequence = 0, .body = hello}, 1000,
+                       sink);
+        sink.sent.clear();
+    }
+
+    void TearDown() override { arm(false); }
+
+    static void arm(bool armed)
+    {
+        vk::msg::ArmingState state{};
+        state.armed = armed;
+        vk::core::Publication<vk::msg::ArmingState>{}.publish(state);
+    }
+
+    void request(FrameType type, const std::vector<std::uint8_t>& body)
+    {
+        session.handle({.version = protocol_version, .type = type, .sequence = 1, .body = body}, 2000, sink);
+    }
+
+    static std::vector<std::uint8_t> name_body(std::string_view name)
+    {
+        std::vector<std::uint8_t> body{static_cast<std::uint8_t>(name.size())};
+        body.insert(body.end(), name.begin(), name.end());
+        return body;
+    }
+
+    static std::vector<std::uint8_t> set_body(std::string_view name, ParamValue value)
+    {
+        std::vector<std::uint8_t> body = name_body(name);
+        body.push_back(static_cast<std::uint8_t>(value.type));
+        for (int shift = 0; shift < 32; shift += 8) {
+            body.push_back(static_cast<std::uint8_t>(value.bits >> static_cast<unsigned>(shift)));
+        }
+        return body;
+    }
+
+    std::array<ParamInfo, 3> table = make_param_table();
+    vk::core::Parameters parameters{table};
+    Session session{{}, Session::default_peer_timeout_us, {.parameters = &parameters, .set_hash = 0x0123456789ABCDEFULL}};
+    MockSink sink;
+};
+
+TEST_F(SessionParameters, HelloReplyCarriesTheParameterSetHashAndCount)
+{
+    Session fresh{{}, Session::default_peer_timeout_us, {.parameters = &parameters, .set_hash = 0x0123456789ABCDEFULL}};
+    const std::array<std::uint8_t, 2> hello = {1, protocol_version};
+    fresh.handle({.version = protocol_version, .type = FrameType::Hello, .sequence = 0, .body = hello}, 1000, sink);
+    ASSERT_EQ(sink.sent.size(), 1U);
+    FrameReader reader;
+    reader.feed(sink.sent[0], [&](const Frame& f) {
+        ASSERT_EQ(f.type, FrameType::HelloReply);
+        BodyReader body(f.body);
+        EXPECT_EQ(body.u8(), protocol_version);
+        EXPECT_EQ(body.u16(), 0U);  // topics
+        EXPECT_EQ(body.u64(), 0x0123456789ABCDEFULL);
+        EXPECT_EQ(body.u16(), 3U);  // parameters
+        EXPECT_TRUE(body.ok());
+    });
+}
+
+TEST_F(SessionParameters, GetRepliesWithTheValueOrRejectsAnUnknownName)
+{
+    request(FrameType::ParamGet, name_body("T_GAIN"));
+    request(FrameType::ParamGet, name_body("T_NONE"));
+    const auto replies = param_replies(sink.sent);
+    ASSERT_EQ(replies.size(), 2U);
+    EXPECT_EQ(replies[0].type, FrameType::ParamValue);
+    EXPECT_EQ(replies[0].name, "T_GAIN");
+    EXPECT_EQ(replies[0].index, 1U);
+    EXPECT_EQ(replies[0].count, 3U);
+    EXPECT_EQ(replies[0].value_type, static_cast<std::uint8_t>(ParamType::Float));
+    EXPECT_EQ(replies[0].bits, ParamValue::from_float(0.5F).bits);
+    EXPECT_EQ(replies[1].type, FrameType::ParamReject);
+    EXPECT_EQ(replies[1].reason, static_cast<std::uint8_t>(ParamResult::UnknownName));
+    EXPECT_EQ(replies[1].name, "T_NONE");
+}
+
+TEST_F(SessionParameters, SetAppliesAValueAndRepliesWithIt)
+{
+    request(FrameType::ParamSet, set_body("T_COUNT", ParamValue::from_int(7)));
+    const auto replies = param_replies(sink.sent);
+    ASSERT_EQ(replies.size(), 1U);
+    EXPECT_EQ(replies[0].type, FrameType::ParamValue);
+    EXPECT_EQ(replies[0].bits, ParamValue::from_int(7).bits);
+    EXPECT_EQ(param_count_value, 7);
+}
+
+TEST_F(SessionParameters, SetRejectsWithTheReason)
+{
+    request(FrameType::ParamSet, set_body("T_NONE", ParamValue::from_int(1)));
+    request(FrameType::ParamSet, set_body("T_GAIN", ParamValue::from_int(1)));
+    request(FrameType::ParamSet, set_body("T_COUNT", ParamValue::from_int(11)));
+    arm(true);
+    request(FrameType::ParamSet, set_body("T_LOCK", ParamValue::from_int(1)));
+    const auto replies = param_replies(sink.sent);
+    ASSERT_EQ(replies.size(), 4U);
+    const std::array<ParamResult, 4> reasons{ParamResult::UnknownName, ParamResult::WrongType,
+                                             ParamResult::OutOfRange, ParamResult::LockedWhileArmed};
+    for (std::size_t i = 0; i < reasons.size(); ++i) {
+        EXPECT_EQ(replies[i].type, FrameType::ParamReject) << i;
+        EXPECT_EQ(replies[i].reason, static_cast<std::uint8_t>(reasons[i])) << i;
+    }
+    EXPECT_EQ(param_count_value, 3);
+    EXPECT_EQ(param_lock_value, 0);
+}
+
+TEST_F(SessionParameters, ListStreamsFromTheFirstIndexAtTheGivenPace)
+{
+    request(FrameType::ParamListRequest, {1, 0});  // from index 1
+    EXPECT_TRUE(sink.sent.empty());
+    EXPECT_TRUE(session.listing());
+    session.send_pending(2000, sink, 1);
+    EXPECT_EQ(sink.sent.size(), 1U);
+    session.send_pending(2000, sink, 5);
+    EXPECT_FALSE(session.listing());
+    const auto replies = param_replies(sink.sent);
+    ASSERT_EQ(replies.size(), 2U);
+    EXPECT_EQ(replies[0].name, "T_GAIN");
+    EXPECT_EQ(replies[1].name, "T_LOCK");
+    EXPECT_EQ(replies[1].index, 2U);
+}
+
+TEST_F(SessionParameters, ListResendsAFrameTheSinkDropped)
+{
+    class DroppingSink : public FrameSink {
+    public:
+        bool send(std::span<const std::uint8_t> wire) override
+        {
+            if (drop_next) {
+                drop_next = false;
+                return false;
+            }
+            sent.emplace_back(wire.begin(), wire.end());
+            return true;
+        }
+        bool drop_next = true;
+        std::vector<std::vector<std::uint8_t>> sent;
+    } dropping;
+
+    request(FrameType::ParamListRequest, {0, 0});
+    session.send_pending(2000, dropping, 10);  // the first frame is dropped; the list waits
+    EXPECT_TRUE(dropping.sent.empty());
+    session.send_pending(2000, dropping, 10);
+    const auto replies = param_replies(dropping.sent);
+    ASSERT_EQ(replies.size(), 3U);
+    EXPECT_EQ(replies[0].name, "T_COUNT");
+}
+
+TEST(Session, WithoutParametersEveryNameIsUnknown)
+{
+    Session session;
+    MockSink sink;
+    const std::array<std::uint8_t, 2> hello = {1, protocol_version};
+    session.handle({.version = protocol_version, .type = FrameType::Hello, .sequence = 0, .body = hello}, 1000, sink);
+    sink.sent.clear();
+    const std::array<std::uint8_t, 7> get = {6, 'T', '_', 'G', 'A', 'I', 'N'};
+    session.handle({.version = protocol_version, .type = FrameType::ParamGet, .sequence = 1, .body = get}, 1000, sink);
+    const auto replies = param_replies(sink.sent);
+    ASSERT_EQ(replies.size(), 1U);
+    EXPECT_EQ(replies[0].reason, static_cast<std::uint8_t>(ParamResult::UnknownName));
 }
 
 }  // namespace

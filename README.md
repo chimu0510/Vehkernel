@@ -151,6 +151,22 @@ Without a magnetometer, yaw is relative to the start and drifts slowly with the 
 
 The filter's gains and its accelerometer rejection are parameters (ADR-0012), `ATT_KP`, `ATT_KI` and `ATT_ACC_REJ`, defined in `modules/estimation/params.toml` next to the estimator. The parameter generator turns every `params.toml` the build contains into plain structs, a parameter table and a metadata file, `build/<preset>/generated/params/params.json`. A change applies from the next IMU sample.
 
+The Link monitor lists, reads and sets parameters over the Link with its `param` command, describing them from that metadata file (`build/sitl/generated/params/params.json` by default, or `--param-meta`). Enum values may be given by name. It warns when the metadata does not match the parameter set hash the MCU reports at the handshake, and exits non-zero when the MCU refuses a change, printing the reason:
+
+```bash
+tools/link/link_monitor.py --udp 127.0.0.1:15600 param list
+```
+
+```bash
+tools/link/link_monitor.py --udp 127.0.0.1:15600 param set ATT_KP 2.5
+```
+
+```text
+param name=ATT_KP value=2.5 type=FLOAT unit=1/s default=1 min=0 max=10 description="Attitude correction gain: how fast roll and pitch follow the accelerometer."
+```
+
+CI runs `test/sitl/check_params.py` (the `sitl_params` test): the `param` command against SITL, refusals included, and `ATT_KP` changed while the estimator runs under the shake profile.
+
 SITL's simulated IMU follows a scripted motion chosen with `--motion`, and SITL publishes its true attitude on `vehicle_attitude_groundtruth`, which the Link also carries, so the monitor shows the estimate and the truth side by side. Each profile starts moving 3 s after boot, once the estimator has aligned, and ends by 10 s:
 
 | Profile | Motion |
