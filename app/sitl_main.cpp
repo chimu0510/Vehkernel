@@ -22,13 +22,13 @@
 #endif
 #include <vk/hal/i2c.hpp>
 #include <vk/msg/registry.hpp>
+#include <vk/params/params.hpp>
 #include <vk/platform/platform.hpp>
 
 #ifdef CONFIG_LINK
 #include <vk/hal/transport.hpp>
 #include <vk/link/link.hpp>
 #include <vk/link/topic_map.hpp>
-#include <vk/params/params.hpp>
 #endif
 #ifdef CONFIG_LINK_UDP
 #include <vk/platform/udp_transport.hpp>
@@ -62,7 +62,10 @@ vk::core::StaticInstance<vk::drivers::Icm20948> imu;
 void start_imu()
 {
     imu.emplace(vk::hal::I2cDevice(vk::platform::imu_bus(), vk::platform::imu_address),
-                vk::drivers::Icm20948::Config{.instance = 0, .rate_hz = vk::platform::imu_rate_hz},
+                vk::drivers::Icm20948::Config{
+                    .instance = 0,
+                    .board_orientation = static_cast<vk::hal::Rotation>(vk::params::sens.board_rot),
+                    .rate_hz = vk::platform::imu_rate_hz},
                 vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     imu->start();
 }

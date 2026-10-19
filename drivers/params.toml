@@ -1,0 +1,31 @@
+# Parameters of the IMU processing every IMU driver shares (ADR-0012, ADR-0014).
+prefix = "SENS"
+
+[[param]]
+name = "SENS_BOARD_ROT"
+type = "INT32"
+default = "NONE"
+values = [
+  { name = "NONE", value = 0 },
+  { name = "YAW_45", value = 1 },
+  { name = "YAW_90", value = 2 },
+  { name = "YAW_135", value = 3 },
+  { name = "YAW_180", value = 4 },
+  { name = "YAW_225", value = 5 },
+  { name = "YAW_270", value = 6 },
+  { name = "YAW_315", value = 7 },
+  { name = "ROLL_180", value = 8 },
+  { name = "ROLL_180_YAW_45", value = 9 },
+  { name = "ROLL_180_YAW_90", value = 10 },
+  { name = "ROLL_180_YAW_135", value = 11 },
+  { name = "PITCH_180", value = 12 },
+  { name = "ROLL_180_YAW_225", value = 13 },
+  { name = "ROLL_180_YAW_270", value = 14 },
+  { name = "ROLL_180_YAW_315", value = 15 },
+  { name = "ROLL_90", value = 16 },
+  { name = "ROLL_270", value = 20 },
+  { name = "PITCH_90", value = 24 },
+  { name = "PITCH_270", value = 25 },
+]
+description = "Board orientation: how the board sits in the vehicle, applied after each device's mounting rotation on the board. Numbered as ArduPilot's and PX4's rotation table."
+reboot_required = true

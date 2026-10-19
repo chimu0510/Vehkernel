@@ -58,7 +58,8 @@ std::uint8_t sample_rate_divider(std::uint32_t rate_hz)
 }  // namespace
 
 Icm20948::Icm20948(const hal::I2cDevice& device, const Config& config, core::WorkQueue& queue)
-    : core::WorkItem("icm20948", queue), device_(device), config_(config), publication_(config.instance)
+    : core::WorkItem("icm20948", queue), device_(device), config_(config),
+      to_body_(hal::compose(config.rotation, config.board_orientation)), publication_(config.instance)
 {
 }
 
@@ -154,7 +155,7 @@ void Icm20948::read_sample(std::uint64_t now)
     constexpr float gyro_scale = std::numbers::pi_v<float> / 180.0F / gyro_lsb_per_dps;
     // The sensor frame is x forward, y left, z up; the body frame is x
     // forward, y right, z down, so y and z change sign before the mounting
-    // rotation is applied.
+    // rotation and the board orientation are applied.
     const std::array<float, 3> accel{static_cast<float>(word_at(raw, 0)) * accel_scale,
                                      -static_cast<float>(word_at(raw, 2)) * accel_scale,
                                      -static_cast<float>(word_at(raw, 4)) * accel_scale};
@@ -165,8 +166,8 @@ void Icm20948::read_sample(std::uint64_t now)
     msg::ImuSample sample{};
     sample.timestamp = now;
     sample.device_instance = config_.instance;
-    sample.accel = hal::rotate(config_.rotation, accel);
-    sample.gyro = hal::rotate(config_.rotation, gyro);
+    sample.accel = to_body_ * accel;
+    sample.gyro = to_body_ * gyro;
     sample.temperature = static_cast<float>(word_at(raw, 12)) / temp_sensitivity + room_temp_offset_c;
     publication_.publish(sample);
     ++samples_;

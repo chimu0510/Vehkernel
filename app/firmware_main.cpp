@@ -6,13 +6,13 @@
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
+#include <vk/params/params.hpp>
 #include <vk/platform/platform.hpp>
 
 #ifdef CONFIG_LINK_SERIAL
 #include <vk/hal/uart.hpp>
 #include <vk/link/link.hpp>
 #include <vk/link/topic_map.hpp>
-#include <vk/params/params.hpp>
 #include <vk/platform/dma_uart.hpp>
 #endif
 
@@ -55,7 +55,10 @@ void start_imu()
     imu_bus.init();
     imu.emplace(vk::hal::I2cDevice(imu_bus, Imu::address),
                 vk::drivers::Icm20948::Config{
-                    .instance = 0, .rotation = Imu::rotation, .rate_hz = vk::board::timing::base_rate_hz},
+                    .instance = 0,
+                    .rotation = Imu::rotation,
+                    .board_orientation = static_cast<vk::hal::Rotation>(vk::params::sens.board_rot),
+                    .rate_hz = vk::board::timing::base_rate_hz},
                 vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     imu->start();
 }

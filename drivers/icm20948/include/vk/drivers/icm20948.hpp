@@ -3,7 +3,8 @@
 // A timer-triggered work item: each run reads one sample of accelerometer,
 // gyroscope and temperature over the I2C contract, converts it to SI units,
 // rotates it into the body frame (x forward, y right, z down) by the board
-// device's mounting rotation, and publishes it on imu_sample. Before the
+// device's mounting rotation and then the board orientation, composed once
+// at construction, and publishes it on imu_sample. Before the
 // first sample it checks WHO_AM_I, resets and configures the device. Read
 // failures are counted and retried; a device that keeps failing is probed
 // and configured again, so a loose cable never stops the firmware. The
@@ -23,7 +24,8 @@ class Icm20948 final : public core::WorkItem {
 public:
     struct Config {
         std::uint8_t instance = 0;  // imu_sample instance to publish on
-        hal::Rotation rotation = hal::Rotation::None;
+        hal::Rotation rotation = hal::Rotation::None;           // mounting rotation on the board
+        hal::Rotation board_orientation = hal::Rotation::None;  // the board in the vehicle, SENS_BOARD_ROT
         std::uint32_t rate_hz = 200;  // read rate; the output data rate is set at or above it
     };
 
@@ -61,6 +63,7 @@ private:
 
     hal::I2cDevice device_;
     Config config_;
+    hal::RotationMatrix to_body_;  // sensor frame to body frame
     core::Publication<msg::ImuSample> publication_;
 
     State state_ = State::Probing;

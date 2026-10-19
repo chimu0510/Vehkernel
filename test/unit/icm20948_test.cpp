@@ -168,6 +168,30 @@ TEST_F(Icm20948Test, AppliesTheMountingRotation)
     EXPECT_EQ(sample.device_instance, 1);
 }
 
+TEST_F(Icm20948Test, AppliesTheMountingRotationThenTheBoardOrientation)
+{
+    // Sensor x is body x before any rotation; sensor z (up) is body -z.
+    model.set_accel({1.0F, 0.0F, 0.0F});
+    model.set_gyro({0.0F, 0.0F, 0.3F});
+    Icm20948 imu(vk::hal::I2cDevice(bus, 0x68),
+                 {.instance = 1,
+                  .rotation = vk::hal::Rotation::Yaw90,
+                  .board_orientation = vk::hal::Rotation::Roll180,
+                  .rate_hz = rate_hz},
+                 queue);
+    imu.start();
+    vk::core::Subscription<vk::msg::ImuSample> sub(1);
+    run_for(300'000);
+    vk::msg::ImuSample sample{};
+    ASSERT_GT(drain(sub, sample), 0);
+    // x -> yaw 90 -> y -> roll 180 -> -y
+    EXPECT_NEAR(sample.accel[0], 0.0F, accel_lsb);
+    EXPECT_NEAR(sample.accel[1], -1.0F, accel_lsb);
+    EXPECT_NEAR(sample.accel[2], 0.0F, accel_lsb);
+    // -z -> yaw 90 -> -z -> roll 180 -> z
+    EXPECT_NEAR(sample.gyro[2], 0.3F, gyro_lsb);
+}
+
 TEST_F(Icm20948Test, CountsReadFailuresAndRecoversWhenTheDeviceReturns)
 {
     Icm20948 imu(vk::hal::I2cDevice(bus, 0x68), {.rate_hz = rate_hz}, queue);
