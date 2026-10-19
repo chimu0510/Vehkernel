@@ -273,9 +273,12 @@ class LinkMonitor:
         # are far behind. Losses count from the handshake on.
         self.lost_at_handshake = 0
         self.crc_errors_at_handshake = 0
-        # The first link_status of each instance after the handshake: the MCU's
-        # drops count from there, not from boot.
+        # The MCU's drops count from the second link_status of each instance
+        # after the handshake, not from boot: link_status is published once a
+        # second, so the first may predate the handshake and miss what its
+        # burst of topic_info frames dropped.
         self.first_link_status: dict[int, object] = {}
+        self._link_status_seen: dict[int, int] = {}
         # Parameter replies, as they arrive.
         self.params: dict[str, ParamValue] = {}
         self.param_rejects: list[ParamReject] = []
@@ -367,7 +370,9 @@ class LinkMonitor:
             self.topics[key] = TopicStats(peer.name, instance)
         self.topics[key].add(message)
         if message is not None and peer.name == "link_status":
-            self.first_link_status.setdefault(instance, message)
+            self._link_status_seen[instance] = self._link_status_seen.get(instance, 0) + 1
+            if self._link_status_seen[instance] == 2:
+                self.first_link_status[instance] = message
         if message is not None:
             for listener in self.listeners:
                 listener(peer.name, instance, message)
