@@ -1,0 +1,2 @@
+board.toml:8: error: board default of TA_BAUD, 1234, is not one of its values: B9600, B115200
+board.toml:8: error: board default of TA_MODE, 'TURBO', is not one of its values: SLOW, FAST

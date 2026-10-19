@@ -1,0 +1,8 @@
+# A board definition, only for its line numbers.
+serial = [
+  { port = "SERIAL1", function = "LINK", baud = 115200 },
+]
+
+timing = { base_rate_hz = 200 }
+
+defaults = { TA_GAIN = 1.5, TA_MODE = "TURBO", TA_BAUD = 1234 }

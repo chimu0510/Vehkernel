@@ -102,7 +102,7 @@ pins = [
 ]
 
 serial = [
-  { port = "SERIAL1", tx = "SERIAL1_TX", rx = "SERIAL1_RX", function = "LINK" },
+  { port = "SERIAL1", tx = "SERIAL1_TX", rx = "SERIAL1_RX", function = "LINK", baud = 921600 },
   { port = "SERIAL2", tx = "SERIAL2_TX", rx = "SERIAL2_RX", function = "LINK" },
   { port = "SERIAL3", tx = "SERIAL3_TX", rx = "SERIAL3_RX", function = "NONE" },
   { port = "SERIAL4", rx = "SBUS_RX", function = "RC_INPUT" },

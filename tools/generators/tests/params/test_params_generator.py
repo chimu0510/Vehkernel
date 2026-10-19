@@ -1,8 +1,9 @@
 """Parameter generator tests, run through its command line.
 
 Each directory under ``cases/`` holds parameter definitions (any
-``params.toml`` below it), an optional solved Kconfig ``config``, and the
-expected result: ``expected/`` with the generated files, or
+``params.toml`` below it), an optional solved Kconfig ``config``, optional
+board defaults (``board_defaults.json`` with the ``board.toml`` they come
+from), and the expected result: ``expected/`` with the generated files, or
 ``expected_stderr.txt`` with the diagnostics. Run with ``VK_UPDATE_GOLDEN=1``
 to rewrite the expected files after an intended change, then review the diff.
 """
@@ -32,6 +33,8 @@ def definitions_in(directory: Path) -> list[str]:
 def generate(case_dir: Path, output_dir: Path, definitions: list[str] | None = None):
     # Run from the case directory so diagnostics read "<dir>/params.toml:<line>".
     config = ["--config", "config"] if (case_dir / "config").exists() else []
+    if (case_dir / "board_defaults.json").exists():
+        config += ["--board-defaults", "board_defaults.json", "--board", "board.toml"]
     files = definitions_in(case_dir) if definitions is None else definitions
     return subprocess.run(
         [sys.executable, str(GENERATOR), *files, *config, "--output-dir", str(output_dir)],
@@ -132,3 +135,20 @@ def test_set_hash_ignores_comments_and_file_order(tmp_path: Path):
     base = set_hash(write(tmp_path / "a", GAIN), tmp_path / "out_a")
     commented = set_hash(write(tmp_path / "b", "# A comment.\n" + GAIN), tmp_path / "out_b")
     assert base == commented
+
+
+def test_the_c50c_board_sets_the_link_baud_rate(tmp_path: Path):
+    """The repository's definitions with the C50C V1.1's golden board defaults."""
+    board_defaults = REPO / "tools" / "generators" / "tests" / "boards" / "c50c-v1_1" / "expected" / "board_defaults.json"
+    definitions = sorted(str(p.relative_to(REPO)) for layer in ("core", "drivers", "modules", "platform")
+                         for p in (REPO / layer).rglob("params.toml"))
+    config = tmp_path / "config"
+    config.write_text("CONFIG_PLATFORM_STM32F4=y\nCONFIG_ESTIMATOR_MAHONY=y\n", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(GENERATOR), *definitions, "--config", str(config), "--board-defaults", str(board_defaults),
+         "--board", "boards/c50c-v1_1/board.toml", "--output-dir", str(tmp_path / "out")],
+        cwd=REPO, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    params = {p["name"]: p for p in json.loads((tmp_path / "out" / "params.json").read_text())["parameters"]}
+    assert params["SERIAL1_BAUD"]["default"] == 921600
+    assert params["ATT_KP"]["default"] == 1.0

@@ -2,7 +2,9 @@
 #
 # Runs as a custom command after the Kconfig solve: every params.toml in the
 # repository is checked, and the ones Kconfig compiles in become parameter
-# groups, the parameter table and the metadata file. The output lives in the
+# groups, the parameter table and the metadata file. On a board, the board
+# generator's defaults replace the definitions' defaults, and a board default
+# out of range fails the build. The output lives in the
 # build tree and is never committed.
 
 # vk_generate_params() creates the vk_params target. Call it after
@@ -23,6 +25,14 @@ function(vk_generate_params)
     ${CMAKE_SOURCE_DIR}/tools/generators/vkschema/schema.py
     ${CMAKE_SOURCE_DIR}/tools/generators/vkboard/diagnostics.py)
 
+  # On a board, its defaults replace the definitions' (ADR-0012).
+  set(board_args "")
+  set(board_inputs "")
+  if(VK_BOARD)
+    set(board_args --board-defaults ${VK_BOARD_GENERATED_DIR}/board_defaults.json --board boards/${VK_BOARD}/board.toml)
+    set(board_inputs ${VK_BOARD_GENERATED_DIR}/board_defaults.json)
+  endif()
+
   set(outputs
     ${out_dir}/vk/params/params.hpp
     ${out_dir}/vk/params/params.cpp
@@ -30,12 +40,13 @@ function(vk_generate_params)
 
   add_custom_command(
     OUTPUT ${outputs}
-    COMMAND ${Python3_EXECUTABLE} -I ${generator} ${definitions} --config ${config} --output-dir ${out_dir}
+    COMMAND ${Python3_EXECUTABLE} -I ${generator} ${definitions} --config ${config} ${board_args}
+      --output-dir ${out_dir}
     # The generator leaves unchanged files alone; touch them so the outputs
     # are newer than the inputs and the command does not run again.
     COMMAND ${CMAKE_COMMAND} -E touch ${outputs}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    DEPENDS ${definitions} ${config} ${generator} ${generator_sources}
+    DEPENDS ${definitions} ${config} ${board_inputs} ${generator} ${generator_sources}
     COMMENT "Generating parameter groups"
     VERBATIM)
 

@@ -1,0 +1,1 @@
+board.toml:8: error: board default of TA_GAIN, 5.0, is outside its range [0.0, 2.0]

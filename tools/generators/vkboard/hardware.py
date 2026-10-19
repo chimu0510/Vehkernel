@@ -1,7 +1,8 @@
 """Ports, board devices, storage, timing and board default parameters (ADR-0011).
 
-- ``serial``: logical ports such as SERIAL1 with their TX/RX pins and default
-  use, which the ``SERIALn_FUNCTION`` parameter changes at runtime.
+- ``serial``: logical ports such as SERIAL1 with their TX/RX pins, default
+  use and optional default baud rate, which the ``SERIALn_FUNCTION`` and
+  ``SERIALn_BAUD`` parameters change.
 - ``devices``: board devices with kind, type, peripheral bus, pins, I2C
   address and mounting rotation (ADR-0014, ADR-0015).
 - ``storage``: storage devices that log sinks can use (ADR-0019).
@@ -16,7 +17,7 @@ from dataclasses import dataclass
 
 from .diagnostics import Diagnostics, Loc
 
-SERIAL_KEYS = {"port", "tx", "rx", "function"}
+SERIAL_KEYS = {"port", "tx", "rx", "function", "baud"}
 SERIAL_FUNCTIONS = ("NONE", "LINK", "RC_INPUT", "LOG")
 DEVICE_KEYS = {"device", "kind", "type", "bus", "pins", "address", "rotation"}
 DEVICE_BUSES = ("I2C", "SOFT_I2C", "SPI")
@@ -47,6 +48,7 @@ class SerialPort:
     tx: str | None
     rx: str | None
     function: str
+    baud: int | None = None
 
 
 @dataclass(frozen=True)
@@ -108,6 +110,10 @@ def _serial(entries, roles: dict, diag: Diagnostics) -> list[SerialPort]:
         if "tx" not in entry and "rx" not in entry:
             diag.error(f"serial port {port} needs a 'tx' or 'rx' pin role", loc)
             continue
+        baud = entry.get("baud")
+        if baud is not None and (not isinstance(baud, int) or isinstance(baud, bool) or not 1200 <= baud <= 10_000_000):
+            diag.error(f"baud of {port} must be an integer from 1200 to 10000000, got {baud!r}", loc)
+            continue
         peripherals, ok = set(), True
         for direction in ("tx", "rx"):
             role = entry.get(direction)
@@ -125,7 +131,7 @@ def _serial(entries, roles: dict, diag: Diagnostics) -> list[SerialPort]:
             diag.error(f"tx and rx of {port} use different peripherals: {', '.join(sorted(peripherals))}", loc)
             ok = False
         if ok:
-            ports.append(SerialPort(port, peripherals.pop(), entry.get("tx"), entry.get("rx"), function))
+            ports.append(SerialPort(port, peripherals.pop(), entry.get("tx"), entry.get("rx"), function, baud))
     return ports
 
 
@@ -259,6 +265,7 @@ def check_hardware(serial, devices, storage, timing, defaults, roles: dict, top:
     """Validate the hardware sections; ``roles`` maps default role names to pins."""
     ports = _serial(serial, roles, diag)
     params: dict[str, object] = {f"{p.port}_FUNCTION": p.function for p in ports}
+    params.update({f"{p.port}_BAUD": p.baud for p in ports if p.baud is not None})
     for name, value in _timing(timing, timing_loc, diag).items():
         params[name] = value
 

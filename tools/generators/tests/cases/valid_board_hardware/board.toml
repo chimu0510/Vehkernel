@@ -17,7 +17,7 @@ pins = [
 ]
 
 serial = [
-  { port = "SERIAL1", tx = "SERIAL1_TX", rx = "SERIAL1_RX", function = "LINK" },
+  { port = "SERIAL1", tx = "SERIAL1_TX", rx = "SERIAL1_RX", function = "LINK", baud = 115200 },
   { port = "SERIAL2", tx = "SERIAL2_TX", function = "LOG" },
 ]
 

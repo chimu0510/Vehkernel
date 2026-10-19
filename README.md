@@ -63,7 +63,7 @@ Flash the C50C over SWD with an ST-Link on header HDR2 (pin 4 GND, pin 6 PA13/SW
 openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program build/c50c-v1_1/app/vehkernel.elf verify reset exit"
 ```
 
-The firmware runs a Link on SERIAL1, the Type-C port (USART3 to the CH9102F USB serial adapter), at 921600 baud 8N1 with DMA both ways; the port and baud rate are fixed until the parameter system exists. Plug a USB cable into the Type-C port and the adapter appears on the host as a serial device, usually `/dev/ttyACM0` (your user needs the `dialout` group). Run the Link monitor on the host, with the Python decoders of the firmware build:
+The firmware runs a Link on SERIAL1, the Type-C port (USART3 to the CH9102F USB serial adapter), 8N1 with DMA both ways, at the `SERIAL1_BAUD` parameter: 921600 baud by default, as the board definition's `baud` for SERIAL1 sets it. A changed rate takes effect at the next boot; pass the same rate to the monitor with `--baud`. A rate the port cannot reach falls back to the board default. Plug a USB cable into the Type-C port and the adapter appears on the host as a serial device, usually `/dev/ttyACM0` (your user needs the `dialout` group). Run the Link monitor on the host, with the Python decoders of the firmware build:
 
 ```bash
 tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/c50c-v1_1/generated/schema/python

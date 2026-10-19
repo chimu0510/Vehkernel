@@ -469,6 +469,56 @@ def compiled_in(groups: list[Group], enabled: set[str] | None) -> list[Group]:
     return result
 
 
+def _board_default_line(text: str, name: str) -> int | None:
+    """Where a board definition sets a board default: its serial port, timing key or own key."""
+    serial = re.match(r"(SERIAL\d+)_", name)
+    timing = {"CTRL_TRIGGER": "trigger", "CTRL_RATE_HZ": "base_rate_hz", "IMU_SAMPLING": "sampling"}
+    if serial:
+        pattern = re.compile(r'port\s*=\s*"' + serial.group(1) + '"')
+    elif name in timing:
+        pattern = re.compile(r"\b" + timing[name] + r"\s*=")
+    else:
+        pattern = re.compile(r"\b" + name + r"\s*=")
+    for number, line in enumerate(text.splitlines(), start=1):
+        if pattern.search(line.split("#", 1)[0]):
+            return number
+    return None
+
+
+def apply_board_defaults(groups: list[Group], defaults: dict, board_path: str, board_text: str) -> list[Group]:
+    """Replaces the defaults of compiled-in parameters the board definition sets (ADR-0012).
+
+    A board default must be in range, or for an enum one of its values, by
+    name or by number. Board defaults without a definition are left to the
+    board header, as compile-time constants.
+    """
+    errors: list[Diagnostic] = []
+    by_name = {p.name: p for g in groups for p in g.params}
+    for name, raw in sorted(defaults.items()):
+        param = by_name.get(name)
+        if param is None:
+            continue
+        line = _board_default_line(board_text, name)
+        if param.is_enum:
+            match = next((v for v in param.values if v.name == raw or (_is_int(raw) and v.value == raw)), None)
+            if match is None:
+                errors.append(Diagnostic(board_path, line, f"board default of {name}, {raw!r}, is not one of its "
+                                                           f"values: {', '.join(v.name for v in param.values)}"))
+                continue
+            param.default, param.default_name = match.value, match.name
+            continue
+        valid = _is_int(raw) if param.type == "INT32" else _is_number(raw)
+        if not valid or (param.is_bitmask and raw & ~param.maximum) or \
+                (not param.is_bitmask and not param.minimum <= raw <= param.maximum):
+            errors.append(Diagnostic(board_path, line, f"board default of {name}, {raw!r}, is outside its range "
+                                                       f"[{param.minimum}, {param.maximum}]"))
+            continue
+        param.default = float(raw) if param.type == "FLOAT" else raw
+    if errors:
+        raise ParamsError(errors)
+    return groups
+
+
 def all_params(groups: list[Group]) -> list[Param]:
     """Every parameter, sorted by name: the order of the parameter table."""
     return sorted((p for g in groups for p in g.params), key=lambda p: p.name)

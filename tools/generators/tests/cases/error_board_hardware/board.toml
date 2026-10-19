@@ -13,6 +13,7 @@ serial = [
   { port = "SERIAL1", tx = "SERIAL1_TX", rx = "SERIAL2_TX", function = "LINK" },
   { port = "UART7",   tx = "SERIAL2_TX", function = "LINK" },
   { port = "SERIAL3", tx = "SERIAL2_TX", function = "GPS" },
+  { port = "SERIAL4", tx = "SERIAL1_TX", function = "LINK", baud = 300 },
 ]
 
 devices = [

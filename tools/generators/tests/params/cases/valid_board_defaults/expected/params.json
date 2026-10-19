@@ -1,0 +1,74 @@
+{
+  "generator": "tools/generators/generate_params.py",
+  "set_hash": "0xBB9A910AFFFD870C",
+  "parameters": [
+    {
+      "name": "TA_BAUD",
+      "hash": 2102933343,
+      "type": "INT32",
+      "default": 115200,
+      "min": 9600,
+      "max": 115200,
+      "unit": null,
+      "description": "An enum the board sets by number.",
+      "reboot_required": false,
+      "locked_when_armed": false,
+      "values": [
+        {
+          "name": "B9600",
+          "value": 9600
+        },
+        {
+          "name": "B115200",
+          "value": 115200
+        }
+      ]
+    },
+    {
+      "name": "TA_GAIN",
+      "hash": 954008980,
+      "type": "FLOAT",
+      "default": 1.5,
+      "min": 0.0,
+      "max": 2.0,
+      "unit": null,
+      "description": "A gain the board sets.",
+      "reboot_required": false,
+      "locked_when_armed": false
+    },
+    {
+      "name": "TA_KEEP",
+      "hash": 3821604266,
+      "type": "INT32",
+      "default": 4,
+      "min": 0,
+      "max": 9,
+      "unit": null,
+      "description": "A parameter the board leaves alone.",
+      "reboot_required": false,
+      "locked_when_armed": false
+    },
+    {
+      "name": "TA_MODE",
+      "hash": 2021296292,
+      "type": "INT32",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "unit": null,
+      "description": "An enum the board sets by name.",
+      "reboot_required": false,
+      "locked_when_armed": false,
+      "values": [
+        {
+          "name": "SLOW",
+          "value": 0
+        },
+        {
+          "name": "FAST",
+          "value": 1
+        }
+      ]
+    }
+  ]
+}

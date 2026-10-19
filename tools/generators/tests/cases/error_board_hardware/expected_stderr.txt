@@ -1,11 +1,12 @@
 board.toml:13: error: rx of SERIAL1 must be a pin role with a U(S)ART RX function, not 'SERIAL2_TX'
 board.toml:14: error: serial port 'UART7' must be named SERIAL<n>
 board.toml:15: error: default function 'GPS' of SERIAL3 must be one of: NONE, LINK, RC_INPUT, LOG
-board.toml:29: error: timing trigger must be one of: IMU_EVENT, TIMER
-board.toml:29: error: timing base_rate_hz must be an integer from 1 to 8000
-board.toml:30: error: parameter name 'a long lower name' must be upper case and at most 16 characters
-board.toml:19: error: I2C device BARO0 needs pins of one I2C peripheral in the order SCL, SDA
-board.toml:20: error: I2C device MAG0 needs a 7-bit 'address' between 0x08 and 0x77
-board.toml:21: error: device IMU0 uses undefined pin roles: MISSING
-board.toml:22: error: rotation 'UPSIDE_DOWN' of device IMU1 is not one of the known rotations
-board.toml:26: error: storage SD_CARD connects over SDIO or SPI, not 'QSPI'
+board.toml:16: error: baud of SERIAL4 must be an integer from 1200 to 10000000, got 300
+board.toml:30: error: timing trigger must be one of: IMU_EVENT, TIMER
+board.toml:30: error: timing base_rate_hz must be an integer from 1 to 8000
+board.toml:31: error: parameter name 'a long lower name' must be upper case and at most 16 characters
+board.toml:20: error: I2C device BARO0 needs pins of one I2C peripheral in the order SCL, SDA
+board.toml:21: error: I2C device MAG0 needs a 7-bit 'address' between 0x08 and 0x77
+board.toml:22: error: device IMU0 uses undefined pin roles: MISSING
+board.toml:23: error: rotation 'UPSIDE_DOWN' of device IMU1 is not one of the known rotations
+board.toml:27: error: storage SD_CARD connects over SDIO or SPI, not 'QSPI'

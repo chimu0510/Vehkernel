@@ -1,0 +1,31 @@
+prefix = "TA"
+
+[[param]]
+name = "TA_GAIN"
+type = "FLOAT"
+default = 0.5
+min = 0.0
+max = 2.0
+description = "A gain the board sets."
+
+[[param]]
+name = "TA_BAUD"
+type = "INT32"
+default = "B9600"
+values = [{ name = "B9600", value = 9600 }, { name = "B115200", value = 115200 }]
+description = "An enum the board sets by number."
+
+[[param]]
+name = "TA_MODE"
+type = "INT32"
+default = "SLOW"
+values = [{ name = "SLOW", value = 0 }, { name = "FAST", value = 1 }]
+description = "An enum the board sets by name."
+
+[[param]]
+name = "TA_KEEP"
+type = "INT32"
+default = 4
+min = 0
+max = 9
+description = "A parameter the board leaves alone."

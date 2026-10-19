@@ -65,11 +65,11 @@ void start_imu()
 #endif
 
 #ifdef CONFIG_LINK_SERIAL
-// The Link's serial port and baud rate, fixed until the parameter system
-// exists (spec 0003): SERIAL1, the Type-C port, at 921600 baud 8N1.
+// The Link's serial port: SERIAL1, the Type-C port, 8N1 at SERIAL1_BAUD
+// (spec 0005), whose default the board definition gives. The port stays
+// fixed until SERIALn_FUNCTION exists.
 using LinkPort = vk::board::ports::SERIAL1;
 static_assert(vk::board::defaults::SERIAL1_FUNCTION == "LINK", "SERIAL1 must be a Link port");
-constexpr std::uint32_t link_baud = 921'600;
 
 using LinkUart = vk::platform::DmaUart<LinkPort>;
 static_assert(vk::hal::Uart<LinkUart>);
@@ -80,7 +80,11 @@ vk::core::StaticInstance<vk::link::Link> serial_link;
 
 void start_link()
 {
-    if (!link_uart.configure(link_baud)) {
+    // A rate the USART cannot reach falls back to the board default, so a bad
+    // parameter never costs the Link that could change it back.
+    const auto baud = static_cast<std::uint32_t>(vk::params::serial.serial1_baud);
+    if (!link_uart.configure(baud) &&
+        !link_uart.configure(static_cast<std::uint32_t>(vk::board::defaults::SERIAL1_BAUD))) {
         vk::core::fail("the Link's baud rate is out of the USART's reach");
     }
     link_transport.emplace(link_uart);

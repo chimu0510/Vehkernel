@@ -1,0 +1,7 @@
+{
+  "CTRL_RATE_HZ": 200,
+  "SERIAL1_FUNCTION": "LINK",
+  "TA_BAUD": 115200,
+  "TA_GAIN": 5.0,
+  "TA_MODE": "FAST"
+}

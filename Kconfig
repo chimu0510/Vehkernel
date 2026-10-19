@@ -110,9 +110,9 @@ config LINK_SERIAL
 	default y
 	help
 	  A Link on the board's first serial port whose function is LINK,
-	  SERIAL1 (the Type-C port) on the C50C V1.1, at 921600 baud 8N1
-	  until the parameter system exists. UART transmit and receive use
-	  DMA.
+	  SERIAL1 (the Type-C port) on the C50C V1.1, 8N1 at the SERIAL1_BAUD
+	  parameter, 921600 by default on that board. UART transmit and
+	  receive use DMA.
 
 config LINK_UDP
 	bool "Link over UDP"

@@ -270,6 +270,7 @@ namespace defaults {
 inline constexpr std::int32_t CTRL_RATE_HZ = 200;
 inline constexpr std::string_view CTRL_TRIGGER = "TIMER";
 inline constexpr std::string_view IMU_SAMPLING = "PER_SAMPLE";
+inline constexpr std::int32_t SERIAL1_BAUD = 921600;
 inline constexpr std::string_view SERIAL1_FUNCTION = "LINK";
 inline constexpr std::string_view SERIAL2_FUNCTION = "LINK";
 inline constexpr std::string_view SERIAL3_FUNCTION = "NONE";
