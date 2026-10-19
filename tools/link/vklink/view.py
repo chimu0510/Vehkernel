@@ -41,8 +41,8 @@ def render(monitor: LinkMonitor, target: str, width: int = 120) -> list[str]:
         header += f"  rtt {monitor.time_sync.rtt_us / 1000:.1f} ms"
     lines = [
         header,
-        f"host received  frames {stats.frames}  crc_errors {stats.crc_errors}  "
-        f"malformed {stats.malformed}  lost {stats.lost}",
+        f"host received  frames {stats.frames}  crc_errors {monitor.crc_errors}  "
+        f"malformed {stats.malformed}  lost {monitor.lost}",
     ]
     for instance, status in monitor.latest("link_status"):
         lines.append(

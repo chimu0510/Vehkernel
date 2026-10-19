@@ -268,6 +268,14 @@ class LinkMonitor:
         # Called with (topic name, instance, message) for every decoded message.
         self.listeners: list[Callable[[str, int, object], None]] = []
         self._next_time_sync = 0.0
+        # Frames lost before the handshake are not the Link's: a serial adapter
+        # may still hold the end of the previous session, whose sequence numbers
+        # are far behind. Losses count from the handshake on.
+        self.lost_at_handshake = 0
+        self.crc_errors_at_handshake = 0
+        # The first link_status of each instance after the handshake: the MCU's
+        # drops count from there, not from boot.
+        self.first_link_status: dict[int, object] = {}
         # Parameter replies, as they arrive.
         self.params: dict[str, ParamValue] = {}
         self.param_rejects: list[ParamReject] = []
@@ -275,6 +283,16 @@ class LinkMonitor:
     @property
     def connected(self) -> bool:
         return self.session.handshake_done
+
+    @property
+    def lost(self) -> int:
+        """Frames lost since the handshake."""
+        return self.reader.stats.lost - self.lost_at_handshake
+
+    @property
+    def crc_errors(self) -> int:
+        """Frames with a wrong CRC since the handshake; one before it may be a stale frame cut in two."""
+        return self.reader.stats.crc_errors - self.crc_errors_at_handshake
 
     @property
     def mismatches(self) -> list[Mismatch]:
@@ -295,6 +313,8 @@ class LinkMonitor:
                 self.connection.send(self.session.make_hello())
                 next_hello = now + self.HELLO_INTERVAL_S
             self._receive(min(next_hello, deadline) - now)
+        self.lost_at_handshake = self.reader.stats.lost
+        self.crc_errors_at_handshake = self.reader.stats.crc_errors
         return True
 
     def run(self, duration_s: float) -> None:
@@ -346,6 +366,8 @@ class LinkMonitor:
         if key not in self.topics:
             self.topics[key] = TopicStats(peer.name, instance)
         self.topics[key].add(message)
+        if message is not None and peer.name == "link_status":
+            self.first_link_status.setdefault(instance, message)
         if message is not None:
             for listener in self.listeners:
                 listener(peer.name, instance, message)
@@ -417,7 +439,7 @@ class LinkMonitor:
             f"link handshake={'ok' if self.connected else 'failed'} version={self.session.version} "
             f"mismatches={len(self.session.mismatched_topics)} params={self.session.param_count} "
             f"param_set_hash=0x{self.session.param_set_hash:016X} frames={stats.frames} "
-            f"crc_errors={stats.crc_errors} malformed={stats.malformed} lost={stats.lost}"
+            f"crc_errors={self.crc_errors} malformed={stats.malformed} lost={self.lost}"
         )
         if self.time_sync is not None:
             link += f" rtt_us={self.time_sync.rtt_us} clock_offset_us={self.time_sync.clock_offset_us}"
@@ -488,14 +510,14 @@ def check(monitor: LinkMonitor, expectations: list[RateExpectation], tolerance: 
         return result
     for mismatch in monitor.mismatches:
         result.failures.append(f"topic {mismatch.name} has a different schema hash on the MCU")
-    stats = monitor.reader.stats
-    if stats.lost:
-        result.failures.append(f"{stats.lost} frames lost")
-    if stats.crc_errors:
-        result.failures.append(f"{stats.crc_errors} frames with CRC errors")
+    if monitor.lost:
+        result.failures.append(f"{monitor.lost} frames lost")
+    if monitor.crc_errors:
+        result.failures.append(f"{monitor.crc_errors} frames with CRC errors")
     for instance, status in monitor.latest("link_status"):
-        if status.drops:
-            result.failures.append(f"the MCU dropped {status.drops} frames on Link {instance}")
+        first = monitor.first_link_status.get(instance, status)
+        if status.drops > first.drops:
+            result.failures.append(f"the MCU dropped {status.drops - first.drops} frames on Link {instance}")
     for expected in expectations:
         topic = monitor.topics.get((expected.name, expected.instance))
         if topic is None:

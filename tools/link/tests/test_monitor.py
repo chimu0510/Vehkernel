@@ -160,6 +160,7 @@ def test_summary_and_live_view_show_link_statistics_and_work_item_timing():
     worker = types.SimpleNamespace(timestamp=1, work_item=0, name=tuple(b"icm20948".ljust(16, b"\0")), runs=1000,
                                    overruns=0, run_time_last_us=4, run_time_max_us=12, run_time_mean_us=3,
                                    jitter_max_us=900)
+    monitor.first_link_status[0] = types.SimpleNamespace(drops=0)  # at the start of the check
     sample = Sample(timestamp=5, value=42)
     sample.FIELDS = ("timestamp", "value")
     for name, message in (("link_status", link), ("work_item_status", worker), ("sample", sample)):
@@ -197,3 +198,27 @@ def test_attitudes_show_as_roll_pitch_and_yaw_in_degrees():
     view = render(monitor, "udp", width=200)
     assert any(line.startswith("vehicle_attitude") and "roll=28.6° pitch=0.0° yaw=0.0° estimator_id=1" in line
                for line in view)
+
+
+def test_only_losses_and_drops_after_the_handshake_count():
+    """A serial adapter may still hold the end of the previous session, and
+    the MCU's drops count from boot: neither is this Link's fault."""
+    connection = types.SimpleNamespace(send=lambda data: None, receive=lambda timeout: b"", close=lambda: None)
+    monitor = LinkMonitor(connection, messages())
+    monitor.reader.stats.lost = 650  # a stale frame, then the current stream
+    monitor.reader.stats.crc_errors = 1
+    monitor.session.handshake_done = True
+    monitor.lost_at_handshake = 650
+    monitor.crc_errors_at_handshake = 1
+    monitor.first_link_status[0] = types.SimpleNamespace(drops=3)
+    status = types.SimpleNamespace(timestamp=1, frames_sent=1, bytes_sent=1, frames_received=1, bytes_received=1,
+                                   drops=3, crc_errors=0, malformed=0, lost=0, handshake_state=1)
+    monitor.topics[("link_status", 0)] = TopicStats("link_status", 0)
+    monitor.topics[("link_status", 0)].add(status)
+    assert check(monitor, [], 0.05).failures == []
+    assert "lost=0" in monitor.summary()[0]
+
+    monitor.reader.stats.lost += 2
+    status.drops = 5
+    assert check(monitor, [], 0.05).failures == ["2 frames lost", "the MCU dropped 2 frames on Link 0"]
+
