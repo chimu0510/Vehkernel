@@ -7,7 +7,9 @@ one, and is refused, with the reason, a value out of range and an unknown
 name. Then, with SITL under the shake profile and the accelerometer rejection
 turned off through ATT_ACC_REJ, the estimate follows the linear acceleration
 bursts barely at a small ATT_KP and far at a large one set in between: the
-gain reaches the running filter.
+gain reaches the running filter. Last, values set over the Link are back
+after SITL restarts with the same --param-file, parameter_status reporting
+nothing skipped, and SITL without --param-file starts from the defaults.
 
     check_params.py build/test/app/vehkernel-sitl tools/link/link_monitor.py \\
         --msg-dir build/test/generated/schema/python --param-meta build/test/generated/params/params.json
@@ -19,6 +21,8 @@ import argparse
 import bisect
 import subprocess
 import sys
+import tempfile
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -177,6 +181,82 @@ def check_gain(args) -> list[str]:
     return failures
 
 
+class Sitl:
+    """SITL with its UDP Link and the Link monitor library connected to it."""
+
+    def __init__(self, args, *extra: str):
+        port = free_udp_port()
+        self.process = subprocess.Popen([args.sitl, "--duration", "0", "--udp", f"127.0.0.1:{port}", *extra],
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        print(self.process.stdout.readline(), end="")
+        self.connection = UdpConnection("127.0.0.1", port)
+        self.monitor = LinkMonitor(self.connection, load_messages(args.msg_dir))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.connection.close()
+        self.process.terminate()
+        self.process.communicate(timeout=30)
+
+    def status(self, timeout_s: float = 3.0):
+        """The next parameter_status to arrive."""
+        stats = self.monitor.topics.get(("parameter_status", 0))
+        count = stats.messages if stats else 0
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            self.monitor.poll(0.05)
+            stats = self.monitor.topics.get(("parameter_status", 0))
+            if stats and stats.messages > count and stats.latest is not None:
+                return stats.latest
+        return None
+
+
+def check_persistence(args) -> list[str]:
+    """Values set over the Link, kept in --param-file across a restart."""
+    failures = []
+    with tempfile.TemporaryDirectory() as directory:
+        param_file = str(Path(directory) / "params.bin")
+        with Sitl(args, "--param-file", param_file) as sitl:
+            if not sitl.monitor.handshake(HANDSHAKE_S):
+                return ["no handshake with SITL"]
+            for name, value in (("ATT_KP", 3.0), ("ATT_KI", 0.1)):
+                reply = sitl.monitor.set_param(name, ParamType.FLOAT, value, 3.0)
+                if not isinstance(reply, ParamValue):
+                    failures.append(f"setting {name} failed: {reply}")
+            status = None
+            for _ in range(5):
+                status = sitl.status()
+                if status is not None and status.unsaved == 0:
+                    break
+            if status is None or status.unsaved != 0:
+                failures.append(f"the changes were not stored: {status}")
+            else:
+                print(f"stored: bytes_used={status.bytes_used} sector={status.active_sector}")
+        with Sitl(args, "--param-file", param_file) as sitl:
+            if not sitl.monitor.handshake(HANDSHAKE_S):
+                return failures + ["no handshake with SITL after the restart"]
+            for name, expected in (("ATT_KP", 3.0), ("ATT_KI", 0.1)):
+                reply = sitl.monitor.get_param(name, 3.0)
+                if not isinstance(reply, ParamValue) or abs(reply.value - expected) > 1e-6:
+                    failures.append(f"{name} after the restart is {getattr(reply, 'value', reply)}, "
+                                    f"expected {expected:g}")
+            status = sitl.status()
+            skipped = None if status is None else (status.skipped_unknown + status.skipped_wrong_type +
+                                                   status.skipped_out_of_range + status.skipped_corrupt)
+            print(f"restarted: skipped={skipped} unsaved={getattr(status, 'unsaved', None)}")
+            if skipped != 0 or status.unsaved != 0 or status.failed:
+                failures.append(f"parameter_status after the restart: {status}")
+    with Sitl(args) as sitl:
+        if not sitl.monitor.handshake(HANDSHAKE_S):
+            return failures + ["no handshake with SITL without --param-file"]
+        reply = sitl.monitor.get_param("ATT_KP", 3.0)
+        if not isinstance(reply, ParamValue) or reply.value != 1.0:
+            failures.append(f"without --param-file ATT_KP is {getattr(reply, 'value', reply)}, not the default 1")
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("sitl", help="the vehkernel-sitl executable")
@@ -185,7 +265,7 @@ def main() -> int:
     parser.add_argument("--param-meta", required=True, help="the build's parameter metadata file")
     args = parser.parse_args()
 
-    failures = check_cli(args) + check_gain(args)
+    failures = check_cli(args) + check_gain(args) + check_persistence(args)
     for failure in failures:
         print(f"FAIL: {failure}", file=sys.stderr)
     return 1 if failures else 0

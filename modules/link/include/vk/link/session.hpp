@@ -16,6 +16,7 @@
 // that send_pending() paces.
 #pragma once
 
+#include <vk/core/parameter_storage.hpp>
 #include <vk/core/parameters.hpp>
 #include <vk/link/frame.hpp>
 #include <vk/msg/topics.hpp>
@@ -65,7 +66,8 @@ public:
 // The parameters a session offers; without a runtime it offers none.
 struct ParameterAccess {
     core::Parameters* parameters = nullptr;
-    std::uint64_t set_hash = 0;  // of the metadata the parameters come from
+    std::uint64_t set_hash = 0;                         // of the metadata the parameters come from
+    const core::ParameterStorage* storage = nullptr;    // for the flags of param_value, if parameters are stored
 };
 
 class Session {

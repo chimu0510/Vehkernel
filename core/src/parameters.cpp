@@ -18,6 +18,16 @@ std::optional<std::size_t> Parameters::find(std::string_view name) const
     return static_cast<std::size_t>(it - table_.begin());
 }
 
+std::optional<std::size_t> Parameters::find_hash(std::uint32_t hash) const
+{
+    for (std::size_t i = 0; i < table_.size(); ++i) {
+        if (table_[i].hash == hash) {
+            return i;
+        }
+    }
+    return std::nullopt;
+}
+
 ParamValue Parameters::get(std::size_t index) const
 {
     const ParamInfo& info = table_[index];

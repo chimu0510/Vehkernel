@@ -100,6 +100,8 @@ public:
 
     // The index of a parameter, or nothing if no parameter has that name.
     [[nodiscard]] std::optional<std::size_t> find(std::string_view name) const;
+    // The same by the hash of the name, as stored entries carry it.
+    [[nodiscard]] std::optional<std::size_t> find_hash(std::uint32_t hash) const;
 
     // The current value. `index` must be below count().
     [[nodiscard]] ParamValue get(std::size_t index) const;

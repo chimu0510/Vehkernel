@@ -1,7 +1,7 @@
 // SITL entry point: the firmware on the FreeRTOS POSIX port (ADR-0018).
 //
 // Usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]
-//                       [--motion still|tilt|rotate|shake]
+//                       [--motion still|tilt|rotate|shake] [--param-file <path>]
 //
 // The run stops by itself after the duration (default 1 s; 0 runs until
 // interrupted) and prints a report: one line per topic instance and per work
@@ -11,6 +11,8 @@
 // Its line, with the port bound or the pty's path, is printed when it starts.
 // The simulated IMU follows a scripted motion (level and still by default),
 // and its true attitude is published on vehicle_attitude_groundtruth.
+// Parameters are stored in a simulated NOR Flash: blank at every start, so
+// runs are reproducible, or kept in the file given with --param-file.
 #include <vk/config.h>
 #include <vk/core/bus.hpp>
 #include <vk/core/scheduler.hpp>
@@ -23,6 +25,11 @@
 #include <vk/hal/i2c.hpp>
 #include <vk/msg/registry.hpp>
 #include <vk/params/params.hpp>
+#ifdef CONFIG_PARAM_STORAGE_FLASH
+#include <vk/core/parameter_storage.hpp>
+#include <vk/hal/flash.hpp>
+#include <vk/sim/nor_flash.hpp>
+#endif
 #include <vk/platform/platform.hpp>
 
 #ifdef CONFIG_LINK
@@ -76,6 +83,7 @@ struct Options {
     std::array<char, 64> udp_address{"127.0.0.1"};  // NUL-terminated
     std::uint16_t udp_port = 15600;
     vk::sim::MotionProfile motion = vk::sim::MotionProfile::Still;
+    const char* param_file = nullptr;  // nullptr: blank Flash in memory
 };
 
 bool parse_address(const char* argument, Options& options)
@@ -130,6 +138,8 @@ bool parse_options(std::span<char*> args, Options& options)
             if (!parse_address(value, options)) {
                 return false;
             }
+        } else if (arg == "--param-file") {
+            options.param_file = value;
         } else {
             return false;
         }
@@ -147,7 +157,37 @@ vk::platform::UdpTransport udp;
 vk::platform::PtyTransport pty;
 #endif
 
+#ifdef CONFIG_PARAM_STORAGE_FLASH
+vk::sim::NorFlash param_flash;
+std::array<vk::core::ParameterStorage::Slot, vk::params::count> param_slots{};
+vk::core::StaticInstance<vk::core::ParameterStorage> param_storage;
+
+// Loads the stored parameters, before anything reads them, and starts storing changes.
+bool start_parameters(const Options& options)
+{
+    if (options.param_file != nullptr && !param_flash.attach_file(options.param_file)) {
+        std::fprintf(stderr, "param-file: cannot open %s\n", options.param_file);
+        return false;
+    }
+    param_storage.emplace(vk::params::parameters(), vk::hal::FlashSectors(param_flash), param_slots,
+                          vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+    param_storage->load();
+    param_storage->start();
+    return true;
+}
+#endif
+
 #ifdef CONFIG_LINK
+// The parameter storage, if parameters are stored, for the Link's param_value flags.
+const vk::core::ParameterStorage* stored_parameters()
+{
+#ifdef CONFIG_PARAM_STORAGE_FLASH
+    return &*param_storage;
+#else
+    return nullptr;
+#endif
+}
+
 // Opens the chosen transport and starts the Link on it; false if it cannot.
 bool start_link(const Options& options)
 {
@@ -179,7 +219,8 @@ bool start_link(const Options& options)
     std::fflush(stdout);
     host_link.emplace("link0", *transport, vk::link::default_topic_map(),
                       vk::link::Link::Config{.parameters = {.parameters = &vk::params::parameters(),
-                                                            .set_hash = vk::params::set_hash}},
+                                                            .set_hash = vk::params::set_hash,
+                                                            .storage = stored_parameters()}},
                       vk::core::work_queue(vk::core::WorkQueueTier::Io));
     host_link->start();
     return true;
@@ -226,11 +267,16 @@ int main(int argc, char** argv)
     Options options;
     if (!parse_options(std::span(argv, static_cast<std::size_t>(argc)), options)) {
         std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]\n"
-                   "                      [--motion still|tilt|rotate|shake]\n",
+                   "                      [--motion still|tilt|rotate|shake] [--param-file <path>]\n",
                    stderr);
         return 2;
     }
     vk::platform::init(options.motion);
+#ifdef CONFIG_PARAM_STORAGE_FLASH
+    if (!start_parameters(options)) {
+        return 1;
+    }
+#endif
     start_imu();
     vk::platform::start_ground_truth(vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
 #ifdef CONFIG_ESTIMATOR_MAHONY

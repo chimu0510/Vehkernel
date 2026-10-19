@@ -21,7 +21,8 @@
 //   param_reject        u8 reason, u8 name length, name
 //
 // Parameter values travel as their 32 bits with the type: 1 int32, 2 float32
-// (ADR-0012). Reject reasons are those of vk::core::ParamResult.
+// (ADR-0012). Reject reasons are those of vk::core::ParamResult; the flags of
+// param_value are vk::core::param_state: 1 pending reboot, 2 unsaved.
 #pragma once
 
 #include <vk/link/cobs.hpp>

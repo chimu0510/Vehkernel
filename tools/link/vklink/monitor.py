@@ -119,6 +119,20 @@ def load_messages(directory: str | Path) -> ModuleType:
     return module
 
 
+# Flags of param_value: vk::core::param_state.
+PARAM_PENDING_REBOOT = 1
+PARAM_UNSAVED = 2
+
+
+def param_status_line(status) -> str:
+    """parameter_status as a space-separated key=value line."""
+    return (f"param_status count={status.parameter_count} sector={status.active_sector} "
+            f"bytes_used={status.bytes_used} sector_size={status.sector_size} unsaved={status.unsaved} "
+            f"pending_reboot={status.pending_reboot} skipped_unknown={status.skipped_unknown} "
+            f"skipped_wrong_type={status.skipped_wrong_type} skipped_out_of_range={status.skipped_out_of_range} "
+            f"skipped_corrupt={status.skipped_corrupt} failed={int(status.failed)}")
+
+
 @dataclass(frozen=True)
 class ParamMetadata:
     """The parameter generator's metadata file (ADR-0012)."""
@@ -157,6 +171,10 @@ def format_param(param: ParamValue, meta: dict | None) -> str:
     if param.value in names:
         line += f" value_name={names[param.value]}"
     line += f" type={ParamType(param.type).name if param.type in (1, 2) else param.type}"
+    if param.flags & PARAM_PENDING_REBOOT:
+        line += " pending_reboot=1"
+    if param.flags & PARAM_UNSAVED:
+        line += " unsaved=1"
     if meta is not None:
         if meta.get("unit"):
             line += f" unit={meta['unit']}"
@@ -426,6 +444,8 @@ class LinkMonitor:
                 f"drops={status.drops} crc_errors={status.crc_errors} malformed={status.malformed} "
                 f"lost={status.lost} handshake_state={HANDSHAKE_STATES.get(status.handshake_state, '?')}"
             )
+        for _, status in self.latest("parameter_status"):
+            lines.append(param_status_line(status))
         for _, status in self.latest("work_item_status"):
             lines.append(
                 f"work_item name={work_item_name(status)} runs={status.runs} overruns={status.overruns} "

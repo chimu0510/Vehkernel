@@ -5,7 +5,7 @@ from __future__ import annotations
 from .monitor import HANDSHAKE_STATES, LinkMonitor, euler_degrees, work_item_name
 
 # Topics shown in their own tables rather than by their raw values.
-STATUS_TOPICS = ("link_status", "work_item_status")
+STATUS_TOPICS = ("link_status", "work_item_status", "parameter_status")
 
 
 def format_value(value: object) -> str:
@@ -50,6 +50,14 @@ def render(monitor: LinkMonitor, target: str, width: int = 120) -> list[str]:
             f"received {status.frames_received} frames / {status.bytes_received} B  drops {status.drops}  "
             f"crc_errors {status.crc_errors}  malformed {status.malformed}  lost {status.lost}  "
             f"{HANDSHAKE_STATES.get(status.handshake_state, '?')}"
+        )
+    for _, status in monitor.latest("parameter_status"):
+        lines.append(
+            f"parameters     {status.parameter_count}  sector {status.active_sector} "
+            f"{status.bytes_used}/{status.sector_size} B  unsaved {status.unsaved}  "
+            f"pending reboot {status.pending_reboot}  skipped at boot "
+            f"{status.skipped_unknown + status.skipped_wrong_type + status.skipped_out_of_range + status.skipped_corrupt}"
+            f"{'  FLASH FAILED' if status.failed else ''}"
         )
     for mismatch in monitor.mismatches:
         lines.append(f"MISMATCH       topic {mismatch.name}: schema hash differs from the local build")

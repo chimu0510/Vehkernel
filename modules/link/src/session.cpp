@@ -166,7 +166,7 @@ bool Session::send_param_value(std::size_t index, FrameSink& sink)
     out.u16(static_cast<std::uint16_t>(parameter_count()));
     out.u8(static_cast<std::uint8_t>(value.type));
     out.u32(value.bits);
-    out.u8(0);  // flags
+    out.u8(parameters_.storage == nullptr ? 0 : parameters_.storage->state(index));  // core::param_state
     write_name(out, info.name);
     return out.ok() && send(FrameType::ParamValue, out.written(), sink);
 }

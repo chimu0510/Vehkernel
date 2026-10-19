@@ -165,7 +165,15 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600 param set ATT_KP 2.5
 param name=ATT_KP value=2.5 type=FLOAT unit=1/s default=1 min=0 max=10 description="Attitude correction gain: how fast roll and pitch follow the accelerometer."
 ```
 
-CI runs `test/sitl/check_params.py` (the `sitl_params` test): the `param` command against SITL, refusals included, and `ATT_KP` changed while the estimator runs under the shake profile.
+Parameters that differ from their defaults are stored in internal Flash, entry by entry in two alternating sectors, and survive power loss (ADR-0012, ADR-0020). SITL keeps them in a simulated NOR Flash that follows the same rules. It starts blank at every run, so runs are reproducible; with `--param-file <path>` the Flash lives in that file and the parameters survive a restart:
+
+```bash
+build/sitl/app/vehkernel-sitl --duration 0 --param-file /tmp/vk-params.bin
+```
+
+The monitor's live view and `--check` summary show `parameter_status`: the sector in use and its fill, changes not yet in Flash (`unsaved`), `reboot_required` changes waiting for a restart (`pending_reboot`), and stored entries skipped at boot because their parameter is gone, changed type, is out of range or was cut short by a power loss. `param list` and `param get` mark a parameter `pending_reboot=1` or `unsaved=1` the same way.
+
+CI runs `test/sitl/check_params.py` (the `sitl_params` test): the `param` command against SITL, refusals included; `ATT_KP` changed while the estimator runs under the shake profile; and values set over the Link found again after SITL restarts with the same `--param-file`.
 
 SITL's simulated IMU follows a scripted motion chosen with `--motion`, and SITL publishes its true attitude on `vehicle_attitude_groundtruth`, which the Link also carries, so the monitor shows the estimate and the truth side by side. Each profile starts moving 3 s after boot, once the estimator has aligned, and ends by 10 s:
 

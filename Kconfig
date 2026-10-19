@@ -89,8 +89,14 @@ menu "Storage"
 
 config PARAM_STORAGE_FLASH
 	bool "Parameters in internal Flash"
-	depends on BOARD_HAS_FLASH_PARAMS
+	depends on BOARD_HAS_FLASH_PARAMS || PLATFORM_SITL
 	default y
+	help
+	  Non-default parameter values are stored entry by entry in two
+	  alternating Flash sectors and survive power loss (ADR-0012,
+	  ADR-0020). SITL keeps them in a simulated NOR Flash, in memory or
+	  in the file given with --param-file. Without it, parameters live in
+	  RAM and start from their defaults at every boot.
 
 endmenu
 

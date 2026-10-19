@@ -1,6 +1,7 @@
 # Bus, Work Queues, parameter runtime and timing monitor (ADR-0008, ADR-0012, ADR-0015).
 vk_add_library(vk_core LAYER core STATIC
   src/critical_section.cpp
+  src/parameter_storage.cpp
   src/parameters.cpp
   src/scheduler.cpp
   src/timing_monitor.cpp

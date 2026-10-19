@@ -191,3 +191,29 @@ def test_cli_fails_with_the_reason_on_a_refused_set(tmp_path: Path):
     assert "FAIL: T_GAIN rejected: out of range" in out_of_range.stderr
     assert unknown.returncode == 1
     assert "FAIL: T_NONE rejected: unknown name" in unknown.stderr
+
+
+def test_flags_show_pending_reboot_and_unsaved():
+    value = ParamValue(index=0, count=1, type=ParamType.INT32, bits=4, flags=3, name="T_COUNT")
+    assert format_param(value, None) == "param name=T_COUNT value=4 type=INT32 pending_reboot=1 unsaved=1"
+
+
+def test_summary_and_live_view_show_parameter_status():
+    import types
+
+    from vklink.monitor import TopicStats
+    from vklink.view import render
+
+    connection = types.SimpleNamespace(send=lambda data: None, receive=lambda timeout: b"", close=lambda: None)
+    monitor = LinkMonitor(connection, messages())
+    status = types.SimpleNamespace(timestamp=1, parameter_count=5, active_sector=1, bytes_used=44,
+                                   sector_size=16384, unsaved=1, pending_reboot=2, skipped_unknown=1,
+                                   skipped_wrong_type=0, skipped_out_of_range=0, skipped_corrupt=1, failed=False)
+    monitor.topics[("parameter_status", 0)] = TopicStats("parameter_status", 0)
+    monitor.topics[("parameter_status", 0)].add(status)
+    assert ("param_status count=5 sector=1 bytes_used=44 sector_size=16384 unsaved=1 pending_reboot=2 "
+            "skipped_unknown=1 skipped_wrong_type=0 skipped_out_of_range=0 skipped_corrupt=1 failed=0") \
+        in monitor.summary()
+    view = render(monitor, "udp", width=200)
+    assert any(line.startswith("parameters     5  sector 1 44/16384 B  unsaved 1  pending reboot 2  "
+                               "skipped at boot 2") for line in view)
