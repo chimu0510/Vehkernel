@@ -1,6 +1,6 @@
 # Spec 0005: parameter system
 
-**Status**: open. Issue: [#36](https://github.com/chimu0510/Vehkernel/issues/36).
+**Status**: open. Issue: [#36](https://github.com/chimu0510/Vehkernel/issues/36); tickets #37 to #42.
 
 This file and the issue carry the same spec; update both when the spec changes.
 
