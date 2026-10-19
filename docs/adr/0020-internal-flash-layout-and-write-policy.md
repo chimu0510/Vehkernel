@@ -2,7 +2,17 @@
 
 The STM32F407 Flash has a single bank. During an erase or write, every instruction or constant fetch from Flash stalls, including ISRs and `wq:ctrl`. Writing one 32-bit word stalls for only about 16 µs, but erasing a sector takes hundreds of milliseconds up to 2 seconds, long enough to stall the control chain. Parameter storage (ADR-0012) and the event log (ADR-0019) both write internal Flash, so they need one layout and one set of write rules.
 
-**Layout**: S0 is reserved for a future bootloader and until then holds only a jump stub; S1–S2 hold parameter storage (two alternating sectors, ADR-0012); S3 holds the event log; S4–S7 hold the firmware as one contiguous 448 KB region. The board definition declares the layout, and each region's size is a budget the link enforces (ADR-0017). Flashing works over SWD without any bootloader; when firmware updates over a Link are added, a new ADR decides what goes into S0, with no change to the layout.
+**Layout**
+
+| Sector | Size | Use |
+|---|---|---|
+| S0 | 16 KB | Reserved for a future bootloader; for now holds only a stub that jumps to the firmware |
+| S1–S2 | 16 KB × 2 | Parameter storage, two alternating sectors (ADR-0012) |
+| S3 | 16 KB | Event log (ADR-0019) |
+| S4–S7 | 64 KB + 128 KB × 3 | Firmware, 448 KB contiguous; VTOR points the vector table at S4 |
+
+- The board TOML declares the layout, and the sector table comes from the MCU database (ADR-0011). The generator derives the linker script memory regions from it and uses the firmware region size as the Flash budget of ADR-0017.
+- Flashing works over SWD without any bootloader. When firmware updates over a Link are added, a new ADR decides what goes into S0, with no change to the layout.
 
 **Write policy**
 
