@@ -76,6 +76,8 @@ tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/c50c-v1_1/gener
     --check --duration 60 --expect-rate imu_sample:0=200
 ```
 
+The attitude estimate is in the same view: lift the board's front edge and pitch goes positive, lower its right edge and roll goes positive, turn it clockwise seen from above and yaw goes positive (body frame x forward, y right, z down). The IMU's mounting rotation, `YAW_90` on the C50C V1.1, was measured this way and is set in `boards/c50c-v1_1/board.toml`; a board whose estimate tilts the wrong way needs its `rotation` corrected there.
+
 The bring-up test build (L4, [ADR-0018](docs/adr/0018-test-layers-and-sitl.md)) runs the hardware bring-up cases at boot instead of the application: it reads the ICM20948's WHO_AM_I over software I2C and measures the IMU read rate. It never configures actuator outputs, so it is safe with motors connected. Build it in the devcontainer, then run the bring-up runner on the host, which flashes it over SWD, reads the result block back and exits non-zero if a case fails or no results arrive:
 
 ```bash

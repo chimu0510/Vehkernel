@@ -259,7 +259,7 @@ struct IMU0 {
     static constexpr std::string_view type = "ICM20948";
     static constexpr std::string_view bus = "SOFT_I2C";
     static constexpr std::uint8_t address = 0x68;
-    static constexpr vk::hal::Rotation rotation = vk::hal::Rotation::None;
+    static constexpr vk::hal::Rotation rotation = vk::hal::Rotation::Yaw90;
     using pins = vk::hal::PinList<pins::IMU_SCL, pins::IMU_SDA>;
 };
 }  // namespace devices

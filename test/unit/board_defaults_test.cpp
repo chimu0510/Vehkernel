@@ -11,7 +11,7 @@ namespace board = vk::board;
 static_assert(board::timing::trigger == vk::hal::TimingTrigger::Timer);
 static_assert(board::timing::base_rate_hz == 200);
 static_assert(board::timing::sampling == vk::hal::ImuSampling::PerSample);
-static_assert(board::devices::IMU0::rotation == vk::hal::Rotation::None);
+static_assert(board::devices::IMU0::rotation == vk::hal::Rotation::Yaw90);  // measured in #35
 
 TEST(BoardDefaults, ExposeTheTimingPreset)
 {

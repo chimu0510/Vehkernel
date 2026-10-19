@@ -656,7 +656,7 @@
         "IMU_SDA"
       ],
       "address": 104,
-      "rotation": "NONE"
+      "rotation": "YAW_90"
     }
   ],
   "storage": [],
