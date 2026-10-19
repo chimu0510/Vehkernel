@@ -5,6 +5,7 @@ vk_add_library(vk_platform LAYER platform OBJECT
   boot_stub.c
   src/clock_tree.cpp
   src/freertos_hooks.cpp
+  src/internal_flash.cpp
   src/microsecond_clock.cpp
   src/platform.cpp)
 target_include_directories(vk_platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

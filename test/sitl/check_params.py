@@ -3,8 +3,8 @@
 
 First, with SITL at rest, the Link monitor's param command lists every
 parameter with its metadata and a matching parameter set hash, reads and sets
-one, and is refused, with the reason, a value out of range and an unknown
-name. Then, with SITL under the shake profile and the accelerometer rejection
+one, sets SENS_BOARD_ROT by name and sees it pending reboot, and is refused,
+with the reason, a value out of range and an unknown name. Then, with SITL under the shake profile and the accelerometer rejection
 turned off through ATT_ACC_REJ, the estimate follows the linear acceleration
 bursts barely at a small ATT_KP and far at a large one set in between: the
 gain reaches the running filter. Last, values set over the Link are back
@@ -80,6 +80,18 @@ def check_cli(args) -> list[str]:
         got = param_cli(args, address, "get", "ATT_KP")
         if " value=2.5 " not in got.stdout:
             failures.append("param get ATT_KP did not return the new value 2.5")
+
+        # A reboot_required parameter: stored, flagged until the next boot, and set by enum name.
+        rotated = param_cli(args, address, "set", "SENS_BOARD_ROT", "ROLL_180")
+        if rotated.returncode != 0 or "value_name=ROLL_180" not in rotated.stdout \
+                or "pending_reboot=1" not in rotated.stdout:
+            failures.append("param set SENS_BOARD_ROT ROLL_180 was not taken and flagged pending reboot")
+        rotated = param_cli(args, address, "get", "SENS_BOARD_ROT")
+        if "pending_reboot=1" not in rotated.stdout:
+            failures.append("param get SENS_BOARD_ROT does not show the pending reboot")
+        got = param_cli(args, address, "get", "ATT_KP")
+        if "pending_reboot" in got.stdout:
+            failures.append("ATT_KP, applied at once, shows a pending reboot")
 
         for command, reason in ((("set", "ATT_KP", "50"), "out of range"), (("set", "ATT_NONE", "1"), "unknown name"),
                                 (("get", "ATT_NONE"), "unknown name")):

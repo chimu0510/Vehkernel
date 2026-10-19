@@ -76,6 +76,15 @@ tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/c50c-v1_1/gener
     --check --duration 60 --expect-rate imu_sample:0=200
 ```
 
+On the board, parameters are listed, read and set the same way, with the metadata of the firmware build. They are stored in sectors S1 and S2 of internal Flash, which flashing over SWD leaves untouched, so they survive power cycles and firmware updates:
+
+```bash
+tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/c50c-v1_1/generated/schema/python \
+    --param-meta build/c50c-v1_1/generated/params/params.json param list
+```
+
+The hardware check of the parameters (L4): set `ATT_KP` and `SENS_BOARD_ROT`, power-cycle the board, and `param get` returns both while the attitude follows the new board orientation; then set `SERIAL1_BAUD` to 460800, reboot, and connect with `--baud 460800`. The `param_storage` line of the work item timing shows the cost of each Flash write.
+
 The attitude estimate is in the same view: lift the board's front edge and pitch goes positive, lower its right edge and roll goes positive, turn it clockwise seen from above and yaw goes positive (body frame x forward, y right, z down). Two rotations bring the IMU's axes into the body frame (ADR-0014). The mounting rotation is how the IMU chip sits on the board, a hardware fact: `YAW_90` on the C50C V1.1, measured this way with the board's front edge forward and set as `rotation` in `boards/c50c-v1_1/board.toml`. Correct it there only if the board itself is described wrongly. The board orientation is how the board sits in the vehicle, the `SENS_BOARD_ROT` parameter, `NONE` by default and numbered as ArduPilot's and PX4's rotation table: a board mounted turned or upside down in a vehicle needs only this parameter, which takes effect at the next boot.
 
 The bring-up test build (L4, [ADR-0018](docs/adr/0018-test-layers-and-sitl.md)) runs the hardware bring-up cases at boot instead of the application: it reads the ICM20948's WHO_AM_I over software I2C and measures the IMU read rate. It never configures actuator outputs, so it is safe with motors connected. Build it in the devcontainer, then run the bring-up runner on the host, which flashes it over SWD, reads the result block back and exits non-zero if a case fails or no results arrive:

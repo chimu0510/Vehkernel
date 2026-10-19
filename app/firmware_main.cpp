@@ -8,6 +8,11 @@
 #include <vk/core/work_queue.hpp>
 #include <vk/params/params.hpp>
 #include <vk/platform/platform.hpp>
+#ifdef CONFIG_PARAM_STORAGE_FLASH
+#include <vk/core/parameter_storage.hpp>
+#include <vk/hal/flash.hpp>
+#include <vk/platform/internal_flash.hpp>
+#endif
 
 #ifdef CONFIG_LINK_SERIAL
 #include <vk/hal/uart.hpp>
@@ -26,6 +31,7 @@
 #include <vk/platform/soft_i2c.hpp>
 #endif
 
+#include <array>
 #include <cstdint>
 
 #ifndef CONFIG_PLATFORM_STM32F4
@@ -41,6 +47,25 @@ const unsigned char vk_flash_fill[VK_FILL_FLASH_KB * 1024] = {1};  // NOLINT
 #endif
 
 namespace {
+
+#ifdef CONFIG_PARAM_STORAGE_FLASH
+// Parameters live in sectors S1 and S2 of internal Flash (ADR-0020).
+using ParamFlash = vk::platform::InternalFlash<vk::board::flash::PARAMS>;
+static_assert(vk::hal::ParamFlash<ParamFlash>);
+ParamFlash param_flash;
+std::array<vk::core::ParameterStorage::Slot, vk::params::count> param_slots{};
+vk::core::StaticInstance<vk::core::ParameterStorage> param_storage;
+
+// Loads the stored parameters, before anything reads them, and starts storing
+// changes. The boot erases the spare sector while still disarmed.
+void start_parameters()
+{
+    param_storage.emplace(vk::params::parameters(), vk::hal::FlashSectors(param_flash), param_slots,
+                          vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+    param_storage->load();
+    param_storage->start();
+}
+#endif
 
 #ifdef CONFIG_DRIVER_ICM20948
 using Imu = vk::board::devices::IMU0;
@@ -90,7 +115,11 @@ void start_link()
     link_transport.emplace(link_uart);
     serial_link.emplace("link0", *link_transport, vk::link::default_topic_map(),
                         vk::link::Link::Config{.parameters = {.parameters = &vk::params::parameters(),
-                                                              .set_hash = vk::params::set_hash}},
+                                                              .set_hash = vk::params::set_hash,
+#ifdef CONFIG_PARAM_STORAGE_FLASH
+                                                              .storage = &*param_storage,
+#endif
+                                                              }},
                         vk::core::work_queue(vk::core::WorkQueueTier::Io));
     serial_link->start();
 }
@@ -117,6 +146,9 @@ int main()
     __asm__ volatile("" : : "r"(vk_flash_fill));
 #endif
     vk::platform::init();
+#ifdef CONFIG_PARAM_STORAGE_FLASH
+    start_parameters();
+#endif
 #ifdef CONFIG_DRIVER_ICM20948
     start_imu();
 #endif
