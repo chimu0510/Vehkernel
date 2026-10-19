@@ -1,0 +1,9 @@
+prefix = "TA"
+
+[[param]]
+name = "TA_GAIN"
+type = "FLOAT"
+default = 0.5
+min = 0.0
+max = 1.0
+description = "A gain."

@@ -1,0 +1,96 @@
+{
+  "generator": "tools/generators/generate_params.py",
+  "set_hash": "0x6D29DE15D6A15385",
+  "parameters": [
+    {
+      "name": "TA_COUNT",
+      "hash": 2625869354,
+      "type": "INT32",
+      "default": 3,
+      "min": -10,
+      "max": 10,
+      "unit": null,
+      "description": "A count.",
+      "reboot_required": true,
+      "locked_when_armed": false
+    },
+    {
+      "name": "TA_FLAGS",
+      "hash": 2395173682,
+      "type": "INT32",
+      "default": 5,
+      "min": 0,
+      "max": 5,
+      "unit": null,
+      "description": "A bitmask.",
+      "reboot_required": false,
+      "locked_when_armed": false,
+      "bits": [
+        {
+          "name": "FIRST",
+          "bit": 0
+        },
+        {
+          "name": "THIRD",
+          "bit": 2
+        }
+      ]
+    },
+    {
+      "name": "TA_GAIN",
+      "hash": 954008980,
+      "type": "FLOAT",
+      "default": 0.5,
+      "min": 0.0,
+      "max": 2.0,
+      "unit": "1/s",
+      "description": "A gain.",
+      "reboot_required": false,
+      "locked_when_armed": false
+    },
+    {
+      "name": "TA_LOCK",
+      "hash": 3276146260,
+      "type": "INT32",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "unit": null,
+      "description": "A boolean that cannot change while armed.",
+      "reboot_required": false,
+      "locked_when_armed": true,
+      "values": [
+        {
+          "name": "DISABLED",
+          "value": 0
+        },
+        {
+          "name": "ENABLED",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "TA_MODE",
+      "hash": 2021296292,
+      "type": "INT32",
+      "default": 0,
+      "min": -1,
+      "max": 0,
+      "unit": null,
+      "description": "An enum, one of whose values is not compiled in.",
+      "reboot_required": false,
+      "locked_when_armed": false,
+      "values": [
+        {
+          "name": "SLOW",
+          "value": 0
+        },
+        {
+          "name": "OFF",
+          "value": -1
+        }
+      ]
+    }
+  ]
+}

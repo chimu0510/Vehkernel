@@ -7,6 +7,10 @@
 // gyro reading; movement restarts the wait. Nothing is published while
 // aligning. Then every sample steps the filter and is published on
 // vehicle_attitude.
+//
+// The filter gains and the accelerometer rejection are the ATT_* parameters
+// (ADR-0012), read at construction and again after each parameter_update, so
+// a change applies from the next sample.
 #pragma once
 
 #include <vk/core/bus.hpp>
@@ -14,6 +18,7 @@
 #include <vk/estimation/filters/mahony.hpp>
 #include <vk/estimation/math/vector3.hpp>
 #include <vk/msg/imu_sample.hpp>
+#include <vk/msg/parameter_update.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
 
 #include <cstdint>
@@ -24,7 +29,7 @@ class AttitudeEstimator final : public core::WorkItem {
 public:
     static constexpr std::uint8_t estimator_id = 1;
 
-    // Compile-time defaults until the parameter system exists.
+    // Compile-time settings; the gains in `filter` are replaced by the ATT_* parameters.
     struct Config {
         std::uint8_t imu_instance = 0;           // imu_sample instance to read
         MahonyConfig filter{};
@@ -51,11 +56,13 @@ protected:
     void run() override;
 
 private:
+    void apply_parameters();
     void align(const msg::ImuSample& sample, const Vector3& gyro, const Vector3& accel);
     void estimate(const msg::ImuSample& sample, const Vector3& gyro, const Vector3& accel, std::uint64_t now);
 
     Config config_;
     core::Subscription<msg::ImuSample> imu_;
+    core::Subscription<msg::ParameterUpdate> parameter_update_;
     core::Publication<msg::VehicleAttitude> attitude_;
     MahonyFilter filter_;
     State state_ = State::Aligning;

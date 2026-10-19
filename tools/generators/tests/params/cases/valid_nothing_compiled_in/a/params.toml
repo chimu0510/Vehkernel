@@ -1,0 +1,11 @@
+# Parameters of a module this build leaves out.
+prefix = "TB"
+kconfig = "TEST_B"
+
+[[param]]
+name = "TB_SPEED"
+type = "FLOAT"
+default = 1.0
+min = 0.0
+max = 5.0
+description = "Not compiled in."

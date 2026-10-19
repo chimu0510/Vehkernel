@@ -2,8 +2,8 @@
 find_package(GTest CONFIG REQUIRED)
 include(GoogleTest)
 
-add_executable(vk_unit_tests smoke_test.cpp pin_test.cpp dma_test.cpp clock_test.cpp schema_test.cpp bus_test.cpp work_queue_test.cpp i2c_test.cpp rotation_test.cpp icm20948_test.cpp wire_test.cpp link_test.cpp link_work_item_test.cpp uart_test.cpp estimation_math_test.cpp mahony_test.cpp attitude_estimator_test.cpp)
-target_link_libraries(vk_unit_tests PRIVATE GTest::gtest_main vk_hal vk_msg vk_drivers vk_sim vk_platform vk_core vk_link vk_lib_estimation vk_estimation vk_warnings)
+add_executable(vk_unit_tests smoke_test.cpp pin_test.cpp dma_test.cpp clock_test.cpp schema_test.cpp bus_test.cpp work_queue_test.cpp i2c_test.cpp rotation_test.cpp icm20948_test.cpp wire_test.cpp link_test.cpp link_work_item_test.cpp uart_test.cpp estimation_math_test.cpp mahony_test.cpp attitude_estimator_test.cpp parameters_test.cpp)
+target_link_libraries(vk_unit_tests PRIVATE GTest::gtest_main vk_hal vk_msg vk_drivers vk_sim vk_platform vk_core vk_link vk_lib_estimation vk_estimation vk_params vk_warnings)
 # Hardware-free logic of the STM32F4 platform layer, tested on the host.
 target_include_directories(vk_unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/platform/stm32f4/include)
 gtest_discover_tests(vk_unit_tests)
@@ -50,4 +50,15 @@ foreach(case_dir IN LISTS schema_cases)
   target_include_directories(vk_golden_schema_${case} PRIVATE ${case_dir}/expected)
   target_link_libraries(vk_golden_schema_${case} PRIVATE vk_core vk_warnings)
   set_target_properties(vk_golden_schema_${case} PROPERTIES CXX_CLANG_TIDY "")
+endforeach()
+
+# Every golden output of the parameter generator tests must compile: each
+# case's parameter table source, which includes its header.
+file(GLOB params_cases LIST_DIRECTORIES true ${CMAKE_SOURCE_DIR}/tools/generators/tests/params/cases/valid_*)
+foreach(case_dir IN LISTS params_cases)
+  get_filename_component(case ${case_dir} NAME)
+  add_library(vk_golden_params_${case} OBJECT ${case_dir}/expected/vk/params/params.cpp)
+  target_include_directories(vk_golden_params_${case} PRIVATE ${case_dir}/expected)
+  target_link_libraries(vk_golden_params_${case} PRIVATE vk_core vk_warnings)
+  set_target_properties(vk_golden_params_${case} PROPERTIES CXX_CLANG_TIDY "")
 endforeach()

@@ -1,0 +1,10 @@
+prefix = "TA"
+kconfig = "TEST_A"
+
+[[param]]
+name = "TA_GHUEY"
+type = "FLOAT"
+default = 0.5
+min = 0.0
+max = 1.0
+description = "A gain."

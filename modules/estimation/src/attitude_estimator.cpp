@@ -1,5 +1,7 @@
 #include <vk/estimation/attitude_estimator.hpp>
 
+#include <vk/params/params.hpp>
+
 #include <cmath>
 
 namespace vk::estimation {
@@ -12,6 +14,14 @@ AttitudeEstimator::AttitudeEstimator(const Config& config, core::WorkQueue& queu
     msg::ImuSample stale{};
     while (imu_.copy(stale)) {
     }
+    msg::ParameterUpdate seen{};
+    parameter_update_.copy(seen);
+    apply_parameters();
+}
+
+void AttitudeEstimator::apply_parameters()
+{
+    filter_.set_gains(params::att.kp, params::att.ki, params::att.acc_rej);
 }
 
 void AttitudeEstimator::start()
@@ -21,6 +31,10 @@ void AttitudeEstimator::start()
 
 void AttitudeEstimator::run()
 {
+    msg::ParameterUpdate update{};
+    if (parameter_update_.copy(update)) {
+        apply_parameters();
+    }
     msg::ImuSample sample{};
     while (imu_.copy(sample)) {
         const Vector3 gyro = Vector3::from(sample.gyro);

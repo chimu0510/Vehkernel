@@ -1,0 +1,50 @@
+# Parameters of a test module.
+prefix = "TA"
+kconfig = "TEST_A"
+
+[[param]]
+name = "TA_GAIN"
+type = "FLOAT"
+default = 0.5
+min = 0.0
+max = 2.0
+unit = "1/s"
+description = "A gain."
+
+[[param]]
+name = "TA_COUNT"
+type = "INT32"
+default = 3
+min = -10
+max = 10
+description = "A count."
+reboot_required = true
+
+[[param]]
+name = "TA_MODE"
+type = "INT32"
+default = "SLOW"
+values = [
+  { name = "SLOW", value = 0 },
+  { name = "FAST", value = 1, kconfig = "TEST_FAST" },
+  { name = "OFF", value = -1 },
+]
+description = "An enum, one of whose values is not compiled in."
+
+[[param]]
+name = "TA_FLAGS"
+type = "INT32"
+default = 5
+bits = [
+  { name = "FIRST", bit = 0 },
+  { name = "THIRD", bit = 2 },
+]
+description = "A bitmask."
+
+[[param]]
+name = "TA_LOCK"
+type = "INT32"
+default = "ENABLED"
+values = [{ name = "DISABLED", value = 0 }, { name = "ENABLED", value = 1 }]
+description = "A boolean that cannot change while armed."
+locked_when_armed = true

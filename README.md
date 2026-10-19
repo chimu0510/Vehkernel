@@ -149,6 +149,8 @@ attitude name=vehicle_attitude instance=0 roll_deg=-0.01 pitch_deg=0.01 yaw_deg=
 
 Without a magnetometer, yaw is relative to the start and drifts slowly with the remaining gyro bias.
 
+The filter's gains and its accelerometer rejection are parameters (ADR-0012), `ATT_KP`, `ATT_KI` and `ATT_ACC_REJ`, defined in `modules/estimation/params.toml` next to the estimator. The parameter generator turns every `params.toml` the build contains into plain structs, a parameter table and a metadata file, `build/<preset>/generated/params/params.json`. A change applies from the next IMU sample.
+
 SITL's simulated IMU follows a scripted motion chosen with `--motion`, and SITL publishes its true attitude on `vehicle_attitude_groundtruth`, which the Link also carries, so the monitor shows the estimate and the truth side by side. Each profile starts moving 3 s after boot, once the estimator has aligned, and ends by 10 s:
 
 | Profile | Motion |

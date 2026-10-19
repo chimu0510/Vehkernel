@@ -1,0 +1,1 @@
+a/params.toml:4: error: unknown key 'scale'; expected one of: bits, default, description, locked_when_armed, max, min, name, reboot_required, type, unit, values

@@ -1,0 +1,32 @@
+# Parameters of the attitude estimator: the Mahony filter's gains and its
+# accelerometer rejection (ADR-0012, ADR-0014). Changes apply from the next
+# IMU sample.
+prefix = "ATT"
+kconfig = "ESTIMATOR_MAHONY"
+
+[[param]]
+name = "ATT_KP"
+type = "FLOAT"
+default = 1.0
+min = 0.0
+max = 10.0
+unit = "1/s"
+description = "Attitude correction gain: how fast roll and pitch follow the accelerometer."
+
+[[param]]
+name = "ATT_KI"
+type = "FLOAT"
+default = 0.05
+min = 0.0
+max = 1.0
+unit = "1/s^2"
+description = "Gyro bias gain: how fast the gyro bias estimate follows the accelerometer correction."
+
+[[param]]
+name = "ATT_ACC_REJ"
+type = "FLOAT"
+default = 0.1
+min = 0.01
+max = 1.0
+unit = "g"
+description = "Accelerometer rejection: the correction is skipped when the specific force differs from gravity by more than this."

@@ -78,6 +78,16 @@ public:
         angular_velocity_ = gyro - bias_;
     }
 
+    // Changes the gains and the rejection threshold from the next sample on;
+    // the attitude and the bias estimate are kept.
+    void set_gains(float kp, float ki, float accel_rejection)
+    {
+        config_.kp = kp;
+        config_.ki = ki;
+        config_.accel_rejection = accel_rejection;
+    }
+
+    [[nodiscard]] const Config& config() const { return config_; }
     [[nodiscard]] const Quaternion& attitude() const { return q_; }
     [[nodiscard]] const Vector3& gyro_bias() const { return bias_; }
     // The last body rate with the bias estimate removed [rad/s].

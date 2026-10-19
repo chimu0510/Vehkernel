@@ -1,0 +1,1 @@
+a/params.toml:4: error: TA_GAIN: default 1.5 is outside its range [0.0, 1.0]

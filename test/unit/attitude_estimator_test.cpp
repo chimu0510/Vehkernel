@@ -1,18 +1,22 @@
 // The attitude estimator work item on a fake clock (ADR-0008, ADR-0014):
-// alignment, draining the IMU queue, and what it publishes.
+// alignment, draining the IMU queue, what it publishes, and the ATT_*
+// parameters (ADR-0012).
 #include <vk/core/bus.hpp>
+#include <vk/core/parameters.hpp>
 #include <vk/core/work_queue.hpp>
 #include <vk/estimation/attitude_estimator.hpp>
 #include <vk/estimation/math/quaternion.hpp>
 #include <vk/estimation/models/accelerometer_model.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
+#include <vk/params/params.hpp>
 
 #include <gtest/gtest.h>
 
 #include <array>
 #include <cstdint>
 #include <numbers>
+#include <string_view>
 
 namespace {
 
@@ -40,6 +44,21 @@ protected:
         // Drop what earlier tests left on vehicle_attitude.
         vk::msg::VehicleAttitude stale{};
         drain(stale);
+    }
+
+    // Leaves the ATT_* parameters at their defaults for the next test.
+    void TearDown() override
+    {
+        auto& parameters = vk::params::parameters();
+        for (std::size_t i = 0; i < parameters.count(); ++i) {
+            parameters.set(i, parameters.info(i).default_value);
+        }
+    }
+
+    static void set(std::string_view name, float value)
+    {
+        ASSERT_EQ(vk::params::parameters().set(name, vk::core::ParamValue::from_float(value)),
+                  vk::core::ParamResult::Ok);
     }
 
     // Publishes `count` samples 5 ms apart, `per_run` of them before each run of the queue.
@@ -140,6 +159,29 @@ TEST_F(AttitudeEstimatorTest, ConsumesEveryQueuedSample)
     // Three samples per run, as when wq:ctrl runs late: each one is estimated.
     feed(30, level, {}, 3);
     EXPECT_EQ(drain(out), 30);
+}
+
+TEST_F(AttitudeEstimatorTest, AppliesNewGainsFromTheNextSample)
+{
+    AttitudeEstimator estimator(config, queue);
+    estimator.start();
+    feed(201, level, {});
+    ASSERT_EQ(estimator.state(), AttitudeEstimator::State::Running);
+
+    // Without gains, a tilt the gyro never saw is not corrected.
+    set("ATT_KP", 0.0F);
+    set("ATT_KI", 0.0F);
+    const Vector3 tilted = AccelerometerModel::predict(Quaternion::from_euler({.roll = 0.2F, .pitch = 0.0F, .yaw = 0.0F}));
+    feed(200, tilted, {});
+    vk::msg::VehicleAttitude out{};
+    drain(out);
+    EXPECT_NEAR(Quaternion::from(out.q).euler().roll, 0.0F, 1e-4F);
+
+    // A large gain pulls roll to the accelerometer within a second.
+    set("ATT_KP", 5.0F);
+    feed(200, tilted, {});
+    drain(out);
+    EXPECT_NEAR(Quaternion::from(out.q).euler().roll, 0.2F, 0.005F);
 }
 
 }  // namespace

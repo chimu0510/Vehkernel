@@ -1,0 +1,2 @@
+CONFIG_TEST_A=y
+# CONFIG_TEST_B is not set
