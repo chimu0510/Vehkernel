@@ -1,6 +1,6 @@
 # Spec 0004: first attitude estimate
 
-**Status**: open. Issue: [#30](https://github.com/chimu0510/Vehkernel/issues/30); tickets #31 to #35.
+**Status**: done. Issue: [#30](https://github.com/chimu0510/Vehkernel/issues/30); tickets #31 to #35. The IMU mounting rotation and the estimate were confirmed on the C50C in [#35](https://github.com/chimu0510/Vehkernel/issues/35).
 
 This file and the issue carry the same spec; update both when the spec changes.
 
