@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -39,10 +40,17 @@ protected:
             fake_now += cycle_us;
             const std::array<std::uint16_t, 1> counts{motor.count()};
             const std::array<float, 1> targets{target};
-            control.step(dt, counts, targets, enabled, settings);
-            motor.drive(control.output(0).duty);
+            control.step(dt, counts, targets, enabled, settings, applied);
+            applied[0] = control.output(0).duty;
+            motor.drive(applied[0]);
+            largest_change = std::max(largest_change, std::fabs(applied[0] - last));
+            last = applied[0];
         }
     }
+
+    std::array<float, 1> applied{};
+    float last = 0.0F;
+    float largest_change = 0.0F;
 
     vk::sim::Motor motor{{}, &fake_clock};
     ActuatorControl control{1};
@@ -139,6 +147,42 @@ TEST(SimMotor, StopsWithoutPowerWhateverTheDuty)
     motor.set_powered(false);
     fake_now += 1'000'000;
     EXPECT_NEAR(motor.speed(), 0.0F, 0.01F);
+}
+
+TEST_F(WheelLoop, ASetpointStepRampsNoFasterThanTheSlewRate)
+{
+    settings.loop.slew_rate = 0.5F;
+    run(10.0F, 100'000);
+    EXPECT_LE(largest_change, 0.5F * dt + 1e-6F);
+    EXPECT_NEAR(control.output(0).duty, 0.5F * 0.1F, 1e-3F);  // still ramping after 0.1 s
+    run(10.0F, 2'000'000);
+    EXPECT_NEAR(motor.speed(), 10.0F, 0.5F);  // and no windup while it ramped
+}
+
+TEST_F(WheelLoop, ASlewRateOfZeroDoesNotLimit)
+{
+    settings.loop.slew_rate = 0.0F;
+    run(10.0F, cycle_us);
+    EXPECT_FLOAT_EQ(control.output(0).duty, settings.loop.out_max);
+}
+
+TEST_F(WheelLoop, StoppingIsNeverSlewLimited)
+{
+    settings.loop.slew_rate = 0.1F;
+    run(10.0F, 3'000'000);
+    ASSERT_GT(control.output(0).duty, 0.1F);
+    run(nan, cycle_us);
+    EXPECT_FLOAT_EQ(control.output(0).duty, 0.0F);
+    run(10.0F, 3'000'000);
+    run(10.0F, cycle_us, false);  // disarmed or the emergency stop
+    EXPECT_FLOAT_EQ(control.output(0).duty, 0.0F);
+}
+
+TEST(OutputStage, SlewsOpenLoopDutiesButLetsAStopThrough)
+{
+    EXPECT_FLOAT_EQ(vk::actuators::slew(0.0F, 0.2F, 2.0F, 0.005F), 0.01F);
+    EXPECT_FLOAT_EQ(vk::actuators::slew(0.2F, 0.0F, 2.0F, 0.005F), 0.0F);
+    EXPECT_FLOAT_EQ(vk::actuators::slew(0.0F, 0.2F, 0.0F, 0.005F), 0.2F);
 }
 
 }  // namespace

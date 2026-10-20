@@ -48,6 +48,7 @@ struct Inputs {
     bool bringup_running = false;
     bool bringup_available = false;             // the bring-up case is built in
     std::uint64_t last_setpoint_us = 0;         // when the last setpoint was accepted, 0 for never
+    std::uint32_t output_watchdog_trips = 0;    // times the platform's output watchdog turned the outputs off
 };
 
 enum class ActuatorPower : std::uint8_t {
@@ -68,6 +69,7 @@ struct State {
     std::uint32_t skipped_checks = 0;
     core::ArmingResult arming_refusal = core::ArmingResult::Ok;
     core::DisarmReason disarm_reason = core::DisarmReason::None;
+    std::uint32_t output_watchdog_trips = 0;
 
     friend bool operator==(const State&, const State&) = default;
 };

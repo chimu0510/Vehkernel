@@ -38,6 +38,7 @@ public:
         bool (*actuator_power)() = nullptr;  // reads the power sense; nullptr if the board has none
         bool actuators_started = false;      // actuator outputs and encoders are running
         bool bringup = false;                // the motor bring-up case is built in
+        std::uint32_t (*output_watchdog_trips)() = nullptr;  // the platform's count; nullptr without one
     };
 
     CommanderTask(const Config& config, core::WorkQueue& queue);

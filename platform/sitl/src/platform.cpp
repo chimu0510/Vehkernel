@@ -8,6 +8,7 @@
 #include <vk/sim/motion.hpp>
 
 #include <vk/core/bus.hpp>
+#include <vk/hal/output_watchdog.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_attitude_groundtruth.hpp>
@@ -28,17 +29,30 @@ std::uint64_t stop_duration_us = 0;
 
 std::atomic<bool> simulated_actuator_power{true};
 
+core::StaticInstance<hal::OutputWatchdog> watchdog;
+StaticTask_t watchdog_tcb;
+std::array<StackType_t, configMINIMAL_STACK_SIZE> watchdog_stack;
+
 // One actuator output over a simulated motor: the duty and direction lines as
-// an H-bridge applies them, and the encoder counter.
+// an H-bridge applies them, and the encoder counter. Every duty refreshes the
+// output watchdog.
 class MotorOutput final : public hal::PwmOutput, public hal::DirectionLines, public hal::QuadratureEncoder {
 public:
     void attach(sim::Motor& motor) { motor_ = &motor; }
 
+    bool set_frequency(std::uint32_t /*hz*/) override { return true; }  // the model has no PWM
+
     void set_duty(float duty) override
     {
         duty_ = duty;
+        if (watchdog.has_value()) {
+            watchdog->refresh(hal::SystemClock::now_us());
+        }
         apply();
     }
+
+    // The watchdog's stop: the motor coasts until the next duty.
+    void stop() { motor_->drive(0.0F); }
 
     void set(bool in1, bool in2) override
     {
@@ -162,6 +176,29 @@ void set_actuator_power(bool powered)
             m->set_powered(powered);
         }
     }
+}
+
+void start_output_watchdog(std::uint32_t period_us)
+{
+    watchdog.emplace(period_us);
+    xTaskCreateStatic(
+        [](void* /*unused*/) {
+            // Above the work queues, so it runs when they stall.
+            for (;;) {
+                if (watchdog->expired(hal::SystemClock::now_us())) {
+                    for (auto& output : motor_outputs) {
+                        output.stop();
+                    }
+                }
+                vTaskDelay(1);
+            }
+        },
+        "watchdog", watchdog_stack.size(), nullptr, configMAX_PRIORITIES - 1, watchdog_stack.data(), &watchdog_tcb);
+}
+
+std::uint32_t output_watchdog_trips()
+{
+    return watchdog.has_value() ? watchdog->trips() : 0;
 }
 
 std::span<const hal::MotorChannel> motor_channels()

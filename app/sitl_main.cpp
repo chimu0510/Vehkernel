@@ -191,7 +191,8 @@ void start_commander()
     commander.emplace(vk::commander::CommanderTask::Config{.interval_us = control_interval_us,
                                                            .actuator_power = &vk::platform::actuator_power,
                                                            .actuators_started = actuators,
-                                                           .bringup = bringup},
+                                                           .bringup = bringup,
+                                                           .output_watchdog_trips = &vk::platform::output_watchdog_trips},
                       vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     commander->start();
 }
@@ -212,6 +213,7 @@ void start_actuators()
                                                                  .bringup = bringup},
                              vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     actuator_control->start();
+    vk::platform::start_output_watchdog(control_interval_us);
 }
 #endif
 

@@ -2,7 +2,8 @@
 // ADR-0013).
 //
 // Each run reads the encoders, steps the speed loops with the MOT_*
-// parameters, drives each output's PWM and direction lines, and publishes
+// parameters, drives each output's PWM and direction lines through the
+// output stage's slew limit (MOT_SLEWRATE), and publishes
 // wheel_encoders and actuator_outputs. Targets come from actuator_setpoint,
 // which only setpoint arbitration publishes, and count only when accepted
 // since the vehicle last armed and since the emergency stop was last
@@ -31,6 +32,7 @@
 #include <vk/msg/vehicle_status.hpp>
 #include <vk/msg/wheel_encoders.hpp>
 
+#include <array>
 #include <cstdint>
 #include <span>
 
@@ -75,6 +77,7 @@ private:
     std::uint64_t setpoints_from_us_ = 0;  // setpoints accepted before this do not count
     bool emergency_stop_ = false;
     std::uint64_t last_run_us_ = 0;
+    std::array<float, max_outputs> applied_{};  // each output's duty last cycle, for the slew limit
 };
 
 }  // namespace vk::actuators

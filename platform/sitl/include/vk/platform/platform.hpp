@@ -43,6 +43,11 @@ std::span<const hal::MotorChannel> motor_channels();
 // The simulated motor of an output, 1 to actuator_count.
 sim::Motor& motor(std::size_t output);
 
+// Starts the output watchdog (ADR-0005) for actuator control running every
+// `period_us`, as a task above the work queues on the simulated clock.
+void start_output_watchdog(std::uint32_t period_us);
+std::uint32_t output_watchdog_trips();
+
 // Stops the scheduler after the given run time, so a SITL run ends on its own.
 void stop_after(std::uint64_t duration_us);
 

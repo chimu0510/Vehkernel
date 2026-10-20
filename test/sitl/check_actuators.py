@@ -6,7 +6,9 @@ monitor library, judging what wheel_encoders, actuator_outputs and
 vehicle_status show. In order: arming in STANDBY is refused; in TEST, armed,
 a mode request is refused and COM_ARM_CHECK is locked; 10 rad/s on all four
 outputs is reached within 1 s to within 5 %; setpoints stopped disarm after
-COM_SP_TIMEOUT with every output zero; actuator power cut while turning stops
+COM_SP_TIMEOUT with every output zero; with a slow MOT_SLEWRATE the outputs
+ramp no faster than it and the disarm still zeroes them; actuator power cut
+while turning stops
 the wheels and disarms with ACTUATOR_POWER_LOST, restoring it does not re-arm
 and arming while it settles is refused; the emergency stop engaged from a
 second connection zeroes the outputs, released after 2 s resumes from the next
@@ -208,6 +210,32 @@ def check_speed_and_timeout(vehicle: Vehicle, failures: list[str]) -> None:
         failures.append("setpoints stopped, vehicle_status does not report a setpoint timeout disarm")
 
 
+SLOW_SLEW = 0.5        # 1/s: from 0 to the 0.2 duty 10 rad/s needs in 0.4 s
+
+
+def check_slew(vehicle: Vehicle, failures: list[str]) -> None:
+    """A setpoint step ramps the outputs no faster than MOT_SLEWRATE; a stop is not slowed."""
+    if not isinstance(set_param(vehicle, "MOT_SLEWRATE", ParamType.FLOAT, SLOW_SLEW), ParamValue):
+        failures.append("MOT_SLEWRATE could not be set")
+        return
+    if not arm(vehicle, failures, "before the slew check"):
+        return
+    start = len(vehicle.outputs)
+    _, last = drive(vehicle, (TARGET,) * 4, 1.0)
+    samples = vehicle.outputs[start:]
+    steepest = max((abs(b.output[0] - a.output[0]) / ((b.timestamp - a.timestamp) * 1e-6)
+                    for a, b in zip(samples, samples[1:]) if b.timestamp > a.timestamp), default=0.0)
+    if not samples or steepest > SLOW_SLEW * 1.2:
+        failures.append(f"output 1 changed at {steepest:.2f}/s, faster than MOT_SLEWRATE {SLOW_SLEW}")
+    # Setpoints stop: the disarm still zeroes every output at once.
+    vehicle.monitor.run(SP_TIMEOUT_S + 0.5)
+    problem = stopped_after(vehicle.outputs, vehicle.mcu_us(last) + int(SP_TIMEOUT_S * 1e6) + REACT_US)
+    if problem:
+        failures.append(f"with a slow slew rate, the disarm did not zero the outputs at once: {problem}")
+    if not isinstance(set_param(vehicle, "MOT_SLEWRATE", ParamType.FLOAT, 2.0), ParamValue):
+        failures.append("MOT_SLEWRATE could not be set back")
+
+
 def check_power_cut(vehicle: Vehicle, failures: list[str]) -> None:
     if not arm(vehicle, failures, "before the power cut"):
         return
@@ -369,6 +397,7 @@ def main() -> int:
             return report(failures)
         check_arming_and_modes(vehicle, failures)
         check_speed_and_timeout(vehicle, failures)
+        check_slew(vehicle, failures)
         check_power_cut(vehicle, failures)
         second = check_emergency_stop(vehicle, args, port, failures)
         check_power_check_skipped(second, failures)

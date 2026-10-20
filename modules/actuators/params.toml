@@ -151,3 +151,22 @@ default = 0.3
 min = 0.0
 max = 1.0
 description = "Largest duty any output may drive, low by default while there is no remote control (ADR-0005)."
+
+[[param]]
+name = "MOT_SLEWRATE"
+type = "FLOAT"
+default = 2.0
+min = 0.0
+max = 100.0
+unit = "1/s"
+description = "Largest change of an output's duty per second, as a fraction of full duty; 0 for no limit. Stopping is never limited."
+
+[[param]]
+name = "MOT_PWM_FREQ"
+type = "INT32"
+default = 10000
+min = 1000
+max = 20000
+unit = "Hz"
+description = "PWM frequency of the motor outputs; a frequency the timer cannot reach falls back to the board default."
+reboot_required = true

@@ -8,6 +8,9 @@
 // way. The target is clamped to MOT_MAX_SPD; the duty is
 // MOT_SPD_FF·target + MOT_SPD_P·error + integral, clamped to MOT_OUT_MAX,
 // and the integral does not grow towards a side where the duty is clamped.
+// The duty then changes by at most MOT_SLEWRATE of full duty per second
+// from the one applied last cycle, and the integral does not grow towards a
+// side where the slew limit holds it either.
 // MOTn_ENC_REV flips the counts, MOTn_REV the duty the driver gets. A NaN
 // target, or outputs not enabled (disarmed or the emergency stop engaged),
 // give no duty and clear the integral, so a wheel never jumps when control
@@ -37,7 +40,12 @@ struct LoopSettings {
     float ff = 0.02F;         // MOT_SPD_FF
     float max_speed = 30.0F;  // MOT_MAX_SPD
     float out_max = 0.3F;     // MOT_OUT_MAX
+    float slew_rate = 2.0F;   // MOT_SLEWRATE, 1/s; 0 for no limit
 };
+
+// The output stage's slew limit: `requested` moves from `previous` by at most
+// `rate` per second, 0 for no limit. A duty of zero, a stop, passes at once.
+float slew(float previous, float requested, float rate, float dt_s);
 
 struct Settings {
     std::array<OutputSettings, max_outputs> outputs{};
@@ -57,10 +65,11 @@ public:
     explicit ActuatorControl(std::size_t outputs);
 
     // One control cycle `dt_s` after the last: each output's encoder count,
-    // its speed target (NaN leaves it uncontrolled), and whether outputs may
-    // drive at all.
+    // its speed target (NaN leaves it uncontrolled), whether outputs may drive
+    // at all, and the duty each output applied last cycle, which the slew
+    // limit counts from (none: no slew limit).
     void step(float dt_s, std::span<const std::uint16_t> counts, std::span<const float> targets, bool enabled,
-              const Settings& settings);
+              const Settings& settings, std::span<const float> previous = {});
 
     [[nodiscard]] const Output& output(std::size_t index) const { return wheels_.at(index).out; }
     [[nodiscard]] std::size_t size() const { return size_; }

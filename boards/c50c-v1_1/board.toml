@@ -126,6 +126,9 @@ actuators = [
   { output = 4, pwm = "MOTOR_D_PWM", in1 = "MOTOR_D_IN1", in2 = "MOTOR_D_IN2", encoder = ["ENC_D_1", "ENC_D_2"], cpr = 60000 },
 ]
 
+# ADR-0012: the motor drivers run at 10 kHz, as the vendor firmware does.
+defaults = { MOT_PWM_FREQ = 10000 }
+
 # ADR-0010: the revision-ID pins read 0 on V1.1 (schematic sheet 2, firmware sys.h).
 revision = { pins = ["REV_ID0", "REV_ID1", "REV_ID2"], value = 0 }
 

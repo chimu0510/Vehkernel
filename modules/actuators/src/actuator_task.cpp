@@ -21,7 +21,7 @@ Settings settings_from_parameters()
         {.reversed = mot.mot4_rev != 0, .encoder_reversed = mot.mot4_enc_rev != 0, .counts_per_turn = mot.mot4_cpr},
     }};
     settings.loop = {.p = mot.spd_p, .i = mot.spd_i, .ff = mot.spd_ff, .max_speed = mot.max_spd,
-                     .out_max = mot.out_max};
+                     .out_max = mot.out_max, .slew_rate = mot.slewrate};
     return settings;
 }
 
@@ -35,6 +35,10 @@ ActuatorTask::ActuatorTask(const Config& config, core::WorkQueue& queue)
 
 void ActuatorTask::start()
 {
+    // MOT_PWM_FREQ is reboot_required: read once, before the first duty.
+    for (const hal::MotorChannel& channel : config_.channels) {
+        channel.pwm->set_frequency(static_cast<std::uint32_t>(params::mot.pwm_freq));
+    }
     for (const hal::MotorChannel& channel : config_.channels) {
         drive(channel, 0.0F);
     }
@@ -83,14 +87,20 @@ void ActuatorTask::run()
         // Setpoints are ignored while the case drives the outputs open loop.
         targets.fill(std::numeric_limits<float>::quiet_NaN());
     }
-    control_.step(dt, read, targets, armed_ && !emergency_stop_ && !bringup_running, settings);
+    control_.step(dt, read, targets, armed_ && !emergency_stop_ && !bringup_running, settings,
+                  std::span(applied_).first(control_.size()));
     std::array<float, max_outputs> duties{};
     for (std::size_t i = 0; i < control_.size(); ++i) {
         duties[i] = control_.output(i).duty;
     }
     if (bringup_running) {
+        // Open loop too goes through the output stage's slew limit.
         duties = bringup_.step(now, read, settings);
+        for (std::size_t i = 0; i < control_.size(); ++i) {
+            duties[i] = slew(applied_[i], duties[i], settings.loop.slew_rate, dt);
+        }
     }
+    applied_ = duties;
     publish_bringup(now);
 
     msg::WheelEncoders encoders{};

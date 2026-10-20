@@ -17,6 +17,7 @@ void Commander::update(std::uint64_t now_us, const Inputs& inputs, const Setting
     inputs_ = inputs;
     settings_ = settings;
     state_.board_verified = inputs.board_verified;
+    state_.output_watchdog_trips = inputs.output_watchdog_trips;
     state_.skipped_checks = ~settings.arm_check & core::arm_checks::all;
     track_power(now_us, inputs.actuator_power);
     if (!state_.armed) {

@@ -6,10 +6,19 @@
 
 namespace vk::actuators {
 
+float slew(float previous, float requested, float rate, float dt_s)
+{
+    if (rate <= 0.0F || requested == 0.0F) {
+        return requested;
+    }
+    const float step = rate * dt_s;
+    return std::clamp(requested, previous - step, previous + step);
+}
+
 ActuatorControl::ActuatorControl(std::size_t outputs) : size_(std::min(outputs, max_outputs)) {}
 
 void ActuatorControl::step(float dt_s, std::span<const std::uint16_t> counts, std::span<const float> targets,
-                           bool enabled, const Settings& settings)
+                           bool enabled, const Settings& settings, std::span<const float> previous)
 {
     const LoopSettings& loop = settings.loop;
     for (std::size_t i = 0; i < size_ && i < counts.size(); ++i) {
@@ -34,14 +43,24 @@ void ActuatorControl::step(float dt_s, std::span<const std::uint16_t> counts, st
         }
         const float target = std::clamp(requested, -loop.max_speed, loop.max_speed);
         const float error = target - wheel.out.speed;
+        // The window the duty may take: the output limit, narrowed by the slew
+        // limit around last cycle's duty, in the wheel's own direction.
+        float low = -loop.out_max;
+        float high = loop.out_max;
+        if (loop.slew_rate > 0.0F && i < previous.size()) {
+            const float last = output.reversed ? -previous[i] : previous[i];
+            const float step = loop.slew_rate * dt_s;
+            low = std::max(low, std::min(last - step, high));
+            high = std::min(high, std::max(last + step, low));
+        }
         float integral = wheel.integral + loop.i * error * dt_s;
         float duty = loop.ff * target + loop.p * error + integral;
         // Clamping anti-windup: the integral stops growing towards a clamped side.
-        if (duty > loop.out_max) {
-            duty = loop.out_max;
+        if (duty > high) {
+            duty = high;
             integral = error > 0.0F ? wheel.integral : integral;
-        } else if (duty < -loop.out_max) {
-            duty = -loop.out_max;
+        } else if (duty < low) {
+            duty = low;
             integral = error < 0.0F ? wheel.integral : integral;
         }
         wheel.integral = integral;

@@ -12,7 +12,8 @@
 
 namespace vk::hal {
 
-// A PWM channel at a frequency fixed when it starts.
+// A PWM channel at a frequency set once at start. Channels on one timer
+// share its frequency.
 class PwmOutput {
 public:
     PwmOutput() = default;
@@ -21,7 +22,12 @@ public:
     PwmOutput(PwmOutput&&) = delete;
     PwmOutput& operator=(PwmOutput&&) = delete;
 
-    // `duty` from 0 to 1.
+    // Before the first duty; false if the timer cannot reach `hz`, which then
+    // keeps the board default.
+    virtual bool set_frequency(std::uint32_t hz) = 0;
+
+    // `duty` from 0 to 1. Each call also refreshes the platform's output
+    // watchdog, which turns every output off when the calls stop.
     virtual void set_duty(float duty) = 0;
 
 protected:

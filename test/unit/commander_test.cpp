@@ -336,4 +336,11 @@ TEST_F(CommanderTest, ItsSourceFallingSilentAbortsABringupCase)
     EXPECT_EQ(commander.state().disarm_reason, DisarmReason::BringupAbort);
 }
 
+TEST_F(CommanderTest, ReportsTheOutputWatchdogTrips)
+{
+    inputs.output_watchdog_trips = 2;
+    step();
+    EXPECT_EQ(commander.state().output_watchdog_trips, 2U);
+}
+
 }  // namespace
