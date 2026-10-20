@@ -13,6 +13,18 @@ vk_target_link_libraries(vk_commander PUBLIC vk_msg_headers vk_core vk_params)
 target_link_libraries(vk_commander PRIVATE vk_warnings vk_cxx_subset)
 vk_target_link_libraries(vk_modules INTERFACE vk_commander)
 
+if(CONFIG_ACTUATOR_CONTROL)
+  # Actuator control (ADR-0013): the speed loops use neither the bus nor
+  # FreeRTOS and are tested on the development host; the work item wraps them.
+  vk_add_library(vk_actuators LAYER module STATIC
+    actuators/src/actuator_control.cpp
+    actuators/src/actuator_task.cpp)
+  target_include_directories(vk_actuators PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/actuators/include)
+  vk_target_link_libraries(vk_actuators PUBLIC vk_msg_headers vk_core vk_hal vk_params)
+  target_link_libraries(vk_actuators PRIVATE vk_warnings vk_cxx_subset)
+  vk_target_link_libraries(vk_modules INTERFACE vk_actuators)
+endif()
+
 if(CONFIG_LINK)
   # The custom protocol and the Link work item (ADR-0002). The protocol code
   # uses neither a transport nor FreeRTOS, so it is tested on the development

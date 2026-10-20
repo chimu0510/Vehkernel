@@ -1,0 +1,153 @@
+# Parameters of actuator control: each motor output's wiring and encoder, and
+# the wheel speed loop (ADR-0012, ADR-0013). An output's encoder resolution
+# defaults to the board definition's value for its stock motors.
+prefix = "MOT"
+kconfig = "ACTUATOR_CONTROL"
+
+[[param]]
+name = "MOT1_REV"
+type = "INT32"
+default = "NORMAL"
+values = [{ name = "NORMAL", value = 0 }, { name = "REVERSED", value = 1 }]
+description = "Output 1: reverses the motor, when it is wired the other way round."
+locked_when_armed = true
+
+[[param]]
+name = "MOT1_ENC_REV"
+type = "INT32"
+default = "NORMAL"
+values = [{ name = "NORMAL", value = 0 }, { name = "REVERSED", value = 1 }]
+description = "Output 1: reverses the encoder, when its channels are wired the other way round."
+locked_when_armed = true
+
+[[param]]
+name = "MOT1_CPR"
+type = "FLOAT"
+default = 20000.0
+min = 1.0
+max = 1000000.0
+unit = "counts"
+description = "Output 1: encoder counts per wheel turn, after the gearbox and quadrature decoding."
+locked_when_armed = true
+
+[[param]]
+name = "MOT2_REV"
+type = "INT32"
+default = "NORMAL"
+values = [{ name = "NORMAL", value = 0 }, { name = "REVERSED", value = 1 }]
+description = "Output 2: reverses the motor, when it is wired the other way round."
+locked_when_armed = true
+
+[[param]]
+name = "MOT2_ENC_REV"
+type = "INT32"
+default = "NORMAL"
+values = [{ name = "NORMAL", value = 0 }, { name = "REVERSED", value = 1 }]
+description = "Output 2: reverses the encoder, when its channels are wired the other way round."
+locked_when_armed = true
+
+[[param]]
+name = "MOT2_CPR"
+type = "FLOAT"
+default = 20000.0
+min = 1.0
+max = 1000000.0
+unit = "counts"
+description = "Output 2: encoder counts per wheel turn, after the gearbox and quadrature decoding."
+locked_when_armed = true
+
+[[param]]
+name = "MOT3_REV"
+type = "INT32"
+default = "NORMAL"
+values = [{ name = "NORMAL", value = 0 }, { name = "REVERSED", value = 1 }]
+description = "Output 3: reverses the motor, when it is wired the other way round."
+locked_when_armed = true
+
+[[param]]
+name = "MOT3_ENC_REV"
+type = "INT32"
+default = "NORMAL"
+values = [{ name = "NORMAL", value = 0 }, { name = "REVERSED", value = 1 }]
+description = "Output 3: reverses the encoder, when its channels are wired the other way round."
+locked_when_armed = true
+
+[[param]]
+name = "MOT3_CPR"
+type = "FLOAT"
+default = 20000.0
+min = 1.0
+max = 1000000.0
+unit = "counts"
+description = "Output 3: encoder counts per wheel turn, after the gearbox and quadrature decoding."
+locked_when_armed = true
+
+[[param]]
+name = "MOT4_REV"
+type = "INT32"
+default = "NORMAL"
+values = [{ name = "NORMAL", value = 0 }, { name = "REVERSED", value = 1 }]
+description = "Output 4: reverses the motor, when it is wired the other way round."
+locked_when_armed = true
+
+[[param]]
+name = "MOT4_ENC_REV"
+type = "INT32"
+default = "NORMAL"
+values = [{ name = "NORMAL", value = 0 }, { name = "REVERSED", value = 1 }]
+description = "Output 4: reverses the encoder, when its channels are wired the other way round."
+locked_when_armed = true
+
+[[param]]
+name = "MOT4_CPR"
+type = "FLOAT"
+default = 20000.0
+min = 1.0
+max = 1000000.0
+unit = "counts"
+description = "Output 4: encoder counts per wheel turn, after the gearbox and quadrature decoding."
+locked_when_armed = true
+
+[[param]]
+name = "MOT_SPD_P"
+type = "FLOAT"
+default = 0.01
+min = 0.0
+max = 10.0
+unit = "s/rad"
+description = "Wheel speed loop: proportional gain, duty per rad/s of speed error."
+
+[[param]]
+name = "MOT_SPD_I"
+type = "FLOAT"
+default = 0.05
+min = 0.0
+max = 100.0
+unit = "1/rad"
+description = "Wheel speed loop: integral gain, duty per rad of accumulated speed error."
+
+[[param]]
+name = "MOT_SPD_FF"
+type = "FLOAT"
+default = 0.02
+min = 0.0
+max = 1.0
+unit = "s/rad"
+description = "Wheel speed loop: feedforward, duty per rad/s of target speed."
+
+[[param]]
+name = "MOT_MAX_SPD"
+type = "FLOAT"
+default = 30.0
+min = 0.0
+max = 500.0
+unit = "rad/s"
+description = "Largest wheel speed target; larger targets are clamped to it."
+
+[[param]]
+name = "MOT_OUT_MAX"
+type = "FLOAT"
+default = 0.3
+min = 0.0
+max = 1.0
+description = "Largest duty any output may drive, low by default while there is no remote control (ADR-0005)."

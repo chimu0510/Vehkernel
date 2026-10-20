@@ -60,6 +60,17 @@ struct Sample {
         vk::msg::wire::put(out, at, value);
         return at;
     }
+
+    [[nodiscard]] static bool decode(std::span<const std::uint8_t> in, Sample& out)
+    {
+        if (in.size() != encoded_size) {
+            return false;
+        }
+        std::size_t at = 0;
+        vk::msg::wire::get(in, at, out.timestamp);
+        vk::msg::wire::get(in, at, out.value);
+        return true;
+    }
 };
 
 class FakeTransport final : public vk::hal::Transport {
@@ -436,6 +447,11 @@ struct Large {
         }
         std::fill_n(out.begin(), encoded_size, std::uint8_t{1});
         return encoded_size;
+    }
+
+    [[nodiscard]] static bool decode(std::span<const std::uint8_t> in, Large& /*out*/)
+    {
+        return in.size() == encoded_size;
     }
 };
 

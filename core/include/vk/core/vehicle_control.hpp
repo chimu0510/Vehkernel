@@ -80,6 +80,11 @@ public:
 
     // Bits of arm_checks currently skipped.
     [[nodiscard]] virtual std::uint32_t skipped_checks() const = 0;
+
+    // Setpoint arbitration (ADR-0005): whether a direct-actuator setpoint from
+    // `source` is accepted now: from the source in control, in TEST, while
+    // armed and no bring-up case runs.
+    [[nodiscard]] virtual bool accepts_setpoint(ControlSource source) const = 0;
 };
 
 }  // namespace vk::core

@@ -8,6 +8,10 @@
 // hardware state (only actuator power so far) are skipped by clearing their
 // bit in COM_ARM_CHECK.
 //
+// A setpoint counts while it is current: accepted since arming when armed,
+// or within COM_SP_TIMEOUT when disarmed, so one left from before a disarm
+// neither blocks arming for long nor drives anything after it.
+//
 // update() runs once per control cycle with that cycle's inputs. It tracks
 // actuator power, on boards that sense it: one unpowered sample is
 // unpowered and disarms an armed vehicle unless the check is skipped;
@@ -37,7 +41,7 @@ struct Inputs {
     bool board_verified = false;                // the IMU answered and the revision matched (ADR-0010)
     std::optional<bool> actuator_power;         // the sample read powered; none if the board cannot sense it
     bool actuators_started = false;
-    bool setpoints_idle = true;                 // every target NaN or zero
+    bool setpoints_idle = true;                 // every target of the last setpoint NaN or zero
     bool bringup_running = false;
     std::uint64_t last_setpoint_us = 0;         // when the last setpoint was accepted, 0 for never
 };
@@ -78,10 +82,13 @@ public:
     core::ArmingResult request_arming(std::uint64_t now_us, core::ControlSource source, bool arm);
     bool request_emergency_stop(std::uint64_t now_us, bool engage);
 
+    // Setpoint arbitration: whether a setpoint from `source` is accepted now.
+    [[nodiscard]] bool accepts_setpoint(core::ControlSource source) const;
+
     [[nodiscard]] const State& state() const { return state_; }
 
 private:
-    [[nodiscard]] core::ArmingResult arming_check(core::ControlSource source) const;
+    [[nodiscard]] core::ArmingResult arming_check(std::uint64_t now_us, core::ControlSource source) const;
     [[nodiscard]] bool power_checked() const;
     void track_power(std::uint64_t now_us, std::optional<bool> sample);
     void arm(std::uint64_t now_us);

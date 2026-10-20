@@ -225,6 +225,14 @@ class HostSession:
     def make_sim_actuator_power(self, powered: bool) -> bytes:
         return self.writer.write(FrameType.SIM_ACTUATOR_POWER, struct.pack("<B", int(powered)))
 
+    def make_topic_data(self, name: str, message: bytes, instance: int = 0) -> bytes:
+        """Encodes an inbound TopicData frame for a topic the MCU announced at the handshake.
+
+        Raises KeyError when the MCU did not announce the topic.
+        """
+        topic = self.peer_topics_by_name[name]
+        return self.writer.write(FrameType.TOPIC_DATA, struct.pack("<HB", topic.id, instance) + message)
+
     def handle_frame(self, frame: Frame) -> None:
         """Consumes one frame received from the MCU."""
         if frame.type == FrameType.HELLO_REPLY:
@@ -332,6 +340,8 @@ class McuSession:
         self.handshake_done = False
         self.last_heard_us = 0
         self.frames_sent = 0
+        # Inbound topic data, as (topic id, instance, message) in arrival order.
+        self.topic_data: list[tuple[int, int, bytes]] = []
 
     def handle(self, frame: Frame, now_us: int) -> list[bytes]:
         """Handles an incoming frame; returns wire frames to send in reply."""
@@ -352,6 +362,10 @@ class McuSession:
             return [self._param_value(i) for i in range(first, len(self.params))]
         if frame.type in (FrameType.PARAM_GET, FrameType.PARAM_SET) and frame.body:
             return [self._on_param(frame)]
+        if frame.type == FrameType.TOPIC_DATA and len(frame.body) >= 3:
+            topic_id, instance = struct.unpack("<HB", frame.body[:3])
+            self.topic_data.append((topic_id, instance, bytes(frame.body[3:])))
+            return []
         if self.control is not None and frame.body:
             return self._on_control(frame)
         return []

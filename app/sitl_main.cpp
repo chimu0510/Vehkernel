@@ -16,8 +16,12 @@
 // runs are reproducible, or kept in the file given with --param-file.
 // The simulated board senses actuator power, on unless --actuator-power-off
 // cuts it at start; the Link's sim_actuator_power frame cuts or restores it.
-#include <vk/commander/commander_task.hpp>
 #include <vk/config.h>
+
+#ifdef CONFIG_ACTUATOR_CONTROL
+#include <vk/actuators/actuator_task.hpp>
+#endif
+#include <vk/commander/commander_task.hpp>
 #include <vk/core/bus.hpp>
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
@@ -158,15 +162,36 @@ bool parse_options(std::span<char*> args, Options& options)
 
 vk::core::StaticInstance<vk::commander::CommanderTask> commander;
 
+constexpr std::uint32_t control_interval_us = 1'000'000 / vk::platform::imu_rate_hz;
+
 // The commander on wq:ctrl at the IMU's rate (ADR-0005). SITL's board has no
 // revision-ID pins, so it is verified once the simulated IMU answers.
 void start_commander()
 {
-    commander.emplace(vk::commander::CommanderTask::Config{.interval_us = 1'000'000 / vk::platform::imu_rate_hz,
-                                                           .actuator_power = &vk::platform::actuator_power},
+#ifdef CONFIG_ACTUATOR_CONTROL
+    constexpr bool actuators = true;
+#else
+    constexpr bool actuators = false;
+#endif
+    commander.emplace(vk::commander::CommanderTask::Config{.interval_us = control_interval_us,
+                                                           .actuator_power = &vk::platform::actuator_power,
+                                                           .actuators_started = actuators},
                       vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     commander->start();
 }
+
+#ifdef CONFIG_ACTUATOR_CONTROL
+vk::core::StaticInstance<vk::actuators::ActuatorTask> actuator_control;
+
+// Actuator control on wq:ctrl after the commander, over the simulated motors (spec 0006).
+void start_actuators()
+{
+    actuator_control.emplace(vk::actuators::ActuatorTask::Config{.interval_us = control_interval_us,
+                                                                 .channels = vk::platform::motor_channels()},
+                             vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    actuator_control->start();
+}
+#endif
 
 #ifdef CONFIG_LINK
 vk::core::StaticInstance<vk::link::Link> host_link;
@@ -308,6 +333,9 @@ int main(int argc, char** argv)
     start_estimator();
 #endif
     start_commander();
+#ifdef CONFIG_ACTUATOR_CONTROL
+    start_actuators();
+#endif
 #ifdef CONFIG_LINK
     if (!start_link(options)) {
         return 1;

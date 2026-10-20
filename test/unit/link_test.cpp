@@ -889,6 +889,7 @@ public:
     [[nodiscard]] vk::core::Mode mode() const override { return current_mode; }
     [[nodiscard]] bool armed() const override { return is_armed; }
     [[nodiscard]] std::uint32_t skipped_checks() const override { return skipped; }
+    [[nodiscard]] bool accepts_setpoint(vk::core::ControlSource /*source*/) const override { return is_armed; }
 
     vk::core::ModeResult mode_result = vk::core::ModeResult::Ok;
     vk::core::ArmingResult arming_result = vk::core::ArmingResult::Ok;

@@ -1,9 +1,12 @@
 // Topic maps (ADR-0002): which topic instances leave through a Link, and how
 // often.
 //
-// A topic map is a table of topic streams fixed at build time. Each stream
-// reads one topic instance and either sends every sample, for queued topics
-// such as imu_sample, or sends the latest value at most at a given rate.
+// A topic map is a table of topic streams fixed at build time. Each outbound
+// stream reads one topic instance and either sends every sample, for queued
+// topics such as imu_sample, or sends the latest value at most at a given
+// rate. An inbound stream publishes what the peer sends on its topic
+// instance; the peer may send no other topic. Inbound setpoints pass setpoint
+// arbitration first (ADR-0005).
 //
 // A Link on a transport with a baud rate scales its streams down when the map
 // would need more than 80 % of the port (ADR-0002): every stream faster than
@@ -26,6 +29,12 @@ inline constexpr EverySample every_sample{};
 // Send the latest message at most `hz` times a second.
 struct MaxRate {
     float hz;
+};
+
+// Receive the topic from the peer and publish it; a setpoint goes through
+// setpoint arbitration first.
+struct Inbound {
+    bool setpoint = false;
 };
 
 class TopicStream {
@@ -53,6 +62,13 @@ public:
     // only the newest sample of each interval.
     virtual void limit_rate(float hz) = 0;
 
+    // Inbound streams only: whether the topic is a setpoint, and publishing a
+    // message the peer sent, stamped with the time it arrived; false if it
+    // does not decode.
+    [[nodiscard]] virtual bool inbound() const = 0;
+    [[nodiscard]] virtual bool setpoint() const = 0;
+    virtual bool receive(std::span<const std::uint8_t> message, std::uint64_t now_us) = 0;
+
     [[nodiscard]] std::uint16_t topic_id() const { return topic_id_; }
     [[nodiscard]] std::uint8_t instance() const { return instance_; }
 
@@ -72,14 +88,34 @@ public:
     // leaves it to the board, as for imu_sample.
     explicit TopicStreamOf(EverySample /*unused*/, std::size_t instance = 0, float nominal_hz = T::nominal_rate_hz)
         : TopicStream(T::topic_id, static_cast<std::uint8_t>(instance)), subscription_(instance),
-          nominal_hz_(nominal_hz)
+          publication_(instance), nominal_hz_(nominal_hz)
     {
     }
 
     explicit TopicStreamOf(MaxRate rate, std::size_t instance = 0)
         : TopicStream(T::topic_id, static_cast<std::uint8_t>(instance)), subscription_(instance),
-          interval_us_(static_cast<std::uint32_t>(1e6F / rate.hz)), nominal_hz_(rate.hz)
+          publication_(instance), interval_us_(static_cast<std::uint32_t>(1e6F / rate.hz)), nominal_hz_(rate.hz)
     {
+    }
+
+    explicit TopicStreamOf(Inbound direction, std::size_t instance = 0)
+        : TopicStream(T::topic_id, static_cast<std::uint8_t>(instance)), subscription_(instance),
+          publication_(instance), inbound_(true), setpoint_(direction.setpoint)
+    {
+    }
+
+    [[nodiscard]] bool inbound() const override { return inbound_; }
+    [[nodiscard]] bool setpoint() const override { return setpoint_; }
+
+    bool receive(std::span<const std::uint8_t> message, std::uint64_t now_us) override
+    {
+        T decoded{};
+        if (!inbound_ || !T::decode(message, decoded)) {
+            return false;
+        }
+        decoded.timestamp = now_us;
+        publication_.publish(decoded);
+        return true;
     }
 
     [[nodiscard]] float nominal_hz() const override { return nominal_hz_; }
@@ -93,6 +129,9 @@ public:
     std::size_t next(std::uint64_t now_us, std::span<std::uint8_t> out) override
     {
         T message{};
+        if (inbound_) {
+            return 0;
+        }
         if (interval_us_ == 0) {
             return subscription_.copy(message) ? message.encode(out) : 0;
         }
@@ -112,8 +151,11 @@ public:
 
 private:
     core::Subscription<T> subscription_;
+    core::Publication<T> publication_;
     std::uint32_t interval_us_ = 0;  // 0 sends every sample
-    float nominal_hz_ = 0.0F;
+    float nominal_hz_ = 0.0F;  // 0 for an inbound stream, which the rate scaling leaves alone
+    bool inbound_ = false;
+    bool setpoint_ = false;
     std::uint64_t next_send_us_ = 0;
 };
 
@@ -133,9 +175,10 @@ float topic_map_load(TopicMap map);
 std::uint8_t scale_to_baud(TopicMap map, std::uint32_t baud);
 
 // The default topic map: imu_sample instance 0 at every sample,
-// vehicle_attitude and (in SITL) vehicle_attitude_groundtruth at 50 Hz,
-// vehicle_status at 5 Hz, and parameter_status and every instance of
-// work_item_status and link_status at 1 Hz.
+// vehicle_attitude, (in SITL) vehicle_attitude_groundtruth, wheel_encoders and
+// actuator_outputs at 50 Hz, vehicle_status at 5 Hz, and parameter_status and
+// every instance of work_item_status and link_status at 1 Hz; actuator_setpoint
+// comes in, as a setpoint.
 // `imu_rate_hz` is imu_sample's publish rate, from the board's timing preset.
 TopicMap default_topic_map(float imu_rate_hz);
 

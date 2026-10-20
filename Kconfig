@@ -70,6 +70,21 @@ config ESTIMATOR_MAHONY
 
 endmenu
 
+menu "Actuators"
+
+config ACTUATOR_CONTROL
+	bool "Actuator control"
+	depends on BOARD_HAS_ACTUATORS || PLATFORM_SITL
+	default y if PLATFORM_SITL
+	help
+	  A wheel speed PI per motor output on its encoder, driving PWM and
+	  direction lines (ADR-0013), with direct-actuator setpoints over a
+	  Link (spec 0006). On by default in SITL only: a board turns it on in
+	  its defconfig once its platform implements the PWM output and
+	  quadrature encoder contracts.
+
+endmenu
+
 menu "Drivers"
 
 config DRIVER_CAN

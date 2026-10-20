@@ -5,6 +5,7 @@
 // every change and vehicle_status on every change and five times a second.
 // The board counts as verified (ADR-0010) once the boot check of the
 // revision-ID pins has passed and the IMU has answered with its first sample.
+// It follows the setpoints that arbitration accepted on actuator_setpoint.
 //
 // It is also the vehicle control service the Links call from their own work
 // queue; requests and cycles take turns in short critical sections.
@@ -14,6 +15,7 @@
 #include <vk/core/bus.hpp>
 #include <vk/core/vehicle_control.hpp>
 #include <vk/core/work_queue.hpp>
+#include <vk/msg/actuator_setpoint.hpp>
 #include <vk/msg/arming_state.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_status.hpp>
@@ -44,6 +46,7 @@ public:
     [[nodiscard]] core::Mode mode() const override;
     [[nodiscard]] bool armed() const override;
     [[nodiscard]] std::uint32_t skipped_checks() const override;
+    [[nodiscard]] bool accepts_setpoint(core::ControlSource source) const override;
 
 protected:
     void run() override;
@@ -54,6 +57,8 @@ private:
     Config config_;
     Commander commander_;
     core::Subscription<msg::ImuSample> imu_{0};
+    core::Subscription<msg::ActuatorSetpoint> setpoint_{0};
+    msg::ActuatorSetpoint last_setpoint_{};
     core::Publication<msg::ArmingState> arming_publication_;
     core::Publication<msg::VehicleStatus> status_publication_;
     bool imu_answered_ = false;

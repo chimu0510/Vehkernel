@@ -43,12 +43,13 @@ def messages(schema_hash=SAMPLE_HASH):
 class FakeMcu:
     """Answers the handshake and time sync, and sends `sample` every 10 ms of MCU time."""
 
-    def __init__(self, skip_sequence: bool = False, params=None, param_set_hash: int = 0, control=None):
+    def __init__(self, skip_sequence: bool = False, params=None, param_set_hash: int = 0, control=None,
+                 topics=()):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind(("127.0.0.1", 0))
         self.socket.settimeout(0.002)
         self.port = self.socket.getsockname()[1]
-        self.session = McuSession([TopicDescription(0, 1, SAMPLE_HASH, "sample")], params=params,
+        self.session = McuSession([TopicDescription(0, 1, SAMPLE_HASH, "sample"), *topics], params=params,
                                   param_set_hash=param_set_hash, control=control)
         self.reader = FrameReader()
         self.skip_sequence = skip_sequence

@@ -48,12 +48,22 @@ if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_LINK_UDP)
 endif()
 
 # L3 SITL arming test (spec 0006): arming refused for each check in turn,
-# actuator power settling, the emergency stop and a skipped power check.
+# actuator power settling, the emergency stop and a skipped power check, then
+# arming accepted.
 if(CONFIG_LINK_UDP)
   add_test(NAME sitl_arming
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_arming.py
       $<TARGET_FILE:vehkernel-sitl> ${CMAKE_SOURCE_DIR}/tools/link/link_monitor.py
       --msg-dir ${VK_MSG_PYTHON_DIR} --param-meta ${VK_PARAM_METADATA})
+endif()
+
+# L3 SITL actuator test (spec 0006): direct-actuator setpoints turn the
+# simulated wheels at 10 rad/s, and the setpoint timeout, actuator power loss,
+# the emergency stop, a skipped power check and the idle disarm stop them.
+if(CONFIG_ACTUATOR_CONTROL AND CONFIG_LINK_UDP)
+  add_test(NAME sitl_actuators
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_actuators.py
+      $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
 endif()
 
 # Kconfig smoke test (ADR-0017): a debug overlay that sets an option whose

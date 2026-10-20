@@ -30,7 +30,8 @@ void Commander::update(std::uint64_t now_us, const Inputs& inputs, const Setting
         disarm(core::DisarmReason::EmergencyStop);
         return;
     }
-    if (!inputs.setpoints_idle || inputs.bringup_running) {
+    const bool setpoint_since_arming = inputs.last_setpoint_us != 0 && inputs.last_setpoint_us >= armed_at_us_;
+    if ((setpoint_since_arming && !inputs.setpoints_idle) || inputs.bringup_running) {
         active_at_us_ = now_us;
     }
     if (now_us - active_at_us_ >= to_us(settings.disarm_idle_s)) {
@@ -41,7 +42,7 @@ void Commander::update(std::uint64_t now_us, const Inputs& inputs, const Setting
     if (state_.emergency_stop || inputs.bringup_running) {
         timeout_from_us_ = now_us;
     }
-    if (inputs.last_setpoint_us != 0 && inputs.last_setpoint_us >= armed_at_us_ &&
+    if (setpoint_since_arming &&
         now_us - std::max(inputs.last_setpoint_us, timeout_from_us_) > to_us(settings.setpoint_timeout_s)) {
         disarm(core::DisarmReason::SetpointTimeout);
     }
@@ -74,7 +75,7 @@ core::ArmingResult Commander::request_arming(std::uint64_t now_us, core::Control
     if (state_.armed) {
         return core::ArmingResult::Ok;
     }
-    const core::ArmingResult result = arming_check(source);
+    const core::ArmingResult result = arming_check(now_us, source);
     state_.arming_refusal = result;
     if (result == core::ArmingResult::Ok) {
         arm(now_us);
@@ -91,7 +92,12 @@ bool Commander::request_emergency_stop(std::uint64_t now_us, bool engage)
     return state_.emergency_stop;
 }
 
-core::ArmingResult Commander::arming_check(core::ControlSource source) const
+bool Commander::accepts_setpoint(core::ControlSource source) const
+{
+    return state_.armed && state_.mode == core::Mode::Test && source == state_.source && !inputs_.bringup_running;
+}
+
+core::ArmingResult Commander::arming_check(std::uint64_t now_us, core::ControlSource source) const
 {
     if (!state_.board_verified) {
         return core::ArmingResult::BoardNotVerified;
@@ -105,7 +111,9 @@ core::ArmingResult Commander::arming_check(core::ControlSource source) const
     if (source != state_.source) {
         return core::ArmingResult::NotInControl;
     }
-    if (!inputs_.setpoints_idle) {
+    const bool current = inputs_.last_setpoint_us != 0 &&
+                         now_us - inputs_.last_setpoint_us <= to_us(settings_.setpoint_timeout_s);
+    if (current && !inputs_.setpoints_idle) {
         return core::ArmingResult::SetpointsActive;
     }
     if (inputs_.bringup_running) {

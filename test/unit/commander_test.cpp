@@ -86,8 +86,13 @@ TEST_F(CommanderTest, RefusesEachArmingCheckWithItsReasonInOrder)
     EXPECT_EQ(commander.request_arming(now, link1, true), ArmingResult::NotInControl);
 
     inputs.setpoints_idle = false;
+    inputs.last_setpoint_us = now;
     step();
     EXPECT_EQ(commander.request_arming(now, link0, true), ArmingResult::SetpointsActive);
+    // A setpoint older than the setpoint timeout no longer counts.
+    step(static_cast<std::uint64_t>(settings.setpoint_timeout_s * 1e6F) + cycle_us);
+    EXPECT_NE(commander.request_arming(now, link0, true), ArmingResult::SetpointsActive);
+    commander.request_arming(now, link0, false);
     inputs.setpoints_idle = true;
 
     inputs.bringup_running = true;

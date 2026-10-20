@@ -4,7 +4,8 @@ Connects to a Link, performs the handshake and time synchronization, decodes
 every topic with the Python module generated from the schema, and keeps each
 topic instance's rate and latest values. It also lists, reads and sets
 parameters (spec 0005), described by the metadata file the parameter
-generator writes into the build tree.
+generator writes into the build tree, and sends direct-actuator setpoints
+(spec 0006).
 """
 
 from __future__ import annotations
@@ -148,6 +149,22 @@ def vehicle_status_line(status) -> str:
             f"arming_refusal={ARMING_REJECT_REASONS.get(status.arming_refusal, 'none').replace(' ', '_')} "
             f"disarm_reason={DISARM_REASONS.get(status.disarm_reason, status.disarm_reason).replace(' ', '_')} "
             f"output_watchdog_trips={status.output_watchdog_trips}")
+
+
+def speeds_text(values) -> str:
+    """Four floats as a comma-separated list, NaN as nan."""
+    return ",".join(f"{v:.3f}" for v in values)
+
+
+def wheel_encoders_line(encoders) -> str:
+    """wheel_encoders as a space-separated key=value line."""
+    return (f"wheel_encoders speed={speeds_text(encoders.speed)} angle={speeds_text(encoders.angle)} "
+            f"valid=0x{encoders.valid:X}")
+
+
+def actuator_outputs_line(outputs) -> str:
+    """actuator_outputs as a space-separated key=value line."""
+    return f"actuator_outputs output={speeds_text(outputs.output)} target={speeds_text(outputs.target)}"
 
 
 def param_status_line(status) -> str:
@@ -503,6 +520,49 @@ class LinkMonitor:
         """SITL only: cuts or restores the simulated actuator power. The MCU does not answer."""
         self.connection.send(self.session.make_sim_actuator_power(powered))
 
+    def send_topic(self, name: str, message: object, instance: int = 0) -> None:
+        """Sends a message as inbound topic data; the MCU drops it unless its topic map declares it inbound.
+
+        Raises KeyError when the MCU did not announce the topic at the handshake.
+        """
+        self.connection.send(self.session.make_topic_data(name, message.encode(), instance))
+
+    SETPOINT_RATE_HZ = 20.0
+
+    def drive(self, wheel_speed: tuple[float, ...], duration_s: float,
+              rate_hz: float = SETPOINT_RATE_HZ) -> object | None:
+        """Sends actuator_setpoint at `rate_hz` for `duration_s`, then one with every target NaN.
+
+        Stops early when vehicle_status reports the vehicle disarmed after it
+        reported it armed; returns that vehicle_status, or None.
+        """
+        setpoint = self.messages.BY_NAME["actuator_setpoint"]
+        armed_seen = False
+        disarmed = None
+
+        def watch(name: str, _instance: int, message: object) -> None:
+            nonlocal armed_seen, disarmed
+            if name != "vehicle_status":
+                return
+            if message.armed:
+                armed_seen = True
+            elif armed_seen and disarmed is None:
+                disarmed = message
+
+        self.listeners.append(watch)
+        try:
+            end = self.clock() + duration_s
+            next_send = 0.0
+            while disarmed is None and (now := self.clock()) < end:
+                if now >= next_send:
+                    self.send_topic("actuator_setpoint", setpoint(wheel_speed=tuple(wheel_speed)))
+                    next_send = now + 1.0 / rate_hz
+                self.poll(min(next_send, end) - now)
+        finally:
+            self.listeners.remove(watch)
+        self.send_topic("actuator_setpoint", setpoint(wheel_speed=(math.nan,) * len(wheel_speed)))
+        return disarmed
+
     def latest(self, name: str) -> list[tuple[int, object]]:
         """The latest message of every instance of a topic that arrived, by instance."""
         return [
@@ -550,6 +610,10 @@ class LinkMonitor:
             lines.append(param_status_line(status))
         for _, status in self.latest("vehicle_status"):
             lines.append(vehicle_status_line(status))
+        for _, encoders in self.latest("wheel_encoders"):
+            lines.append(wheel_encoders_line(encoders))
+        for _, outputs in self.latest("actuator_outputs"):
+            lines.append(actuator_outputs_line(outputs))
         for _, status in self.latest("work_item_status"):
             lines.append(
                 f"work_item name={work_item_name(status)} runs={status.runs} overruns={status.overruns} "

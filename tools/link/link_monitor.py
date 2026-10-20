@@ -23,12 +23,18 @@ The mode, arm, disarm and estop commands change the mode, arm or disarm, and
 engage or release the emergency stop (spec 0006), print the state now in
 effect and exit non-zero when the MCU refuses. arm warns when arming checks
 are skipped. sim-power cuts or restores SITL's simulated actuator power.
+drive requests TEST and arming if needed, sends one wheel speed per actuator
+output (rad/s, nan leaves an output uncontrolled) at 20 Hz for the duration,
+then all NaN, and disarms; it prints the wheel speeds reached and exits
+non-zero when the vehicle disarms on the way.
 
     link_monitor.py --udp 127.0.0.1:15600 param list
     link_monitor.py --udp 127.0.0.1:15600 param set ATT_KP 2.5
     link_monitor.py --udp 127.0.0.1:15600 mode test
     link_monitor.py --udp 127.0.0.1:15600 arm
     link_monitor.py --udp 127.0.0.1:15600 estop on
+    link_monitor.py --udp 127.0.0.1:15600 drive 10,10,10,10 --duration 3
+    link_monitor.py --udp 127.0.0.1:15600 drive --duration 2 -- -5,nan,nan,nan
 """
 
 from __future__ import annotations
@@ -43,6 +49,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from vklink.monitor import (  # noqa: E402
     LinkMonitor,
+    speeds_text,
     ParamMetadata,
     RateExpectation,
     SerialConnection,
@@ -53,7 +60,15 @@ from vklink.monitor import (  # noqa: E402
     load_param_metadata,
     parse_param_text,
 )
-from vklink.session import MODES, ControlReply, ParamReject, ParamType, ParamValue, check_names  # noqa: E402
+from vklink.session import (  # noqa: E402
+    DISARM_REASONS,
+    MODES,
+    ControlReply,
+    ParamReject,
+    ParamType,
+    ParamValue,
+    check_names,
+)
 from vklink.view import render  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -87,6 +102,26 @@ def refused(name: str, reply: ParamReject | None) -> int:
     else:
         print(f"FAIL: {reply.name} rejected: {reply.reason_text}", file=sys.stderr)
     return 1
+
+
+def parse_speeds(text: str) -> tuple[float, ...]:
+    try:
+        speeds = tuple(float(value) for value in text.split(","))
+    except ValueError:
+        speeds = ()
+    if len(speeds) != 4:
+        raise argparse.ArgumentTypeError(f"expected four wheel speeds <w1>,<w2>,<w3>,<w4> in rad/s, got '{text}'")
+    return speeds
+
+
+def parse_duration(text: str) -> float:
+    try:
+        duration = float(text)
+    except ValueError:
+        duration = -1.0
+    if not duration > 0:
+        raise argparse.ArgumentTypeError(f"expected a positive number of seconds, got '{text}'")
+    return duration
 
 
 def run_param(monitor: LinkMonitor, args: argparse.Namespace, metadata: ParamMetadata | None) -> int:
@@ -161,6 +196,43 @@ def run_control(monitor: LinkMonitor, args: argparse.Namespace) -> int:
     return 0
 
 
+def run_drive(monitor: LinkMonitor, args: argparse.Namespace) -> int:
+    """The drive command, once the handshake is done."""
+    test = next(number for number, name in MODES.items() if name == "TEST")
+    if "actuator_setpoint" not in monitor.session.peer_topics_by_name:
+        print("FAIL: the MCU does not offer actuator_setpoint", file=sys.stderr)
+        return 1
+    for command, request in (("mode", lambda: monitor.request_mode(test, PARAM_TIMEOUT_S)),
+                             ("arm", lambda: monitor.request_arming(True, PARAM_TIMEOUT_S))):
+        reply = request()
+        if reply is None:
+            print(f"FAIL: no reply from the MCU to {command}", file=sys.stderr)
+            return 1
+        if reply.refused:
+            print(f"FAIL: {command} refused: {reply.reason_text}", file=sys.stderr)
+            return 1
+    skipped = check_names(reply.skipped)
+    if skipped:
+        print(f"warning: arming checks skipped: {', '.join(skipped)}", file=sys.stderr)
+
+    try:
+        disarmed = monitor.drive(args.speeds, args.drive_duration)
+        encoders = monitor.latest("wheel_encoders")
+    finally:
+        # Disarm whatever happened, an interrupt included.
+        disarm = monitor.request_arming(False, PARAM_TIMEOUT_S)
+    speeds = speeds_text(encoders[0][1].speed) if encoders else "none"
+    print(f"wheel_speed={speeds} armed={disarm.value if disarm is not None else 'unknown'}")
+    if disarmed is not None:
+        reason = DISARM_REASONS.get(disarmed.disarm_reason, disarmed.disarm_reason)
+        print(f"FAIL: the vehicle disarmed while driving: {reason}", file=sys.stderr)
+        return 1
+    if disarm is None:
+        print("FAIL: no reply from the MCU to disarm", file=sys.stderr)
+        return 1
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     target = parser.add_mutually_exclusive_group()
@@ -195,6 +267,11 @@ def main() -> int:
     estop.add_argument("state", choices=["on", "off"])
     sim_power = commands.add_parser("sim-power", help="SITL only: cut or restore the simulated actuator power")
     sim_power.add_argument("state", choices=["on", "off"])
+    drive = commands.add_parser("drive", help="arm and drive the wheels for a while, then disarm")
+    drive.add_argument("speeds", type=parse_speeds, metavar="W1,W2,W3,W4",
+                       help="wheel speeds in rad/s by output number, nan for none; put -- before a negative first one")
+    drive.add_argument("--duration", dest="drive_duration", type=parse_duration, required=True, metavar="SECONDS",
+                       help="seconds to send the setpoints")
     args = parser.parse_args()
 
     metadata = None
@@ -229,6 +306,8 @@ def main() -> int:
             return 1
         if args.command == "param":
             return run_param(monitor, args, metadata)
+        if args.command == "drive":
+            return run_drive(monitor, args)
         if args.command is not None:
             return run_control(monitor, args)
         if args.check:

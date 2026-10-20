@@ -6,10 +6,12 @@
 // emergency stop requests, then sends a few frames of the handshake's
 // topic_info frames or of a parameter list in progress, and every topic map
 // entry that is due once the session is connected and every topic has been
-// described. A frame the transport cannot
-// take is dropped and counted; the Link never blocks its work queue. Once a
-// second it publishes its statistics on link_status. On a transport with a
-// baud rate, start() scales the topic map down to fit it (ADR-0002).
+// described. Topic data from the peer is published on an inbound topic of the
+// map, a setpoint only once setpoint arbitration accepts it, and counted
+// otherwise. A frame the transport cannot take is dropped and counted; the
+// Link never blocks its work queue. Once a second it publishes its statistics
+// on link_status. On a transport with a baud rate, start() scales the topic
+// map down to fit it (ADR-0002).
 #pragma once
 
 #include <vk/core/work_queue.hpp>
@@ -44,6 +46,8 @@ struct LinkStats {
     std::uint32_t lost;             // frames missing from the peer's sequence
     HandshakeState handshake_state;
     std::uint8_t rate_scale;        // percent of the topic map's rates, scaled to fit the baud rate
+    std::uint32_t inbound_undeclared;  // topic data for a topic the map does not declare inbound
+    std::uint32_t setpoints_rejected;  // setpoints refused by setpoint arbitration
 };
 
 class Link final : public core::WorkItem {
@@ -93,6 +97,7 @@ private:
     };
 
     void receive(std::uint64_t now_us);
+    void on_topic_data(BodyReader body, std::uint64_t now_us);
     void send_topics(std::uint64_t now_us);
     void publish_status(std::uint64_t now_us);
 
@@ -107,6 +112,8 @@ private:
     HandshakeState handshake_state_ = HandshakeState::Waiting;
     std::uint64_t next_status_us_ = 0;
     std::uint8_t rate_scale_ = 100;
+    std::uint32_t inbound_undeclared_ = 0;
+    std::uint32_t setpoints_rejected_ = 0;
     std::array<std::uint8_t, 2 * max_wire_size> receive_buffer_{};
 };
 

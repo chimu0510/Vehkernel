@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """L3 SITL arming test (ADR-0018, spec 0006): modes, arming checks and the emergency stop.
 
-SITL starts with its simulated actuator power off and has no actuator
-control yet, so it can never arm: every arm request is refused, and the
-reason shows which check stopped it, in the order the commander runs them.
+SITL starts with its simulated actuator power off. Each refusal's reason
+shows which check stopped it, in the order the commander runs them.
 Through the Link monitor's commands: arming is refused in STANDBY, then in
-TEST with actuator power off, then while power settles after it is restored,
-then with the emergency stop engaged from another connection, which
-vehicle_status reports; with power present, or with the power check skipped
-by COM_ARM_CHECK and power cut again, the refusal moves on to the actuators,
-and vehicle_status reports the check skipped.
+TEST with actuator power off, then while power settles after it is restored;
+with power present it is accepted. Disarmed again, it is refused with the
+emergency stop engaged from another connection, which vehicle_status
+reports; with the power check skipped by COM_ARM_CHECK and power cut again,
+it is accepted, and the reply and vehicle_status report the check skipped.
 
     check_arming.py build/test/app/vehkernel-sitl tools/link/link_monitor.py \\
         --msg-dir build/test/generated/schema/python --param-meta build/test/generated/params/params.json
@@ -116,8 +115,11 @@ def main() -> int:
                 failures.append("arming right after power was restored was not refused while it settles")
             time.sleep(SETTLED_S)
             powered = monitor.request_arming(True, REPLY_S)
-            if powered is None or powered.reason_text != "actuators not started":
-                failures.append("with actuator power settled, arming was not refused for the actuators next")
+            if powered is None or powered.refused:
+                failures.append("with actuator power settled, arming was not accepted")
+            disarmed = monitor.request_arming(False, REPLY_S)
+            if disarmed is None or disarmed.value != 0:
+                failures.append("disarming was not taken")
 
         # The emergency stop, from another connection than the one in control.
         if cli(args, address, "estop", "on").stdout != "emergency_stop=1\n":
@@ -141,8 +143,9 @@ def main() -> int:
             monitor.sim_actuator_power(False)
             skipped = monitor.request_arming(True, REPLY_S)
             status = latest_status(monitor)
-        if skipped is None or skipped.reason_text != "actuators not started":
-            failures.append("with the power check skipped, arming was still refused before the actuators")
+            monitor.request_arming(False, REPLY_S)
+        if skipped is None or skipped.refused or skipped.skipped != 1:
+            failures.append("with the power check skipped, arming was not accepted with the check reported")
         if status is None or status.skipped_checks != 1 or status.actuator_power != 1:
             failures.append("vehicle_status does not report the power check skipped and the power off")
         if status is not None and not status.board_verified:

@@ -1,5 +1,6 @@
 #include <vk/link/link.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 
@@ -44,7 +45,9 @@ LinkStats Link::link_stats() const
             .malformed = received.malformed,
             .lost = received.lost,
             .handshake_state = handshake_state_,
-            .rate_scale = rate_scale_};
+            .rate_scale = rate_scale_,
+            .inbound_undeclared = inbound_undeclared_,
+            .setpoints_rejected = setpoints_rejected_};
 }
 
 void Link::run()
@@ -80,6 +83,8 @@ void Link::publish_status(std::uint64_t now_us)
     status.lost = current.lost;
     status.handshake_state = static_cast<std::uint8_t>(current.handshake_state);
     status.rate_scale = current.rate_scale;
+    status.inbound_undeclared = current.inbound_undeclared;
+    status.setpoints_rejected = current.setpoints_rejected;
     status_publication_.publish(status);
 }
 
@@ -97,8 +102,36 @@ void Link::receive(std::uint64_t now_us)
                 transport_->select_peer();
             }
             session_.handle(frame, now_us, sink_);
+            if (frame.type == FrameType::TopicData && session_.handshake_done()) {
+                on_topic_data(BodyReader(frame.body), now_us);
+            }
         });
     }
+}
+
+void Link::on_topic_data(BodyReader body, std::uint64_t now_us)
+{
+    const std::uint16_t topic_id = body.u16();
+    const std::uint8_t instance = body.u8();
+    const auto message = body.rest();
+    if (!body.ok()) {
+        return;
+    }
+    const auto stream = std::ranges::find_if(map_, [&](const TopicStream* s) {
+        return s->inbound() && s->topic_id() == topic_id && s->instance() == instance;
+    });
+    if (stream == map_.end()) {
+        ++inbound_undeclared_;
+        return;
+    }
+    // A setpoint counts only from the source in control (ADR-0005).
+    const ControlAccess& control = config_.control;
+    if ((*stream)->setpoint() &&
+        (control.control == nullptr || !control.control->accepts_setpoint(config_.instance))) {
+        ++setpoints_rejected_;
+        return;
+    }
+    (*stream)->receive(message, now_us);
 }
 
 void Link::send_topics(std::uint64_t now_us)
