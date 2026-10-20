@@ -34,3 +34,5 @@ Split by mathematical model, under `lib/estimation/`:
 An estimator = one algorithm + several models. The library depends on neither the bus nor the HAL, so it can be unit tested and replayed against recorded data on the development host.
 
 The initial implementation covers attitude estimation with a complementary filter (Mahony) + quaternion kinematics + accelerometer model, local odometry by dead reckoning, and two body velocity sources: the `WHEELED` vehicle model and velocities injected over a Link. For the external estimator, only the interface and schema are defined at first. Directories and interfaces follow this structure from the start; EKF and other algorithms come later.
+
+The attitude estimator's alignment time and stillness thresholds are compile-time constants for now; they become parameters when a vehicle must align with motors or pumps running, as ArduPilot's `INS_STILL_THRESH` is (ADR-0012). Its variance models stay internal.

@@ -13,6 +13,16 @@ In RAM, parameters are plain structs that modules read directly; in Flash they a
 - **Names**: at most 16 characters, upper case with a module prefix, for example `RD_WHEEL_TRACK`, for compatibility with the MAVLink parameter protocol. Each parameter definition file declares its prefix, the generator rejects a name without it, and no two files share a prefix. Every Link and ROS2 use the same name.
 - **ROS2**: the MCU is the single source of truth. On connection the Bridge pulls every parameter and declares it as a ROS2 parameter from its metadata. The MCU validates each change against the range and safety attributes and returns the reason when it rejects one.
 
+- **What becomes a parameter**: a value becomes a parameter when it differs between vehicles, motors, wiring or users, or when it is tuned, as ArduPilot and PX4 do. Values stay compile-time constants when they are fixed by a protocol or storage format (frame sizes, CRCs, the Flash layout), by a device's datasheet (register addresses, scale factors), by internal scheduling (work items per run, Flash words per run), or when they are safety invariants that no vehicle should change (the actuator power settle time, the output watchdog, which arming checks cannot be skipped). Board facts stay in the board definition and reach parameters only as board defaults (ADR-0011).
+- **Later parameters**: values that are constants today but should become parameters in the milestone that first needs them:
+  - `SERIALn_FUNCTION` and `SERIALn_BAUD` for every port, before the Bridge: the companion computer needs a Link on a second port, and the firmware now asserts that SERIAL1 is the Link (ArduPilot `SERIALn_PROTOCOL`, PX4 `MAV_n_CONFIG`).
+  - `CTRL_RATE_HZ`, `CTRL_TRIGGER` and `IMU_SAMPLING`, `reboot_required`, with the control chain: they set the work queue periods and the IMU's sample rate divider, so they need range checks against what the board's timing can reach (ADR-0015).
+  - The attitude estimator's alignment time and stillness thresholds (ADR-0014), when a vehicle aligns with motors or pumps running.
+  - IMU software low-pass cutoffs, with angular rate control (PX4 `IMU_GYRO_CUTOFF`, ArduPilot `INS_GYRO_FILTER`). The sensor's full-scale ranges and on-chip filters stay fixed, as both projects keep them.
+  - The failsafe action and the source timeout per mode, with the remote control and companion mode (ADR-0005; ArduPilot Rover `FS_ACTION` and `FS_TIMEOUT`, PX4 `COM_OF_LOSS_T`). Test mode keeps stop and disarm.
+  - The disarmed output state, coast or brake, with the vehicle model (ArduPilot `MOT_SAFE_DISARM`).
+  - Topic rates per Link, if scaling by baud rate (ADR-0002) proves too coarse (ArduPilot `SRn_*`, PX4 `MAV_n_RATE`).
+
 ## Considered Options
 
 - **All metadata in the firmware, or PX4-style compressed metadata sent over the Link**: rejected for now. Descriptions cost Flash that only host tools need, and host tools already come from the same build.

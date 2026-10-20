@@ -14,3 +14,4 @@ The first protocol is a lightweight custom protocol: COBS + CRC16 framing, with 
 ## Consequences
 
 - A setpoint arriving on any Link goes through setpoint arbitration; it never drives actuators directly.
+- A Link on a transport with a baud rate scales its outbound topic rates by one common factor when the topic map would exceed 80 % of the port's capacity, so a lower baud rate costs rate, not frames; 1 Hz status topics are never scaled, and the factor is reported in `link_status`. Rates per topic as parameters come later if this proves too coarse (ADR-0012).
