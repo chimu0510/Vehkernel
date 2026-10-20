@@ -1,6 +1,6 @@
 # Spec 0006: first wheel motion
 
-**Status**: draft. Issue: not yet created.
+**Status**: in progress. Issue: [#43](https://github.com/chimu0510/Vehkernel/issues/43); tickets #44 to #47.
 
 This file and the issue carry the same spec; update both when the spec changes.
 
