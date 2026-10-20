@@ -116,14 +116,14 @@ devices = [
   { device = "IMU0", kind = "IMU", type = "ICM20948", bus = "SOFT_I2C", pins = ["IMU_SCL", "IMU_SDA"], address = 0x68, rotation = "YAW_90" },
 ]
 
-# ADR-0011: actuator outputs 1 to 4 are motors A to D. The encoder counts per
-# wheel turn are an assumption for the stock motors (500-line encoders,
-# quadrature decoding, 1:30 gearboxes) until measured at bring-up (#50).
+# ADR-0011: actuator outputs 1 to 4 are motors A to D. The stock motors have
+# 500-line GMR encoders and 1:18 gearboxes: with quadrature decoding,
+# 500 x 4 x 18 = 36000 counts per wheel turn.
 actuators = [
-  { output = 1, pwm = "MOTOR_A_PWM", in1 = "MOTOR_A_IN1", in2 = "MOTOR_A_IN2", encoder = ["ENC_A_1", "ENC_A_2"], cpr = 60000 },
-  { output = 2, pwm = "MOTOR_B_PWM", in1 = "MOTOR_B_IN1", in2 = "MOTOR_B_IN2", encoder = ["ENC_B_1", "ENC_B_2"], cpr = 60000 },
-  { output = 3, pwm = "MOTOR_C_PWM", in1 = "MOTOR_C_IN1", in2 = "MOTOR_C_IN2", encoder = ["ENC_C_1", "ENC_C_2"], cpr = 60000 },
-  { output = 4, pwm = "MOTOR_D_PWM", in1 = "MOTOR_D_IN1", in2 = "MOTOR_D_IN2", encoder = ["ENC_D_1", "ENC_D_2"], cpr = 60000 },
+  { output = 1, pwm = "MOTOR_A_PWM", in1 = "MOTOR_A_IN1", in2 = "MOTOR_A_IN2", encoder = ["ENC_A_1", "ENC_A_2"], cpr = 36000 },
+  { output = 2, pwm = "MOTOR_B_PWM", in1 = "MOTOR_B_IN1", in2 = "MOTOR_B_IN2", encoder = ["ENC_B_1", "ENC_B_2"], cpr = 36000 },
+  { output = 3, pwm = "MOTOR_C_PWM", in1 = "MOTOR_C_IN1", in2 = "MOTOR_C_IN2", encoder = ["ENC_C_1", "ENC_C_2"], cpr = 36000 },
+  { output = 4, pwm = "MOTOR_D_PWM", in1 = "MOTOR_D_IN1", in2 = "MOTOR_D_IN2", encoder = ["ENC_D_1", "ENC_D_2"], cpr = 36000 },
 ]
 
 # ADR-0012: the motor drivers run at 10 kHz, as the vendor firmware does.
