@@ -1,0 +1,4 @@
+board.toml:15: error: pwm of output 1 must be a pin role with a timer channel function, not 'LED'
+board.toml:16: error: encoder of output 2 must be two pin roles on CH1 and CH2 of one timer, not ['ENC_A_1', 'ENC_B_1']
+board.toml:17: error: in2 of output 3 must be a pin role with the GPIO_OUTPUT function, not 'MISSING'
+board.toml:18: error: actuator output must be a number from 1 to 4, got 5

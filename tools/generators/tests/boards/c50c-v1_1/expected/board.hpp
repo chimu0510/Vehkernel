@@ -264,6 +264,56 @@ struct IMU0 {
 };
 }  // namespace devices
 
+// Actuator outputs (ADR-0011): a motor driver's PWM channel and direction
+// lines, and the quadrature encoder paired with it.
+namespace actuators {
+struct OUTPUT1 {
+    static constexpr unsigned number = 1;
+    using pwm = pins::MOTOR_A_PWM;
+    static constexpr unsigned pwm_timer = 8;
+    static constexpr unsigned pwm_channel = 4;
+    using in1 = pins::MOTOR_A_IN1;
+    using in2 = pins::MOTOR_A_IN2;
+    using encoder_a = pins::ENC_A_1;
+    using encoder_b = pins::ENC_A_2;
+    static constexpr unsigned encoder_timer = 2;
+};
+struct OUTPUT2 {
+    static constexpr unsigned number = 2;
+    using pwm = pins::MOTOR_B_PWM;
+    static constexpr unsigned pwm_timer = 8;
+    static constexpr unsigned pwm_channel = 3;
+    using in1 = pins::MOTOR_B_IN1;
+    using in2 = pins::MOTOR_B_IN2;
+    using encoder_a = pins::ENC_B_1;
+    using encoder_b = pins::ENC_B_2;
+    static constexpr unsigned encoder_timer = 3;
+};
+struct OUTPUT3 {
+    static constexpr unsigned number = 3;
+    using pwm = pins::MOTOR_C_PWM;
+    static constexpr unsigned pwm_timer = 8;
+    static constexpr unsigned pwm_channel = 2;
+    using in1 = pins::MOTOR_C_IN1;
+    using in2 = pins::MOTOR_C_IN2;
+    using encoder_a = pins::ENC_C_1;
+    using encoder_b = pins::ENC_C_2;
+    static constexpr unsigned encoder_timer = 4;
+};
+struct OUTPUT4 {
+    static constexpr unsigned number = 4;
+    using pwm = pins::MOTOR_D_PWM;
+    static constexpr unsigned pwm_timer = 8;
+    static constexpr unsigned pwm_channel = 1;
+    using in1 = pins::MOTOR_D_IN1;
+    using in2 = pins::MOTOR_D_IN2;
+    using encoder_a = pins::ENC_D_1;
+    using encoder_b = pins::ENC_D_2;
+    static constexpr unsigned encoder_timer = 5;
+};
+inline constexpr unsigned count = 4;
+}  // namespace actuators
+
 // Board revision (ADR-0010): the revision-ID pins, least significant bit
 // first, must read `value` at boot.
 namespace revision {
@@ -284,6 +334,10 @@ namespace defaults {
 inline constexpr std::int32_t CTRL_RATE_HZ = 200;
 inline constexpr std::string_view CTRL_TRIGGER = "TIMER";
 inline constexpr std::string_view IMU_SAMPLING = "PER_SAMPLE";
+inline constexpr std::int32_t MOT1_CPR = 60000;
+inline constexpr std::int32_t MOT2_CPR = 60000;
+inline constexpr std::int32_t MOT3_CPR = 60000;
+inline constexpr std::int32_t MOT4_CPR = 60000;
 inline constexpr std::int32_t SERIAL1_BAUD = 921600;
 inline constexpr std::string_view SERIAL1_FUNCTION = "LINK";
 inline constexpr std::string_view SERIAL2_FUNCTION = "LINK";

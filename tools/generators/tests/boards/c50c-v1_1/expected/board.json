@@ -660,6 +660,52 @@
     }
   ],
   "storage": [],
+  "actuators": [
+    {
+      "output": 1,
+      "pwm": "MOTOR_A_PWM",
+      "in1": "MOTOR_A_IN1",
+      "in2": "MOTOR_A_IN2",
+      "encoder": [
+        "ENC_A_1",
+        "ENC_A_2"
+      ],
+      "cpr": 60000
+    },
+    {
+      "output": 2,
+      "pwm": "MOTOR_B_PWM",
+      "in1": "MOTOR_B_IN1",
+      "in2": "MOTOR_B_IN2",
+      "encoder": [
+        "ENC_B_1",
+        "ENC_B_2"
+      ],
+      "cpr": 60000
+    },
+    {
+      "output": 3,
+      "pwm": "MOTOR_C_PWM",
+      "in1": "MOTOR_C_IN1",
+      "in2": "MOTOR_C_IN2",
+      "encoder": [
+        "ENC_C_1",
+        "ENC_C_2"
+      ],
+      "cpr": 60000
+    },
+    {
+      "output": 4,
+      "pwm": "MOTOR_D_PWM",
+      "in1": "MOTOR_D_IN1",
+      "in2": "MOTOR_D_IN2",
+      "encoder": [
+        "ENC_D_1",
+        "ENC_D_2"
+      ],
+      "cpr": 60000
+    }
+  ],
   "revision": {
     "pins": [
       "REV_ID0",

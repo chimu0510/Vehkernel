@@ -1,0 +1,21 @@
+# Two actuator outputs, one with the encoder resolution of its stock motor.
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA9",  role = "MOTOR_A_PWM", func = "TIM1_CH2" },
+  { pin = "PA2",  role = "MOTOR_A_IN1", func = "GPIO_OUTPUT" },
+  { pin = "PA5",  role = "MOTOR_A_IN2", func = "GPIO_OUTPUT" },
+  { pin = "PB6",  role = "ENC_A_1",     func = "TIM4_CH1" },
+  { pin = "PB7",  role = "ENC_A_2",     func = "TIM4_CH2" },
+  { pin = "PA10", role = "MOTOR_B_PWM", func = "TIM1_CH3" },
+  { pin = "PA6",  role = "MOTOR_B_IN1", func = "GPIO_OUTPUT" },
+  { pin = "PA7",  role = "MOTOR_B_IN2", func = "GPIO_OUTPUT" },
+  { pin = "PA0",  role = "ENC_B_1",     func = "TIM2_CH1" },
+  { pin = "PA1",  role = "ENC_B_2",     func = "TIM2_CH2" },
+]
+
+actuators = [
+  { output = 1, pwm = "MOTOR_A_PWM", in1 = "MOTOR_A_IN1", in2 = "MOTOR_A_IN2", encoder = ["ENC_A_1", "ENC_A_2"], cpr = 2000 },
+  { output = 2, pwm = "MOTOR_B_PWM", in1 = "MOTOR_B_IN1", in2 = "MOTOR_B_IN2", encoder = ["ENC_B_1", "ENC_B_2"] },
+]

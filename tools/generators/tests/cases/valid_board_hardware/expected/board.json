@@ -192,6 +192,7 @@
       "bus": "SPI"
     }
   ],
+  "actuators": [],
   "revision": null,
   "actuator_power": null,
   "clock": {

@@ -1,0 +1,171 @@
+{
+  "name": "demo",
+  "mcu": "testmcu",
+  "pins": [
+    {
+      "role": "MOTOR_A_PWM",
+      "pin": "PA9",
+      "port": "A",
+      "number": 9,
+      "func": "TIM1_CH2",
+      "kind": "af",
+      "af": 1,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_A_IN1",
+      "pin": "PA2",
+      "port": "A",
+      "number": 2,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_A_IN2",
+      "pin": "PA5",
+      "port": "A",
+      "number": 5,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "ENC_A_1",
+      "pin": "PB6",
+      "port": "B",
+      "number": 6,
+      "func": "TIM4_CH1",
+      "kind": "af",
+      "af": 2,
+      "alt": []
+    },
+    {
+      "role": "ENC_A_2",
+      "pin": "PB7",
+      "port": "B",
+      "number": 7,
+      "func": "TIM4_CH2",
+      "kind": "af",
+      "af": 2,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_B_PWM",
+      "pin": "PA10",
+      "port": "A",
+      "number": 10,
+      "func": "TIM1_CH3",
+      "kind": "af",
+      "af": 1,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_B_IN1",
+      "pin": "PA6",
+      "port": "A",
+      "number": 6,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "MOTOR_B_IN2",
+      "pin": "PA7",
+      "port": "A",
+      "number": 7,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "ENC_B_1",
+      "pin": "PA0",
+      "port": "A",
+      "number": 0,
+      "func": "TIM2_CH1",
+      "kind": "af",
+      "af": 1,
+      "alt": []
+    },
+    {
+      "role": "ENC_B_2",
+      "pin": "PA1",
+      "port": "A",
+      "number": 1,
+      "func": "TIM2_CH2",
+      "kind": "af",
+      "af": 1,
+      "alt": []
+    }
+  ],
+  "alt_configs": [],
+  "flash": [],
+  "ram": [
+    {
+      "region": "CCM",
+      "start": 268435456,
+      "size": 16384
+    },
+    {
+      "region": "RAM",
+      "start": 536870912,
+      "size": 65536
+    }
+  ],
+  "serial": [],
+  "devices": [],
+  "storage": [],
+  "actuators": [
+    {
+      "output": 1,
+      "pwm": "MOTOR_A_PWM",
+      "in1": "MOTOR_A_IN1",
+      "in2": "MOTOR_A_IN2",
+      "encoder": [
+        "ENC_A_1",
+        "ENC_A_2"
+      ],
+      "cpr": 2000
+    },
+    {
+      "output": 2,
+      "pwm": "MOTOR_B_PWM",
+      "in1": "MOTOR_B_IN1",
+      "in2": "MOTOR_B_IN2",
+      "encoder": [
+        "ENC_B_1",
+        "ENC_B_2"
+      ],
+      "cpr": null
+    }
+  ],
+  "revision": null,
+  "actuator_power": null,
+  "clock": null,
+  "peripherals": [
+    {
+      "name": "TIM1",
+      "address": 1073807360,
+      "kind": "timer",
+      "bus_clock": "PCLK2"
+    },
+    {
+      "name": "TIM2",
+      "address": 1073741824,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    },
+    {
+      "name": "TIM4",
+      "address": 1073743872,
+      "kind": "timer",
+      "bus_clock": "PCLK1"
+    }
+  ],
+  "dma": []
+}

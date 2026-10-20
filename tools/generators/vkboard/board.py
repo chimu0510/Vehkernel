@@ -29,9 +29,9 @@ PIN_KEYS = {"pin", "role", "func", "alt"}
 ALT_KEYS = {"config", "role", "func"}
 TOP_LEVEL_KEYS = {"name", "mcu", "extends", "remove", "pins", "dma", "flash",
                   "serial", "devices", "storage", "clock", "timing", "defaults",
-                  "revision", "actuator_power"}
+                  "revision", "actuator_power", "actuators"}
 ARRAY_SECTIONS = {"pins": "pin", "dma": "request", "flash": "region", "serial": "port",
-                  "devices": "device", "storage": "storage"}
+                  "devices": "device", "storage": "storage", "actuators": "output"}
 TABLE_SECTIONS = ("clock", "timing", "defaults", "revision", "actuator_power")
 
 _ROLE_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
@@ -193,7 +193,7 @@ def _resolve(path: Path, shown: str, diag: Diagnostics,
     # A Flash layout is replaced as a whole, never merged region by region.
     merged["flash"] = arrays["flash"] or base.arrays["flash"]
     # Other arrays: child entries replace base entries with the same key.
-    for section in ("dma", "serial", "devices", "storage"):
+    for section in ("dma", "serial", "devices", "storage", "actuators"):
         key = ARRAY_SECTIONS[section]
         child_keys = {key_of(e, key) for e in arrays[section]}
         merged[section] = [e for e in base.arrays[section] if key_of(e, key) not in child_keys] + arrays[section]
@@ -258,7 +258,8 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
                               {p.role: p for p in pins}, Loc(shown), table("timing").loc,
                               table("defaults").loc, diag,
                               (table("revision").data, table("revision").loc),
-                              (table("actuator_power").data, table("actuator_power").loc))
+                              (table("actuator_power").data, table("actuator_power").loc),
+                              [(e.data, e.loc) for e in arrays["actuators"]])
     clock = _check_clock(table("clock"), database, diag)
     used = {f.func.rsplit("_", 1)[0] for p in pins for f in (p.default, *(fn for _, fn in p.alt))
             if f.kind in ("af", "analog")}

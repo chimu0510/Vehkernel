@@ -8,6 +8,10 @@
 - ``storage``: storage devices that log sinks can use (ADR-0019).
 - ``timing``: the board's timing preset (ADR-0015).
 - ``defaults``: any other board default parameters (ADR-0012).
+- ``actuators``: actuator outputs by number, each a motor driver's PWM
+  channel and two direction lines with the quadrature encoder paired with it,
+  and optionally the encoder's counts per wheel turn for the stock motors,
+  which becomes the ``MOTn_CPR`` board default (ADR-0011).
 - ``revision``: the revision-ID pins, least significant bit first, and the
   value they must read at boot (ADR-0010).
 - ``actuator_power``: on boards that have one, the input that reads whether
@@ -28,6 +32,9 @@ DEVICE_BUSES = ("I2C", "SOFT_I2C", "SPI")
 STORAGE_KEYS = {"storage", "bus"}
 STORAGE_KINDS = {"SD_CARD": ("SDIO", "SPI"), "SPI_NOR_FLASH": ("SPI",)}
 TIMING_KEYS = {"trigger", "base_rate_hz", "sampling", "dividers"}
+ACTUATOR_KEYS = {"output", "pwm", "in1", "in2", "encoder", "cpr"}
+# The most actuator outputs a board may have: the length of the actuator topics' arrays.
+MAX_ACTUATORS = 4
 REVISION_KEYS = {"pins", "value"}
 ACTUATOR_POWER_KEYS = {"pin", "powered"}
 POWERED_LEVELS = ("HIGH", "LOW")
@@ -44,6 +51,7 @@ _ID_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _PORT_RE = re.compile(r"^SERIAL(\d+)$")
 _PARAM_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,15}$")
 _SERIAL_FUNC_RE = re.compile(r"^(U(?:S)?ART\d+)_(TX|RX)$")
+_TIMER_CHANNEL_RE = re.compile(r"^TIM(\d+)_CH(\d)$")
 # Pin functions each bus needs, in the order the device's pins list them.
 _BUS_SIGNALS = {"I2C": ("SCL", "SDA"), "SPI": ("SCK", "MISO", "MOSI")}
 
@@ -77,6 +85,19 @@ class Storage:
 
 
 @dataclass(frozen=True)
+class Actuator:
+    output: int
+    pwm: str  # pin roles
+    in1: str
+    in2: str
+    encoder: tuple[str, str]  # channel A on CH1, channel B on CH2 of one timer
+    pwm_timer: int
+    pwm_channel: int
+    encoder_timer: int
+    cpr: float | None = None
+
+
+@dataclass(frozen=True)
 class Revision:
     pins: tuple[str, ...]  # pin roles, least significant bit first
     value: int
@@ -96,6 +117,7 @@ class Hardware:
     defaults: tuple[tuple[str, object], ...] = ()  # sorted by name
     revision: Revision | None = None
     actuator_power: ActuatorPower | None = None
+    actuators: tuple[Actuator, ...] = ()
 
 
 def _keys(entry: object, allowed: set, required: set, what: str, loc: Loc, diag: Diagnostics) -> bool:
@@ -281,6 +303,64 @@ def _timing(timing: object, loc: Loc, diag: Diagnostics) -> dict[str, object]:
     return params
 
 
+def _timer_channel(role: object, roles: dict) -> tuple[int, int] | None:
+    pin = roles.get(role) if isinstance(role, str) else None
+    match = _TIMER_CHANNEL_RE.match(pin.func) if pin is not None else None
+    return (int(match.group(1)), int(match.group(2))) if match else None
+
+
+def _actuator(entry: dict, loc: Loc, roles: dict, diag: Diagnostics) -> Actuator | None:
+    output = entry["output"]
+    if not isinstance(output, int) or isinstance(output, bool) or not 1 <= output <= MAX_ACTUATORS:
+        diag.error(f"actuator output must be a number from 1 to {MAX_ACTUATORS}, got {output!r}", loc)
+        return None
+    pwm = _timer_channel(entry["pwm"], roles)
+    if pwm is None:
+        diag.error(f"pwm of output {output} must be a pin role with a timer channel function, "
+                   f"not {entry['pwm']!r}", loc)
+        return None
+    for line in ("in1", "in2"):
+        role = entry[line]
+        pin = roles.get(role) if isinstance(role, str) else None
+        if pin is None or pin.kind != "gpio_output":
+            diag.error(f"{line} of output {output} must be a pin role with the GPIO_OUTPUT function, "
+                       f"not {role!r}", loc)
+            return None
+    encoder = entry["encoder"]
+    channels = [_timer_channel(role, roles) for role in encoder] if isinstance(encoder, list) else []
+    if len(channels) != 2 or None in channels or channels[0][0] != channels[1][0] \
+            or [c[1] for c in channels] != [1, 2]:
+        diag.error(f"encoder of output {output} must be two pin roles on CH1 and CH2 of one timer, "
+                   f"not {encoder!r}", loc)
+        return None
+    cpr = entry.get("cpr")
+    if cpr is not None and (not isinstance(cpr, (int, float)) or isinstance(cpr, bool) or cpr <= 0):
+        diag.error(f"cpr of output {output} must be a positive number of counts per wheel turn", loc)
+        return None
+    return Actuator(output, entry["pwm"], entry["in1"], entry["in2"], (encoder[0], encoder[1]),
+                    pwm[0], pwm[1], channels[0][0], cpr)
+
+
+def _actuators(entries, roles: dict, diag: Diagnostics) -> list[Actuator]:
+    actuators, seen = [], {}
+    for entry, loc in entries:
+        if not _keys(entry, ACTUATOR_KEYS, ACTUATOR_KEYS - {"cpr"}, "actuator", loc, diag):
+            continue
+        actuator = _actuator(entry, loc, roles, diag)
+        if actuator is None:
+            continue
+        if actuator.output in seen:
+            diag.error(f"actuator output {actuator.output} is already defined ({seen[actuator.output].refer(loc)})", loc)
+            continue
+        seen[actuator.output] = loc
+        actuators.append(actuator)
+    numbers = sorted(seen)
+    if numbers != list(range(1, len(numbers) + 1)):
+        diag.error(f"actuator outputs must be numbered from 1 without gaps, got {numbers}",
+                   entries[0][1] if entries else Loc(""))
+    return sorted(actuators, key=lambda a: a.output)
+
+
 def _gpio_input(role: object, what: str, roles: dict, loc: Loc, diag: Diagnostics) -> bool:
     pin = roles.get(role) if isinstance(role, str) else None
     if pin is None or pin.kind != "gpio_input":
@@ -326,11 +406,14 @@ def _actuator_power(entry: object, loc: Loc, roles: dict, diag: Diagnostics) -> 
 def check_hardware(serial, devices, storage, timing, defaults, roles: dict, top: Loc,
                    timing_loc: Loc, defaults_loc: Loc, diag: Diagnostics,
                    revision: tuple[object, Loc] | None = None,
-                   actuator_power: tuple[object, Loc] | None = None) -> Hardware:
+                   actuator_power: tuple[object, Loc] | None = None,
+                   actuators=()) -> Hardware:
     """Validate the hardware sections; ``roles`` maps default role names to pins."""
     ports = _serial(serial, roles, diag)
     params: dict[str, object] = {f"{p.port}_FUNCTION": p.function for p in ports}
     params.update({f"{p.port}_BAUD": p.baud for p in ports if p.baud is not None})
+    outputs = _actuators(actuators, roles, diag)
+    params.update({f"MOT{a.output}_CPR": a.cpr for a in outputs if a.cpr is not None})
     for name, value in _timing(timing, timing_loc, diag).items():
         params[name] = value
 
@@ -341,7 +424,7 @@ def check_hardware(serial, devices, storage, timing, defaults, roles: dict, top:
         if not _PARAM_RE.match(name):
             diag.error(f"parameter name '{name}' must be upper case and at most 16 characters", defaults_loc)
         elif name in params:
-            diag.error(f"parameter {name} is already set by the serial or timing section", defaults_loc)
+            diag.error(f"parameter {name} is already set by the serial, timing or actuators section", defaults_loc)
         elif isinstance(value, (dict, list)):
             diag.error(f"default of parameter {name} must be a number, boolean or string", defaults_loc)
         else:
@@ -349,4 +432,5 @@ def check_hardware(serial, devices, storage, timing, defaults, roles: dict, top:
     return Hardware(tuple(ports), tuple(_devices(devices, roles, diag)), tuple(_storage(storage, diag)),
                     tuple(sorted(params.items())),
                     _revision(*(revision or (None, top)), roles, diag),
-                    _actuator_power(*(actuator_power or (None, top)), roles, diag))
+                    _actuator_power(*(actuator_power or (None, top)), roles, diag),
+                    tuple(outputs))

@@ -70,6 +70,7 @@ def board_header(board: Board) -> str:
     out += _peripherals_namespace(board)
     out += _ports_namespace(board)
     out += _devices_namespace(board)
+    out += _actuators_namespace(board)
     out += _revision_namespace(board)
     out += _actuator_power_namespace(board)
     out += _defaults_namespace(board)
@@ -184,6 +185,29 @@ def _devices_namespace(board: Board) -> list[str]:
     return out + ["}  // namespace devices", ""]
 
 
+def _actuators_namespace(board: Board) -> list[str]:
+    actuators = board.hardware.actuators
+    if not actuators:
+        return []
+    out = ["// Actuator outputs (ADR-0011): a motor driver's PWM channel and direction",
+           "// lines, and the quadrature encoder paired with it.",
+           "namespace actuators {"]
+    for a in actuators:
+        out += [f"struct OUTPUT{a.output} {{",
+                f"    static constexpr unsigned number = {a.output};",
+                f"    using pwm = pins::{a.pwm};",
+                f"    static constexpr unsigned pwm_timer = {a.pwm_timer};",
+                f"    static constexpr unsigned pwm_channel = {a.pwm_channel};",
+                f"    using in1 = pins::{a.in1};",
+                f"    using in2 = pins::{a.in2};",
+                f"    using encoder_a = pins::{a.encoder[0]};",
+                f"    using encoder_b = pins::{a.encoder[1]};",
+                f"    static constexpr unsigned encoder_timer = {a.encoder_timer};",
+                "};"]
+    out += [f"inline constexpr unsigned count = {len(actuators)};", "}  // namespace actuators", ""]
+    return out
+
+
 def _revision_namespace(board: Board) -> list[str]:
     revision = board.hardware.revision
     if revision is None:
@@ -286,6 +310,8 @@ def board_symbols(board: Board) -> list[str]:
         symbols.add(f"BOARD_{d.kind}_BUS_{d.bus}")
     for s in board.hardware.storage:
         symbols.add(f"BOARD_HAS_{s.storage}")
+    if board.hardware.actuators:
+        symbols.add("BOARD_HAS_ACTUATORS")
     if board.hardware.revision is not None:
         symbols.add("BOARD_HAS_REVISION_ID")
     if board.hardware.actuator_power is not None:
@@ -349,6 +375,8 @@ def board_json(board: Board) -> str:
                      "peripheral": d.peripheral, "pins": list(d.pins), "address": d.address,
                      "rotation": d.rotation} for d in board.hardware.devices],
         "storage": [{"storage": s.storage, "bus": s.bus} for s in board.hardware.storage],
+        "actuators": [{"output": a.output, "pwm": a.pwm, "in1": a.in1, "in2": a.in2,
+                       "encoder": list(a.encoder), "cpr": a.cpr} for a in board.hardware.actuators],
         "revision": None if board.hardware.revision is None else {
             "pins": list(board.hardware.revision.pins), "value": board.hardware.revision.value},
         "actuator_power": None if board.hardware.actuator_power is None else {

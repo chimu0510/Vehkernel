@@ -1,0 +1,19 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA9",  role = "MOTOR_A_PWM", func = "TIM1_CH2" },
+  { pin = "PA2",  role = "MOTOR_A_IN1", func = "GPIO_OUTPUT" },
+  { pin = "PA5",  role = "MOTOR_A_IN2", func = "GPIO_OUTPUT" },
+  { pin = "PA0",  role = "ENC_A_1",     func = "TIM2_CH1" },
+  { pin = "PA1",  role = "ENC_A_2",     func = "TIM2_CH2" },
+  { pin = "PB6",  role = "ENC_B_1",     func = "TIM4_CH1" },
+  { pin = "PA6",  role = "LED",         func = "GPIO_OUTPUT" },
+]
+
+actuators = [
+  { output = 1, pwm = "LED",         in1 = "MOTOR_A_IN1", in2 = "MOTOR_A_IN2", encoder = ["ENC_A_1", "ENC_A_2"] },
+  { output = 2, pwm = "MOTOR_A_PWM", in1 = "MOTOR_A_IN1", in2 = "MOTOR_A_IN2", encoder = ["ENC_A_1", "ENC_B_1"] },
+  { output = 3, pwm = "MOTOR_A_PWM", in1 = "MOTOR_A_IN1", in2 = "MISSING",     encoder = ["ENC_A_1", "ENC_A_2"] },
+  { output = 5, pwm = "MOTOR_A_PWM", in1 = "MOTOR_A_IN1", in2 = "MOTOR_A_IN2", encoder = ["ENC_A_1", "ENC_A_2"], cpr = -1 },
+]

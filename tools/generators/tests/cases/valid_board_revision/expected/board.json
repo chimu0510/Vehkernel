@@ -50,6 +50,7 @@
   "serial": [],
   "devices": [],
   "storage": [],
+  "actuators": [],
   "revision": {
     "pins": [
       "REV_ID0",

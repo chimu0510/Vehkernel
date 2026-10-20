@@ -59,6 +59,7 @@
   "serial": [],
   "devices": [],
   "storage": [],
+  "actuators": [],
   "revision": null,
   "actuator_power": null,
   "clock": null,
