@@ -2,10 +2,11 @@
 // one work item on wq:io (ADR-0008).
 //
 // Each run drains the bytes the transport has received through the protocol,
-// which answers the handshake, time sync and parameter requests, then sends
-// a few frames of the handshake's topic_info frames or of a parameter list in
-// progress, and every topic map entry that is due once the session is
-// connected and every topic has been described. A frame the transport cannot
+// which answers the handshake, time sync, parameter, mode, arming and
+// emergency stop requests, then sends a few frames of the handshake's
+// topic_info frames or of a parameter list in progress, and every topic map
+// entry that is due once the session is connected and every topic has been
+// described. A frame the transport cannot
 // take is dropped and counted; the Link never blocks its work queue. Once a
 // second it publishes its statistics on link_status.
 #pragma once
@@ -53,6 +54,7 @@ public:
         std::uint32_t interval_us = default_interval_us;  // how often the Link runs
         std::uint64_t peer_timeout_us = Session::default_peer_timeout_us;
         ParameterAccess parameters{};                     // what the peer may read and change
+        ControlAccess control{};                          // modes, arming and the emergency stop; the source is the instance
     };
 
     // topic_info and parameter list frames sent per run: at the default

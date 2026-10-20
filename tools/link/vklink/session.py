@@ -26,6 +26,68 @@ REJECT_REASONS = {
 }
 
 
+# Modes and the reasons of mode, arming and emergency stop replies; vk::core.
+MODES = {0: "STANDBY", 1: "TEST"}
+MODE_REJECT_REASONS = {1: "armed", 2: "unknown mode"}
+ARMING_REJECT_REASONS = {
+    1: "board not verified",
+    2: "emergency stop engaged",
+    3: "wrong mode",
+    4: "not in control",
+    5: "setpoints active",
+    6: "bring-up running",
+    7: "actuator power off",
+    8: "actuators not started",
+}
+DISARM_REASONS = {
+    0: "none",
+    1: "request",
+    2: "emergency stop",
+    3: "actuator power lost",
+    4: "setpoint timeout",
+    5: "idle",
+    6: "bring-up abort",
+}
+ACTUATOR_POWER_STATES = {0: "not available", 1: "unpowered", 2: "settling", 3: "powered"}
+# Bits of COM_ARM_CHECK.
+ARM_CHECK_BITS = {0: "ACT_POWER"}
+
+
+def check_names(mask: int) -> list[str]:
+    """The arming checks a COM_ARM_CHECK-style mask names."""
+    return [ARM_CHECK_BITS.get(bit, f"bit {bit}") for bit in range(32) if mask & (1 << bit)]
+
+
+@dataclass(frozen=True)
+class ControlReply:
+    """A reply to a mode, arming or emergency stop request."""
+
+    type: FrameType
+    value: int        # the mode, armed or engaged now in effect; for a reject, the reason
+    mode: int = 0     # mode_reject: the mode still in effect
+    skipped: int = 0  # arming_reply: the arming checks skipped
+
+    @property
+    def refused(self) -> bool:
+        return self.type in (FrameType.MODE_REJECT, FrameType.ARMING_REJECT)
+
+    @property
+    def reason_text(self) -> str:
+        reasons = MODE_REJECT_REASONS if self.type == FrameType.MODE_REJECT else ARMING_REJECT_REASONS
+        return reasons.get(self.value, f"reason {self.value}")
+
+    @classmethod
+    def parse(cls, frame: Frame) -> "ControlReply | None":
+        body = frame.body
+        if frame.type == FrameType.MODE_REJECT and len(body) >= 2:
+            return cls(frame.type, body[0], mode=body[1])
+        if frame.type == FrameType.ARMING_REPLY and len(body) >= 5:
+            return cls(frame.type, body[0], skipped=struct.unpack("<I", body[1:5])[0])
+        if frame.type in (FrameType.MODE_REPLY, FrameType.ARMING_REJECT, FrameType.ESTOP_REPLY) and body:
+            return cls(frame.type, body[0])
+        return None
+
+
 def encode_param(param_type: ParamType, value: int | float) -> int:
     """The 32 bits of a value as the MCU stores it."""
     if param_type == ParamType.FLOAT:
@@ -151,6 +213,18 @@ class HostSession:
         body = _name(name) + struct.pack("<BI", int(param_type), encode_param(param_type, value))
         return self.writer.write(FrameType.PARAM_SET, body)
 
+    def make_mode_request(self, mode: int) -> bytes:
+        return self.writer.write(FrameType.MODE_REQUEST, struct.pack("<B", mode))
+
+    def make_arming_request(self, arm: bool) -> bytes:
+        return self.writer.write(FrameType.ARMING_REQUEST, struct.pack("<B", int(arm)))
+
+    def make_estop_request(self, engage: bool) -> bytes:
+        return self.writer.write(FrameType.ESTOP_REQUEST, struct.pack("<B", int(engage)))
+
+    def make_sim_actuator_power(self, powered: bool) -> bytes:
+        return self.writer.write(FrameType.SIM_ACTUATOR_POWER, struct.pack("<B", int(powered)))
+
     def handle_frame(self, frame: Frame) -> None:
         """Consumes one frame received from the MCU."""
         if frame.type == FrameType.HELLO_REPLY:
@@ -218,6 +292,19 @@ class McuParam:
     maximum: int | float
 
 
+@dataclass
+class McuControl:
+    """The vehicle control a McuSession offers: it answers as told, like a fake commander."""
+
+    mode: int = 0
+    armed: bool = False
+    emergency_stop: bool = False
+    skipped: int = 0
+    mode_result: int = 0    # vk::core::ModeResult
+    arming_result: int = 0  # vk::core::ArmingResult
+    sim_actuator_power: bool = True
+
+
 class McuSession:
     """MCU side of a Link session (ADR-0002).
 
@@ -233,7 +320,9 @@ class McuSession:
         peer_timeout_us: int = DEFAULT_PEER_TIMEOUT_US,
         param_set_hash: int = 0,
         params: list[McuParam] | None = None,
+        control: McuControl | None = None,
     ):
+        self.control = control
         self.topics = topics or []
         self.param_set_hash = param_set_hash
         self.params = sorted(params or [], key=lambda p: p.name)
@@ -263,7 +352,34 @@ class McuSession:
             return [self._param_value(i) for i in range(first, len(self.params))]
         if frame.type in (FrameType.PARAM_GET, FrameType.PARAM_SET) and frame.body:
             return [self._on_param(frame)]
+        if self.control is not None and frame.body:
+            return self._on_control(frame)
         return []
+
+    def _on_control(self, frame: Frame) -> list[bytes]:
+        control, value = self.control, frame.body[0]
+        if frame.type == FrameType.MODE_REQUEST:
+            if value not in MODES:
+                return [self._send(FrameType.MODE_REJECT, struct.pack("<BB", 2, control.mode))]
+            if control.mode_result != 0:
+                return [self._send(FrameType.MODE_REJECT, struct.pack("<BB", control.mode_result, control.mode))]
+            control.mode = value
+            return [self._send(FrameType.MODE_REPLY, struct.pack("<B", control.mode))]
+        if frame.type == FrameType.ARMING_REQUEST:
+            if value and control.arming_result != 0:
+                return [self._send(FrameType.ARMING_REJECT, struct.pack("<B", control.arming_result))]
+            control.armed = bool(value)
+            return [self._send(FrameType.ARMING_REPLY, struct.pack("<BI", int(control.armed), control.skipped))]
+        if frame.type == FrameType.ESTOP_REQUEST:
+            control.emergency_stop = bool(value)
+            return [self._send(FrameType.ESTOP_REPLY, struct.pack("<B", int(control.emergency_stop)))]
+        if frame.type == FrameType.SIM_ACTUATOR_POWER:
+            control.sim_actuator_power = bool(value)
+        return []
+
+    def _send(self, frame_type: FrameType, body: bytes) -> bytes:
+        self.frames_sent += 1
+        return self.writer.write(frame_type, body)
 
     def connected(self, now_us: int) -> bool:
         """Whether topic data may be sent at now_us."""

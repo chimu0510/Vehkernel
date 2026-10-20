@@ -36,8 +36,9 @@
 namespace vk::link {
 
 // Protocol version; peers negotiate it with hello (ADR-0002). Version 2 added
-// parameter access; the MCU offers only the current version.
-inline constexpr std::uint8_t protocol_version = 2;
+// parameter access, version 3 mode, arming and emergency stop requests; the
+// MCU offers only the current version.
+inline constexpr std::uint8_t protocol_version = 3;
 
 enum class FrameType : std::uint8_t {
     TopicData = 0x01,
@@ -51,6 +52,16 @@ enum class FrameType : std::uint8_t {
     ParamSet = 0x32,
     ParamValue = 0x33,
     ParamReject = 0x34,
+    ModeRequest = 0x40,
+    ModeReply = 0x41,
+    ModeReject = 0x42,
+    ArmingRequest = 0x43,
+    ArmingReply = 0x44,
+    ArmingReject = 0x45,
+    EstopRequest = 0x46,
+    EstopReply = 0x47,
+    // SITL only: cuts or restores the simulated actuator power.
+    SimActuatorPower = 0x70,
 };
 
 constexpr std::optional<FrameType> to_frame_type(std::uint8_t raw)
@@ -78,6 +89,24 @@ constexpr std::optional<FrameType> to_frame_type(std::uint8_t raw)
         return FrameType::ParamValue;
     case static_cast<std::uint8_t>(FrameType::ParamReject):
         return FrameType::ParamReject;
+    case static_cast<std::uint8_t>(FrameType::ModeRequest):
+        return FrameType::ModeRequest;
+    case static_cast<std::uint8_t>(FrameType::ModeReply):
+        return FrameType::ModeReply;
+    case static_cast<std::uint8_t>(FrameType::ModeReject):
+        return FrameType::ModeReject;
+    case static_cast<std::uint8_t>(FrameType::ArmingRequest):
+        return FrameType::ArmingRequest;
+    case static_cast<std::uint8_t>(FrameType::ArmingReply):
+        return FrameType::ArmingReply;
+    case static_cast<std::uint8_t>(FrameType::ArmingReject):
+        return FrameType::ArmingReject;
+    case static_cast<std::uint8_t>(FrameType::EstopRequest):
+        return FrameType::EstopRequest;
+    case static_cast<std::uint8_t>(FrameType::EstopReply):
+        return FrameType::EstopReply;
+    case static_cast<std::uint8_t>(FrameType::SimActuatorPower):
+        return FrameType::SimActuatorPower;
     default:
         return std::nullopt;
     }

@@ -2,6 +2,7 @@
 //
 // Usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]
 //                       [--motion still|tilt|rotate|shake] [--param-file <path>]
+//                       [--actuator-power-off]
 //
 // The run stops by itself after the duration (default 1 s; 0 runs until
 // interrupted) and prints a report: one line per topic instance and per work
@@ -13,6 +14,9 @@
 // and its true attitude is published on vehicle_attitude_groundtruth.
 // Parameters are stored in a simulated NOR Flash: blank at every start, so
 // runs are reproducible, or kept in the file given with --param-file.
+// The simulated board senses actuator power, on unless --actuator-power-off
+// cuts it at start; the Link's sim_actuator_power frame cuts or restores it.
+#include <vk/commander/commander_task.hpp>
 #include <vk/config.h>
 #include <vk/core/bus.hpp>
 #include <vk/core/scheduler.hpp>
@@ -84,6 +88,7 @@ struct Options {
     std::uint16_t udp_port = 15600;
     vk::sim::MotionProfile motion = vk::sim::MotionProfile::Still;
     const char* param_file = nullptr;  // nullptr: blank Flash in memory
+    bool actuator_power = true;
 };
 
 bool parse_address(const char* argument, Options& options)
@@ -113,6 +118,10 @@ bool parse_options(std::span<char*> args, Options& options)
 {
     for (std::size_t i = 1; i < args.size(); ++i) {
         const std::string_view arg = args[i];
+        if (arg == "--actuator-power-off") {
+            options.actuator_power = false;
+            continue;
+        }
         if (i + 1 >= args.size()) {
             return false;
         }
@@ -145,6 +154,18 @@ bool parse_options(std::span<char*> args, Options& options)
         }
     }
     return true;
+}
+
+vk::core::StaticInstance<vk::commander::CommanderTask> commander;
+
+// The commander on wq:ctrl at the IMU's rate (ADR-0005). SITL's board has no
+// revision-ID pins, so it is verified once the simulated IMU answers.
+void start_commander()
+{
+    commander.emplace(vk::commander::CommanderTask::Config{.interval_us = 1'000'000 / vk::platform::imu_rate_hz,
+                                                           .actuator_power = &vk::platform::actuator_power},
+                      vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    commander->start();
 }
 
 #ifdef CONFIG_LINK
@@ -220,7 +241,9 @@ bool start_link(const Options& options)
     host_link.emplace("link0", *transport, vk::link::default_topic_map(),
                       vk::link::Link::Config{.parameters = {.parameters = &vk::params::parameters(),
                                                             .set_hash = vk::params::set_hash,
-                                                            .storage = stored_parameters()}},
+                                                            .storage = stored_parameters()},
+                                             .control = {.control = &*commander,
+                                                         .set_sim_actuator_power = &vk::platform::set_actuator_power}},
                       vk::core::work_queue(vk::core::WorkQueueTier::Io));
     host_link->start();
     return true;
@@ -267,11 +290,13 @@ int main(int argc, char** argv)
     Options options;
     if (!parse_options(std::span(argv, static_cast<std::size_t>(argc)), options)) {
         std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]\n"
-                   "                      [--motion still|tilt|rotate|shake] [--param-file <path>]\n",
+                   "                      [--motion still|tilt|rotate|shake] [--param-file <path>]\n"
+                   "                      [--actuator-power-off]\n",
                    stderr);
         return 2;
     }
     vk::platform::init(options.motion);
+    vk::platform::set_actuator_power(options.actuator_power);
 #ifdef CONFIG_PARAM_STORAGE_FLASH
     if (!start_parameters(options)) {
         return 1;
@@ -282,6 +307,7 @@ int main(int argc, char** argv)
 #ifdef CONFIG_ESTIMATOR_MAHONY
     start_estimator();
 #endif
+    start_commander();
 #ifdef CONFIG_LINK
     if (!start_link(options)) {
         return 1;

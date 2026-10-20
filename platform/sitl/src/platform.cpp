@@ -16,6 +16,7 @@
 #include <task.h>
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 
 namespace vk::platform {
@@ -24,6 +25,8 @@ namespace {
 StaticTask_t stop_tcb;
 std::array<StackType_t, configMINIMAL_STACK_SIZE> stop_stack;
 std::uint64_t stop_duration_us = 0;
+
+std::atomic<bool> simulated_actuator_power{true};
 
 sim::I2cBus bus;
 sim::Icm20948 imu;
@@ -100,6 +103,16 @@ void stop_after(std::uint64_t duration_us)
     stop_duration_us = duration_us;
     xTaskCreateStatic(stop_task, "sitl_stop", stop_stack.size(), nullptr, configMAX_PRIORITIES - 1,
                       stop_stack.data(), &stop_tcb);
+}
+
+bool actuator_power()
+{
+    return simulated_actuator_power.load();
+}
+
+void set_actuator_power(bool powered)
+{
+    simulated_actuator_power.store(powered);
 }
 
 }  // namespace vk::platform

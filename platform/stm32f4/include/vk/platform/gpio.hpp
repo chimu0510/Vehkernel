@@ -50,4 +50,39 @@ struct OpenDrain {
     static bool is_high() { return LL_GPIO_IsInputPinSet(detail::gpio_port(Pin::port), mask) != 0U; }
 };
 
+// An input line on a GPIO_INPUT pin, without pull resistors: the board
+// drives it, as with revision-ID straps or a sense input.
+template <hal::GpioInputPin Pin>
+struct InputLine {
+    static constexpr std::uint32_t mask = 1U << Pin::number;
+
+    static void init()
+    {
+        detail::enable_gpio_clock(Pin::port);
+        GPIO_TypeDef* const port = detail::gpio_port(Pin::port);
+        LL_GPIO_SetPinPull(port, mask, LL_GPIO_PULL_NO);
+        LL_GPIO_SetPinMode(port, mask, LL_GPIO_MODE_INPUT);
+    }
+
+    static bool is_high() { return LL_GPIO_IsInputPinSet(detail::gpio_port(Pin::port), mask) != 0U; }
+};
+
+// A list of GPIO_INPUT pins read as a number, the first pin as the least
+// significant bit, such as a board's revision-ID pins (ADR-0010).
+template <class List>
+struct InputBits;
+
+template <hal::GpioInputPin... Pins>
+struct InputBits<hal::PinList<Pins...>> {
+    static void init() { (InputLine<Pins>::init(), ...); }
+
+    static std::uint32_t read()
+    {
+        std::uint32_t value = 0;
+        std::uint32_t bit = 0;
+        ((value |= (InputLine<Pins>::is_high() ? 1U : 0U) << bit++), ...);
+        return value;
+    }
+};
+
 }  // namespace vk::platform

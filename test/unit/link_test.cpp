@@ -855,3 +855,170 @@ TEST(Session, WithoutParametersEveryNameIsUnknown)
 }
 
 }  // namespace
+
+// --- Mode, arming and emergency stop requests (spec 0006) ---
+
+namespace {
+
+using namespace vk::link;
+
+// Records the requests a session passes on and answers as told.
+class FakeControl final : public vk::core::VehicleControl {
+public:
+    vk::core::ModeResult request_mode(vk::core::ControlSource source, vk::core::Mode mode) override
+    {
+        last_source = source;
+        if (mode_result == vk::core::ModeResult::Ok) {
+            current_mode = mode;
+        }
+        return mode_result;
+    }
+    vk::core::ArmingResult request_arming(vk::core::ControlSource source, bool arm) override
+    {
+        last_source = source;
+        if (!arm || arming_result == vk::core::ArmingResult::Ok) {
+            is_armed = arm;
+        }
+        return arm ? arming_result : vk::core::ArmingResult::Ok;
+    }
+    bool request_emergency_stop(bool engage) override
+    {
+        engaged = engage;
+        return engaged;
+    }
+    [[nodiscard]] vk::core::Mode mode() const override { return current_mode; }
+    [[nodiscard]] bool armed() const override { return is_armed; }
+    [[nodiscard]] std::uint32_t skipped_checks() const override { return skipped; }
+
+    vk::core::ModeResult mode_result = vk::core::ModeResult::Ok;
+    vk::core::ArmingResult arming_result = vk::core::ArmingResult::Ok;
+    vk::core::Mode current_mode = vk::core::Mode::Standby;
+    vk::core::ControlSource last_source = vk::core::no_source;
+    bool is_armed = false;
+    bool engaged = false;
+    std::uint32_t skipped = 0;
+};
+
+bool sim_power = true;
+void set_sim_power(bool powered)
+{
+    sim_power = powered;
+}
+
+struct Reply {
+    FrameType type{};
+    std::vector<std::uint8_t> body;
+};
+
+std::vector<Reply> replies(const std::vector<std::vector<std::uint8_t>>& wires)
+{
+    std::vector<Reply> out;
+    FrameReader reader;
+    for (const auto& wire : wires) {
+        reader.feed(wire, [&](const Frame& f) { out.push_back({f.type, {f.body.begin(), f.body.end()}}); });
+    }
+    return out;
+}
+
+class SessionControl : public ::testing::Test {
+protected:
+    void SetUp() override { handshake(session); }
+
+    void handshake(Session& s)
+    {
+        const std::array<std::uint8_t, 2> hello = {1, protocol_version};
+        s.handle({.version = protocol_version, .type = FrameType::Hello, .sequence = 0, .body = hello}, 1000, sink);
+        sink.sent.clear();
+    }
+
+    void request(Session& s, FrameType type, std::uint8_t value)
+    {
+        const std::array<std::uint8_t, 1> body{value};
+        s.handle({.version = protocol_version, .type = type, .sequence = 1, .body = body}, 2000, sink);
+    }
+
+    FakeControl control;
+    MockSink sink;
+    Session session{{}, Session::default_peer_timeout_us, {}, {.control = &control, .source = 2,
+                                                              .set_sim_actuator_power = &set_sim_power}};
+};
+
+TEST_F(SessionControl, ModeRequestIsAnsweredWithTheModeOrTheRefusal)
+{
+    request(session, FrameType::ModeRequest, 1);
+    control.mode_result = vk::core::ModeResult::Armed;
+    request(session, FrameType::ModeRequest, 0);
+    const auto got = replies(sink.sent);
+    ASSERT_EQ(got.size(), 2U);
+    EXPECT_EQ(got[0].type, FrameType::ModeReply);
+    EXPECT_EQ(got[0].body, (std::vector<std::uint8_t>{1}));
+    EXPECT_EQ(got[1].type, FrameType::ModeReject);
+    EXPECT_EQ(got[1].body, (std::vector<std::uint8_t>{1, 1}));  // armed, still TEST
+    EXPECT_EQ(control.last_source, 2);
+}
+
+TEST_F(SessionControl, AnUnknownModeIsRefusedWithoutAsking)
+{
+    request(session, FrameType::ModeRequest, 9);
+    const auto got = replies(sink.sent);
+    ASSERT_EQ(got.size(), 1U);
+    EXPECT_EQ(got[0].type, FrameType::ModeReject);
+    EXPECT_EQ(got[0].body, (std::vector<std::uint8_t>{2, 0}));  // unknown mode, still STANDBY
+    EXPECT_EQ(control.last_source, vk::core::no_source);
+}
+
+TEST_F(SessionControl, ArmingReplyCarriesTheSkippedChecks)
+{
+    control.skipped = 1;
+    request(session, FrameType::ArmingRequest, 1);
+    control.arming_result = vk::core::ArmingResult::ActuatorPowerOff;
+    control.is_armed = false;
+    request(session, FrameType::ArmingRequest, 1);
+    const auto got = replies(sink.sent);
+    ASSERT_EQ(got.size(), 2U);
+    EXPECT_EQ(got[0].type, FrameType::ArmingReply);
+    EXPECT_EQ(got[0].body, (std::vector<std::uint8_t>{1, 1, 0, 0, 0}));
+    EXPECT_EQ(got[1].type, FrameType::ArmingReject);
+    EXPECT_EQ(got[1].body, (std::vector<std::uint8_t>{7}));
+}
+
+TEST_F(SessionControl, EstopRequestIsAnsweredWithItsState)
+{
+    request(session, FrameType::EstopRequest, 1);
+    request(session, FrameType::EstopRequest, 0);
+    const auto got = replies(sink.sent);
+    ASSERT_EQ(got.size(), 2U);
+    EXPECT_EQ(got[0].type, FrameType::EstopReply);
+    EXPECT_EQ(got[0].body, (std::vector<std::uint8_t>{1}));
+    EXPECT_EQ(got[1].body, (std::vector<std::uint8_t>{0}));
+}
+
+TEST_F(SessionControl, SimActuatorPowerGoesToTheHookWithoutAReply)
+{
+    request(session, FrameType::SimActuatorPower, 0);
+    EXPECT_FALSE(sim_power);
+    request(session, FrameType::SimActuatorPower, 1);
+    EXPECT_TRUE(sim_power);
+    EXPECT_TRUE(sink.sent.empty());
+}
+
+TEST_F(SessionControl, WithoutVehicleControlRequestsGoUnanswered)
+{
+    Session bare{{}, Session::default_peer_timeout_us};
+    handshake(bare);
+    request(bare, FrameType::ModeRequest, 1);
+    request(bare, FrameType::ArmingRequest, 1);
+    request(bare, FrameType::EstopRequest, 1);
+    request(bare, FrameType::SimActuatorPower, 0);
+    EXPECT_TRUE(sink.sent.empty());
+}
+
+TEST_F(SessionControl, RequestsBeforeTheHandshakeAreIgnored)
+{
+    Session fresh{{}, Session::default_peer_timeout_us, {}, {.control = &control}};
+    request(fresh, FrameType::EstopRequest, 1);
+    EXPECT_FALSE(control.engaged);
+    EXPECT_TRUE(sink.sent.empty());
+}
+
+}  // namespace

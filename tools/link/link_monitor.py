@@ -19,8 +19,16 @@ parameter set hash, and exits non-zero when the MCU refuses a request.
     link_monitor.py --udp 127.0.0.1:15600
     link_monitor.py --serial /dev/ttyACM0
     link_monitor.py --udp 127.0.0.1:15600 --check --duration 5 --expect-rate imu_sample:0=200
+The mode, arm, disarm and estop commands change the mode, arm or disarm, and
+engage or release the emergency stop (spec 0006), print the state now in
+effect and exit non-zero when the MCU refuses. arm warns when arming checks
+are skipped. sim-power cuts or restores SITL's simulated actuator power.
+
     link_monitor.py --udp 127.0.0.1:15600 param list
     link_monitor.py --udp 127.0.0.1:15600 param set ATT_KP 2.5
+    link_monitor.py --udp 127.0.0.1:15600 mode test
+    link_monitor.py --udp 127.0.0.1:15600 arm
+    link_monitor.py --udp 127.0.0.1:15600 estop on
 """
 
 from __future__ import annotations
@@ -45,7 +53,7 @@ from vklink.monitor import (  # noqa: E402
     load_param_metadata,
     parse_param_text,
 )
-from vklink.session import ParamReject, ParamType, ParamValue  # noqa: E402
+from vklink.session import MODES, ControlReply, ParamReject, ParamType, ParamValue, check_names  # noqa: E402
 from vklink.view import render  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -121,6 +129,38 @@ def run_param(monitor: LinkMonitor, args: argparse.Namespace, metadata: ParamMet
     return 0
 
 
+def run_control(monitor: LinkMonitor, args: argparse.Namespace) -> int:
+    """The mode, arm, disarm, estop and sim-power commands, once the handshake is done."""
+    if args.command == "sim-power":
+        monitor.sim_actuator_power(args.state == "on")
+        print(f"sim_actuator_power={args.state}")
+        return 0
+    reply: ControlReply | None
+    if args.command == "mode":
+        mode = next(number for number, name in MODES.items() if name.lower() == args.mode)
+        reply = monitor.request_mode(mode, PARAM_TIMEOUT_S)
+    elif args.command in ("arm", "disarm"):
+        reply = monitor.request_arming(args.command == "arm", PARAM_TIMEOUT_S)
+    else:
+        reply = monitor.request_estop(args.state == "on", PARAM_TIMEOUT_S)
+    if reply is None:
+        print(f"FAIL: no reply from the MCU to {args.command}", file=sys.stderr)
+        return 1
+    if reply.refused:
+        print(f"FAIL: {args.command} refused: {reply.reason_text}", file=sys.stderr)
+        return 1
+    if args.command == "mode":
+        print(f"mode={MODES.get(reply.value, reply.value)}")
+    elif args.command in ("arm", "disarm"):
+        skipped = check_names(reply.skipped)
+        print(f"armed={reply.value} skipped_checks={','.join(skipped) or 'none'}")
+        if args.command == "arm" and skipped:
+            print(f"warning: arming checks skipped: {', '.join(skipped)}", file=sys.stderr)
+    else:
+        print(f"emergency_stop={reply.value}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     target = parser.add_mutually_exclusive_group()
@@ -147,6 +187,14 @@ def main() -> int:
     set_ = actions.add_parser("set", help="change a parameter; enum values may be given by name")
     set_.add_argument("name")
     set_.add_argument("value")
+    mode = commands.add_parser("mode", help="change the mode; only while disarmed")
+    mode.add_argument("mode", choices=[name.lower() for name in MODES.values()])
+    commands.add_parser("arm", help="arm, if every arming check passes")
+    commands.add_parser("disarm", help="disarm")
+    estop = commands.add_parser("estop", help="engage or release the emergency stop")
+    estop.add_argument("state", choices=["on", "off"])
+    sim_power = commands.add_parser("sim-power", help="SITL only: cut or restore the simulated actuator power")
+    sim_power.add_argument("state", choices=["on", "off"])
     args = parser.parse_args()
 
     metadata = None
@@ -181,6 +229,8 @@ def main() -> int:
             return 1
         if args.command == "param":
             return run_param(monitor, args, metadata)
+        if args.command is not None:
+            return run_control(monitor, args)
         if args.check:
             monitor.run(args.duration)
             print("\n".join(monitor.summary()))

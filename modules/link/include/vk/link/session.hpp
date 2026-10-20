@@ -18,10 +18,18 @@
 // param_get and param_set are answered at once with param_value or
 // param_reject, and param_list_request starts a stream of param_value frames
 // that send_pending() paces after the topic_info frames.
+//
+// Mode, arming and emergency stop requests (ADR-0005) go to the vehicle
+// control service, with this Link as their source, and are answered at once:
+// mode_request with mode_reply or mode_reject, arming_request with
+// arming_reply, which carries the arming checks skipped, or arming_reject,
+// and estop_request with estop_reply. Without the service they go
+// unanswered.
 #pragma once
 
 #include <vk/core/parameter_storage.hpp>
 #include <vk/core/parameters.hpp>
+#include <vk/core/vehicle_control.hpp>
 #include <vk/link/frame.hpp>
 #include <vk/msg/topics.hpp>
 
@@ -74,13 +82,22 @@ struct ParameterAccess {
     const core::ParameterStorage* storage = nullptr;    // for the flags of param_value, if parameters are stored
 };
 
+// The vehicle control a session offers; without it, mode, arming and
+// emergency stop requests go unanswered.
+struct ControlAccess {
+    core::VehicleControl* control = nullptr;
+    core::ControlSource source = 0;                     // this Link, as the source of its requests
+    void (*set_sim_actuator_power)(bool) = nullptr;     // SITL only: sim_actuator_power frames
+};
+
 class Session {
 public:
     static constexpr std::uint64_t default_peer_timeout_us = 3'000'000;
 
     explicit Session(std::span<const TopicDescription> topics = schema_topics,
-                     std::uint64_t peer_timeout_us = default_peer_timeout_us, ParameterAccess parameters = {})
-        : topics_(topics), peer_timeout_us_(peer_timeout_us), parameters_(parameters)
+                     std::uint64_t peer_timeout_us = default_peer_timeout_us, ParameterAccess parameters = {},
+                     ControlAccess control = {})
+        : topics_(topics), peer_timeout_us_(peer_timeout_us), parameters_(parameters), control_(control)
     {
     }
 
@@ -123,6 +140,10 @@ private:
     void on_param_set(BodyReader body, FrameSink& sink);
     bool send_param_value(std::size_t index, FrameSink& sink);
     void send_param_reject(core::ParamResult reason, std::string_view name, FrameSink& sink);
+    void on_mode_request(BodyReader body, FrameSink& sink);
+    void on_arming_request(BodyReader body, FrameSink& sink);
+    void on_estop_request(BodyReader body, FrameSink& sink);
+    void on_sim_actuator_power(BodyReader body);
     [[nodiscard]] std::size_t parameter_count() const
     {
         return parameters_.parameters == nullptr ? 0 : parameters_.parameters->count();
@@ -132,6 +153,7 @@ private:
     std::span<const TopicDescription> topics_;
     std::uint64_t peer_timeout_us_;
     ParameterAccess parameters_;
+    ControlAccess control_;
     // Next topic to describe with topic_info; none at or past the topic count.
     std::size_t info_next_ = std::numeric_limits<std::size_t>::max();
     // Next parameter of the list being sent; none at or past the count.

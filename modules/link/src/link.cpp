@@ -9,12 +9,20 @@ namespace {
 // Reads per run; bounds the run time when bytes keep arriving.
 constexpr int max_reads_per_run = 8;
 
+// A Link's requests come from the Link itself.
+ControlAccess with_source(ControlAccess control, std::uint8_t instance)
+{
+    control.source = instance;
+    return control;
+}
+
 }  // namespace
 
 Link::Link(std::string_view name, hal::Transport& transport, TopicMap map, const Config& config,
            core::WorkQueue& queue)
     : WorkItem(name, queue), transport_(&transport), map_(map), config_(config),
-      session_(schema_topics, config.peer_timeout_us, config.parameters), sink_(transport), status_publication_(config.instance)
+      session_(schema_topics, config.peer_timeout_us, config.parameters, with_source(config.control, config.instance)),
+      sink_(transport), status_publication_(config.instance)
 {
 }
 

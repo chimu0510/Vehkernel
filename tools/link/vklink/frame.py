@@ -11,8 +11,9 @@ from dataclasses import dataclass
 from .cobs import cobs_decode, cobs_encode, cobs_max_encoded_size
 from .crc16 import crc16
 
-# Version 2 added parameter access (ADR-0012); the MCU offers only its current version.
-PROTOCOL_VERSION = 2
+# Version 2 added parameter access (ADR-0012), version 3 mode, arming and
+# emergency stop requests (ADR-0005); the MCU offers only its current version.
+PROTOCOL_VERSION = 3
 
 HEADER_SIZE = 4
 CRC_SIZE = 2
@@ -34,6 +35,16 @@ class FrameType(enum.IntEnum):
     PARAM_SET = 0x32
     PARAM_VALUE = 0x33
     PARAM_REJECT = 0x34
+    MODE_REQUEST = 0x40
+    MODE_REPLY = 0x41
+    MODE_REJECT = 0x42
+    ARMING_REQUEST = 0x43
+    ARMING_REPLY = 0x44
+    ARMING_REJECT = 0x45
+    ESTOP_REQUEST = 0x46
+    ESTOP_REPLY = 0x47
+    # SITL only: cuts or restores the simulated actuator power.
+    SIM_ACTUATOR_POWER = 0x70
 
 
 @dataclass(frozen=True)

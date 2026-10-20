@@ -47,6 +47,15 @@ if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_LINK_UDP)
       --msg-dir ${VK_MSG_PYTHON_DIR} --param-meta ${VK_PARAM_METADATA})
 endif()
 
+# L3 SITL arming test (spec 0006): arming refused for each check in turn,
+# actuator power settling, the emergency stop and a skipped power check.
+if(CONFIG_LINK_UDP)
+  add_test(NAME sitl_arming
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_arming.py
+      $<TARGET_FILE:vehkernel-sitl> ${CMAKE_SOURCE_DIR}/tools/link/link_monitor.py
+      --msg-dir ${VK_MSG_PYTHON_DIR} --param-meta ${VK_PARAM_METADATA})
+endif()
+
 # Kconfig smoke test (ADR-0017): a debug overlay that sets an option whose
 # dependencies are not met must fail configuration.
 add_test(NAME kconfig_overlay_smoke

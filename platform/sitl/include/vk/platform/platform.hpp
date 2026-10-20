@@ -25,6 +25,11 @@ void init(sim::MotionProfile motion = sim::MotionProfile::Still);
 // for every imu_sample, from a work item on `queue`.
 void start_ground_truth(core::WorkQueue& queue);
 
+// SITL's board senses actuator power (ADR-0005). The simulated power is on
+// unless cut, at start or later over the Link's sim_actuator_power frame.
+bool actuator_power();
+void set_actuator_power(bool powered);
+
 // Stops the scheduler after the given run time, so a SITL run ends on its own.
 void stop_after(std::uint64_t duration_us);
 

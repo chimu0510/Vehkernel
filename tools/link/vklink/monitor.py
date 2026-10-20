@@ -24,7 +24,19 @@ from types import ModuleType
 from typing import Callable, Protocol
 
 from .frame import Frame, FrameReader, FrameType
-from .session import HostSession, ParamReject, ParamType, ParamValue, TimeSyncResult
+from .session import (
+    ACTUATOR_POWER_STATES,
+    ARMING_REJECT_REASONS,
+    DISARM_REASONS,
+    MODES,
+    ControlReply,
+    HostSession,
+    ParamReject,
+    ParamType,
+    ParamValue,
+    TimeSyncResult,
+    check_names,
+)
 
 
 class Connection(Protocol):
@@ -122,6 +134,20 @@ def load_messages(directory: str | Path) -> ModuleType:
 # Flags of param_value: vk::core::param_state.
 PARAM_PENDING_REBOOT = 1
 PARAM_UNSAVED = 2
+
+
+def vehicle_status_line(status) -> str:
+    """vehicle_status as a space-separated key=value line."""
+    source = "none" if status.source == 0xFF else str(status.source)
+    skipped = ",".join(check_names(status.skipped_checks)) or "none"
+    return (f"vehicle_status mode={MODES.get(status.mode, status.mode)} armed={int(status.armed)} "
+            f"source={source} board_verified={int(status.board_verified)} "
+            f"emergency_stop={int(status.emergency_stop)} "
+            f"actuator_power={ACTUATOR_POWER_STATES.get(status.actuator_power, status.actuator_power).replace(' ', '_')} "
+            f"skipped_checks={skipped} "
+            f"arming_refusal={ARMING_REJECT_REASONS.get(status.arming_refusal, 'none').replace(' ', '_')} "
+            f"disarm_reason={DISARM_REASONS.get(status.disarm_reason, status.disarm_reason).replace(' ', '_')} "
+            f"output_watchdog_trips={status.output_watchdog_trips}")
 
 
 def param_status_line(status) -> str:
@@ -250,6 +276,11 @@ class Mismatch:
     local_hash: int
 
 
+# Replies to mode, arming and emergency stop requests.
+CONTROL_REPLIES = (FrameType.MODE_REPLY, FrameType.MODE_REJECT, FrameType.ARMING_REPLY,
+                   FrameType.ARMING_REJECT, FrameType.ESTOP_REPLY)
+
+
 class LinkMonitor:
     """The development host's end of one Link."""
 
@@ -282,6 +313,8 @@ class LinkMonitor:
         # Parameter replies, as they arrive.
         self.params: dict[str, ParamValue] = {}
         self.param_rejects: list[ParamReject] = []
+        # Mode, arming and emergency stop replies, as they arrive.
+        self.control_replies: list[ControlReply] = []
 
     @property
     def connected(self) -> bool:
@@ -350,6 +383,10 @@ class LinkMonitor:
             reject = ParamReject.parse(frame.body)
             if reject is not None:
                 self.param_rejects.append(reject)
+        elif frame.type in CONTROL_REPLIES:
+            reply = ControlReply.parse(frame)
+            if reply is not None:
+                self.control_replies.append(reply)
         else:
             self.session.handle_frame(frame)
 
@@ -429,6 +466,43 @@ class LinkMonitor:
         """Changes a parameter; the reply holds the value now in effect, or why it was refused."""
         return self._await_param(name, lambda: self.session.make_param_set(name, param_type, value), timeout_s)
 
+    def _await_control(self, request: Callable[[], bytes], answers: tuple[FrameType, ...],
+                       timeout_s: float) -> ControlReply | None:
+        seen = len(self.control_replies)
+        deadline = self.clock() + timeout_s
+        next_request = 0.0
+        while True:
+            for reply in self.control_replies[seen:]:
+                if reply.type in answers:
+                    return reply
+            now = self.clock()
+            if now >= deadline:
+                return None
+            if now >= next_request:
+                # Requests are idempotent, so one may go again.
+                self.connection.send(request())
+                next_request = now + self.REQUEST_INTERVAL_S
+            self.poll(min(0.05, deadline - now))
+
+    def request_mode(self, mode: int, timeout_s: float) -> ControlReply | None:
+        """Changes the mode; the reply holds the mode now in effect, or why it was refused."""
+        return self._await_control(lambda: self.session.make_mode_request(mode),
+                                   (FrameType.MODE_REPLY, FrameType.MODE_REJECT), timeout_s)
+
+    def request_arming(self, arm: bool, timeout_s: float) -> ControlReply | None:
+        """Arms or disarms; the reply holds the armed state and the skipped checks, or why it was refused."""
+        return self._await_control(lambda: self.session.make_arming_request(arm),
+                                   (FrameType.ARMING_REPLY, FrameType.ARMING_REJECT), timeout_s)
+
+    def request_estop(self, engage: bool, timeout_s: float) -> ControlReply | None:
+        """Engages or releases the emergency stop; the reply says whether it is engaged."""
+        return self._await_control(lambda: self.session.make_estop_request(engage),
+                                   (FrameType.ESTOP_REPLY,), timeout_s)
+
+    def sim_actuator_power(self, powered: bool) -> None:
+        """SITL only: cuts or restores the simulated actuator power. The MCU does not answer."""
+        self.connection.send(self.session.make_sim_actuator_power(powered))
+
     def latest(self, name: str) -> list[tuple[int, object]]:
         """The latest message of every instance of a topic that arrived, by instance."""
         return [
@@ -473,6 +547,8 @@ class LinkMonitor:
             )
         for _, status in self.latest("parameter_status"):
             lines.append(param_status_line(status))
+        for _, status in self.latest("vehicle_status"):
+            lines.append(vehicle_status_line(status))
         for _, status in self.latest("work_item_status"):
             lines.append(
                 f"work_item name={work_item_name(status)} runs={status.runs} overruns={status.overruns} "

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from .monitor import HANDSHAKE_STATES, LinkMonitor, euler_degrees, work_item_name
+from .monitor import HANDSHAKE_STATES, LinkMonitor, euler_degrees, vehicle_status_line, work_item_name
 
 # Topics shown in their own tables rather than by their raw values.
-STATUS_TOPICS = ("link_status", "work_item_status", "parameter_status")
+STATUS_TOPICS = ("link_status", "work_item_status", "parameter_status", "vehicle_status")
 
 
 def format_value(value: object) -> str:
@@ -59,6 +59,8 @@ def render(monitor: LinkMonitor, target: str, width: int = 120) -> list[str]:
             f"{status.skipped_unknown + status.skipped_wrong_type + status.skipped_out_of_range + status.skipped_corrupt}"
             f"{'  FLASH FAILED' if status.failed else ''}"
         )
+    for _, status in monitor.latest("vehicle_status"):
+        lines.append("vehicle        " + vehicle_status_line(status).removeprefix("vehicle_status "))
     for mismatch in monitor.mismatches:
         lines.append(f"MISMATCH       topic {mismatch.name}: schema hash differs from the local build")
 

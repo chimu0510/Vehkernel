@@ -33,6 +33,18 @@ void Session::handle(const Frame& frame, std::uint64_t now_us, FrameSink& sink)
     case FrameType::ParamSet:
         on_param_set(BodyReader(frame.body), sink);
         break;
+    case FrameType::ModeRequest:
+        on_mode_request(BodyReader(frame.body), sink);
+        break;
+    case FrameType::ArmingRequest:
+        on_arming_request(BodyReader(frame.body), sink);
+        break;
+    case FrameType::EstopRequest:
+        on_estop_request(BodyReader(frame.body), sink);
+        break;
+    case FrameType::SimActuatorPower:
+        on_sim_actuator_power(BodyReader(frame.body));
+        break;
     default:
         break;  // Frames only the MCU sends, or not meant for a session.
     }
@@ -180,6 +192,67 @@ void Session::send_param_reject(core::ParamResult reason, std::string_view name,
     write_name(out, name);
     if (out.ok()) {
         send(FrameType::ParamReject, out.written(), sink);
+    }
+}
+
+void Session::on_mode_request(BodyReader body, FrameSink& sink)
+{
+    const std::uint8_t mode = body.u8();
+    if (!body.ok() || control_.control == nullptr) {
+        return;
+    }
+    const core::ModeResult result =
+        mode > static_cast<std::uint8_t>(core::Mode::Test)
+            ? core::ModeResult::UnknownMode
+            : control_.control->request_mode(control_.source, static_cast<core::Mode>(mode));
+    std::array<std::uint8_t, 2> reply{};
+    BodyWriter out(reply);
+    if (result != core::ModeResult::Ok) {
+        out.u8(static_cast<std::uint8_t>(result));
+        out.u8(static_cast<std::uint8_t>(control_.control->mode()));
+        send(FrameType::ModeReject, out.written(), sink);
+        return;
+    }
+    out.u8(static_cast<std::uint8_t>(control_.control->mode()));
+    send(FrameType::ModeReply, out.written(), sink);
+}
+
+void Session::on_arming_request(BodyReader body, FrameSink& sink)
+{
+    const std::uint8_t arm = body.u8();
+    if (!body.ok() || control_.control == nullptr) {
+        return;
+    }
+    const core::ArmingResult result = control_.control->request_arming(control_.source, arm != 0);
+    std::array<std::uint8_t, 5> reply{};
+    BodyWriter out(reply);
+    if (result != core::ArmingResult::Ok) {
+        out.u8(static_cast<std::uint8_t>(result));
+        send(FrameType::ArmingReject, out.written(), sink);
+        return;
+    }
+    out.u8(control_.control->armed() ? 1 : 0);
+    out.u32(control_.control->skipped_checks());
+    send(FrameType::ArmingReply, out.written(), sink);
+}
+
+void Session::on_estop_request(BodyReader body, FrameSink& sink)
+{
+    const std::uint8_t engage = body.u8();
+    if (!body.ok() || control_.control == nullptr) {
+        return;
+    }
+    std::array<std::uint8_t, 1> reply{};
+    BodyWriter out(reply);
+    out.u8(control_.control->request_emergency_stop(engage != 0) ? 1 : 0);
+    send(FrameType::EstopReply, out.written(), sink);
+}
+
+void Session::on_sim_actuator_power(BodyReader body)
+{
+    const std::uint8_t powered = body.u8();
+    if (body.ok() && control_.set_sim_actuator_power != nullptr) {
+        control_.set_sim_actuator_power(powered != 0);
     }
 }
 

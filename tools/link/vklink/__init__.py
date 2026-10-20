@@ -17,7 +17,9 @@ from .frame import (
 )
 from .session import (
     REJECT_REASONS,
+    ControlReply,
     HostSession,
+    McuControl,
     McuParam,
     McuSession,
     ParamReject,
@@ -52,4 +54,6 @@ __all__ = [
     "ParamValue",
     "ParamReject",
     "REJECT_REASONS",
+    "ControlReply",
+    "McuControl",
 ]

@@ -6,7 +6,9 @@
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
+#include <vk/commander/commander_task.hpp>
 #include <vk/params/params.hpp>
+#include <vk/platform/gpio.hpp>
 #include <vk/platform/platform.hpp>
 #ifdef CONFIG_PARAM_STORAGE_FLASH
 #include <vk/core/parameter_storage.hpp>
@@ -67,6 +69,43 @@ void start_parameters()
 }
 #endif
 
+// The commander on wq:ctrl at the base rate (ADR-0005). The board counts as
+// verified once the revision-ID pins have read the board's revision at boot
+// and the IMU has answered (ADR-0010).
+vk::core::StaticInstance<vk::commander::CommanderTask> commander;
+
+bool revision_matches()
+{
+#ifdef CONFIG_BOARD_HAS_REVISION_ID
+    using Revision = vk::platform::InputBits<vk::board::revision::pins>;
+    Revision::init();
+    return Revision::read() == vk::board::revision::value;
+#else
+    return true;
+#endif
+}
+
+#ifdef CONFIG_BOARD_HAS_ACTUATOR_POWER_SENSE
+using ActuatorPowerSense = vk::platform::InputLine<vk::board::actuator_power::pin>;
+
+bool actuator_powered()
+{
+    return ActuatorPowerSense::is_high() == vk::board::actuator_power::powered_high;
+}
+#endif
+
+void start_commander()
+{
+    vk::commander::CommanderTask::Config config{.interval_us = 1'000'000 / vk::board::timing::base_rate_hz,
+                                                .revision_ok = revision_matches()};
+#ifdef CONFIG_BOARD_HAS_ACTUATOR_POWER_SENSE
+    ActuatorPowerSense::init();
+    config.actuator_power = &actuator_powered;
+#endif
+    commander.emplace(config, vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    commander->start();
+}
+
 #ifdef CONFIG_DRIVER_ICM20948
 using Imu = vk::board::devices::IMU0;
 static_assert(Imu::type == "ICM20948" && Imu::bus == "SOFT_I2C", "the C50C's IMU is an ICM20948 on software I2C");
@@ -119,7 +158,8 @@ void start_link()
 #ifdef CONFIG_PARAM_STORAGE_FLASH
                                                               .storage = &*param_storage,
 #endif
-                                                              }},
+                                                              },
+                                               .control = {.control = &*commander}},
                         vk::core::work_queue(vk::core::WorkQueueTier::Io));
     serial_link->start();
 }
@@ -152,6 +192,7 @@ int main()
 #ifdef CONFIG_DRIVER_ICM20948
     start_imu();
 #endif
+    start_commander();
 #ifdef CONFIG_ESTIMATOR_MAHONY
     start_estimator();
 #endif
