@@ -29,8 +29,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools" / "link"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from check_report import parse_report  # noqa: E402
-from vklink.monitor import LinkMonitor, UdpConnection, load_messages  # noqa: E402
+from vklink.monitor import LinkMonitor, UdpConnection, WorkItemOverruns, load_messages  # noqa: E402
 
 # Every profile's motion ends by 10 s after boot.
 PROFILE_END_S = 10.0
@@ -98,8 +97,13 @@ def main() -> int:
     truth_times: list[int] = []
     truths: list[tuple] = []
     estimates: list[tuple[int, tuple]] = []
+    # Overruns during the check, without the host's stalls of the whole process.
+    overruns = WorkItemOverruns()
 
     def record(name: str, instance: int, message) -> None:
+        if name == "work_item_status":
+            overruns.record(message)
+            return
         if instance != 0:
             return
         if name == "vehicle_attitude_groundtruth":
@@ -147,10 +151,13 @@ def main() -> int:
         failures.append(f"tilt error reached {worst_tilt:.2f} deg, more than {args.max_tilt_deg:g} deg")
     if worst_error > args.max_error_deg:
         failures.append(f"attitude error reached {worst_error:.2f} deg, more than {args.max_error_deg:g} deg")
-    _, reported = parse_report("\n".join(monitor.summary()))
-    for item in reported:
-        if int(item["overruns"]) != 0:
-            failures.append(f"work item {item['name']} overran {item['overruns']} times during the check")
+    judged = overruns.judge()
+    if judged is None:
+        failures.append("the Link carried too little work item timing")
+    else:
+        for name, count in sorted(judged[0].items()):
+            if count != 0:
+                failures.append(f"work item {name} overran {count} times during the check")
 
     for failure in failures:
         print(f"FAIL: {failure}", file=sys.stderr)

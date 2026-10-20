@@ -75,6 +75,13 @@ if(CONFIG_BRINGUP_MOTORS AND CONFIG_LINK_UDP)
       --msg-dir ${VK_MSG_PYTHON_DIR} --param-meta ${VK_PARAM_METADATA})
 endif()
 
+# Every SITL test judges timing on the host's clock, so none runs alongside
+# another test under ctest -j: another SITL, or a test that configures and
+# builds, contends for the host and stalls SITL's work queues.
+get_property(_vk_sitl_tests DIRECTORY PROPERTY TESTS)
+list(FILTER _vk_sitl_tests INCLUDE REGEX "^sitl_")
+set_tests_properties(${_vk_sitl_tests} PROPERTIES RUN_SERIAL TRUE)
+
 # Kconfig smoke test (ADR-0017): a debug overlay that sets an option whose
 # dependencies are not met must fail configuration.
 add_test(NAME kconfig_overlay_smoke

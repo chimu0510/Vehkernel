@@ -9,7 +9,8 @@ import types
 import pytest
 
 from vklink import FrameReader, McuSession, TopicDescription
-from vklink.monitor import LinkMonitor, RateExpectation, TopicStats, UdpConnection, check, euler_degrees
+from vklink.monitor import (LinkMonitor, RateExpectation, TopicStats, UdpConnection, WorkItemOverruns, check,
+                            euler_degrees)
 from vklink.view import render
 
 SAMPLE_HASH = 0x1122334455667788
@@ -223,3 +224,35 @@ def test_only_losses_and_drops_after_the_handshake_count():
     status.drops = 5
     assert check(monitor, [], 0.05).failures == ["2 frames lost", "the MCU dropped 2 frames on Link 0"]
 
+
+
+def work_item_reports(*reports):
+    """WorkItemOverruns fed one report a second, each a {name: overruns} map."""
+    tracker = WorkItemOverruns()
+    for second, report in enumerate(reports):
+        for index, (name, overruns) in enumerate(report.items()):
+            tracker.record(types.SimpleNamespace(timestamp=second * 1_000_000, work_item=index,
+                                                 name=tuple(name.encode().ljust(16, b"\0")), overruns=overruns))
+    return tracker
+
+
+def test_work_item_overruns_set_aside_a_stall_of_the_whole_process():
+    # Start-up overruns, then one interval where the four periodic items of six overran together.
+    tracker = work_item_reports({"imu": 5, "ctrl": 5, "act": 5, "link": 6, "est": 0, "timing": 0},
+                                {"imu": 5, "ctrl": 5, "act": 5, "link": 6, "est": 0, "timing": 0},
+                                {"imu": 8, "ctrl": 8, "act": 9, "link": 9, "est": 0, "timing": 0},
+                                {"imu": 8, "ctrl": 8, "act": 9, "link": 9, "est": 0, "timing": 0})
+    assert tracker.judge() == ({"imu": 0, "ctrl": 0, "act": 0, "link": 0, "est": 0, "timing": 0}, 1)
+
+
+def test_work_item_overruns_count_a_few_work_items_overrunning_alone():
+    tracker = work_item_reports({"imu": 0, "ctrl": 0, "act": 0, "link": 0, "est": 0, "timing": 0},
+                                {"imu": 0, "ctrl": 2, "act": 1, "link": 0, "est": 0, "timing": 0},
+                                {"imu": 0, "ctrl": 2, "act": 1, "link": 0, "est": 0, "timing": 0})
+    assert tracker.judge() == ({"imu": 0, "ctrl": 2, "act": 1, "link": 0, "est": 0, "timing": 0}, 0)
+
+
+def test_work_item_overruns_need_two_reports_with_every_work_item():
+    assert WorkItemOverruns().judge() is None
+    # The second report lacks a work item, so there is no interval to judge.
+    assert work_item_reports({"imu": 0, "ctrl": 0}, {"imu": 1}).judge() is None
