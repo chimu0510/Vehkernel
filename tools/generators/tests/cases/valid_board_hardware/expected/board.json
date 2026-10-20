@@ -192,6 +192,8 @@
       "bus": "SPI"
     }
   ],
+  "revision": null,
+  "actuator_power": null,
   "clock": {
     "hse_hz": 8000000,
     "sysclk_hz": 168000000,

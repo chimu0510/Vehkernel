@@ -70,6 +70,8 @@ def board_header(board: Board) -> str:
     out += _peripherals_namespace(board)
     out += _ports_namespace(board)
     out += _devices_namespace(board)
+    out += _revision_namespace(board)
+    out += _actuator_power_namespace(board)
     out += _defaults_namespace(board)
     out += ["}  // namespace vk::board", ""]
     return "\n".join(out)
@@ -182,6 +184,31 @@ def _devices_namespace(board: Board) -> list[str]:
     return out + ["}  // namespace devices", ""]
 
 
+def _revision_namespace(board: Board) -> list[str]:
+    revision = board.hardware.revision
+    if revision is None:
+        return []
+    pins = ", ".join(f"pins::{role}" for role in revision.pins)
+    return ["// Board revision (ADR-0010): the revision-ID pins, least significant bit",
+            "// first, must read `value` at boot.",
+            "namespace revision {",
+            f"using pins = vk::hal::PinList<{pins}>;",
+            f"inline constexpr std::uint32_t value = {revision.value};",
+            "}  // namespace revision", ""]
+
+
+def _actuator_power_namespace(board: Board) -> list[str]:
+    power = board.hardware.actuator_power
+    if power is None:
+        return []
+    return ["// Actuator power sense (ADR-0005): reads whether the actuators' power",
+            "// circuit is closed.",
+            "namespace actuator_power {",
+            f"using pin = pins::{power.pin};",
+            f"inline constexpr bool powered_high = {'true' if power.powered == 'HIGH' else 'false'};",
+            "}  // namespace actuator_power", ""]
+
+
 def _default_constant(name: str, value: object) -> str:
     if isinstance(value, bool):
         return f"inline constexpr bool {name} = {'true' if value else 'false'};"
@@ -259,6 +286,10 @@ def board_symbols(board: Board) -> list[str]:
         symbols.add(f"BOARD_{d.kind}_BUS_{d.bus}")
     for s in board.hardware.storage:
         symbols.add(f"BOARD_HAS_{s.storage}")
+    if board.hardware.revision is not None:
+        symbols.add("BOARD_HAS_REVISION_ID")
+    if board.hardware.actuator_power is not None:
+        symbols.add("BOARD_HAS_ACTUATOR_POWER_SENSE")
     # A serial port with both lines whose default use is a Link (spec 0003).
     if any(p.function == "LINK" and p.tx and p.rx for p in board.hardware.serial):
         symbols.add("BOARD_HAS_LINK_PORT")
@@ -318,6 +349,10 @@ def board_json(board: Board) -> str:
                      "peripheral": d.peripheral, "pins": list(d.pins), "address": d.address,
                      "rotation": d.rotation} for d in board.hardware.devices],
         "storage": [{"storage": s.storage, "bus": s.bus} for s in board.hardware.storage],
+        "revision": None if board.hardware.revision is None else {
+            "pins": list(board.hardware.revision.pins), "value": board.hardware.revision.value},
+        "actuator_power": None if board.hardware.actuator_power is None else {
+            "pin": board.hardware.actuator_power.pin, "powered": board.hardware.actuator_power.powered},
         "clock": None if board.clock is None else {
             "hse_hz": board.clock.hse_hz, "sysclk_hz": board.clock.sysclk_hz, "pll_m": board.clock.pll_m,
             "pll_n": board.clock.pll_n, "pll_p": board.clock.pll_p, "pll_q": board.clock.pll_q,

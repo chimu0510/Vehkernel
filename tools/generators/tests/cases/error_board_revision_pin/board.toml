@@ -1,0 +1,10 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA0", role = "REV_ID0", func = "GPIO_INPUT" },
+  { pin = "PA1", role = "LED",     func = "GPIO_OUTPUT" },
+]
+
+revision = { pins = ["REV_ID0", "LED"], value = 0 }
+actuator_power = { pin = "MISSING", powered = "HIGH" }

@@ -21,6 +21,12 @@ config BOARD_IMU_BUS_SOFT_I2C
 config BOARD_HAS_LINK_PORT
 	bool
 
+config BOARD_HAS_REVISION_ID
+	bool
+
+config BOARD_HAS_ACTUATOR_POWER_SENSE
+	bool
+
 source "$(VK_BOARD_KCONFIG)"
 
 choice PLATFORM

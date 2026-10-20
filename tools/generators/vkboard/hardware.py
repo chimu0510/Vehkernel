@@ -8,6 +8,10 @@
 - ``storage``: storage devices that log sinks can use (ADR-0019).
 - ``timing``: the board's timing preset (ADR-0015).
 - ``defaults``: any other board default parameters (ADR-0012).
+- ``revision``: the revision-ID pins, least significant bit first, and the
+  value they must read at boot (ADR-0010).
+- ``actuator_power``: on boards that have one, the input that reads whether
+  the actuators' power circuit is closed, and its powered level (ADR-0005).
 """
 
 from __future__ import annotations
@@ -24,6 +28,9 @@ DEVICE_BUSES = ("I2C", "SOFT_I2C", "SPI")
 STORAGE_KEYS = {"storage", "bus"}
 STORAGE_KINDS = {"SD_CARD": ("SDIO", "SPI"), "SPI_NOR_FLASH": ("SPI",)}
 TIMING_KEYS = {"trigger", "base_rate_hz", "sampling", "dividers"}
+REVISION_KEYS = {"pins", "value"}
+ACTUATOR_POWER_KEYS = {"pin", "powered"}
+POWERED_LEVELS = ("HIGH", "LOW")
 TIMING_TRIGGERS = ("IMU_EVENT", "TIMER")
 TIMING_SAMPLING = ("PER_SAMPLE", "FIFO")
 TIMING_DIVIDERS = {"estimator": "CTRL_DIV_EST", "rate": "CTRL_DIV_RATE",
@@ -70,11 +77,25 @@ class Storage:
 
 
 @dataclass(frozen=True)
+class Revision:
+    pins: tuple[str, ...]  # pin roles, least significant bit first
+    value: int
+
+
+@dataclass(frozen=True)
+class ActuatorPower:
+    pin: str  # pin role
+    powered: str  # level read while powered: HIGH or LOW
+
+
+@dataclass(frozen=True)
 class Hardware:
     serial: tuple[SerialPort, ...] = ()
     devices: tuple[Device, ...] = ()
     storage: tuple[Storage, ...] = ()
     defaults: tuple[tuple[str, object], ...] = ()  # sorted by name
+    revision: Revision | None = None
+    actuator_power: ActuatorPower | None = None
 
 
 def _keys(entry: object, allowed: set, required: set, what: str, loc: Loc, diag: Diagnostics) -> bool:
@@ -260,8 +281,52 @@ def _timing(timing: object, loc: Loc, diag: Diagnostics) -> dict[str, object]:
     return params
 
 
+def _gpio_input(role: object, what: str, roles: dict, loc: Loc, diag: Diagnostics) -> bool:
+    pin = roles.get(role) if isinstance(role, str) else None
+    if pin is None or pin.kind != "gpio_input":
+        diag.error(f"{what} must be a pin role with the GPIO_INPUT function, not {role!r}", loc)
+        return False
+    return True
+
+
+def _revision(entry: object, loc: Loc, roles: dict, diag: Diagnostics) -> Revision | None:
+    if entry is None:
+        return None
+    if not _keys(entry, REVISION_KEYS, REVISION_KEYS, "revision", loc, diag):
+        return None
+    pins, value = entry["pins"], entry["value"]
+    if not isinstance(pins, list) or not pins:
+        diag.error("'pins' of the revision must be a non-empty array of pin roles", loc)
+        return None
+    if not all(_gpio_input(role, "each revision pin", roles, loc, diag) for role in pins):
+        return None
+    if len(set(pins)) != len(pins):
+        diag.error("a revision pin is listed twice", loc)
+        return None
+    if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value < (1 << len(pins)):
+        diag.error(f"the revision value must be an integer from 0 to {(1 << len(pins)) - 1} "
+                   f"for {len(pins)} pins, got {value!r}", loc)
+        return None
+    return Revision(tuple(pins), value)
+
+
+def _actuator_power(entry: object, loc: Loc, roles: dict, diag: Diagnostics) -> ActuatorPower | None:
+    if entry is None:
+        return None
+    if not _keys(entry, ACTUATOR_POWER_KEYS, ACTUATOR_POWER_KEYS, "actuator_power", loc, diag):
+        return None
+    if not _gpio_input(entry["pin"], "the actuator power pin", roles, loc, diag):
+        return None
+    if entry["powered"] not in POWERED_LEVELS:
+        diag.error(f"the powered level must be one of: {', '.join(POWERED_LEVELS)}, got {entry['powered']!r}", loc)
+        return None
+    return ActuatorPower(entry["pin"], entry["powered"])
+
+
 def check_hardware(serial, devices, storage, timing, defaults, roles: dict, top: Loc,
-                   timing_loc: Loc, defaults_loc: Loc, diag: Diagnostics) -> Hardware:
+                   timing_loc: Loc, defaults_loc: Loc, diag: Diagnostics,
+                   revision: tuple[object, Loc] | None = None,
+                   actuator_power: tuple[object, Loc] | None = None) -> Hardware:
     """Validate the hardware sections; ``roles`` maps default role names to pins."""
     ports = _serial(serial, roles, diag)
     params: dict[str, object] = {f"{p.port}_FUNCTION": p.function for p in ports}
@@ -282,4 +347,6 @@ def check_hardware(serial, devices, storage, timing, defaults, roles: dict, top:
         else:
             params[name] = value
     return Hardware(tuple(ports), tuple(_devices(devices, roles, diag)), tuple(_storage(storage, diag)),
-                    tuple(sorted(params.items())))
+                    tuple(sorted(params.items())),
+                    _revision(*(revision or (None, top)), roles, diag),
+                    _actuator_power(*(actuator_power or (None, top)), roles, diag))

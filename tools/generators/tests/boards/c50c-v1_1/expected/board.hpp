@@ -69,15 +69,15 @@ using OLED_SDA = vk::hal::GpioOutput<vk::hal::Port::D, 6>;  // PD6 GPIO_OUTPUT
 using OLED_RST = vk::hal::GpioOutput<vk::hal::Port::D, 5>;  // PD5 GPIO_OUTPUT
 using OLED_DC = vk::hal::GpioOutput<vk::hal::Port::D, 4>;  // PD4 GPIO_OUTPUT
 using USER_KEY = vk::hal::GpioInput<vk::hal::Port::C, 5>;  // PC5 GPIO_INPUT
-using ENABLE_SWITCH = vk::hal::GpioInput<vk::hal::Port::E, 4>;  // PE4 GPIO_INPUT
+using ACT_POWER_SENSE = vk::hal::GpioInput<vk::hal::Port::E, 4>;  // PE4 GPIO_INPUT
 
-using all = vk::hal::PinList<REV_ID0, REV_ID1, REV_ID2, IMU_SCL, IMU_SDA, IMU_INT, ENC_A_1, ENC_A_2, ENC_B_1, ENC_B_2, ENC_C_1, ENC_C_2, ENC_D_1, ENC_D_2, MOTOR_A_PWM, MOTOR_A_IN1, MOTOR_A_IN2, MOTOR_B_PWM, MOTOR_B_IN1, MOTOR_B_IN2, MOTOR_C_PWM, MOTOR_C_IN1, MOTOR_C_IN2, MOTOR_D_PWM, MOTOR_D_IN1, MOTOR_D_IN2, SERVO_SENIOR, RC_CH1, RC_CH2, RC_CH3, RC_CH4, SBUS_RX, SERIAL1_TX, SERIAL1_RX, SERIAL2_TX, SERIAL2_RX, SERIAL3_TX, SERIAL3_RX, CAN1_RX, CAN1_TX, USB_DM, USB_DP, BATTERY_SENSE, FRAME_SELECT, SERVO_TRIM, SERVO_FEEDBACK, LIGHT_B, LIGHT_R, LIGHT_G, OLED_SCL, OLED_SDA, OLED_RST, OLED_DC, USER_KEY, ENABLE_SWITCH>;
+using all = vk::hal::PinList<REV_ID0, REV_ID1, REV_ID2, IMU_SCL, IMU_SDA, IMU_INT, ENC_A_1, ENC_A_2, ENC_B_1, ENC_B_2, ENC_C_1, ENC_C_2, ENC_D_1, ENC_D_2, MOTOR_A_PWM, MOTOR_A_IN1, MOTOR_A_IN2, MOTOR_B_PWM, MOTOR_B_IN1, MOTOR_B_IN2, MOTOR_C_PWM, MOTOR_C_IN1, MOTOR_C_IN2, MOTOR_D_PWM, MOTOR_D_IN1, MOTOR_D_IN2, SERVO_SENIOR, RC_CH1, RC_CH2, RC_CH3, RC_CH4, SBUS_RX, SERIAL1_TX, SERIAL1_RX, SERIAL2_TX, SERIAL2_RX, SERIAL3_TX, SERIAL3_RX, CAN1_RX, CAN1_TX, USB_DM, USB_DP, BATTERY_SENSE, FRAME_SELECT, SERVO_TRIM, SERVO_FEEDBACK, LIGHT_B, LIGHT_R, LIGHT_G, OLED_SCL, OLED_SDA, OLED_RST, OLED_DC, USER_KEY, ACT_POWER_SENSE>;
 
 // Alt config 1: the pins whose role changes when it is selected at boot.
 namespace alt1 {
 using SPARE_PB6 = vk::hal::GpioInput<vk::hal::Port::B, 6>;  // PB6 GPIO_INPUT
 using SERVO_TOP = vk::hal::AfPin<vk::hal::Port::B, 7, 2, "TIM4_CH2">;  // PB7 TIM4_CH2
-using all = vk::hal::PinList<REV_ID0, REV_ID1, REV_ID2, IMU_SCL, IMU_SDA, IMU_INT, ENC_A_1, ENC_A_2, ENC_B_1, ENC_B_2, alt1::SPARE_PB6, alt1::SERVO_TOP, ENC_D_1, ENC_D_2, MOTOR_A_PWM, MOTOR_A_IN1, MOTOR_A_IN2, MOTOR_B_PWM, MOTOR_B_IN1, MOTOR_B_IN2, MOTOR_C_PWM, MOTOR_C_IN1, MOTOR_C_IN2, MOTOR_D_PWM, MOTOR_D_IN1, MOTOR_D_IN2, SERVO_SENIOR, RC_CH1, RC_CH2, RC_CH3, RC_CH4, SBUS_RX, SERIAL1_TX, SERIAL1_RX, SERIAL2_TX, SERIAL2_RX, SERIAL3_TX, SERIAL3_RX, CAN1_RX, CAN1_TX, USB_DM, USB_DP, BATTERY_SENSE, FRAME_SELECT, SERVO_TRIM, SERVO_FEEDBACK, LIGHT_B, LIGHT_R, LIGHT_G, OLED_SCL, OLED_SDA, OLED_RST, OLED_DC, USER_KEY, ENABLE_SWITCH>;
+using all = vk::hal::PinList<REV_ID0, REV_ID1, REV_ID2, IMU_SCL, IMU_SDA, IMU_INT, ENC_A_1, ENC_A_2, ENC_B_1, ENC_B_2, alt1::SPARE_PB6, alt1::SERVO_TOP, ENC_D_1, ENC_D_2, MOTOR_A_PWM, MOTOR_A_IN1, MOTOR_A_IN2, MOTOR_B_PWM, MOTOR_B_IN1, MOTOR_B_IN2, MOTOR_C_PWM, MOTOR_C_IN1, MOTOR_C_IN2, MOTOR_D_PWM, MOTOR_D_IN1, MOTOR_D_IN2, SERVO_SENIOR, RC_CH1, RC_CH2, RC_CH3, RC_CH4, SBUS_RX, SERIAL1_TX, SERIAL1_RX, SERIAL2_TX, SERIAL2_RX, SERIAL3_TX, SERIAL3_RX, CAN1_RX, CAN1_TX, USB_DM, USB_DP, BATTERY_SENSE, FRAME_SELECT, SERVO_TRIM, SERVO_FEEDBACK, LIGHT_B, LIGHT_R, LIGHT_G, OLED_SCL, OLED_SDA, OLED_RST, OLED_DC, USER_KEY, ACT_POWER_SENSE>;
 }  // namespace alt1
 }  // namespace pins
 
@@ -263,6 +263,20 @@ struct IMU0 {
     using pins = vk::hal::PinList<pins::IMU_SCL, pins::IMU_SDA>;
 };
 }  // namespace devices
+
+// Board revision (ADR-0010): the revision-ID pins, least significant bit
+// first, must read `value` at boot.
+namespace revision {
+using pins = vk::hal::PinList<pins::REV_ID0, pins::REV_ID1, pins::REV_ID2>;
+inline constexpr std::uint32_t value = 0;
+}  // namespace revision
+
+// Actuator power sense (ADR-0005): reads whether the actuators' power
+// circuit is closed.
+namespace actuator_power {
+using pin = pins::ACT_POWER_SENSE;
+inline constexpr bool powered_high = true;
+}  // namespace actuator_power
 
 // Board default parameters (ADR-0012), as compile-time constants until the
 // parameter system exists.

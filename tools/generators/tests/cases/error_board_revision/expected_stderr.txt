@@ -1,0 +1,2 @@
+board.toml:10: error: the revision value must be an integer from 0 to 3 for 2 pins, got 4
+board.toml:11: error: the powered level must be one of: HIGH, LOW, got 'ON'

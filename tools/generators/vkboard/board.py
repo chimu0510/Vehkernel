@@ -28,10 +28,11 @@ GPIO_FUNCTIONS = ("GPIO_INPUT", "GPIO_OUTPUT")
 PIN_KEYS = {"pin", "role", "func", "alt"}
 ALT_KEYS = {"config", "role", "func"}
 TOP_LEVEL_KEYS = {"name", "mcu", "extends", "remove", "pins", "dma", "flash",
-                  "serial", "devices", "storage", "clock", "timing", "defaults"}
+                  "serial", "devices", "storage", "clock", "timing", "defaults",
+                  "revision", "actuator_power"}
 ARRAY_SECTIONS = {"pins": "pin", "dma": "request", "flash": "region", "serial": "port",
                   "devices": "device", "storage": "storage"}
-TABLE_SECTIONS = ("clock", "timing", "defaults")
+TABLE_SECTIONS = ("clock", "timing", "defaults", "revision", "actuator_power")
 
 _ROLE_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _PIN_RE = re.compile(r"^P([A-K])(\d+)$")
@@ -93,7 +94,7 @@ class _Resolved:
     name: object
     mcu: object
     arrays: dict[str, list[_Entry]]  # by section name, see ARRAY_SECTIONS
-    tables: dict[str, _Entry]  # clock, timing, defaults
+    tables: dict[str, _Entry]  # see TABLE_SECTIONS
 
 
 def _entry_lines(text: str, key: str, count: int) -> list[int | None]:
@@ -255,7 +256,9 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
                               [(e.data, e.loc) for e in arrays["storage"]],
                               table("timing").data, table("defaults").data or {},
                               {p.role: p for p in pins}, Loc(shown), table("timing").loc,
-                              table("defaults").loc, diag)
+                              table("defaults").loc, diag,
+                              (table("revision").data, table("revision").loc),
+                              (table("actuator_power").data, table("actuator_power").loc))
     clock = _check_clock(table("clock"), database, diag)
     used = {f.func.rsplit("_", 1)[0] for p in pins for f in (p.default, *(fn for _, fn in p.alt))
             if f.kind in ("af", "analog")}

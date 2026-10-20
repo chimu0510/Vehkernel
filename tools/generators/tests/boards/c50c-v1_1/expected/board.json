@@ -559,7 +559,7 @@
       "alt": []
     },
     {
-      "role": "ENABLE_SWITCH",
+      "role": "ACT_POWER_SENSE",
       "pin": "PE4",
       "port": "E",
       "number": 4,
@@ -660,6 +660,18 @@
     }
   ],
   "storage": [],
+  "revision": {
+    "pins": [
+      "REV_ID0",
+      "REV_ID1",
+      "REV_ID2"
+    ],
+    "value": 0
+  },
+  "actuator_power": {
+    "pin": "ACT_POWER_SENSE",
+    "powered": "HIGH"
+  },
   "clock": {
     "hse_hz": 8000000,
     "sysclk_hz": 168000000,

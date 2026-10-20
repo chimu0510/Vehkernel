@@ -1,0 +1,2 @@
+board.toml:9: error: each revision pin must be a pin role with the GPIO_INPUT function, not 'LED'
+board.toml:10: error: the actuator power pin must be a pin role with the GPIO_INPUT function, not 'MISSING'

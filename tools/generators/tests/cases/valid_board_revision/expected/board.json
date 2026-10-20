@@ -1,0 +1,67 @@
+{
+  "name": "demo",
+  "mcu": "testmcu",
+  "pins": [
+    {
+      "role": "REV_ID0",
+      "pin": "PA0",
+      "port": "A",
+      "number": 0,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "REV_ID1",
+      "pin": "PA1",
+      "port": "A",
+      "number": 1,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "alt": []
+    },
+    {
+      "role": "ACT_POWER_SENSE",
+      "pin": "PA2",
+      "port": "A",
+      "number": 2,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "alt": []
+    }
+  ],
+  "alt_configs": [],
+  "flash": [],
+  "ram": [
+    {
+      "region": "CCM",
+      "start": 268435456,
+      "size": 16384
+    },
+    {
+      "region": "RAM",
+      "start": 536870912,
+      "size": 65536
+    }
+  ],
+  "serial": [],
+  "devices": [],
+  "storage": [],
+  "revision": {
+    "pins": [
+      "REV_ID0",
+      "REV_ID1"
+    ],
+    "value": 2
+  },
+  "actuator_power": {
+    "pin": "ACT_POWER_SENSE",
+    "powered": "LOW"
+  },
+  "clock": null,
+  "peripherals": [],
+  "dma": []
+}

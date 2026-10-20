@@ -1,0 +1,12 @@
+# Revision-ID pins and an actuator power sense input.
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA0", role = "REV_ID0",         func = "GPIO_INPUT" },
+  { pin = "PA1", role = "REV_ID1",         func = "GPIO_INPUT" },
+  { pin = "PA2", role = "ACT_POWER_SENSE", func = "GPIO_INPUT" },
+]
+
+revision = { pins = ["REV_ID0", "REV_ID1"], value = 2 }
+actuator_power = { pin = "ACT_POWER_SENSE", powered = "LOW" }
