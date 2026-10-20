@@ -30,6 +30,7 @@ from .session import (
     ARMING_REJECT_REASONS,
     DISARM_REASONS,
     MODES,
+    BringupReply,
     ControlReply,
     HostSession,
     ParamReject,
@@ -332,6 +333,7 @@ class LinkMonitor:
         self.param_rejects: list[ParamReject] = []
         # Mode, arming and emergency stop replies, as they arrive.
         self.control_replies: list[ControlReply] = []
+        self.bringup_replies: list[BringupReply] = []
 
     @property
     def connected(self) -> bool:
@@ -400,6 +402,10 @@ class LinkMonitor:
             reject = ParamReject.parse(frame.body)
             if reject is not None:
                 self.param_rejects.append(reject)
+        elif frame.type in (FrameType.BRINGUP_REJECT, FrameType.BRINGUP_RESULT):
+            bringup = BringupReply.parse(frame)
+            if bringup is not None:
+                self.bringup_replies.append(bringup)
         elif frame.type in CONTROL_REPLIES:
             reply = ControlReply.parse(frame)
             if reply is not None:
@@ -510,6 +516,20 @@ class LinkMonitor:
         """Arms or disarms; the reply holds the armed state and the skipped checks, or why it was refused."""
         return self._await_control(lambda: self.session.make_arming_request(arm),
                                    (FrameType.ARMING_REPLY, FrameType.ARMING_REJECT), timeout_s)
+
+    def run_bringup(self, bringup_case: int, timeout_s: float) -> BringupReply | None:
+        """Runs a bring-up case; the refusal, the result when it ends, or None after the timeout.
+
+        Sent once: a case is not idempotent, and a repeat would start it again.
+        """
+        seen = len(self.bringup_replies)
+        self.connection.send(self.session.make_bringup_run(bringup_case))
+        deadline = self.clock() + timeout_s
+        while (now := self.clock()) < deadline:
+            if len(self.bringup_replies) > seen:
+                return self.bringup_replies[seen]
+            self.poll(min(0.05, deadline - now))
+        return self.bringup_replies[seen] if len(self.bringup_replies) > seen else None
 
     def request_estop(self, engage: bool, timeout_s: float) -> ControlReply | None:
         """Engages or releases the emergency stop; the reply says whether it is engaged."""

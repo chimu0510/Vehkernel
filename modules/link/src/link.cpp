@@ -54,11 +54,13 @@ void Link::run()
 {
     const std::uint64_t now = queue().now_us();
     receive(now);
+    const HandshakeState previous = handshake_state_;
     if (session_.connected(now)) {
         handshake_state_ = HandshakeState::Connected;
     } else {
         handshake_state_ = session_.handshake_done() ? HandshakeState::PeerSilent : HandshakeState::Waiting;
     }
+    follow_control(previous);
     publish_status(now);
     session_.send_pending(now, sink_, paced_frames_per_run);
     send_topics(now);
@@ -106,6 +108,34 @@ void Link::receive(std::uint64_t now_us)
                 on_topic_data(BodyReader(frame.body), now_us);
             }
         });
+    }
+}
+
+void Link::follow_control(HandshakeState previous)
+{
+    core::VehicleControl* control = config_.control.control;
+    if (control == nullptr) {
+        return;
+    }
+    if (previous == HandshakeState::Connected && handshake_state_ == HandshakeState::PeerSilent) {
+        control->source_lost(config_.instance);
+    }
+    msg::BringupStatus status{};
+    while (bringup_status_.copy(status)) {
+        if (status.source != config_.instance) {
+            continue;
+        }
+        if (status.state == 1) {  // running: this Link's case; its result follows
+            bringup_started_ = true;
+        } else if (status.state >= 2 && bringup_started_) {  // done or aborted
+            bringup_started_ = false;
+            bringup_result_ = status;
+            bringup_result_due_ = true;
+        }
+    }
+    if (bringup_result_due_) {
+        // A result the transport dropped goes again next run.
+        bringup_result_due_ = !session_.send_bringup_result(bringup_result_, sink_);
     }
 }
 

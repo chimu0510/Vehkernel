@@ -12,6 +12,9 @@
 // or within COM_SP_TIMEOUT when disarmed, so one left from before a disarm
 // neither blocks arming for long nor drives anything after it.
 //
+// A bring-up case is aborted, by disarming, when the emergency stop is
+// engaged or its source falls silent while it runs.
+//
 // update() runs once per control cycle with that cycle's inputs. It tracks
 // actuator power, on boards that sense it: one unpowered sample is
 // unpowered and disarms an armed vehicle unless the check is skipped;
@@ -43,6 +46,7 @@ struct Inputs {
     bool actuators_started = false;
     bool setpoints_idle = true;                 // every target of the last setpoint NaN or zero
     bool bringup_running = false;
+    bool bringup_available = false;             // the bring-up case is built in
     std::uint64_t last_setpoint_us = 0;         // when the last setpoint was accepted, 0 for never
 };
 
@@ -81,6 +85,11 @@ public:
     core::ModeResult request_mode(std::uint64_t now_us, core::ControlSource source, core::Mode mode);
     core::ArmingResult request_arming(std::uint64_t now_us, core::ControlSource source, bool arm);
     bool request_emergency_stop(std::uint64_t now_us, bool engage);
+
+    [[nodiscard]] core::BringupStart request_bringup(core::ControlSource source, std::uint8_t bringup_case) const;
+
+    // A source fell silent; aborts a bring-up case it runs by disarming.
+    void source_lost(core::ControlSource source);
 
     // Setpoint arbitration: whether a setpoint from `source` is accepted now.
     [[nodiscard]] bool accepts_setpoint(core::ControlSource source) const;

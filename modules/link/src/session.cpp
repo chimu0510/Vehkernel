@@ -42,6 +42,9 @@ void Session::handle(const Frame& frame, std::uint64_t now_us, FrameSink& sink)
     case FrameType::EstopRequest:
         on_estop_request(BodyReader(frame.body), sink);
         break;
+    case FrameType::BringupRun:
+        on_bringup_run(BodyReader(frame.body), sink);
+        break;
     case FrameType::SimActuatorPower:
         on_sim_actuator_power(BodyReader(frame.body));
         break;
@@ -246,6 +249,35 @@ void Session::on_estop_request(BodyReader body, FrameSink& sink)
     BodyWriter out(reply);
     out.u8(control_.control->request_emergency_stop(engage != 0) ? 1 : 0);
     send(FrameType::EstopReply, out.written(), sink);
+}
+
+void Session::on_bringup_run(BodyReader body, FrameSink& sink)
+{
+    const std::uint8_t bringup_case = body.u8();
+    if (!body.ok() || control_.control == nullptr) {
+        return;
+    }
+    const core::BringupStart result = control_.control->request_bringup(control_.source, bringup_case);
+    if (result == core::BringupStart::Ok) {
+        return;  // The result follows when the case ends.
+    }
+    std::array<std::uint8_t, 1> reply{static_cast<std::uint8_t>(result)};
+    send(FrameType::BringupReject, reply, sink);
+}
+
+bool Session::send_bringup_result(const msg::BringupStatus& status, FrameSink& sink)
+{
+    std::array<std::uint8_t, 3 + 3 * 4> body{};
+    BodyWriter out(body);
+    out.u8(status.bringup_case);
+    out.u8(status.state);
+    out.u8(status.outputs);
+    for (std::size_t i = 0; i < status.outputs && i < status.result.size(); ++i) {
+        out.u8(status.result[i]);
+        out.u8(status.encoder[i]);
+        out.u8(static_cast<std::uint8_t>(status.sign[i]));
+    }
+    return out.ok() && send(FrameType::BringupResult, out.written(), sink);
 }
 
 void Session::on_sim_actuator_power(BodyReader body)

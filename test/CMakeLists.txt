@@ -66,6 +66,15 @@ if(CONFIG_ACTUATOR_CONTROL AND CONFIG_LINK_UDP)
       $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
 endif()
 
+# L3 SITL bring-up test (spec 0006): the motor-to-encoder case finds a
+# reversed motor, and passes once MOTn_REV is set.
+if(CONFIG_BRINGUP_MOTORS AND CONFIG_LINK_UDP)
+  add_test(NAME sitl_bringup
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_bringup.py
+      $<TARGET_FILE:vehkernel-sitl> ${CMAKE_SOURCE_DIR}/tools/link/link_monitor.py
+      --msg-dir ${VK_MSG_PYTHON_DIR} --param-meta ${VK_PARAM_METADATA})
+endif()
+
 # Kconfig smoke test (ADR-0017): a debug overlay that sets an option whose
 # dependencies are not met must fail configuration.
 add_test(NAME kconfig_overlay_smoke

@@ -83,6 +83,15 @@ config ACTUATOR_CONTROL
 	  its defconfig once its platform implements the PWM output and
 	  quadrature encoder contracts.
 
+config BRINGUP_MOTORS
+	bool "Motor-to-encoder bring-up case"
+	depends on ACTUATOR_CONTROL
+	default y
+	help
+	  The bring-up case of ADR-0018 that pulses each motor open loop in
+	  test mode and reports which encoder moved and in which direction,
+	  started over a Link with bringup_run (spec 0006).
+
 endmenu
 
 menu "Drivers"

@@ -17,6 +17,7 @@ from .frame import (
 )
 from .session import (
     REJECT_REASONS,
+    BringupReply,
     ControlReply,
     HostSession,
     McuControl,
@@ -56,4 +57,5 @@ __all__ = [
     "REJECT_REASONS",
     "ControlReply",
     "McuControl",
+    "BringupReply",
 ]

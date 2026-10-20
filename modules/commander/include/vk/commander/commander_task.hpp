@@ -5,7 +5,9 @@
 // every change and vehicle_status on every change and five times a second.
 // The board counts as verified (ADR-0010) once the boot check of the
 // revision-ID pins has passed and the IMU has answered with its first sample.
-// It follows the setpoints that arbitration accepted on actuator_setpoint.
+// It follows the setpoints that arbitration accepted on actuator_setpoint,
+// starts bring-up cases on bringup_command and follows them on
+// bringup_status.
 //
 // It is also the vehicle control service the Links call from their own work
 // queue; requests and cycles take turns in short critical sections.
@@ -17,6 +19,8 @@
 #include <vk/core/work_queue.hpp>
 #include <vk/msg/actuator_setpoint.hpp>
 #include <vk/msg/arming_state.hpp>
+#include <vk/msg/bringup_command.hpp>
+#include <vk/msg/bringup_status.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_status.hpp>
 
@@ -33,6 +37,7 @@ public:
         bool revision_ok = true;             // the revision-ID pins read the board's revision at boot
         bool (*actuator_power)() = nullptr;  // reads the power sense; nullptr if the board has none
         bool actuators_started = false;      // actuator outputs and encoders are running
+        bool bringup = false;                // the motor bring-up case is built in
     };
 
     CommanderTask(const Config& config, core::WorkQueue& queue);
@@ -47,6 +52,8 @@ public:
     [[nodiscard]] bool armed() const override;
     [[nodiscard]] std::uint32_t skipped_checks() const override;
     [[nodiscard]] bool accepts_setpoint(core::ControlSource source) const override;
+    core::BringupStart request_bringup(core::ControlSource source, std::uint8_t bringup_case) override;
+    void source_lost(core::ControlSource source) override;
 
 protected:
     void run() override;
@@ -59,6 +66,9 @@ private:
     core::Subscription<msg::ImuSample> imu_{0};
     core::Subscription<msg::ActuatorSetpoint> setpoint_{0};
     msg::ActuatorSetpoint last_setpoint_{};
+    core::Subscription<msg::BringupStatus> bringup_status_{0};
+    core::Publication<msg::BringupCommand> bringup_publication_;
+    bool bringup_running_ = false;
     core::Publication<msg::ArmingState> arming_publication_;
     core::Publication<msg::VehicleStatus> status_publication_;
     bool imu_answered_ = false;

@@ -51,6 +51,23 @@ enum class DisarmReason : std::uint8_t {
     BringupAbort = 6,
 };
 
+// Bring-up cases run in test mode (ADR-0018).
+enum class BringupCase : std::uint8_t {
+    Motors = 1,  // motor-to-encoder mapping and direction
+};
+
+// Why a bring-up request was refused, in the order the checks run.
+enum class BringupStart : std::uint8_t {
+    Ok = 0,
+    NotAvailable = 1,   // not built in
+    UnknownCase = 2,
+    WrongMode = 3,
+    NotArmed = 4,
+    NotInControl = 5,
+    EmergencyStop = 6,
+    Running = 7,        // a case is already running
+};
+
 // Bits of COM_ARM_CHECK: checks of hardware state that can be skipped.
 namespace arm_checks {
 inline constexpr std::uint32_t actuator_power = 1U << 0U;
@@ -85,6 +102,12 @@ public:
     // `source` is accepted now: from the source in control, in TEST, while
     // armed and no bring-up case runs.
     [[nodiscard]] virtual bool accepts_setpoint(ControlSource source) const = 0;
+
+    // Starts a bring-up case, from the source in control, in TEST, while armed.
+    virtual BringupStart request_bringup(ControlSource source, std::uint8_t bringup_case) = 0;
+
+    // `source` fell silent: a bring-up case it runs is aborted and the vehicle disarmed.
+    virtual void source_lost(ControlSource source) = 0;
 };
 
 }  // namespace vk::core

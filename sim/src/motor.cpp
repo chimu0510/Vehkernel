@@ -19,10 +19,22 @@ void Motor::set_powered(bool powered)
     powered_ = powered;
 }
 
+void Motor::set_reversed(bool reversed)
+{
+    advance();
+    reversed_ = reversed;
+}
+
+void Motor::set_encoder_reversed(bool reversed)
+{
+    encoder_reversed_ = reversed;
+}
+
 std::uint16_t Motor::count()
 {
     advance();
-    const double counts = std::floor(angle_ / (2.0 * std::numbers::pi) * config_.counts_per_turn);
+    const double turns = (encoder_reversed_ ? -angle_ : angle_) / (2.0 * std::numbers::pi);
+    const double counts = std::floor(turns * config_.counts_per_turn);
     // The counter wraps at 16 bits, as a timer's low half does.
     return static_cast<std::uint16_t>(static_cast<std::int64_t>(counts) & 0xFFFF);
 }
@@ -48,7 +60,8 @@ void Motor::advance()
     const double dt = static_cast<double>(now - now_us_) * 1e-6;
     now_us_ = now;
     // The exact step of the first-order lag towards the speed the duty holds.
-    const double target = powered_ ? static_cast<double>(duty_) * config_.max_speed : 0.0;
+    const double duty = reversed_ ? -duty_ : duty_;
+    const double target = powered_ ? duty * config_.max_speed : 0.0;
     const double decay = std::exp(-dt / config_.time_constant_s);
     const double start = speed_;
     const double next = target + (start - target) * decay;

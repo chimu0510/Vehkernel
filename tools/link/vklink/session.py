@@ -53,6 +53,57 @@ ACTUATOR_POWER_STATES = {0: "not available", 1: "unpowered", 2: "settling", 3: "
 ARM_CHECK_BITS = {0: "ACT_POWER"}
 
 
+# The bring-up cases, why a bringup_run was refused, and each output's result; vk::core and vk::actuators.
+BRINGUP_CASES = {"motors": 1}
+BRINGUP_REJECT_REASONS = {
+    1: "not available",
+    2: "unknown case",
+    3: "wrong mode",
+    4: "not armed",
+    5: "not in control",
+    6: "emergency stop engaged",
+    7: "already running",
+}
+BRINGUP_RESULTS = {0: "pass", 1: "no encoder moved", 2: "reversed", 3: "another encoder moved"}
+
+
+@dataclass(frozen=True)
+class BringupOutput:
+    result: int
+    encoder: int  # 1 to 4, 0 for none
+    sign: int
+
+    @property
+    def passed(self) -> bool:
+        return self.result == 0
+
+
+@dataclass(frozen=True)
+class BringupReply:
+    """A bringup_reject, or the bringup_result of a case that ended."""
+
+    rejected: bool
+    reason: int = 0              # bringup_reject
+    bringup_case: int = 0
+    aborted: bool = False
+    outputs: tuple[BringupOutput, ...] = ()
+
+    @property
+    def reason_text(self) -> str:
+        return BRINGUP_REJECT_REASONS.get(self.reason, f"reason {self.reason}")
+
+    @classmethod
+    def parse(cls, frame: Frame) -> "BringupReply | None":
+        body = frame.body
+        if frame.type == FrameType.BRINGUP_REJECT and body:
+            return cls(rejected=True, reason=body[0])
+        if frame.type != FrameType.BRINGUP_RESULT or len(body) < 3 or len(body) < 3 + 3 * body[2]:
+            return None
+        outputs = tuple(BringupOutput(body[3 + 3 * i], body[4 + 3 * i], struct.unpack("<b", body[5 + 3 * i:6 + 3 * i])[0])
+                        for i in range(body[2]))
+        return cls(rejected=False, bringup_case=body[0], aborted=body[1] == 3, outputs=outputs)
+
+
 def check_names(mask: int) -> list[str]:
     """The arming checks a COM_ARM_CHECK-style mask names."""
     return [ARM_CHECK_BITS.get(bit, f"bit {bit}") for bit in range(32) if mask & (1 << bit)]
@@ -222,6 +273,9 @@ class HostSession:
     def make_estop_request(self, engage: bool) -> bytes:
         return self.writer.write(FrameType.ESTOP_REQUEST, struct.pack("<B", int(engage)))
 
+    def make_bringup_run(self, bringup_case: int) -> bytes:
+        return self.writer.write(FrameType.BRINGUP_RUN, struct.pack("<B", bringup_case))
+
     def make_sim_actuator_power(self, powered: bool) -> bytes:
         return self.writer.write(FrameType.SIM_ACTUATOR_POWER, struct.pack("<B", int(powered)))
 
@@ -311,6 +365,9 @@ class McuControl:
     mode_result: int = 0    # vk::core::ModeResult
     arming_result: int = 0  # vk::core::ArmingResult
     sim_actuator_power: bool = True
+    bringup_result: int = 0  # vk::core::BringupStart
+    # What a case reports at once when it is accepted: (result, encoder, sign) per output.
+    bringup_outputs: tuple[tuple[int, int, int], ...] = ((0, 1, 1),)
 
 
 class McuSession:
@@ -389,6 +446,13 @@ class McuSession:
             return [self._send(FrameType.ESTOP_REPLY, struct.pack("<B", int(control.emergency_stop)))]
         if frame.type == FrameType.SIM_ACTUATOR_POWER:
             control.sim_actuator_power = bool(value)
+        if frame.type == FrameType.BRINGUP_RUN:
+            if control.bringup_result != 0:
+                return [self._send(FrameType.BRINGUP_REJECT, struct.pack("<B", control.bringup_result))]
+            body = struct.pack("<BBB", value, 2, len(control.bringup_outputs))
+            for result, encoder, sign in control.bringup_outputs:
+                body += struct.pack("<BBb", result, encoder, sign)
+            return [self._send(FrameType.BRINGUP_RESULT, body)]
         return []
 
     def _send(self, frame_type: FrameType, body: bytes) -> bytes:

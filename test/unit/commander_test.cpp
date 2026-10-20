@@ -280,4 +280,60 @@ TEST_F(CommanderTest, TheEmergencyStopHoldsTheSetpointTimeout)
     EXPECT_TRUE(commander.state().armed);
 }
 
+using vk::core::BringupStart;
+
+constexpr std::uint8_t motors_case = 1;
+
+TEST_F(CommanderTest, ABringupCaseStartsOnlyFromTheArmedSourceInControl)
+{
+    inputs.bringup_available = true;
+    step();
+    EXPECT_EQ(commander.request_bringup(link0, motors_case), BringupStart::WrongMode);
+    arm();
+    EXPECT_EQ(commander.request_bringup(link0, 9), BringupStart::UnknownCase);
+    EXPECT_EQ(commander.request_bringup(link1, motors_case), BringupStart::NotInControl);
+    EXPECT_EQ(commander.request_bringup(link0, motors_case), BringupStart::Ok);
+    commander.request_arming(now, link0, false);
+    EXPECT_EQ(commander.request_bringup(link0, motors_case), BringupStart::NotArmed);
+}
+
+TEST_F(CommanderTest, ABringupCaseNeedsToBeBuiltInAndNotRunning)
+{
+    arm();
+    EXPECT_EQ(commander.request_bringup(link0, motors_case), BringupStart::NotAvailable);
+    inputs.bringup_available = true;
+    inputs.bringup_running = true;
+    step();
+    EXPECT_EQ(commander.request_bringup(link0, motors_case), BringupStart::Running);
+    // While it runs: no setpoints, no idle or setpoint timeout, no arming.
+    EXPECT_FALSE(commander.accepts_setpoint(link0));
+    step(static_cast<std::uint64_t>(settings.disarm_idle_s * 1e6F) + cycle_us);
+    EXPECT_TRUE(commander.state().armed);
+}
+
+TEST_F(CommanderTest, TheEmergencyStopDuringABringupCaseDisarmsAtOnce)
+{
+    arm();
+    inputs.bringup_running = true;
+    step();
+    commander.request_emergency_stop(now, true);
+    step();
+    EXPECT_FALSE(commander.state().armed);
+    EXPECT_EQ(commander.state().disarm_reason, DisarmReason::BringupAbort);
+}
+
+TEST_F(CommanderTest, ItsSourceFallingSilentAbortsABringupCase)
+{
+    arm();
+    commander.source_lost(link0);
+    EXPECT_TRUE(commander.state().armed);  // no case running: nothing to abort
+    inputs.bringup_running = true;
+    step();
+    commander.source_lost(link1);
+    EXPECT_TRUE(commander.state().armed);
+    commander.source_lost(link0);
+    EXPECT_FALSE(commander.state().armed);
+    EXPECT_EQ(commander.state().disarm_reason, DisarmReason::BringupAbort);
+}
+
 }  // namespace

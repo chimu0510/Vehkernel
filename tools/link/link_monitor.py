@@ -23,6 +23,9 @@ The mode, arm, disarm and estop commands change the mode, arm or disarm, and
 engage or release the emergency stop (spec 0006), print the state now in
 effect and exit non-zero when the MCU refuses. arm warns when arming checks
 are skipped. sim-power cuts or restores SITL's simulated actuator power.
+bringup motors runs the motor-to-encoder bring-up case in test mode while
+armed, prints each output's result and what to change, and exits non-zero
+unless every output passes.
 drive requests TEST and arming if needed, sends one wheel speed per actuator
 output (rad/s, nan leaves an output uncontrolled) at 20 Hz for the duration,
 then all NaN, and disarms; it prints the wheel speeds reached and exits
@@ -61,8 +64,11 @@ from vklink.monitor import (  # noqa: E402
     parse_param_text,
 )
 from vklink.session import (  # noqa: E402
+    BRINGUP_CASES,
+    BRINGUP_RESULTS,
     DISARM_REASONS,
     MODES,
+    BringupOutput,
     ControlReply,
     ParamReject,
     ParamType,
@@ -162,6 +168,40 @@ def run_param(monitor: LinkMonitor, args: argparse.Namespace, metadata: ParamMet
         return refused(args.name, reply)
     print(format_param(reply, meta.get(reply.name)))
     return 0
+
+
+# The motor case pulses four outputs for 0.6 s each.
+BRINGUP_TIMEOUT_S = 10.0
+
+
+def bringup_fix(output: int, item: BringupOutput) -> str:
+    """What to change for an output that did not pass."""
+    if item.result == 2:
+        return (f"set MOT{output}_REV=REVERSED if the wheel turned backwards, "
+                f"MOT{output}_ENC_REV=REVERSED if it turned forwards")
+    if item.result == 3:
+        return f"encoder {item.encoder} moved instead: check which encoder is connected to output {output}"
+    return "check the motor, its power and its encoder"
+
+
+def run_bringup(monitor: LinkMonitor, args: argparse.Namespace) -> int:
+    """The bringup command, once the handshake is done: needs TEST and armed."""
+    reply = monitor.run_bringup(BRINGUP_CASES[args.case], BRINGUP_TIMEOUT_S)
+    if reply is None:
+        print("FAIL: no bring-up result from the MCU", file=sys.stderr)
+        return 1
+    if reply.rejected:
+        print(f"FAIL: bringup refused: {reply.reason_text}", file=sys.stderr)
+        return 1
+    for output, item in enumerate(reply.outputs, start=1):
+        sign = {1: "+1", -1: "-1"}.get(item.sign, "0")
+        line = (f"bringup output={output} result={BRINGUP_RESULTS.get(item.result, item.result).replace(' ', '_')} "
+                f"encoder={item.encoder} sign={sign}")
+        print(line if item.passed else f"{line}  fix: {bringup_fix(output, item)}")
+    if reply.aborted:
+        print("FAIL: the bring-up case was aborted", file=sys.stderr)
+        return 1
+    return 0 if all(item.passed for item in reply.outputs) else 1
 
 
 def run_control(monitor: LinkMonitor, args: argparse.Namespace) -> int:
@@ -265,6 +305,8 @@ def main() -> int:
     commands.add_parser("disarm", help="disarm")
     estop = commands.add_parser("estop", help="engage or release the emergency stop")
     estop.add_argument("state", choices=["on", "off"])
+    bringup = commands.add_parser("bringup", help="run a bring-up case; needs TEST and armed")
+    bringup.add_argument("case", choices=list(BRINGUP_CASES))
     sim_power = commands.add_parser("sim-power", help="SITL only: cut or restore the simulated actuator power")
     sim_power.add_argument("state", choices=["on", "off"])
     drive = commands.add_parser("drive", help="arm and drive the wheels for a while, then disarm")
@@ -308,6 +350,8 @@ def main() -> int:
             return run_param(monitor, args, metadata)
         if args.command == "drive":
             return run_drive(monitor, args)
+        if args.command == "bringup":
+            return run_bringup(monitor, args)
         if args.command is not None:
             return run_control(monitor, args)
         if args.check:

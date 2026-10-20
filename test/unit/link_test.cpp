@@ -4,6 +4,7 @@
 #include <vk/link/frame.hpp>
 #include <vk/link/session.hpp>
 #include <vk/msg/arming_state.hpp>
+#include <vk/msg/bringup_status.hpp>
 
 #include <gtest/gtest.h>
 
@@ -890,6 +891,15 @@ public:
     [[nodiscard]] bool armed() const override { return is_armed; }
     [[nodiscard]] std::uint32_t skipped_checks() const override { return skipped; }
     [[nodiscard]] bool accepts_setpoint(vk::core::ControlSource /*source*/) const override { return is_armed; }
+    vk::core::BringupStart request_bringup(vk::core::ControlSource source, std::uint8_t /*bringup_case*/) override
+    {
+        last_source = source;
+        return bringup_result;
+    }
+    void source_lost(vk::core::ControlSource source) override { lost = source; }
+
+    vk::core::BringupStart bringup_result = vk::core::BringupStart::Ok;
+    vk::core::ControlSource lost = vk::core::no_source;
 
     vk::core::ModeResult mode_result = vk::core::ModeResult::Ok;
     vk::core::ArmingResult arming_result = vk::core::ArmingResult::Ok;
@@ -1020,6 +1030,28 @@ TEST_F(SessionControl, RequestsBeforeTheHandshakeAreIgnored)
     request(fresh, FrameType::EstopRequest, 1);
     EXPECT_FALSE(control.engaged);
     EXPECT_TRUE(sink.sent.empty());
+}
+
+TEST_F(SessionControl, BringupRunIsRefusedAtOnceOrAnsweredWithItsResultLater)
+{
+    request(session, FrameType::BringupRun, 1);
+    EXPECT_TRUE(sink.sent.empty());  // accepted: the result follows when the case ends
+    control.bringup_result = vk::core::BringupStart::NotArmed;
+    request(session, FrameType::BringupRun, 1);
+    vk::msg::BringupStatus status{};
+    status.bringup_case = 1;
+    status.state = 2;
+    status.outputs = 2;
+    status.result = {0, 2, 0, 0};
+    status.encoder = {1, 2, 0, 0};
+    status.sign = {1, -1, 0, 0};
+    ASSERT_TRUE(session.send_bringup_result(status, sink));
+    const auto got = replies(sink.sent);
+    ASSERT_EQ(got.size(), 2U);
+    EXPECT_EQ(got[0].type, FrameType::BringupReject);
+    EXPECT_EQ(got[0].body, (std::vector<std::uint8_t>{4}));
+    EXPECT_EQ(got[1].type, FrameType::BringupResult);
+    EXPECT_EQ(got[1].body, (std::vector<std::uint8_t>{1, 2, 2, 0, 1, 1, 2, 2, 0xFF}));
 }
 
 }  // namespace

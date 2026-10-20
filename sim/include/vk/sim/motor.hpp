@@ -31,6 +31,11 @@ public:
     // Whether the motor driver has power; without it the duty does nothing.
     void set_powered(bool powered);
 
+    // Wiring faults for bring-up tests: the motor or the encoder connected
+    // the other way round.
+    void set_reversed(bool reversed);
+    void set_encoder_reversed(bool reversed);
+
     // The encoder counter now.
     [[nodiscard]] std::uint16_t count();
 
@@ -46,6 +51,8 @@ private:
     std::uint64_t now_us_;
     float duty_ = 0.0F;
     bool powered_ = true;
+    bool reversed_ = false;
+    bool encoder_reversed_ = false;
     float speed_ = 0.0F;
     double angle_ = 0.0;
 };

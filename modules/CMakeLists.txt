@@ -18,7 +18,8 @@ if(CONFIG_ACTUATOR_CONTROL)
   # FreeRTOS and are tested on the development host; the work item wraps them.
   vk_add_library(vk_actuators LAYER module STATIC
     actuators/src/actuator_control.cpp
-    actuators/src/actuator_task.cpp)
+    actuators/src/actuator_task.cpp
+    actuators/src/bringup_case.cpp)
   target_include_directories(vk_actuators PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/actuators/include)
   vk_target_link_libraries(vk_actuators PUBLIC vk_msg_headers vk_core vk_hal vk_params)
   target_link_libraries(vk_actuators PRIVATE vk_warnings vk_cxx_subset)

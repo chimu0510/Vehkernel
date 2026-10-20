@@ -11,11 +11,14 @@
 // otherwise. A frame the transport cannot take is dropped and counted; the
 // Link never blocks its work queue. Once a second it publishes its statistics
 // on link_status. On a transport with a baud rate, start() scales the topic
-// map down to fit it (ADR-0002).
+// map down to fit it (ADR-0002). When a bring-up case this Link started
+// ends, it sends the result; when its peer falls silent, it tells the
+// vehicle control, which aborts such a case.
 #pragma once
 
 #include <vk/core/work_queue.hpp>
 #include <vk/hal/transport.hpp>
+#include <vk/msg/bringup_status.hpp>
 #include <vk/link/frame.hpp>
 #include <vk/link/session.hpp>
 #include <vk/link/topic_map.hpp>
@@ -98,6 +101,7 @@ private:
 
     void receive(std::uint64_t now_us);
     void on_topic_data(BodyReader body, std::uint64_t now_us);
+    void follow_control(HandshakeState previous);
     void send_topics(std::uint64_t now_us);
     void publish_status(std::uint64_t now_us);
 
@@ -114,6 +118,10 @@ private:
     std::uint8_t rate_scale_ = 100;
     std::uint32_t inbound_undeclared_ = 0;
     std::uint32_t setpoints_rejected_ = 0;
+    core::Subscription<msg::BringupStatus> bringup_status_{0};
+    bool bringup_started_ = false;     // a case this Link started is running
+    bool bringup_result_due_ = false;  // its result is to be sent
+    msg::BringupStatus bringup_result_{};
     std::array<std::uint8_t, 2 * max_wire_size> receive_buffer_{};
 };
 

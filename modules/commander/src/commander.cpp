@@ -26,6 +26,10 @@ void Commander::update(std::uint64_t now_us, const Inputs& inputs, const Setting
         disarm(core::DisarmReason::ActuatorPowerLost);
         return;
     }
+    if (state_.emergency_stop && inputs.bringup_running) {
+        disarm(core::DisarmReason::BringupAbort);
+        return;
+    }
     if (state_.emergency_stop && now_us - engaged_at_us_ >= emergency_stop_disarm_us) {
         disarm(core::DisarmReason::EmergencyStop);
         return;
@@ -90,6 +94,39 @@ bool Commander::request_emergency_stop(std::uint64_t now_us, bool engage)
     }
     state_.emergency_stop = engage;
     return state_.emergency_stop;
+}
+
+core::BringupStart Commander::request_bringup(core::ControlSource source, std::uint8_t bringup_case) const
+{
+    if (!inputs_.bringup_available) {
+        return core::BringupStart::NotAvailable;
+    }
+    if (bringup_case != static_cast<std::uint8_t>(core::BringupCase::Motors)) {
+        return core::BringupStart::UnknownCase;
+    }
+    if (state_.mode != core::Mode::Test) {
+        return core::BringupStart::WrongMode;
+    }
+    if (!state_.armed) {
+        return core::BringupStart::NotArmed;
+    }
+    if (source != state_.source) {
+        return core::BringupStart::NotInControl;
+    }
+    if (state_.emergency_stop) {
+        return core::BringupStart::EmergencyStop;
+    }
+    if (inputs_.bringup_running) {
+        return core::BringupStart::Running;
+    }
+    return core::BringupStart::Ok;
+}
+
+void Commander::source_lost(core::ControlSource source)
+{
+    if (state_.armed && inputs_.bringup_running && source == state_.source) {
+        disarm(core::DisarmReason::BringupAbort);
+    }
 }
 
 bool Commander::accepts_setpoint(core::ControlSource source) const

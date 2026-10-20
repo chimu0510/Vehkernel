@@ -43,6 +43,9 @@ class FrameType(enum.IntEnum):
     ARMING_REJECT = 0x45
     ESTOP_REQUEST = 0x46
     ESTOP_REPLY = 0x47
+    BRINGUP_RUN = 0x48
+    BRINGUP_REJECT = 0x49
+    BRINGUP_RESULT = 0x4A
     # SITL only: cuts or restores the simulated actuator power.
     SIM_ACTUATOR_POWER = 0x70
 

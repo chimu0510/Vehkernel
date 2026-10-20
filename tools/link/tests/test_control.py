@@ -6,7 +6,7 @@ from pathlib import Path
 
 from test_monitor import FakeMcu
 from test_params import MONITOR, VKMSG
-from vklink import ControlReply, FrameReader, FrameType, HostSession, McuControl, McuSession
+from vklink import BringupReply, ControlReply, FrameReader, FrameType, HostSession, McuControl, McuSession
 
 
 def connected_pair(control: McuControl):
@@ -101,3 +101,23 @@ def test_cli_fails_when_the_mcu_does_not_answer(tmp_path: Path):
         result = run_cli(mcu.port, tmp_path, "estop", "on")
     assert result.returncode == 1
     assert "FAIL: no reply from the MCU to estop" in result.stderr
+
+
+def test_bringup_frames_and_cli(tmp_path: Path):
+    control = McuControl(bringup_outputs=((0, 1, 1), (2, 2, -1)))
+    mcu, host = connected_pair(control)
+    [result] = [BringupReply.parse(f) for w in mcu.handle(next(iter(FrameReader().feed(host.make_bringup_run(1)))),
+                                                         now_us=1000) for f in FrameReader().feed(w)]
+    assert result.outputs[1].result == 2 and result.outputs[1].sign == -1 and not result.aborted
+
+    with FakeMcu(control=control) as mcu:
+        failed = run_cli(mcu.port, tmp_path, "bringup", "motors")
+        control.bringup_outputs = ((0, 1, 1), (0, 2, 1))
+        passed = run_cli(mcu.port, tmp_path, "bringup", "motors")
+        control.bringup_result = 4
+        refused = run_cli(mcu.port, tmp_path, "bringup", "motors")
+    assert failed.returncode == 1
+    assert "bringup output=2 result=reversed encoder=2 sign=-1  fix: set MOT2_REV=REVERSED" in failed.stdout
+    assert passed.returncode == 0, passed.stderr
+    assert passed.stdout.splitlines()[0] == "bringup output=1 result=pass encoder=1 sign=+1"
+    assert refused.returncode == 1 and "FAIL: bringup refused: not armed" in refused.stderr

@@ -2,7 +2,7 @@
 //
 // Usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]
 //                       [--motion still|tilt|rotate|shake] [--param-file <path>]
-//                       [--actuator-power-off]
+//                       [--actuator-power-off] [--reversed-motor <output>]
 //
 // The run stops by itself after the duration (default 1 s; 0 runs until
 // interrupted) and prints a report: one line per topic instance and per work
@@ -16,6 +16,8 @@
 // runs are reproducible, or kept in the file given with --param-file.
 // The simulated board senses actuator power, on unless --actuator-power-off
 // cuts it at start; the Link's sim_actuator_power frame cuts or restores it.
+// Its four motors can be wired the wrong way round with --reversed-motor,
+// once per output, for the bring-up case.
 #include <vk/config.h>
 
 #ifdef CONFIG_ACTUATOR_CONTROL
@@ -93,6 +95,7 @@ struct Options {
     vk::sim::MotionProfile motion = vk::sim::MotionProfile::Still;
     const char* param_file = nullptr;  // nullptr: blank Flash in memory
     bool actuator_power = true;
+    std::array<bool, vk::platform::actuator_count> reversed_motors{};
 };
 
 bool parse_address(const char* argument, Options& options)
@@ -153,6 +156,13 @@ bool parse_options(std::span<char*> args, Options& options)
             }
         } else if (arg == "--param-file") {
             options.param_file = value;
+        } else if (arg == "--reversed-motor") {
+            char* end = nullptr;
+            const unsigned long output = std::strtoul(value, &end, 10);
+            if (*end != '\0' || output < 1 || output > vk::platform::actuator_count) {
+                return false;
+            }
+            options.reversed_motors.at(output - 1) = true;
         } else {
             return false;
         }
@@ -173,9 +183,15 @@ void start_commander()
 #else
     constexpr bool actuators = false;
 #endif
+#ifdef CONFIG_BRINGUP_MOTORS
+    constexpr bool bringup = true;
+#else
+    constexpr bool bringup = false;
+#endif
     commander.emplace(vk::commander::CommanderTask::Config{.interval_us = control_interval_us,
                                                            .actuator_power = &vk::platform::actuator_power,
-                                                           .actuators_started = actuators},
+                                                           .actuators_started = actuators,
+                                                           .bringup = bringup},
                       vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     commander->start();
 }
@@ -186,8 +202,14 @@ vk::core::StaticInstance<vk::actuators::ActuatorTask> actuator_control;
 // Actuator control on wq:ctrl after the commander, over the simulated motors (spec 0006).
 void start_actuators()
 {
+#ifdef CONFIG_BRINGUP_MOTORS
+    constexpr bool bringup = true;
+#else
+    constexpr bool bringup = false;
+#endif
     actuator_control.emplace(vk::actuators::ActuatorTask::Config{.interval_us = control_interval_us,
-                                                                 .channels = vk::platform::motor_channels()},
+                                                                 .channels = vk::platform::motor_channels(),
+                                                                 .bringup = bringup},
                              vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     actuator_control->start();
 }
@@ -316,12 +338,15 @@ int main(int argc, char** argv)
     if (!parse_options(std::span(argv, static_cast<std::size_t>(argc)), options)) {
         std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]\n"
                    "                      [--motion still|tilt|rotate|shake] [--param-file <path>]\n"
-                   "                      [--actuator-power-off]\n",
+                   "                      [--actuator-power-off] [--reversed-motor <output>]\n",
                    stderr);
         return 2;
     }
     vk::platform::init(options.motion);
     vk::platform::set_actuator_power(options.actuator_power);
+    for (std::size_t output = 1; output <= vk::platform::actuator_count; ++output) {
+        vk::platform::motor(output).set_reversed(options.reversed_motors.at(output - 1));
+    }
 #ifdef CONFIG_PARAM_STORAGE_FLASH
     if (!start_parameters(options)) {
         return 1;

@@ -23,14 +23,16 @@
 // control service, with this Link as their source, and are answered at once:
 // mode_request with mode_reply or mode_reject, arming_request with
 // arming_reply, which carries the arming checks skipped, or arming_reject,
-// and estop_request with estop_reply. Without the service they go
-// unanswered.
+// and estop_request with estop_reply. bringup_run is refused at once with
+// bringup_reject, or accepted silently: its bringup_result follows when the
+// case ends. Without the service they go unanswered.
 #pragma once
 
 #include <vk/core/parameter_storage.hpp>
 #include <vk/core/parameters.hpp>
 #include <vk/core/vehicle_control.hpp>
 #include <vk/link/frame.hpp>
+#include <vk/msg/bringup_status.hpp>
 #include <vk/msg/topics.hpp>
 
 #include <array>
@@ -123,6 +125,9 @@ public:
     // again on the next call.
     void send_pending(std::uint64_t now_us, FrameSink& sink, std::size_t max_frames);
 
+    // Sends the result of a bring-up case this session started.
+    bool send_bringup_result(const msg::BringupStatus& status, FrameSink& sink);
+
     // Whether topic_info frames of the handshake are still to be sent.
     [[nodiscard]] bool describing() const { return info_next_ < topics_.size(); }
 
@@ -143,6 +148,7 @@ private:
     void on_mode_request(BodyReader body, FrameSink& sink);
     void on_arming_request(BodyReader body, FrameSink& sink);
     void on_estop_request(BodyReader body, FrameSink& sink);
+    void on_bringup_run(BodyReader body, FrameSink& sink);
     void on_sim_actuator_power(BodyReader body);
     [[nodiscard]] std::size_t parameter_count() const
     {

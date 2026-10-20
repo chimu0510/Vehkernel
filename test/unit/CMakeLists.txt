@@ -2,7 +2,7 @@
 find_package(GTest CONFIG REQUIRED)
 include(GoogleTest)
 
-add_executable(vk_unit_tests smoke_test.cpp pin_test.cpp dma_test.cpp clock_test.cpp schema_test.cpp bus_test.cpp work_queue_test.cpp i2c_test.cpp rotation_test.cpp icm20948_test.cpp wire_test.cpp link_test.cpp link_work_item_test.cpp uart_test.cpp estimation_math_test.cpp mahony_test.cpp attitude_estimator_test.cpp parameters_test.cpp parameter_storage_test.cpp commander_test.cpp actuator_control_test.cpp)
+add_executable(vk_unit_tests smoke_test.cpp pin_test.cpp dma_test.cpp clock_test.cpp schema_test.cpp bus_test.cpp work_queue_test.cpp i2c_test.cpp rotation_test.cpp icm20948_test.cpp wire_test.cpp link_test.cpp link_work_item_test.cpp uart_test.cpp estimation_math_test.cpp mahony_test.cpp attitude_estimator_test.cpp parameters_test.cpp parameter_storage_test.cpp commander_test.cpp actuator_control_test.cpp bringup_case_test.cpp)
 target_link_libraries(vk_unit_tests PRIVATE GTest::gtest_main vk_hal vk_msg vk_drivers vk_sim vk_platform vk_core vk_link vk_lib_estimation vk_estimation vk_commander vk_actuators vk_params vk_warnings)
 # Hardware-free logic of the STM32F4 platform layer, tested on the host.
 target_include_directories(vk_unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/platform/stm32f4/include)

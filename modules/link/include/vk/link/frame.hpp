@@ -60,6 +60,9 @@ enum class FrameType : std::uint8_t {
     ArmingReject = 0x45,
     EstopRequest = 0x46,
     EstopReply = 0x47,
+    BringupRun = 0x48,
+    BringupReject = 0x49,
+    BringupResult = 0x4A,
     // SITL only: cuts or restores the simulated actuator power.
     SimActuatorPower = 0x70,
 };
@@ -105,6 +108,12 @@ constexpr std::optional<FrameType> to_frame_type(std::uint8_t raw)
         return FrameType::EstopRequest;
     case static_cast<std::uint8_t>(FrameType::EstopReply):
         return FrameType::EstopReply;
+    case static_cast<std::uint8_t>(FrameType::BringupRun):
+        return FrameType::BringupRun;
+    case static_cast<std::uint8_t>(FrameType::BringupReject):
+        return FrameType::BringupReject;
+    case static_cast<std::uint8_t>(FrameType::BringupResult):
+        return FrameType::BringupResult;
     case static_cast<std::uint8_t>(FrameType::SimActuatorPower):
         return FrameType::SimActuatorPower;
     default:

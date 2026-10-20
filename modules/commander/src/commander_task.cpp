@@ -28,6 +28,10 @@ void CommanderTask::run()
     while (setpoint_.copy(last_setpoint_)) {
         // Only the newest counts.
     }
+    msg::BringupStatus bringup{};
+    while (bringup_status_.copy(bringup)) {
+        bringup_running_ = bringup.state == 1;  // running
+    }
     const bool idle = std::ranges::all_of(last_setpoint_.wheel_speed,
                                           [](float target) { return std::isnan(target) || target == 0.0F; });
     const Inputs inputs{
@@ -36,6 +40,8 @@ void CommanderTask::run()
                                                              : std::optional<bool>(config_.actuator_power()),
         .actuators_started = config_.actuators_started,
         .setpoints_idle = idle,
+        .bringup_running = bringup_running_,
+        .bringup_available = config_.bringup,
         .last_setpoint_us = last_setpoint_.timestamp,
     };
     const Settings settings{.arm_check = static_cast<std::uint32_t>(params::com.arm_check),
@@ -105,6 +111,26 @@ bool CommanderTask::armed() const
 {
     const core::CriticalSection lock;
     return commander_.state().armed;
+}
+
+core::BringupStart CommanderTask::request_bringup(core::ControlSource source, std::uint8_t bringup_case)
+{
+    core::BringupStart result{};
+    {
+        const core::CriticalSection lock;
+        result = commander_.request_bringup(source, bringup_case);
+    }
+    if (result == core::BringupStart::Ok) {
+        bringup_publication_.publish(
+            msg::BringupCommand{.timestamp = queue().now_us(), .bringup_case = bringup_case, .source = source});
+    }
+    return result;
+}
+
+void CommanderTask::source_lost(core::ControlSource source)
+{
+    const core::CriticalSection lock;
+    commander_.source_lost(source);
 }
 
 bool CommanderTask::accepts_setpoint(core::ControlSource source) const
