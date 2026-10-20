@@ -28,6 +28,44 @@ std::uint64_t stop_duration_us = 0;
 
 std::atomic<bool> simulated_actuator_power{true};
 
+// One actuator output over a simulated motor: the duty and direction lines as
+// an H-bridge applies them, and the encoder counter.
+class MotorOutput final : public hal::PwmOutput, public hal::DirectionLines, public hal::QuadratureEncoder {
+public:
+    void attach(sim::Motor& motor) { motor_ = &motor; }
+
+    void set_duty(float duty) override
+    {
+        duty_ = duty;
+        apply();
+    }
+
+    void set(bool in1, bool in2) override
+    {
+        in1_ = in1;
+        in2_ = in2;
+        apply();
+    }
+
+    [[nodiscard]] std::uint16_t count() const override { return motor_->count(); }
+
+private:
+    void apply()
+    {
+        const float sign = in1_ && !in2_ ? 1.0F : (in2_ && !in1_ ? -1.0F : 0.0F);
+        motor_->drive(sign * duty_);
+    }
+
+    sim::Motor* motor_ = nullptr;
+    float duty_ = 0.0F;
+    bool in1_ = false;
+    bool in2_ = false;
+};
+
+std::array<core::StaticInstance<sim::Motor>, actuator_count> motors;
+std::array<MotorOutput, actuator_count> motor_outputs;
+std::array<hal::MotorChannel, actuator_count> channels{};
+
 sim::I2cBus bus;
 sim::Icm20948 imu;
 // A small gyroscope bias in the body frame.
@@ -79,6 +117,12 @@ void init(sim::MotionProfile profile)
     // The first reading fixes the clock's zero at boot.
     static_cast<void>(hal::SystemClock::now_us());
 
+    for (std::size_t i = 0; i < actuator_count; ++i) {
+        motors[i].emplace(sim::Motor::Config{}, &hal::SystemClock::now_us);
+        motor_outputs[i].attach(*motors[i]);
+        channels[i] = {.pwm = &motor_outputs[i], .direction = &motor_outputs[i], .encoder = &motor_outputs[i]};
+    }
+
     // The scripted motion, with sensor noise and a small gyroscope bias.
     motion.emplace(profile, estimation::Vector3{0.002F, 0.001F, -0.0005F}, &hal::SystemClock::now_us);
     imu.set_output_source(&*motion);
@@ -113,6 +157,21 @@ bool actuator_power()
 void set_actuator_power(bool powered)
 {
     simulated_actuator_power.store(powered);
+    for (auto& m : motors) {
+        if (m.has_value()) {
+            m->set_powered(powered);
+        }
+    }
+}
+
+std::span<const hal::MotorChannel> motor_channels()
+{
+    return channels;
+}
+
+sim::Motor& motor(std::size_t output)
+{
+    return *motors.at(output - 1);
 }
 
 }  // namespace vk::platform

@@ -2,10 +2,14 @@
 #pragma once
 
 #include <vk/core/work_queue.hpp>
+#include <vk/hal/actuator.hpp>
+#include <vk/sim/motor.hpp>
 #include <vk/sim/i2c_bus.hpp>
 #include <vk/sim/motion.hpp>
 
+#include <cstddef>
 #include <cstdint>
+#include <span>
 
 namespace vk::platform {
 
@@ -26,9 +30,18 @@ void init(sim::MotionProfile motion = sim::MotionProfile::Still);
 void start_ground_truth(core::WorkQueue& queue);
 
 // SITL's board senses actuator power (ADR-0005). The simulated power is on
-// unless cut, at start or later over the Link's sim_actuator_power frame.
+// unless cut, at start or later over the Link's sim_actuator_power frame;
+// without it the simulated motors do not move.
 bool actuator_power();
 void set_actuator_power(bool powered);
+
+// SITL's four actuator outputs, each a simulated motor with its encoder
+// (spec 0006), available after init().
+inline constexpr std::size_t actuator_count = 4;
+std::span<const hal::MotorChannel> motor_channels();
+
+// The simulated motor of an output, 1 to actuator_count.
+sim::Motor& motor(std::size_t output);
 
 // Stops the scheduler after the given run time, so a SITL run ends on its own.
 void stop_after(std::uint64_t duration_us);
