@@ -30,7 +30,7 @@ sys.path.insert(0, str(REPO / "tools" / "link"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from check_attitude import free_udp_port, from_rotation_vector, multiply, tilt_between  # noqa: E402
-from vklink.monitor import LinkMonitor, UdpConnection, load_messages, load_param_metadata, work_item_name  # noqa: E402
+from vklink.monitor import LinkMonitor, UdpConnection, WorkItemOverruns, load_messages, load_param_metadata  # noqa: E402
 from vklink.session import ParamType, ParamValue  # noqa: E402
 
 HANDSHAKE_S = 4.0
@@ -115,14 +115,13 @@ def check_gain(args) -> list[str]:
     truth_times: list[int] = []
     truths: list[tuple] = []
     estimates: list[tuple[int, tuple]] = []
-    # Overruns per work item, first and last seen: only those during the check count,
-    # since SITL shares the host and start-up stalls say nothing about parameters.
-    overruns: dict[str, list[int]] = {}
+    # Only overruns during the check count, and not a host stall's: SITL shares
+    # the host, and stalls say nothing about parameters.
+    overruns = WorkItemOverruns()
 
     def record(name: str, instance: int, message) -> None:
         if name == "work_item_status":
-            seen = overruns.setdefault(work_item_name(message), [message.overruns, message.overruns])
-            seen[1] = message.overruns
+            overruns.record(message)
             return
         if instance != 0:
             return
@@ -185,11 +184,13 @@ def check_gain(args) -> list[str]:
     elif not (large > 2 * small and large > 5.0):
         failures.append(f"ATT_KP {LARGE_KP:g} tilted the estimate {large:.2f} deg, not clearly more than "
                         f"{small:.2f} deg at ATT_KP {SMALL_KP:g}")
-    if not overruns:
-        failures.append("the Link carried no work item timing")
-    for name, (first, last) in sorted(overruns.items()):
-        if last != first:
-            failures.append(f"work item {name} overran {last - first} times during the check")
+    judged = overruns.judge()
+    if judged is None:
+        failures.append("the Link carried too little work item timing")
+    else:
+        for name, count in sorted(judged[0].items()):
+            if count != 0:
+                failures.append(f"work item {name} overran {count} times during the check")
     return failures
 
 

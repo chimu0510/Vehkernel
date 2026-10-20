@@ -5,9 +5,11 @@ Fails when any work item overran or never ran, or when a topic instance given
 with --expect-rate is published at a rate outside the tolerance.
 
 With --msg-dir, overruns are judged over a check window alone, by the timing
-statistics the MCU sends over its UDP Link: the overruns at the window's end
-less those at its start. SITL runs on a shared host, and a stall around
-start-up says nothing about the work items. Without it, over SITL's whole run.
+statistics the MCU sends over its UDP Link, report by report. SITL runs on a
+shared host, and a stall around start-up says nothing about the work items;
+nor does an interval in which the host paused the whole process, which shows
+as most work items overrunning at once (vklink's WorkItemOverruns). Without
+it, over SITL's whole run.
 
     check_report.py build/sitl/app/vehkernel-sitl --duration 5 \\
         --msg-dir build/sitl/generated/schema/python --expect-rate imu_sample:0=200
@@ -55,26 +57,27 @@ def free_udp_port() -> int:
         return probe.getsockname()[1]
 
 
-def window_overruns(port: int, msg_dir: str, duration_s: float) -> tuple[dict[str, int], list[str]]:
-    """Overruns of every work item during a window of the Link, by name."""
+def window_overruns(port: int, msg_dir: str, duration_s: float) -> tuple[dict[str, int], int, list[str]]:
+    """Real overruns of every work item during a window of the Link, by name, and the host stalls in it."""
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "link"))
-    from vklink.monitor import LinkMonitor, UdpConnection, load_messages, work_item_name
+    from vklink.monitor import LinkMonitor, UdpConnection, WorkItemOverruns, load_messages
 
     connection = UdpConnection("127.0.0.1", port)
     monitor = LinkMonitor(connection, load_messages(msg_dir))
+    tracker = WorkItemOverruns()
     try:
         if not monitor.handshake(MARGIN_S):
-            return {}, ["no handshake with SITL"]
-        # Let every work item send its status once before the window opens.
+            return {}, 0, ["no handshake with SITL"]
         monitor.run(MARGIN_S / 2)
-        start = {work_item_name(status): status.overruns for _, status in monitor.latest("work_item_status")}
+        monitor.listeners.append(
+            lambda name, _instance, message: tracker.record(message) if name == "work_item_status" else None)
         monitor.run(duration_s)
-        end = {work_item_name(status): status.overruns for _, status in monitor.latest("work_item_status")}
     finally:
         connection.close()
-    if not end:
-        return {}, ["the Link carried no work item timing"]
-    return {name: overruns - start.get(name, 0) for name, overruns in end.items()}, []
+    judged = tracker.judge()
+    if judged is None:
+        return {}, 0, ["the Link carried too little work item timing"]
+    return *judged, []
 
 
 def main() -> int:
@@ -102,8 +105,10 @@ def main() -> int:
         sitl = subprocess.Popen([args.sitl, "--duration", str(duration), "--udp", f"127.0.0.1:{port}"],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         link_line = sitl.stdout.readline()  # printed once the Link is open
-        overruns, link_failures = window_overruns(port, args.msg_dir, args.duration)
+        overruns, stalls, link_failures = window_overruns(port, args.msg_dir, args.duration)
         failures += link_failures
+        if stalls:
+            print(f"host stalls={stalls} (intervals in which most work items overran at once; not counted)")
         rest, errors = sitl.communicate(timeout=duration + 30)
         report, returncode = link_line + rest, sitl.returncode
     print(report, end="")

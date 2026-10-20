@@ -287,6 +287,46 @@ def work_item_name(status: object) -> str:
     return bytes(raw).rstrip(b"\0").decode("ascii", errors="replace")
 
 
+class WorkItemOverruns:
+    """Overruns of each work item over a check, telling host stalls from real overruns.
+
+    The timing monitor reports every work item at once, each report stamped
+    with the same MCU time, and the Link carries them at 1 Hz. Between two
+    reports that every work item is in, overruns of most work items at once
+    mean the host paused SITL: the POSIX port runs the whole MCU in one
+    process, so a host that does not schedule it delays every periodic work
+    item together. Such an interval is a stall and its overruns do not count.
+    Not every work item, since one triggered by a topic or slower than the
+    pause cannot overrun in it. Overruns of one work item, or a few, while
+    the others keep time count. Overruns before the first report are
+    start-up's and do not count either.
+    """
+
+    def __init__(self) -> None:
+        self._reports: dict[int, dict[str, int]] = {}
+
+    def record(self, status: object) -> None:
+        """Adds one work_item_status message."""
+        self._reports.setdefault(status.timestamp, {})[work_item_name(status)] = status.overruns
+
+    def judge(self) -> tuple[dict[str, int], int] | None:
+        """Real overruns by work item and the number of stalls; None with fewer than two whole reports."""
+        names = set().union(*self._reports.values())
+        whole = [report for _, report in sorted(self._reports.items()) if report.keys() == names]
+        if len(whole) < 2:
+            return None
+        overruns = dict.fromkeys(names, 0)
+        stalls = 0
+        for before, after in zip(whole, whole[1:]):
+            counts = {name: after[name] - before[name] for name in names}
+            if 2 * sum(1 for count in counts.values() if count > 0) >= len(names):
+                stalls += 1
+                continue
+            for name, count in counts.items():
+                overruns[name] += count
+        return overruns, stalls
+
+
 @dataclass
 class Mismatch:
     name: str
