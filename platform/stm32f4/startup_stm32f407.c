@@ -24,12 +24,14 @@ void Default_Handler(void);
 VK_WEAK_HANDLER(SVC_Handler);     /* FreeRTOS */
 VK_WEAK_HANDLER(PendSV_Handler);  /* FreeRTOS */
 VK_WEAK_HANDLER(SysTick_Handler); /* FreeRTOS tick */
+VK_WEAK_HANDLER(TIM6_DAC_IRQHandler); /* output watchdog */
 VK_WEAK_HANDLER(TIM7_IRQHandler); /* microsecond clock overflow */
 
 /* Vector numbers: system exceptions first, then IRQn + VK_SYSTEM_VECTORS. */
 #define VK_SVCALL_VECTOR  11
 #define VK_PENDSV_VECTOR  14
 #define VK_SYSTICK_VECTOR 15
+#define VK_TIM6_VECTOR    (VK_SYSTEM_VECTORS + 54)
 #define VK_TIM7_VECTOR    (VK_SYSTEM_VECTORS + 55)
 #define VK_LAST_VECTOR    (VK_SYSTEM_VECTORS + VK_STM32F407_IRQS - 1)
 
@@ -44,7 +46,8 @@ const vk_vector_t vk_vector_table[VK_SYSTEM_VECTORS + VK_STM32F407_IRQS] = {
     [VK_SVCALL_VECTOR + 1 ... VK_PENDSV_VECTOR - 1] = Default_Handler,
     [VK_PENDSV_VECTOR] = PendSV_Handler,
     [VK_SYSTICK_VECTOR] = SysTick_Handler,
-    [VK_SYSTICK_VECTOR + 1 ... VK_TIM7_VECTOR - 1] = Default_Handler,
+    [VK_SYSTICK_VECTOR + 1 ... VK_TIM6_VECTOR - 1] = Default_Handler,
+    [VK_TIM6_VECTOR] = TIM6_DAC_IRQHandler,
     [VK_TIM7_VECTOR] = TIM7_IRQHandler,
     [VK_TIM7_VECTOR + 1 ... VK_LAST_VECTOR] = Default_Handler,
 };

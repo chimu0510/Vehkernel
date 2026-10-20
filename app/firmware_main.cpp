@@ -27,6 +27,12 @@
 #include <vk/estimation/attitude_estimator.hpp>
 #endif
 
+#ifdef CONFIG_ACTUATOR_CONTROL
+#include <vk/actuators/actuator_task.hpp>
+#include <vk/hal/actuator.hpp>
+#include <vk/platform/motor_output.hpp>
+#endif
+
 #ifdef CONFIG_DRIVER_ICM20948
 #include <vk/drivers/icm20948.hpp>
 #include <vk/hal/i2c.hpp>
@@ -94,10 +100,64 @@ bool actuator_powered()
 }
 #endif
 
+constexpr std::uint32_t control_interval_us = 1'000'000 / vk::board::timing::base_rate_hz;
+
+#ifdef CONFIG_ACTUATOR_CONTROL
+// The board's four motor outputs (spec 0006).
+static_assert(vk::board::actuators::count == 4, "the C50C entry point drives four motor outputs");
+vk::platform::MotorOutputOn<vk::board::actuators::OUTPUT1> output1;
+vk::platform::MotorOutputOn<vk::board::actuators::OUTPUT2> output2;
+vk::platform::MotorOutputOn<vk::board::actuators::OUTPUT3> output3;
+vk::platform::MotorOutputOn<vk::board::actuators::OUTPUT4> output4;
+const std::array<vk::hal::MotorChannel, 4> motor_channels{{
+    {.pwm = &output1, .direction = &output1, .encoder = &output1},
+    {.pwm = &output2, .direction = &output2, .encoder = &output2},
+    {.pwm = &output3, .direction = &output3, .encoder = &output3},
+    {.pwm = &output4, .direction = &output4, .encoder = &output4},
+}};
+vk::core::StaticInstance<vk::actuators::ActuatorTask> actuator_control;
+
+// Called from the output watchdog's interrupt.
+void stop_motor_outputs()
+{
+    decltype(output1)::stop();
+    decltype(output2)::stop();
+    decltype(output3)::stop();
+    decltype(output4)::stop();
+}
+
+// Actuator control on wq:ctrl after the commander, and the output watchdog.
+void start_actuators()
+{
+    output1.init();
+    output2.init();
+    output3.init();
+    output4.init();
+#ifdef CONFIG_BRINGUP_MOTORS
+    constexpr bool bringup = true;
+#else
+    constexpr bool bringup = false;
+#endif
+    actuator_control.emplace(vk::actuators::ActuatorTask::Config{.interval_us = control_interval_us,
+                                                                 .channels = motor_channels,
+                                                                 .bringup = bringup},
+                             vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    actuator_control->start();
+    vk::platform::start_output_watchdog(control_interval_us, &stop_motor_outputs);
+}
+#endif
+
 void start_commander()
 {
-    vk::commander::CommanderTask::Config config{.interval_us = 1'000'000 / vk::board::timing::base_rate_hz,
+    vk::commander::CommanderTask::Config config{.interval_us = control_interval_us,
                                                 .revision_ok = revision_matches()};
+#ifdef CONFIG_ACTUATOR_CONTROL
+    config.actuators_started = true;
+    config.output_watchdog_trips = &vk::platform::output_watchdog_trips;
+#endif
+#ifdef CONFIG_BRINGUP_MOTORS
+    config.bringup = true;
+#endif
 #ifdef CONFIG_BOARD_HAS_ACTUATOR_POWER_SENSE
     ActuatorPowerSense::init();
     config.actuator_power = &actuator_powered;
@@ -196,6 +256,9 @@ int main()
     start_imu();
 #endif
     start_commander();
+#ifdef CONFIG_ACTUATOR_CONTROL
+    start_actuators();
+#endif
 #ifdef CONFIG_ESTIMATOR_MAHONY
     start_estimator();
 #endif

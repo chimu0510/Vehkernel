@@ -2,7 +2,7 @@
 
 **Vehkernel** (Vehicle + Kernel) is open-source MCU firmware with ROS2 support, built as a common core for any vehicle: one system drives many vehicles and frames. The MCU handles real-time state estimation, low-level control and safety, and keeps running without a companion computer; global localization and navigation are left to ROS2 applications above it. The first test platform is a UGV.
 
-**Status: parameter system.** Every decision is recorded in [`docs/adr/`](docs/adr/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary. The firmware runs FreeRTOS with the bus and rate-tiered work queues; on the C50C V1.1 the ICM20948 driver publishes IMU samples at 200 Hz over software I2C, and SITL runs the same driver against a simulated ICM20948. A Link with the custom protocol streams topics to the development host, over the Type-C port on the board and over UDP or a pty in SITL, where the Link monitor shows them live. An attitude estimator (a Mahony filter) turns the IMU samples into `vehicle_attitude`, which CI checks against SITL's ground truth. Parameters are defined in TOML, listed, read and set over the Link, and stored in internal Flash across power cycles. The first wheel motion comes next.
+**Status: first wheel motion, awaiting its hardware check.** Every decision is recorded in [`docs/adr/`](docs/adr/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary. The firmware runs FreeRTOS with the bus and rate-tiered work queues; on the C50C V1.1 the ICM20948 driver publishes IMU samples at 200 Hz over software I2C, and SITL runs the same driver against a simulated ICM20948. A Link with the custom protocol streams topics to the development host, over the Type-C port on the board and over UDP or a pty in SITL, where the Link monitor shows them live. An attitude estimator (a Mahony filter) turns the IMU samples into `vehicle_attitude`, which CI checks against SITL's ground truth. Parameters are defined in TOML, listed, read and set over the Link, and stored in internal Flash across power cycles. Modes, arming checks and an emergency stop gate four motor outputs, each with a wheel speed loop on its encoder, driven over the Link in test mode and checked in SITL; the hardware check on the C50C comes next.
 
 ## Target hardware
 
@@ -207,6 +207,39 @@ tools/link/link_monitor.py --serial /dev/pts/3
 ```
 
 `rate_hz` here follows the MCU's timestamps, so host scheduling does not skew it. The `link` line is the development host's side of the Link, `mcu_link` the MCU's: frames the transport could not take count as `drops`, frames missing from the peer's sequence as `lost`. The check also fails when the MCU dropped frames. CI runs SITL and the monitor's check together through `ctest` (the `sitl_link` and `sitl_link_pty` tests, `test/sitl/check_link.py`), which also fail when the Link work item overruns or the pty is left behind.
+
+### Driving the wheels
+
+Actuators move only in test mode, armed, and only on direct-actuator setpoints: one wheel speed in rad/s per motor output (ADR-0005, ADR-0018). Until a remote control exists, these conditions apply:
+
+- The vehicle boots in `STANDBY`; `mode test` makes the Link that asked the source in control. The mode changes only while disarmed.
+- `arm` runs the arming checks in turn and prints the first that fails: the board verified at boot (the IMU answered and, on the C50C, the revision-ID pins read 0), the emergency stop released, `TEST`, the source in control, no setpoint still active, no bring-up case running, actuator power present on boards that sense it, and actuator control started.
+- `estop on` from any connected Link forces every output off at once. Released within 5 s with `estop off`, the wheels resume from the next setpoint; engaged for 5 s, the vehicle disarms.
+- Setpoints that stop for longer than `COM_SP_TIMEOUT` (0.5 s) stop and disarm the vehicle; an armed vehicle whose targets stay zero or unset for `COM_DISARM_IDLE` (10 s) disarms.
+- Outputs are capped at `MOT_OUT_MAX` (30 % duty by default) and change by at most `MOT_SLEWRATE` of full duty per second, though a stop is never slowed. A watchdog turns them off when actuator control stalls for three control periods.
+
+The C50C reads its drive power circuit on `PE4`: arming needs it on for 0.5 s, and losing it disarms. On the bench, with the sense line unwired, skip that check with `param set COM_ARM_CHECK 0`; the vehicle status then reports it skipped, and `arm` warns. Boards without such an input skip it on their own, so make sure the motor power can be cut by hand.
+
+Lift the wheels off the ground first. Then check that each motor turns its own encoder the right way: the bring-up case pulses each output in turn and prints, for any that fails, which parameter to change. `MOTn_REV` and `MOTn_ENC_REV` are locked while armed, so disarm before changing them:
+
+```bash
+tools/link/link_monitor.py --udp 127.0.0.1:15600 mode test
+tools/link/link_monitor.py --udp 127.0.0.1:15600 arm
+tools/link/link_monitor.py --udp 127.0.0.1:15600 bringup motors
+```
+
+```text
+bringup output=1 result=pass encoder=1 sign=+1
+bringup output=2 result=reversed encoder=2 sign=-1  fix: set MOT2_REV=REVERSED if the wheel turned backwards, MOT2_ENC_REV=REVERSED if it turned forwards
+```
+
+`drive` arms if needed, sends the wheel speeds at 20 Hz for the given time, then stops and disarms:
+
+```bash
+tools/link/link_monitor.py --udp 127.0.0.1:15600 drive 5,5,5,5 --duration 3
+```
+
+The live view shows `vehicle_status`, `wheel_encoders` and `actuator_outputs`. On the board, use `--serial /dev/ttyACM0` instead of `--udp`. SITL simulates four motors and encoders; `--actuator-power-off` starts it with the simulated power cut, `sim-power on|off` cuts or restores it while it runs, and `--reversed-motor <output>` wires a motor the wrong way round. CI drives the simulated wheels through every one of these paths (`sitl_arming`, `sitl_actuators` and `sitl_bringup`).
 
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 

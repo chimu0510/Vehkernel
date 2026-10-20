@@ -1,2 +1,4 @@
 # C50C V1.1 board defaults: the second configuration layer (ADR-0017).
 CONFIG_VEHICLE_MODEL_ACKERMANN=y
+# Its STM32F4 platform drives the motors and reads the encoders (spec 0006).
+CONFIG_ACTUATOR_CONTROL=y

@@ -26,6 +26,23 @@ inline void enable_gpio_clock(hal::Port port)
     LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA << static_cast<std::uint32_t>(port));
 }
 
+template <hal::AfPinType Pin>
+void configure_af_pin(std::uint32_t pull)
+{
+    enable_gpio_clock(Pin::port);
+    GPIO_TypeDef* const port = gpio_port(Pin::port);
+    constexpr std::uint32_t mask = 1U << Pin::number;
+    if constexpr (Pin::number < 8) {
+        LL_GPIO_SetAFPin_0_7(port, mask, Pin::af);
+    } else {
+        LL_GPIO_SetAFPin_8_15(port, mask, Pin::af);
+    }
+    LL_GPIO_SetPinOutputType(port, mask, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetPinSpeed(port, mask, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+    LL_GPIO_SetPinPull(port, mask, pull);
+    LL_GPIO_SetPinMode(port, mask, LL_GPIO_MODE_ALTERNATE);
+}
+
 }  // namespace detail
 
 // An open-drain line on a GPIO_OUTPUT pin. Released, the external pull-up

@@ -7,6 +7,7 @@ vk_add_library(vk_platform LAYER platform OBJECT
   src/freertos_hooks.cpp
   src/internal_flash.cpp
   src/microsecond_clock.cpp
+  src/output_watchdog.cpp
   src/platform.cpp)
 target_include_directories(vk_platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 vk_target_link_libraries(vk_platform PUBLIC vk_hal vk_core vk_board)
