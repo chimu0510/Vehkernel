@@ -23,7 +23,8 @@ if(CONFIG_LINK)
     link/src/default_topic_map.cpp
     link/src/frame.cpp
     link/src/link.cpp
-    link/src/session.cpp)
+    link/src/session.cpp
+    link/src/topic_map.cpp)
   target_include_directories(vk_link PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/link/include)
   vk_target_link_libraries(vk_link PUBLIC vk_msg_headers vk_core vk_hal)
   target_link_libraries(vk_link PRIVATE vk_warnings vk_cxx_subset)

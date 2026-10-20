@@ -28,6 +28,7 @@ Link::Link(std::string_view name, hal::Transport& transport, TopicMap map, const
 
 void Link::start()
 {
+    rate_scale_ = scale_to_baud(map_, transport_->baud_rate());
     schedule_periodic(config_.interval_us);
 }
 
@@ -42,7 +43,8 @@ LinkStats Link::link_stats() const
             .crc_errors = received.crc_errors,
             .malformed = received.malformed,
             .lost = received.lost,
-            .handshake_state = handshake_state_};
+            .handshake_state = handshake_state_,
+            .rate_scale = rate_scale_};
 }
 
 void Link::run()
@@ -77,6 +79,7 @@ void Link::publish_status(std::uint64_t now_us)
     status.malformed = current.malformed;
     status.lost = current.lost;
     status.handshake_state = static_cast<std::uint8_t>(current.handshake_state);
+    status.rate_scale = current.rate_scale;
     status_publication_.publish(status);
 }
 

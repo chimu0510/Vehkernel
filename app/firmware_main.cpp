@@ -146,13 +146,16 @@ void start_link()
 {
     // A rate the USART cannot reach falls back to the board default, so a bad
     // parameter never costs the Link that could change it back.
-    const auto baud = static_cast<std::uint32_t>(vk::params::serial.serial1_baud);
-    if (!link_uart.configure(baud) &&
-        !link_uart.configure(static_cast<std::uint32_t>(vk::board::defaults::SERIAL1_BAUD))) {
-        vk::core::fail("the Link's baud rate is out of the USART's reach");
+    auto baud = static_cast<std::uint32_t>(vk::params::serial.serial1_baud);
+    if (!link_uart.configure(baud)) {
+        baud = static_cast<std::uint32_t>(vk::board::defaults::SERIAL1_BAUD);
+        if (!link_uart.configure(baud)) {
+            vk::core::fail("the Link's baud rate is out of the USART's reach");
+        }
     }
-    link_transport.emplace(link_uart);
-    serial_link.emplace("link0", *link_transport, vk::link::default_topic_map(),
+    link_transport.emplace(link_uart, baud);
+    serial_link.emplace("link0", *link_transport,
+                        vk::link::default_topic_map(static_cast<float>(vk::board::timing::base_rate_hz)),
                         vk::link::Link::Config{.parameters = {.parameters = &vk::params::parameters(),
                                                               .set_hash = vk::params::set_hash,
 #ifdef CONFIG_PARAM_STORAGE_FLASH

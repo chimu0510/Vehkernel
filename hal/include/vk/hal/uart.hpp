@@ -31,9 +31,10 @@ concept Uart = requires(T& uart, const T& const_uart, std::uint32_t baud, std::s
 // A Link transport on one UART.
 class UartTransport final : public Transport {
 public:
+    // `baud` is the rate the UART was configured at.
     template <Uart U>
-    explicit UartTransport(U& uart)
-        : uart_(&uart), write_space_(&write_space_on<U>), write_(&write_on<U>), read_(&read_on<U>)
+    UartTransport(U& uart, std::uint32_t baud)
+        : uart_(&uart), baud_(baud), write_space_(&write_space_on<U>), write_(&write_on<U>), read_(&read_on<U>)
     {
     }
 
@@ -46,6 +47,7 @@ public:
     [[nodiscard]] std::size_t write_space() const override { return write_space_(uart_); }
     std::size_t write(std::span<const std::uint8_t> data) override { return write_(uart_, data); }
     std::size_t read(std::span<std::uint8_t> out) override { return read_(uart_, out); }
+    [[nodiscard]] std::uint32_t baud_rate() const override { return baud_; }
 
 private:
     using WriteSpaceFn = std::size_t (*)(const void*);
@@ -71,6 +73,7 @@ private:
     }
 
     void* uart_;
+    std::uint32_t baud_;
     WriteSpaceFn write_space_;
     WriteFn write_;
     ReadFn read_;

@@ -32,6 +32,10 @@ public:
     // peers (UDP) sends to the one they came from from now on.
     virtual void select_peer() {}
 
+    // Bits a second on the line, 0 for a transport without a baud rate, such
+    // as UDP or a pty.
+    [[nodiscard]] virtual std::uint32_t baud_rate() const { return 0; }
+
 protected:
     ~Transport() = default;
 };

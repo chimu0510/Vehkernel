@@ -543,7 +543,8 @@ class LinkMonitor:
                 f"mcu_link instance={instance} frames_sent={status.frames_sent} bytes_sent={status.bytes_sent} "
                 f"frames_received={status.frames_received} bytes_received={status.bytes_received} "
                 f"drops={status.drops} crc_errors={status.crc_errors} malformed={status.malformed} "
-                f"lost={status.lost} handshake_state={HANDSHAKE_STATES.get(status.handshake_state, '?')}"
+                f"lost={status.lost} handshake_state={HANDSHAKE_STATES.get(status.handshake_state, '?')} "
+                f"rate_scale={getattr(status, 'rate_scale', 100)}"
             )
         for _, status in self.latest("parameter_status"):
             lines.append(param_status_line(status))
@@ -599,14 +600,18 @@ def check(monitor: LinkMonitor, expectations: list[RateExpectation], tolerance: 
         first = monitor.first_link_status.get(instance, status)
         if status.drops > first.drops:
             result.failures.append(f"the MCU dropped {status.drops - first.drops} frames on Link {instance}")
+    # The MCU scales its rates to fit a slow serial port (ADR-0002); expect the scaled rate.
+    scale = min((getattr(status, "rate_scale", 100) for _, status in monitor.latest("link_status")), default=100)
     for expected in expectations:
         topic = monitor.topics.get((expected.name, expected.instance))
         if topic is None:
             result.failures.append(f"topic {expected.name}:{expected.instance} never arrived")
             continue
-        if abs(topic.rate_hz - expected.rate_hz) > expected.rate_hz * tolerance:
+        rate_hz = max(1.0, expected.rate_hz * scale / 100) if scale < 100 else expected.rate_hz
+        if abs(topic.rate_hz - rate_hz) > rate_hz * tolerance:
+            scaled = f" (scaled to {scale} %)" if scale < 100 else ""
             result.failures.append(
                 f"topic {expected.name}:{expected.instance} arrived at {topic.rate_hz:.2f} Hz, "
-                f"expected {expected.rate_hz:g} Hz within {tolerance:.0%}"
+                f"expected {rate_hz:g} Hz{scaled} within {tolerance:.0%}"
             )
     return result

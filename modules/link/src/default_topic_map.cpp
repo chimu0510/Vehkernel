@@ -41,10 +41,10 @@ std::array<TopicStream*, 5 + sizeof...(I) + sizeof...(J)> make_map(std::array<To
 
 }  // namespace
 
-TopicMap default_topic_map()
+TopicMap default_topic_map(float imu_rate_hz)
 {
     // Created on first use, after the bus storage is in place.
-    static TopicStreamOf<msg::ImuSample> imu(every_sample, 0);
+    static TopicStreamOf<msg::ImuSample> imu(every_sample, 0, imu_rate_hz);
     static TopicStreamOf<msg::VehicleAttitude> attitude(MaxRate{50.0F}, 0);
     static TopicStreamOf<msg::VehicleAttitudeGroundtruth> truth(MaxRate{50.0F}, 0);  // SITL only
     static TopicStreamOf<msg::ParameterStatus> parameters(status_rate, 0);           // with parameter storage

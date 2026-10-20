@@ -51,7 +51,7 @@ static_assert(vk::hal::Uart<FakeUart>);
 TEST(UartTransport, ForwardsToTheBoundUart)
 {
     FakeUart uart;
-    vk::hal::UartTransport transport(uart);
+    vk::hal::UartTransport transport(uart, 115200);
     vk::hal::Transport& link_side = transport;
 
     EXPECT_EQ(link_side.write_space(), 3U);

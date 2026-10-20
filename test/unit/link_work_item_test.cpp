@@ -90,11 +90,13 @@ public:
     }
 
     void select_peer() override { peer_selected = true; }
+    [[nodiscard]] std::uint32_t baud_rate() const override { return baud; }
 
     std::size_t space = std::numeric_limits<std::size_t>::max();
     std::vector<std::uint8_t> written;
     std::vector<std::uint8_t> incoming;
     bool peer_selected = false;
+    std::uint32_t baud = 0;
 };
 
 struct ReceivedFrame {
@@ -410,6 +412,134 @@ TEST_F(LinkTest, CountsCrcErrorsAndSequenceGapsInLinkStatus)
     EXPECT_EQ(status.frames_sent, link.link_stats().frames_sent);
     EXPECT_GT(status.bytes_sent, 0U);
     EXPECT_GT(status.bytes_received, 0U);
+}
+
+// --- Topic rates scaled to the baud rate (ADR-0002, spec 0006) ---
+
+// A large message, to make a slow stream count.
+template <int Tag>
+struct Large {
+    std::uint64_t timestamp{};
+
+    static constexpr std::string_view topic_name = "link_test_large";
+    static constexpr std::uint64_t schema_hash = 0;
+    static constexpr std::uint16_t topic_id = 200 + Tag;
+    static constexpr std::size_t queue_length = 1;
+    static constexpr std::size_t instances = 1;
+    static constexpr float nominal_rate_hz = 0.0F;
+    static constexpr std::size_t encoded_size = 200;
+
+    [[nodiscard]] std::size_t encode(std::span<std::uint8_t> out) const
+    {
+        if (out.size() < encoded_size) {
+            return 0;
+        }
+        std::fill_n(out.begin(), encoded_size, std::uint8_t{1});
+        return encoded_size;
+    }
+};
+
+// A 12-byte message on the wire: 4 header, 3 topic, 12 message and 2 CRC
+// bytes, one COBS overhead byte and the delimiter.
+constexpr float small_frame_bytes = 23.0F;
+
+TEST(TopicMapLoad, CountsEachFrameWithItsOverhead)
+{
+    TopicStreamOf<Sample<20, 1>> stream(vk::link::MaxRate{10.0F});
+    const std::array<TopicStream*, 1> map{&stream};
+    EXPECT_FLOAT_EQ(vk::link::topic_map_load(map), 10.0F * small_frame_bytes);
+}
+
+TEST(TopicMapScaling, LeavesAMapThatFitsAlone)
+{
+    TopicStreamOf<Sample<21, 4>> fast(vk::link::every_sample, 0, 200.0F);
+    TopicStreamOf<Sample<22, 1>> slow(vk::link::MaxRate{50.0F});
+    const std::array<TopicStream*, 2> map{&fast, &slow};
+    EXPECT_EQ(vk::link::scale_to_baud(map, 921'600), 100);
+    EXPECT_EQ(vk::link::scale_to_baud(map, 0), 100);  // no baud rate, as UDP
+    EXPECT_FLOAT_EQ(fast.rate_hz(), 200.0F);
+    EXPECT_FLOAT_EQ(slow.rate_hz(), 50.0F);
+}
+
+TEST(TopicMapScaling, ScalesEveryStreamFasterThanOneHertzByOneFactor)
+{
+    TopicStreamOf<Sample<23, 4>> fast(vk::link::every_sample, 0, 1000.0F);
+    TopicStreamOf<Sample<24, 1>> medium(vk::link::MaxRate{100.0F});
+    TopicStreamOf<Sample<25, 1>> status(vk::link::MaxRate{1.0F});
+    const std::array<TopicStream*, 3> map{&fast, &medium, &status};
+    const std::uint8_t scale = vk::link::scale_to_baud(map, 57'600);
+    const float capacity = 57'600.0F / 10.0F * vk::link::max_port_load;
+    EXPECT_LT(scale, 100);
+    EXPECT_LE(vk::link::topic_map_load(map), capacity * 1.001F);
+    EXPECT_NEAR(fast.rate_hz() / 1000.0F, medium.rate_hz() / 100.0F, 1e-3F);  // one factor
+    EXPECT_NEAR(fast.rate_hz() / 1000.0F, scale / 100.0F, 0.011F);
+    EXPECT_FLOAT_EQ(status.rate_hz(), 1.0F);
+}
+
+TEST(TopicMapScaling, HoldsAStreamAtOneHertzRatherThanBelow)
+{
+    TopicStreamOf<Sample<26, 4>> fast(vk::link::every_sample, 0, 1000.0F);
+    TopicStreamOf<Large<0>> large(vk::link::MaxRate{2.0F});
+    const std::array<TopicStream*, 2> map{&fast, &large};
+    vk::link::scale_to_baud(map, 9'600);
+    EXPECT_FLOAT_EQ(large.rate_hz(), 1.0F);
+    EXPECT_LE(vk::link::topic_map_load(map), 9'600.0F / 10.0F * vk::link::max_port_load * 1.001F);
+    EXPECT_GT(fast.rate_hz(), 1.0F);
+}
+
+TEST(TopicMapScaling, AnEverySampleStreamSendsOnlyTheNewestSampleOfEachInterval)
+{
+    TopicStreamOf<Sample<27, 8>> stream(vk::link::every_sample, 0, 1000.0F);
+    const std::array<TopicStream*, 1> map{&stream};
+    vk::link::scale_to_baud(map, 57'600);
+    vk::core::Publication<Sample<27, 8>> publication;
+    for (std::uint32_t value = 1; value <= 5; ++value) {
+        publication.publish({.timestamp = 0, .value = value});
+    }
+    std::array<std::uint8_t, 64> out{};
+    EXPECT_GT(stream.next(1'000'000, out), 0U);
+    EXPECT_EQ(stream.next(1'000'000, out), 0U);
+}
+
+TEST(TopicMapScaling, TheDefaultMapFitsEitherRateItIsScaledTo)
+{
+    const vk::link::TopicMap map = vk::link::default_topic_map(200.0F);
+    // Checked by its properties only: later milestones add topics.
+    EXPECT_EQ(vk::link::scale_to_baud(map, 921'600), 100);
+    EXPECT_LT(vk::link::scale_to_baud(map, 57'600), 100);
+    EXPECT_LE(vk::link::topic_map_load(map), 57'600.0F / 10.0F * vk::link::max_port_load * 1.001F);
+    for (const TopicStream* stream : map) {
+        EXPECT_GE(stream->rate_hz(), std::min(1.0F, stream->nominal_hz()) * 0.999F);
+    }
+}
+
+TEST_F(LinkTest, ASerialLinkScaledToItsBaudRateDropsNoFrame)
+{
+    TopicStreamOf<Sample<28, 8>> stream(vk::link::every_sample, 0, 1000.0F);
+    const std::array<TopicStream*, 1> map{&stream};
+    transport.baud = 57'600;
+    Link link("link_test", transport, map, {}, queue);
+    link.start();
+    connect();
+    host.receive();
+    const std::uint32_t drops_after_handshake = link.link_stats().drops;
+
+    // The port carries baud / 10 bytes a second; each run may take what has
+    // accumulated since the last one.
+    vk::core::Publication<Sample<28, 8>> publication;
+    float budget = 0.0F;
+    for (int run = 0; run < 200; ++run) {
+        for (std::uint32_t sample = 0; sample < 5; ++sample) {  // 1000 samples a second
+            publication.publish({.timestamp = fake_now, .value = sample});
+        }
+        budget += 57'600.0F / 10.0F * static_cast<float>(Link::default_interval_us) * 1e-6F;
+        transport.space = static_cast<std::size_t>(budget);
+        step();
+        budget -= static_cast<float>(transport.written.size());
+        host.receive();
+    }
+    EXPECT_EQ(link.link_stats().drops, drops_after_handshake);
+    EXPECT_LT(link.link_stats().rate_scale, 100);
 }
 
 }  // namespace

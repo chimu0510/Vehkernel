@@ -238,7 +238,7 @@ bool start_link(const Options& options)
     }
     // Tools wait for this line, so it leaves at once.
     std::fflush(stdout);
-    host_link.emplace("link0", *transport, vk::link::default_topic_map(),
+    host_link.emplace("link0", *transport, vk::link::default_topic_map(static_cast<float>(vk::platform::imu_rate_hz)),
                       vk::link::Link::Config{.parameters = {.parameters = &vk::params::parameters(),
                                                             .set_hash = vk::params::set_hash,
                                                             .storage = stored_parameters()},

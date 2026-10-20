@@ -169,7 +169,7 @@ def test_summary_and_live_view_show_link_statistics_and_work_item_timing():
 
     summary = monitor.summary()
     assert ("mcu_link instance=0 frames_sent=100 bytes_sent=4000 frames_received=5 bytes_received=80 drops=2 "
-            "crc_errors=1 malformed=0 lost=3 handshake_state=connected") in summary
+            "crc_errors=1 malformed=0 lost=3 handshake_state=connected rate_scale=100") in summary
     assert any(line.startswith("work_item name=icm20948 runs=1000 overruns=0") for line in summary)
     assert "the MCU dropped 2 frames on Link 0" in check(monitor, [], 0.05).failures
 

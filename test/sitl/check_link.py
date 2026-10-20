@@ -96,6 +96,11 @@ def main() -> int:
     for item in reported:
         if int(item["overruns"]) != 0:
             failures.append(f"work item {item['name']} overran {item['overruns']} times during the check")
+    # A transport without a baud rate, UDP or a pty, is never scaled (ADR-0002).
+    scales = [line.split("rate_scale=")[1].split()[0] for line in monitor.stdout.splitlines()
+              if line.startswith("mcu_link ") and "rate_scale=" in line]
+    if not scales or any(scale != "100" for scale in scales):
+        failures.append(f"the Link's rate_scale is {scales or 'missing'}, expected 100 over {args.link}")
     if pty_path is not None and os.path.exists(pty_path):
         failures.append(f"{pty_path} is left behind")
 

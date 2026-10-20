@@ -1,10 +1,14 @@
 // Topic maps (ADR-0002): which topic instances leave through a Link, and how
 // often.
 //
-// A topic map is a table of topic streams fixed at build time, until the
-// parameter system exists. Each stream reads one topic instance and either
-// sends every sample, for queued topics such as imu_sample, or sends the
-// latest value at most at a given rate.
+// A topic map is a table of topic streams fixed at build time. Each stream
+// reads one topic instance and either sends every sample, for queued topics
+// such as imu_sample, or sends the latest value at most at a given rate.
+//
+// A Link on a transport with a baud rate scales its streams down when the map
+// would need more than 80 % of the port (ADR-0002): every stream faster than
+// 1 Hz by one common factor, never below 1 Hz, an every-sample stream
+// becoming a rate-limited one; 1 Hz streams keep their rate.
 #pragma once
 
 #include <vk/core/bus.hpp>
@@ -35,6 +39,20 @@ public:
     // 0 when none is due. Call until it returns 0.
     virtual std::size_t next(std::uint64_t now_us, std::span<std::uint8_t> out) = 0;
 
+    // The rate the stream sends at before any scaling: its rate limit, or an
+    // every-sample stream's nominal publish rate.
+    [[nodiscard]] virtual float nominal_hz() const = 0;
+
+    // The rate it sends at most now.
+    [[nodiscard]] virtual float rate_hz() const = 0;
+
+    // The encoded size of its messages.
+    [[nodiscard]] virtual std::size_t message_size() const = 0;
+
+    // Sends at most `hz` times a second from now on, an every-sample stream
+    // only the newest sample of each interval.
+    virtual void limit_rate(float hz) = 0;
+
     [[nodiscard]] std::uint16_t topic_id() const { return topic_id_; }
     [[nodiscard]] std::uint8_t instance() const { return instance_; }
 
@@ -50,16 +68,27 @@ private:
 template <class T>
 class TopicStreamOf final : public TopicStream {
 public:
-    explicit TopicStreamOf(EverySample /*unused*/, std::size_t instance = 0)
-        : TopicStream(T::topic_id, static_cast<std::uint8_t>(instance)), subscription_(instance)
+    // `nominal_hz` is how often the topic is published, when the schema
+    // leaves it to the board, as for imu_sample.
+    explicit TopicStreamOf(EverySample /*unused*/, std::size_t instance = 0, float nominal_hz = T::nominal_rate_hz)
+        : TopicStream(T::topic_id, static_cast<std::uint8_t>(instance)), subscription_(instance),
+          nominal_hz_(nominal_hz)
     {
     }
 
     explicit TopicStreamOf(MaxRate rate, std::size_t instance = 0)
         : TopicStream(T::topic_id, static_cast<std::uint8_t>(instance)), subscription_(instance),
-          interval_us_(static_cast<std::uint32_t>(1e6F / rate.hz))
+          interval_us_(static_cast<std::uint32_t>(1e6F / rate.hz)), nominal_hz_(rate.hz)
     {
     }
+
+    [[nodiscard]] float nominal_hz() const override { return nominal_hz_; }
+    [[nodiscard]] float rate_hz() const override
+    {
+        return interval_us_ == 0 ? nominal_hz_ : 1e6F / static_cast<float>(interval_us_);
+    }
+    [[nodiscard]] std::size_t message_size() const override { return T::encoded_size; }
+    void limit_rate(float hz) override { interval_us_ = static_cast<std::uint32_t>(1e6F / hz); }
 
     std::size_t next(std::uint64_t now_us, std::span<std::uint8_t> out) override
     {
@@ -84,16 +113,30 @@ public:
 private:
     core::Subscription<T> subscription_;
     std::uint32_t interval_us_ = 0;  // 0 sends every sample
+    float nominal_hz_ = 0.0F;
     std::uint64_t next_send_us_ = 0;
 };
 
 // A Link's topic map.
 using TopicMap = std::span<TopicStream* const>;
 
+// The share of a port's capacity a topic map may use.
+inline constexpr float max_port_load = 0.8F;
+
+// The bytes a second `map` needs at its current rates, each frame with its
+// header, CRC, worst-case COBS overhead and delimiter.
+float topic_map_load(TopicMap map);
+
+// Scales `map` down to fit a port at `baud` bits a second (8N1, 10 bits a
+// byte); returns the common factor in percent, 100 when nothing was scaled
+// or the transport has no baud rate (0).
+std::uint8_t scale_to_baud(TopicMap map, std::uint32_t baud);
+
 // The default topic map: imu_sample instance 0 at every sample,
 // vehicle_attitude and (in SITL) vehicle_attitude_groundtruth at 50 Hz,
 // vehicle_status at 5 Hz, and parameter_status and every instance of
 // work_item_status and link_status at 1 Hz.
-TopicMap default_topic_map();
+// `imu_rate_hz` is imu_sample's publish rate, from the board's timing preset.
+TopicMap default_topic_map(float imu_rate_hz);
 
 }  // namespace vk::link

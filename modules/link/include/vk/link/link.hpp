@@ -8,7 +8,8 @@
 // entry that is due once the session is connected and every topic has been
 // described. A frame the transport cannot
 // take is dropped and counted; the Link never blocks its work queue. Once a
-// second it publishes its statistics on link_status.
+// second it publishes its statistics on link_status. On a transport with a
+// baud rate, start() scales the topic map down to fit it (ADR-0002).
 #pragma once
 
 #include <vk/core/work_queue.hpp>
@@ -42,6 +43,7 @@ struct LinkStats {
     std::uint32_t malformed;        // invalid COBS, too short or too long
     std::uint32_t lost;             // frames missing from the peer's sequence
     HandshakeState handshake_state;
+    std::uint8_t rate_scale;        // percent of the topic map's rates, scaled to fit the baud rate
 };
 
 class Link final : public core::WorkItem {
@@ -104,6 +106,7 @@ private:
     std::uint32_t bytes_received_ = 0;
     HandshakeState handshake_state_ = HandshakeState::Waiting;
     std::uint64_t next_status_us_ = 0;
+    std::uint8_t rate_scale_ = 100;
     std::array<std::uint8_t, 2 * max_wire_size> receive_buffer_{};
 };
 
