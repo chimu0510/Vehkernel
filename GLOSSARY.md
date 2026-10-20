@@ -130,8 +130,15 @@ The state that decides whether actuators may produce output, either armed or dis
 _Avoid_: unlock, lock
 
 **Emergency Stop**:
-A hardware input on the board that must be closed to arm, and that disarms the vehicle at once when opened, independent of the remote control and every Link.
-_Avoid_: kill switch, e-stop button
+A switch that cuts the actuators' power circuit in hardware, independent of the MCU, for example the switch on the C50C's connector CN6. The MCU sees it only through actuator power sense, on boards that have it.
+_Avoid_: kill switch
+
+**Actuator Power Sense**:
+A board input from which the MCU reads whether the actuators' power circuit is closed, for example `PE4` on the C50C.
+_Avoid_: enable switch, emergency stop input
+
+**Arming Check**:
+A condition that must hold for an arm request to be accepted. Checks of hardware state, such as actuator power, can be skipped with `ARM_CHECK`; checks that guard the arming logic cannot.
 
 **Failsafe Action**:
 The action a vehicle takes automatically when the source in control times out or fails, for example stopping, holding position or surfacing.
