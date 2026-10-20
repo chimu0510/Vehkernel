@@ -1,0 +1,31 @@
+# Parameters of the commander: modes, arming and setpoint arbitration
+# (ADR-0005, ADR-0012).
+prefix = "COM"
+
+[[param]]
+name = "COM_ARM_CHECK"
+type = "INT32"
+default = 1
+bits = [
+  { name = "ACT_POWER", bit = 0 },
+]
+description = "Arming checks of hardware state; a cleared bit skips that check. ACT_POWER: actuator power must be present to arm, and losing it disarms, on boards that sense it."
+locked_when_armed = true
+
+[[param]]
+name = "COM_SP_TIMEOUT"
+type = "FLOAT"
+default = 0.5
+min = 0.1
+max = 5.0
+unit = "s"
+description = "Setpoint timeout: after the first setpoint since arming, a longer gap between setpoints from the source in control stops and disarms the vehicle."
+
+[[param]]
+name = "COM_DISARM_IDLE"
+type = "FLOAT"
+default = 10.0
+min = 1.0
+max = 600.0
+unit = "s"
+description = "Idle disarm: the vehicle disarms when every setpoint target has been NaN or zero for this long, including from arming on when no setpoint arrives."

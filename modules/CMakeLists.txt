@@ -2,6 +2,17 @@
 vk_add_library(vk_modules LAYER module INTERFACE)
 vk_target_link_libraries(vk_modules INTERFACE vk_drivers vk_hal vk_core vk_lib_estimation)
 
+# The commander (ADR-0005): modes, arming, arming checks and the emergency
+# stop. Its state machine uses neither the bus nor FreeRTOS, so it is tested
+# on the development host; the work item wraps it.
+vk_add_library(vk_commander LAYER module STATIC
+  commander/src/commander.cpp
+  commander/src/commander_task.cpp)
+target_include_directories(vk_commander PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/commander/include)
+vk_target_link_libraries(vk_commander PUBLIC vk_msg_headers vk_core vk_params)
+target_link_libraries(vk_commander PRIVATE vk_warnings vk_cxx_subset)
+vk_target_link_libraries(vk_modules INTERFACE vk_commander)
+
 if(CONFIG_LINK)
   # The custom protocol and the Link work item (ADR-0002). The protocol code
   # uses neither a transport nor FreeRTOS, so it is tested on the development

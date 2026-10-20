@@ -385,7 +385,10 @@ TEST_F(LinkTest, CountsCrcErrorsAndSequenceGapsInLinkStatus)
     Link link("link_test", transport, map, {.instance = 1}, queue);
     link.start();
     host.send_hello();
-    step();
+    // Until every topic_info is out, so link_status sees every frame sent.
+    for (std::size_t run = 0; run <= vk::link::schema_topics.size() / Link::paced_frames_per_run; ++run) {
+        step();
+    }
 
     host.send_corrupted();
     host.lose_one();
