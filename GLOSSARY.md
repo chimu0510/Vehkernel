@@ -130,15 +130,15 @@ The state that decides whether actuators may produce output, either armed or dis
 _Avoid_: unlock, lock
 
 **Emergency Stop**:
-A switch that cuts the actuators' power circuit in hardware, independent of the MCU, for example the switch on the C50C's connector CN6. The MCU sees it only through actuator power sense, on boards that have it.
-_Avoid_: kill switch
-
-**Actuator Power Sense**:
-A board input from which the MCU reads whether the actuators' power circuit is closed, for example `PE4` on the C50C.
-_Avoid_: enable switch, emergency stop input
+A firmware function, triggered by the remote control or any Link, that forces every actuator output off at once whatever the mode and the source in control, and disarms the vehicle if it stays engaged for 5 s, as ArduPilot's motor emergency stop and PX4's kill switch.
+_Avoid_: kill switch, e-stop button
 
 **Arming Check**:
-A condition that must hold for an arm request to be accepted. Checks of hardware state, such as actuator power, can be skipped with `ARM_CHECK`; checks that guard the arming logic cannot.
+A condition that must hold for an arm request to be accepted. Checks of hardware state can be skipped by bits of `COM_ARM_CHECK`; the others cannot.
+
+**Actuator Power Sense**:
+A board-specific input from which the MCU reads whether the actuators' power circuit is closed, for example `PE4` on the C50C; where a board has it, it is a skippable arming check.
+_Avoid_: enable switch, emergency stop input
 
 **Failsafe Action**:
 The action a vehicle takes automatically when the source in control times out or fails, for example stopping, holding position or surfacing.
@@ -235,7 +235,7 @@ A test that confirms the wiring, mapping and direction of a new board or new wir
 _Avoid_: power-on test
 
 **Test Mode**:
-A mode in which the test runner on the development host is in control, used to run bring-up cases.
+A mode in which the test runner on the development host is in control, accepting only direct-actuator setpoints, used for bring-up cases and actuator tests.
 
 ### Software layers
 
