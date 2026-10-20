@@ -123,11 +123,15 @@ A control target sent to the MCU, at one of three levels: body velocity, attitud
 _Avoid_: command
 
 **Mode**:
-The operating state that decides which source is in control and which setpoint levels it may use.
+The operating state that decides which source is in control and which setpoint levels it may use. The vehicle boots in `STANDBY`, where no source is in control.
 
 **Arming**:
 The state that decides whether actuators may produce output, either armed or disarmed.
 _Avoid_: unlock, lock
+
+**Emergency Stop**:
+A hardware input on the board that must be closed to arm, and that disarms the vehicle at once when opened, independent of the remote control and every Link.
+_Avoid_: kill switch, e-stop button
 
 **Failsafe Action**:
 The action a vehicle takes automatically when the source in control times out or fails, for example stopping, holding position or surfacing.
@@ -202,7 +206,7 @@ The physical or logical channel that carries a Link's bytes, for example UART, C
 _Avoid_: interface, port
 
 **Topic Map**:
-The configuration declaring which topics leave through a Link, in which direction and at what rate.
+The configuration declaring which topics travel over a Link, in which direction and at what rate; inbound topics are accepted only when the map declares them.
 
 **Schema**:
 The single source of truth for topics and message types, from which MCU, Bridge and tool code is generated.

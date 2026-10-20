@@ -17,6 +17,8 @@ Tests are split into six layers, from static checks to ROS2 integration. SITL ru
   - Parameter storage.
 
   Tests that turn the wheels require the wheels to be lifted off the ground first, with output power limited.
+
+  Bring-up cases live in two places. Cases that need no actuators and must work before any Link does, such as IMU wiring on a newly powered board, run in a separate bring-up image that the runner flashes over SWD and whose results it reads back over SWD; that image never configures actuator pins. Cases that move actuators run in the main firmware's test mode, started and reported over a Link, so they are guarded by arming and the emergency stop (ADR-0005). Motor-to-encoder mapping and direction runs before any closed-loop wheel speed control, because a reversed motor or encoder turns the speed loop into positive feedback. PWM frequency is measured with an oscilloscope, since the MCU cannot observe its own output.
 - **L5 ROS2 integration**: SITL + Bridge + Nav2, run with launch_testing.
 
 **SITL**
