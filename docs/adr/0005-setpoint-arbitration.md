@@ -28,7 +28,7 @@ The firmware also guards against itself stalling: the platform layer turns every
 Arming checks are of two kinds:
 
 - **Checks of hardware state**, which can be skipped. Each has a bit in the bitmask parameter `COM_ARM_CHECK`, all set by default, as in ArduPilot's `ARMING_CHECK`. Clearing a bit skips that check: it neither refuses arming nor disarms, but its state is still published. Skipping is for bench testing and for boards whose input is unwired or unreliable. `COM_ARM_CHECK` is locked while armed, the vehicle status reports which checks are skipped, and tools warn on arming while any is. A check whose input a board lacks is not available and passes.
-- **Checks that cannot be skipped**: the board verified at boot (ADR-0010), the emergency stop released, the mode, the source in control, setpoints cleared, no bring-up case running, actuators started.
+- **Checks that cannot be skipped**: the board verified at boot (ADR-0010), the emergency stop released, the mode, the source in control, setpoints cleared, no bring-up case running, actuators started, the local menu closed (ADR-0022).
 
 **Board-specific: actuator power sense**
 

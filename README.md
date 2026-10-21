@@ -23,6 +23,7 @@ Other board revisions and boards get their own board definitions when needed ([A
 - **ROS2 interface**:
   - A vehicle-level topic API with three setpoint levels; ros2_control is optional ([0003](docs/adr/0003-vehicle-level-ros2-api.md)).
   - The mode decides who is in control, and the remote control can always take over ([0005](docs/adr/0005-setpoint-arbitration.md)).
+  - A local display shows the vehicle's status, and its local menu changes whitelisted parameters only while disarmed ([0022](docs/adr/0022-local-display-and-local-menu.md)).
 - **Runtime**: FreeRTOS, a C++20 subset, and rate-tiered work queues ([0004](docs/adr/0004-freertos.md), [0007](docs/adr/0007-cpp20-subset.md), [0008](docs/adr/0008-bus-and-work-queues.md)).
 - **Hardware support**:
   - Board definitions are written in TOML; the generator validates pins against the MCU database and solves DMA assignments ([0011](docs/adr/0011-toml-board-definition-toolchain.md)).

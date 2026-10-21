@@ -148,6 +148,24 @@ _Avoid_: failsafe mode
 The mechanism by which the MCU decides, from the mode and safety state, whose setpoints are in control.
 _Avoid_: command arbitration, priority switching
 
+### Local interface
+
+**Local Display**:
+A display on the board that shows the vehicle's status from topics on the bus and hosts the local menu; it never feeds the control chain.
+_Avoid_: OSD, screen, HMI
+
+**Local Menu**:
+The menu on the local display, operated with the user key, that changes whitelisted parameters only while disarmed; arming is refused while it is open, and it never arms, changes the mode or moves an actuator.
+_Avoid_: CMS, settings menu, UI
+
+**User Key**:
+A push button on the board that operates the local display and the local menu, for example S3 on the C50C; it is not an emergency stop.
+_Avoid_: button, mode key
+
+**Menu Parameter**:
+A parameter whose definition sets `menu = true`, so that it appears in the local menu.
+_Avoid_: quick setting
+
 ### Logging
 
 **Log Sink**:
