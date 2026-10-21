@@ -9,7 +9,15 @@ config BOARD_FLASH_BUS_SPI
 	bool
 	default y
 
+config BOARD_HAS_BARO
+	bool
+	default y
+
 config BOARD_HAS_BMP280
+	bool
+	default y
+
+config BOARD_HAS_FLASH
 	bool
 	default y
 
@@ -22,6 +30,10 @@ config BOARD_HAS_I2C1
 	default y
 
 config BOARD_HAS_ICM20948
+	bool
+	default y
+
+config BOARD_HAS_IMU
 	bool
 	default y
 

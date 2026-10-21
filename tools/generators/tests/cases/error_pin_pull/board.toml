@@ -1,0 +1,10 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA0", role = "LED",    func = "GPIO_OUTPUT", pull = "UP" },
+  { pin = "PA1", role = "BUTTON", func = "GPIO_INPUT",  pull = "SIDEWAYS" },
+  { pin = "PA2", role = "KEY",    func = "GPIO_INPUT" },
+]
+
+user_key = { pin = "KEY", pressed = "PUSHED" }

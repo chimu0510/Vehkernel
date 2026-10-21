@@ -1,0 +1,3 @@
+board.toml:5: error: pull of pin PA0 needs the GPIO_INPUT function, not GPIO_OUTPUT
+board.toml:6: error: pull of pin PA1 must be one of: UP, DOWN, got 'SIDEWAYS'
+board.toml:10: error: the pressed level must be one of: HIGH, LOW, got 'PUSHED'

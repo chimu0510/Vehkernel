@@ -51,8 +51,13 @@ struct AnalogPin : PinId<P, Number> {
     static constexpr std::string_view signal = S.view();
 };
 
-template <Port P, std::uint8_t Number>
-struct GpioInput : PinId<P, Number> {};
+// The pull resistor a GPIO input needs, declared in the board definition.
+enum class Pull : std::uint8_t { None, Up, Down };
+
+template <Port P, std::uint8_t Number, Pull Resistor = Pull::None>
+struct GpioInput : PinId<P, Number> {
+    static constexpr Pull pull = Resistor;
+};
 
 template <Port P, std::uint8_t Number>
 struct GpioOutput : PinId<P, Number> {};

@@ -10,6 +10,7 @@
       "func": "GPIO_INPUT",
       "kind": "gpio_input",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -20,6 +21,7 @@
       "func": "GPIO_INPUT",
       "kind": "gpio_input",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -30,6 +32,7 @@
       "func": "GPIO_INPUT",
       "kind": "gpio_input",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -40,6 +43,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -50,6 +54,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -60,6 +65,7 @@
       "func": "GPIO_INPUT",
       "kind": "gpio_input",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -70,6 +76,7 @@
       "func": "TIM2_CH1",
       "kind": "af",
       "af": 1,
+      "pull": null,
       "alt": []
     },
     {
@@ -80,6 +87,7 @@
       "func": "TIM2_CH2",
       "kind": "af",
       "af": 1,
+      "pull": null,
       "alt": []
     },
     {
@@ -90,6 +98,7 @@
       "func": "TIM3_CH1",
       "kind": "af",
       "af": 2,
+      "pull": null,
       "alt": []
     },
     {
@@ -100,6 +109,7 @@
       "func": "TIM3_CH2",
       "kind": "af",
       "af": 2,
+      "pull": null,
       "alt": []
     },
     {
@@ -110,6 +120,7 @@
       "func": "TIM4_CH1",
       "kind": "af",
       "af": 2,
+      "pull": null,
       "alt": [
         {
           "config": 1,
@@ -128,6 +139,7 @@
       "func": "TIM4_CH2",
       "kind": "af",
       "af": 2,
+      "pull": null,
       "alt": [
         {
           "config": 1,
@@ -146,6 +158,7 @@
       "func": "TIM5_CH1",
       "kind": "af",
       "af": 2,
+      "pull": null,
       "alt": []
     },
     {
@@ -156,6 +169,7 @@
       "func": "TIM5_CH2",
       "kind": "af",
       "af": 2,
+      "pull": null,
       "alt": []
     },
     {
@@ -166,6 +180,7 @@
       "func": "TIM8_CH4",
       "kind": "af",
       "af": 3,
+      "pull": null,
       "alt": []
     },
     {
@@ -176,6 +191,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -186,6 +202,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -196,6 +213,7 @@
       "func": "TIM8_CH3",
       "kind": "af",
       "af": 3,
+      "pull": null,
       "alt": []
     },
     {
@@ -206,6 +224,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -216,6 +235,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -226,6 +246,7 @@
       "func": "TIM8_CH2",
       "kind": "af",
       "af": 3,
+      "pull": null,
       "alt": []
     },
     {
@@ -236,6 +257,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -246,6 +268,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -256,6 +279,7 @@
       "func": "TIM8_CH1",
       "kind": "af",
       "af": 3,
+      "pull": null,
       "alt": []
     },
     {
@@ -266,6 +290,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -276,6 +301,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -286,6 +312,7 @@
       "func": "TIM9_CH1",
       "kind": "af",
       "af": 3,
+      "pull": null,
       "alt": []
     },
     {
@@ -296,6 +323,7 @@
       "func": "TIM1_CH1",
       "kind": "af",
       "af": 1,
+      "pull": null,
       "alt": []
     },
     {
@@ -306,6 +334,7 @@
       "func": "TIM1_CH2",
       "kind": "af",
       "af": 1,
+      "pull": null,
       "alt": []
     },
     {
@@ -316,6 +345,7 @@
       "func": "TIM1_CH3",
       "kind": "af",
       "af": 1,
+      "pull": null,
       "alt": []
     },
     {
@@ -326,6 +356,7 @@
       "func": "TIM1_CH4",
       "kind": "af",
       "af": 1,
+      "pull": null,
       "alt": []
     },
     {
@@ -336,6 +367,7 @@
       "func": "UART5_RX",
       "kind": "af",
       "af": 8,
+      "pull": null,
       "alt": []
     },
     {
@@ -346,6 +378,7 @@
       "func": "USART3_TX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": []
     },
     {
@@ -356,6 +389,7 @@
       "func": "USART3_RX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": []
     },
     {
@@ -366,6 +400,7 @@
       "func": "USART1_TX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": []
     },
     {
@@ -376,6 +411,7 @@
       "func": "USART1_RX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": []
     },
     {
@@ -386,6 +422,7 @@
       "func": "UART4_TX",
       "kind": "af",
       "af": 8,
+      "pull": null,
       "alt": []
     },
     {
@@ -396,6 +433,7 @@
       "func": "UART4_RX",
       "kind": "af",
       "af": 8,
+      "pull": null,
       "alt": []
     },
     {
@@ -406,6 +444,7 @@
       "func": "CAN1_RX",
       "kind": "af",
       "af": 9,
+      "pull": null,
       "alt": []
     },
     {
@@ -416,6 +455,7 @@
       "func": "CAN1_TX",
       "kind": "af",
       "af": 9,
+      "pull": null,
       "alt": []
     },
     {
@@ -426,6 +466,7 @@
       "func": "USB_OTG_FS_DM",
       "kind": "af",
       "af": 10,
+      "pull": null,
       "alt": []
     },
     {
@@ -436,6 +477,7 @@
       "func": "USB_OTG_FS_DP",
       "kind": "af",
       "af": 10,
+      "pull": null,
       "alt": []
     },
     {
@@ -446,6 +488,7 @@
       "func": "ADC1_IN8",
       "kind": "analog",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -456,6 +499,7 @@
       "func": "ADC1_IN12",
       "kind": "analog",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -466,6 +510,7 @@
       "func": "ADC1_IN13",
       "kind": "analog",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -476,6 +521,7 @@
       "func": "ADC1_IN11",
       "kind": "analog",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -486,6 +532,7 @@
       "func": "TIM12_CH1",
       "kind": "af",
       "af": 9,
+      "pull": null,
       "alt": []
     },
     {
@@ -496,6 +543,7 @@
       "func": "TIM12_CH2",
       "kind": "af",
       "af": 9,
+      "pull": null,
       "alt": []
     },
     {
@@ -506,6 +554,7 @@
       "func": "TIM9_CH2",
       "kind": "af",
       "af": 3,
+      "pull": null,
       "alt": []
     },
     {
@@ -516,6 +565,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -526,6 +576,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -536,6 +587,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -546,6 +598,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -556,6 +609,7 @@
       "func": "GPIO_INPUT",
       "kind": "gpio_input",
       "af": null,
+      "pull": "UP",
       "alt": []
     },
     {
@@ -566,6 +620,7 @@
       "func": "GPIO_INPUT",
       "kind": "gpio_input",
       "af": null,
+      "pull": null,
       "alt": []
     }
   ],
@@ -657,6 +712,21 @@
       ],
       "address": 104,
       "rotation": "YAW_90"
+    },
+    {
+      "device": "DISPLAY0",
+      "kind": "DISPLAY",
+      "type": "SSD1306",
+      "bus": "SOFT_SPI",
+      "peripheral": null,
+      "pins": [
+        "OLED_SCL",
+        "OLED_SDA",
+        "OLED_RST",
+        "OLED_DC"
+      ],
+      "address": null,
+      "rotation": "NONE"
     }
   ],
   "storage": [],
@@ -717,6 +787,10 @@
   "actuator_power": {
     "pin": "ACT_POWER_SENSE",
     "powered": "HIGH"
+  },
+  "user_key": {
+    "pin": "USER_KEY",
+    "pressed": "LOW"
   },
   "clock": {
     "hse_hz": 8000000,

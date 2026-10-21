@@ -10,6 +10,7 @@
       "func": "USART1_TX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": []
     },
     {
@@ -20,6 +21,7 @@
       "func": "USART1_RX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": []
     }
   ],
@@ -43,6 +45,7 @@
   "actuators": [],
   "revision": null,
   "actuator_power": null,
+  "user_key": null,
   "clock": null,
   "peripherals": [
     {

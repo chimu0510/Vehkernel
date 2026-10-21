@@ -30,6 +30,12 @@ config BOARD_HAS_REVISION_ID
 config BOARD_HAS_ACTUATOR_POWER_SENSE
 	bool
 
+config BOARD_HAS_DISPLAY
+	bool
+
+config BOARD_HAS_USER_KEY
+	bool
+
 source "$(VK_BOARD_KCONFIG)"
 
 choice PLATFORM

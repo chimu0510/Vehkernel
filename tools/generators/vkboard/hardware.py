@@ -16,6 +16,9 @@
   value they must read at boot (ADR-0010).
 - ``actuator_power``: on boards that have one, the input that reads whether
   the actuators' power circuit is closed, and its powered level (ADR-0005).
+- ``user_key``: on boards that have one, the push button that operates the
+  local display and the local menu, and the level it reads while pressed
+  (ADR-0022).
 """
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ from .diagnostics import Diagnostics, Loc
 SERIAL_KEYS = {"port", "tx", "rx", "function", "baud"}
 SERIAL_FUNCTIONS = ("NONE", "LINK", "RC_INPUT", "LOG")
 DEVICE_KEYS = {"device", "kind", "type", "bus", "pins", "address", "rotation"}
-DEVICE_BUSES = ("I2C", "SOFT_I2C", "SPI")
+DEVICE_BUSES = ("I2C", "SOFT_I2C", "SPI", "SOFT_SPI")
 STORAGE_KEYS = {"storage", "bus"}
 STORAGE_KINDS = {"SD_CARD": ("SDIO", "SPI"), "SPI_NOR_FLASH": ("SPI",)}
 TIMING_KEYS = {"trigger", "base_rate_hz", "sampling", "dividers"}
@@ -38,6 +41,7 @@ MAX_ACTUATORS = 4
 REVISION_KEYS = {"pins", "value"}
 ACTUATOR_POWER_KEYS = {"pin", "powered"}
 POWERED_LEVELS = ("HIGH", "LOW")
+USER_KEY_KEYS = {"pin", "pressed"}
 TIMING_TRIGGERS = ("IMU_EVENT", "TIMER")
 TIMING_SAMPLING = ("PER_SAMPLE", "FIFO")
 TIMING_DIVIDERS = {"estimator": "CTRL_DIV_EST", "rate": "CTRL_DIV_RATE",
@@ -72,7 +76,7 @@ class Device:
     kind: str
     type: str
     bus: str
-    peripheral: str | None  # hardware I2C/SPI instance, None for SOFT_I2C
+    peripheral: str | None  # hardware I2C/SPI instance, None for SOFT_I2C and SOFT_SPI
     pins: tuple[str, ...]
     address: int | None
     rotation: str
@@ -110,6 +114,12 @@ class ActuatorPower:
 
 
 @dataclass(frozen=True)
+class UserKey:
+    pin: str  # pin role
+    pressed: str  # level read while pressed: HIGH or LOW
+
+
+@dataclass(frozen=True)
 class Hardware:
     serial: tuple[SerialPort, ...] = ()
     devices: tuple[Device, ...] = ()
@@ -118,6 +128,7 @@ class Hardware:
     revision: Revision | None = None
     actuator_power: ActuatorPower | None = None
     actuators: tuple[Actuator, ...] = ()
+    user_key: UserKey | None = None
 
 
 def _keys(entry: object, allowed: set, required: set, what: str, loc: Loc, diag: Diagnostics) -> bool:
@@ -201,6 +212,14 @@ def _device(entry: dict, loc: Loc, roles: dict, diag: Diagnostics) -> Device | N
         if len(pins) != 2 or any(roles[r].func != "GPIO_OUTPUT" for r in pins):
             diag.error(f"SOFT_I2C device {name} needs two GPIO_OUTPUT pins: SCL, SDA", loc)
             return None
+    elif bus == "SOFT_SPI":
+        # Write-only: a display's clock, data, reset and data/command lines (ADR-0022).
+        if kind != "DISPLAY":
+            diag.error(f"SOFT_SPI carries only DISPLAY devices, not {kind} device {name}", loc)
+            return None
+        if len(pins) != 4 or any(roles[r].func != "GPIO_OUTPUT" for r in pins):
+            diag.error(f"SOFT_SPI device {name} needs four GPIO_OUTPUT pins: clock, data, reset, data/command", loc)
+            return None
     else:
         signals = _BUS_SIGNALS[bus]
         expected = len(signals) + (1 if bus == "SPI" else 0)
@@ -222,7 +241,7 @@ def _device(entry: dict, loc: Loc, roles: dict, diag: Diagnostics) -> Device | N
             diag.error(f"I2C device {name} needs a 7-bit 'address' between 0x08 and 0x77", loc)
             return None
     elif address is not None:
-        diag.error(f"SPI device {name} takes no 'address'", loc)
+        diag.error(f"{bus} device {name} takes no 'address'", loc)
         return None
     rotation = entry.get("rotation", "NONE")
     if rotation not in ROTATIONS:
@@ -403,11 +422,25 @@ def _actuator_power(entry: object, loc: Loc, roles: dict, diag: Diagnostics) -> 
     return ActuatorPower(entry["pin"], entry["powered"])
 
 
+def _user_key(entry: object, loc: Loc, roles: dict, diag: Diagnostics) -> UserKey | None:
+    if entry is None:
+        return None
+    if not _keys(entry, USER_KEY_KEYS, USER_KEY_KEYS, "user_key", loc, diag):
+        return None
+    if not _gpio_input(entry["pin"], "the user key pin", roles, loc, diag):
+        return None
+    if entry["pressed"] not in POWERED_LEVELS:
+        diag.error(f"the pressed level must be one of: {', '.join(POWERED_LEVELS)}, got {entry['pressed']!r}", loc)
+        return None
+    return UserKey(entry["pin"], entry["pressed"])
+
+
 def check_hardware(serial, devices, storage, timing, defaults, roles: dict, top: Loc,
                    timing_loc: Loc, defaults_loc: Loc, diag: Diagnostics,
                    revision: tuple[object, Loc] | None = None,
                    actuator_power: tuple[object, Loc] | None = None,
-                   actuators=()) -> Hardware:
+                   actuators=(),
+                   user_key: tuple[object, Loc] | None = None) -> Hardware:
     """Validate the hardware sections; ``roles`` maps default role names to pins."""
     ports = _serial(serial, roles, diag)
     params: dict[str, object] = {f"{p.port}_FUNCTION": p.function for p in ports}
@@ -433,4 +466,5 @@ def check_hardware(serial, devices, storage, timing, defaults, roles: dict, top:
                     tuple(sorted(params.items())),
                     _revision(*(revision or (None, top)), roles, diag),
                     _actuator_power(*(actuator_power or (None, top)), roles, diag),
-                    tuple(outputs))
+                    tuple(outputs),
+                    _user_key(*(user_key or (None, top)), roles, diag))

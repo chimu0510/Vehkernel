@@ -22,8 +22,8 @@ struct IsGpioOutput<GpioOutput<P, N>> : std::true_type {};
 
 template <class T>
 struct IsGpioInput : std::false_type {};
-template <Port P, std::uint8_t N>
-struct IsGpioInput<GpioInput<P, N>> : std::true_type {};
+template <Port P, std::uint8_t N, Pull R>
+struct IsGpioInput<GpioInput<P, N, R>> : std::true_type {};
 }  // namespace detail
 
 // A pin whose board role is GPIO_OUTPUT.

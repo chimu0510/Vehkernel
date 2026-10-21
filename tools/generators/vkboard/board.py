@@ -7,6 +7,9 @@ base pins, and its ``dma`` entries replace base entries for the same request.
 A pin may declare alt configs: ``alt = [{ config = 1, role = ..., func = ... }]``.
 One alt config is selected at boot by a parameter, config 0 being the default
 pins; every config is checked for role and peripheral signal conflicts.
+
+A ``GPIO_INPUT`` pin may declare ``pull = "UP"`` or ``"DOWN"``, the pull
+resistor its default function needs; without it the input has no pull.
 """
 
 from __future__ import annotations
@@ -25,14 +28,15 @@ from .flash import FlashRegion, RamRegion, check_layout, ram_regions
 from .hardware import Hardware, check_hardware
 
 GPIO_FUNCTIONS = ("GPIO_INPUT", "GPIO_OUTPUT")
-PIN_KEYS = {"pin", "role", "func", "alt"}
+PIN_KEYS = {"pin", "role", "func", "alt", "pull"}
+PULLS = ("UP", "DOWN")
 ALT_KEYS = {"config", "role", "func"}
 TOP_LEVEL_KEYS = {"name", "mcu", "extends", "remove", "pins", "dma", "flash",
                   "serial", "devices", "storage", "clock", "timing", "defaults",
-                  "revision", "actuator_power", "actuators"}
+                  "revision", "actuator_power", "actuators", "user_key"}
 ARRAY_SECTIONS = {"pins": "pin", "dma": "request", "flash": "region", "serial": "port",
                   "devices": "device", "storage": "storage", "actuators": "output"}
-TABLE_SECTIONS = ("clock", "timing", "defaults", "revision", "actuator_power")
+TABLE_SECTIONS = ("clock", "timing", "defaults", "revision", "actuator_power", "user_key")
 
 _ROLE_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _PIN_RE = re.compile(r"^P([A-K])(\d+)$")
@@ -59,6 +63,7 @@ class Pin:
     af: int | None
     loc: Loc
     alt: tuple[tuple[int, Function], ...] = ()  # (config, function) sorted by config
+    pull: str | None = None  # of the default function, a GPIO_INPUT: UP or DOWN
 
     @property
     def default(self) -> Function:
@@ -105,9 +110,13 @@ def _entry_lines(text: str, key: str, count: int) -> list[int | None]:
     the text does not match that shape.
     """
     pattern = re.compile(r"\{[^}]*\b" + key + r"\s*=")
+    # A top-level inline table such as ``user_key = { pin = ... }`` is not an array entry.
+    table = re.compile(r"^\s*[A-Za-z_]+\s*=\s*\{")
     lines = []
     for number, line in enumerate(text.splitlines(), start=1):
         code = line.split("#", 1)[0]
+        if table.match(code):
+            continue
         lines.extend(number for _ in pattern.finditer(code))
     return lines if len(lines) == count else [None] * count
 
@@ -259,7 +268,8 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
                               table("defaults").loc, diag,
                               (table("revision").data, table("revision").loc),
                               (table("actuator_power").data, table("actuator_power").loc),
-                              [(e.data, e.loc) for e in arrays["actuators"]])
+                              [(e.data, e.loc) for e in arrays["actuators"]],
+                              (table("user_key").data, table("user_key").loc))
     clock = _check_clock(table("clock"), database, diag)
     used = {f.func.rsplit("_", 1)[0] for p in pins for f in (p.default, *(fn for _, fn in p.alt))
             if f.kind in ("af", "analog")}
@@ -319,7 +329,7 @@ def _check_pin(entry: object, loc: Loc, database: dict, diag: Diagnostics) -> Pi
     for key in sorted(set(entry) - PIN_KEYS):
         diag.error(f"unknown key '{key}' in pin entry", loc)
         ok = False
-    for key in sorted((PIN_KEYS - {"alt"}) - set(entry)):
+    for key in sorted((PIN_KEYS - {"alt", "pull"}) - set(entry)):
         diag.error(f"pin entry is missing '{key}'", loc)
         ok = False
     if not ok:
@@ -352,9 +362,16 @@ def _check_pin(entry: object, loc: Loc, database: dict, diag: Diagnostics) -> Pi
             alts[config] = function
     if default is None:
         return None
+    pull = entry.get("pull")
+    if pull is not None and pull not in PULLS:
+        diag.error(f"pull of pin {pin} must be one of: {', '.join(PULLS)}, got {pull!r}", loc)
+        return None
+    if pull is not None and default.kind != "gpio_input":
+        diag.error(f"pull of pin {pin} needs the GPIO_INPUT function, not {default.func}", loc)
+        return None
     return Pin(pin=pin, port=match.group(1), number=int(match.group(2)), role=default.role,
                func=default.func, kind=default.kind, af=default.af, loc=loc,
-               alt=tuple(sorted(alts.items())))
+               alt=tuple(sorted(alts.items())), pull=pull)
 
 
 def _check_unique(pins: list[Pin], diag: Diagnostics) -> None:

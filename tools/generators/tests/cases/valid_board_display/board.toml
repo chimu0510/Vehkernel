@@ -1,0 +1,18 @@
+# A display on a write-only software SPI bus, a user key and an input pull (ADR-0022).
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA0", role = "OLED_SCL", func = "GPIO_OUTPUT" },
+  { pin = "PA1", role = "OLED_SDA", func = "GPIO_OUTPUT" },
+  { pin = "PA2", role = "OLED_RST", func = "GPIO_OUTPUT" },
+  { pin = "PA5", role = "OLED_DC",  func = "GPIO_OUTPUT" },
+  { pin = "PA6", role = "USER_KEY", func = "GPIO_INPUT", pull = "UP" },
+  { pin = "PA7", role = "SENSE",    func = "GPIO_INPUT", pull = "DOWN" },
+]
+
+devices = [
+  { device = "DISPLAY0", kind = "DISPLAY", type = "SSD1306", bus = "SOFT_SPI", pins = ["OLED_SCL", "OLED_SDA", "OLED_RST", "OLED_DC"] },
+]
+
+user_key = { pin = "USER_KEY", pressed = "LOW" }

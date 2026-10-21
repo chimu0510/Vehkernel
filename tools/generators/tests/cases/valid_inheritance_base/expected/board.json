@@ -10,6 +10,7 @@
       "func": "USART1_TX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": []
     },
     {
@@ -20,6 +21,7 @@
       "func": "USART1_RX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": []
     },
     {
@@ -30,6 +32,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -40,6 +43,7 @@
       "func": "GPIO_INPUT",
       "kind": "gpio_input",
       "af": null,
+      "pull": null,
       "alt": []
     }
   ],
@@ -63,6 +67,7 @@
   "actuators": [],
   "revision": null,
   "actuator_power": null,
+  "user_key": null,
   "clock": null,
   "peripherals": [
     {

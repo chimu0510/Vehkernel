@@ -10,6 +10,7 @@
       "func": "GPIO_INPUT",
       "kind": "gpio_input",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -20,6 +21,7 @@
       "func": "GPIO_INPUT",
       "kind": "gpio_input",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -30,6 +32,7 @@
       "func": "GPIO_INPUT",
       "kind": "gpio_input",
       "af": null,
+      "pull": null,
       "alt": []
     }
   ],
@@ -62,6 +65,7 @@
     "pin": "ACT_POWER_SENSE",
     "powered": "LOW"
   },
+  "user_key": null,
   "clock": null,
   "peripherals": [],
   "dma": []

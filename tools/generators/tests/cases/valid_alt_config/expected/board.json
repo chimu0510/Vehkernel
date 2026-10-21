@@ -10,6 +10,7 @@
       "func": "TIM4_CH2",
       "kind": "af",
       "af": 2,
+      "pull": null,
       "alt": [
         {
           "config": 1,
@@ -28,6 +29,7 @@
       "func": "USART1_TX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": [
         {
           "config": 2,
@@ -46,6 +48,7 @@
       "func": "TIM4_CH1",
       "kind": "af",
       "af": 2,
+      "pull": null,
       "alt": [
         {
           "config": 2,
@@ -80,6 +83,7 @@
   "actuators": [],
   "revision": null,
   "actuator_power": null,
+  "user_key": null,
   "clock": null,
   "peripherals": [
     {

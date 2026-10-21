@@ -1,0 +1,5 @@
+board.toml:13: error: SOFT_SPI device DISPLAY0 needs four GPIO_OUTPUT pins: clock, data, reset, data/command
+board.toml:14: error: SOFT_SPI device DISPLAY1 needs four GPIO_OUTPUT pins: clock, data, reset, data/command
+board.toml:15: error: SOFT_SPI carries only DISPLAY devices, not FLASH device FLASH0
+board.toml:16: error: SOFT_SPI device DISPLAY2 takes no 'address'
+board.toml:19: error: the user key pin must be a pin role with the GPIO_INPUT function, not 'OLED_DC'

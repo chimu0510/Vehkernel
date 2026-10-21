@@ -68,7 +68,7 @@ using OLED_SCL = vk::hal::GpioOutput<vk::hal::Port::D, 7>;  // PD7 GPIO_OUTPUT
 using OLED_SDA = vk::hal::GpioOutput<vk::hal::Port::D, 6>;  // PD6 GPIO_OUTPUT
 using OLED_RST = vk::hal::GpioOutput<vk::hal::Port::D, 5>;  // PD5 GPIO_OUTPUT
 using OLED_DC = vk::hal::GpioOutput<vk::hal::Port::D, 4>;  // PD4 GPIO_OUTPUT
-using USER_KEY = vk::hal::GpioInput<vk::hal::Port::C, 5>;  // PC5 GPIO_INPUT
+using USER_KEY = vk::hal::GpioInput<vk::hal::Port::C, 5, vk::hal::Pull::Up>;  // PC5 GPIO_INPUT
 using ACT_POWER_SENSE = vk::hal::GpioInput<vk::hal::Port::E, 4>;  // PE4 GPIO_INPUT
 
 using all = vk::hal::PinList<REV_ID0, REV_ID1, REV_ID2, IMU_SCL, IMU_SDA, IMU_INT, ENC_A_1, ENC_A_2, ENC_B_1, ENC_B_2, ENC_C_1, ENC_C_2, ENC_D_1, ENC_D_2, MOTOR_A_PWM, MOTOR_A_IN1, MOTOR_A_IN2, MOTOR_B_PWM, MOTOR_B_IN1, MOTOR_B_IN2, MOTOR_C_PWM, MOTOR_C_IN1, MOTOR_C_IN2, MOTOR_D_PWM, MOTOR_D_IN1, MOTOR_D_IN2, SERVO_SENIOR, RC_CH1, RC_CH2, RC_CH3, RC_CH4, SBUS_RX, SERIAL1_TX, SERIAL1_RX, SERIAL2_TX, SERIAL2_RX, SERIAL3_TX, SERIAL3_RX, CAN1_RX, CAN1_TX, USB_DM, USB_DP, BATTERY_SENSE, FRAME_SELECT, SERVO_TRIM, SERVO_FEEDBACK, LIGHT_B, LIGHT_R, LIGHT_G, OLED_SCL, OLED_SDA, OLED_RST, OLED_DC, USER_KEY, ACT_POWER_SENSE>;
@@ -262,6 +262,13 @@ struct IMU0 {
     static constexpr vk::hal::Rotation rotation = vk::hal::Rotation::Yaw90;
     using pins = vk::hal::PinList<pins::IMU_SCL, pins::IMU_SDA>;
 };
+struct DISPLAY0 {
+    static constexpr std::string_view kind = "DISPLAY";
+    static constexpr std::string_view type = "SSD1306";
+    static constexpr std::string_view bus = "SOFT_SPI";
+    static constexpr vk::hal::Rotation rotation = vk::hal::Rotation::None;
+    using pins = vk::hal::PinList<pins::OLED_SCL, pins::OLED_SDA, pins::OLED_RST, pins::OLED_DC>;
+};
 }  // namespace devices
 
 // Actuator outputs (ADR-0011): a motor driver's PWM channel and direction
@@ -327,6 +334,12 @@ namespace actuator_power {
 using pin = pins::ACT_POWER_SENSE;
 inline constexpr bool powered_high = true;
 }  // namespace actuator_power
+
+// User key (ADR-0022): operates the local display and the local menu.
+namespace user_key {
+using pin = pins::USER_KEY;
+inline constexpr bool pressed_high = false;
+}  // namespace user_key
 
 // Board default parameters (ADR-0012), as compile-time constants until the
 // parameter system exists.

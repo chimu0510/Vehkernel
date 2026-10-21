@@ -10,6 +10,7 @@
       "func": "TIM4_CH2",
       "kind": "af",
       "af": 2,
+      "pull": null,
       "alt": []
     }
   ],
@@ -33,6 +34,7 @@
   "actuators": [],
   "revision": null,
   "actuator_power": null,
+  "user_key": null,
   "clock": null,
   "peripherals": [
     {

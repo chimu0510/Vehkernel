@@ -90,15 +90,17 @@ pins = [
   { pin = "PB15", role = "LIGHT_R", func = "TIM12_CH2" },
   { pin = "PE6",  role = "LIGHT_G", func = "TIM9_CH2" },
 
-  # OLED (U11 or J4) on V1.1 pins; V1.2 moved RST and DC to PE1 and PE0.
+  # OLED (U11 or J4) on V1.1 pins; V1.2 moved SDA, RST and DC to PD4, PE1 and
+  # PE0 (vendor firmware oled.c).
   { pin = "PD7", role = "OLED_SCL", func = "GPIO_OUTPUT" },
   { pin = "PD6", role = "OLED_SDA", func = "GPIO_OUTPUT" },
   { pin = "PD5", role = "OLED_RST", func = "GPIO_OUTPUT" },
   { pin = "PD4", role = "OLED_DC",  func = "GPIO_OUTPUT" },
 
-  # User key (S3), and the input that reads the drive power circuit switched
-  # on connector CN6 (ADR-0005).
-  { pin = "PC5", role = "USER_KEY",        func = "GPIO_INPUT" },
+  # User key (S3), which reads low when pressed with the internal pull-up the
+  # vendor firmware enables (key.c), and the input that reads the drive power
+  # circuit switched on connector CN6 (ADR-0005).
+  { pin = "PC5", role = "USER_KEY",        func = "GPIO_INPUT", pull = "UP" },
   { pin = "PE4", role = "ACT_POWER_SENSE", func = "GPIO_INPUT" },
 ]
 
@@ -114,6 +116,10 @@ devices = [
   # edge raised the unrotated reading tilted towards -y, and with its right
   # edge lowered towards -x, so the sensor sits turned 90 deg about z.
   { device = "IMU0", kind = "IMU", type = "ICM20948", bus = "SOFT_I2C", pins = ["IMU_SCL", "IMU_SDA"], address = 0x68, rotation = "YAW_90" },
+  # ADR-0022: a 128 x 64 SSD1306 OLED. The connector carries only clock, data,
+  # reset and data/command, with no chip select and no line back to the MCU, so
+  # the bus is write-only (vendor firmware oled.c and the schematic).
+  { device = "DISPLAY0", kind = "DISPLAY", type = "SSD1306", bus = "SOFT_SPI", pins = ["OLED_SCL", "OLED_SDA", "OLED_RST", "OLED_DC"] },
 ]
 
 # ADR-0011: actuator outputs 1 to 4 are motors A to D. The stock motors have
@@ -135,6 +141,9 @@ revision = { pins = ["REV_ID0", "REV_ID1", "REV_ID2"], value = 0 }
 # ADR-0005: PE4 reads the drive power circuit. Its powered level is not in the
 # schematic notes or the vendor firmware; it is measured at bring-up (#50).
 actuator_power = { pin = "ACT_POWER_SENSE", powered = "HIGH" }
+
+# ADR-0022: S3 operates the local display and the local menu.
+user_key = { pin = "USER_KEY", pressed = "LOW" }
 
 # ADR-0020: S0 boot stub, S1-S2 parameters, S3 event log, S4-S7 firmware.
 flash = [

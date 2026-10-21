@@ -5,5 +5,5 @@ vendor = "acme"
 pins = [
   { pin = "PA1", role = "LED" },
   { pin = "PA2", role = "button", func = "GPIO_INPUT" },
-  { pin = "PA9", role = "SERIAL1_TX", func = "USART1_TX", pull = "up" },
+  { pin = "PA9", role = "SERIAL1_TX", func = "USART1_TX", drive = "strong" },
 ]

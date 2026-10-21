@@ -10,6 +10,7 @@
       "func": "USART1_TX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": []
     },
     {
@@ -20,6 +21,7 @@
       "func": "USART1_RX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": []
     },
     {
@@ -30,6 +32,7 @@
       "func": "USART2_TX",
       "kind": "af",
       "af": 7,
+      "pull": null,
       "alt": []
     },
     {
@@ -40,6 +43,7 @@
       "func": "I2C1_SCL",
       "kind": "af",
       "af": 4,
+      "pull": null,
       "alt": []
     },
     {
@@ -50,6 +54,7 @@
       "func": "I2C1_SDA",
       "kind": "af",
       "af": 4,
+      "pull": null,
       "alt": []
     },
     {
@@ -60,6 +65,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -70,6 +76,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     },
     {
@@ -80,6 +87,7 @@
       "func": "SPI1_SCK",
       "kind": "af",
       "af": 5,
+      "pull": null,
       "alt": []
     },
     {
@@ -90,6 +98,7 @@
       "func": "SPI1_MISO",
       "kind": "af",
       "af": 5,
+      "pull": null,
       "alt": []
     },
     {
@@ -100,6 +109,7 @@
       "func": "SPI1_MOSI",
       "kind": "af",
       "af": 5,
+      "pull": null,
       "alt": []
     },
     {
@@ -110,6 +120,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     }
   ],
@@ -195,6 +206,7 @@
   "actuators": [],
   "revision": null,
   "actuator_power": null,
+  "user_key": null,
   "clock": {
     "hse_hz": 8000000,
     "sysclk_hz": 168000000,

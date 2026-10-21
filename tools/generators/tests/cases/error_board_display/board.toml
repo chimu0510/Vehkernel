@@ -1,0 +1,19 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = [
+  { pin = "PA0", role = "OLED_SCL", func = "GPIO_OUTPUT" },
+  { pin = "PA1", role = "OLED_SDA", func = "GPIO_OUTPUT" },
+  { pin = "PA2", role = "OLED_RST", func = "GPIO_OUTPUT" },
+  { pin = "PA5", role = "OLED_DC",  func = "GPIO_OUTPUT" },
+  { pin = "PA6", role = "BUTTON",   func = "GPIO_INPUT" },
+]
+
+devices = [
+  { device = "DISPLAY0", kind = "DISPLAY", type = "SSD1306", bus = "SOFT_SPI", pins = ["OLED_SCL", "OLED_SDA", "OLED_RST"] },
+  { device = "DISPLAY1", kind = "DISPLAY", type = "SSD1306", bus = "SOFT_SPI", pins = ["OLED_SCL", "OLED_SDA", "OLED_RST", "BUTTON"] },
+  { device = "FLASH0",   kind = "FLASH",   type = "W25Q128", bus = "SOFT_SPI", pins = ["OLED_SCL", "OLED_SDA", "OLED_RST", "OLED_DC"] },
+  { device = "DISPLAY2", kind = "DISPLAY", type = "SSD1306", bus = "SOFT_SPI", pins = ["OLED_SCL", "OLED_SDA", "OLED_RST", "OLED_DC"], address = 0x3C },
+]
+
+user_key = { pin = "OLED_DC", pressed = "LOW" }

@@ -1,0 +1,115 @@
+{
+  "name": "demo",
+  "mcu": "testmcu",
+  "pins": [
+    {
+      "role": "OLED_SCL",
+      "pin": "PA0",
+      "port": "A",
+      "number": 0,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "pull": null,
+      "alt": []
+    },
+    {
+      "role": "OLED_SDA",
+      "pin": "PA1",
+      "port": "A",
+      "number": 1,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "pull": null,
+      "alt": []
+    },
+    {
+      "role": "OLED_RST",
+      "pin": "PA2",
+      "port": "A",
+      "number": 2,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "pull": null,
+      "alt": []
+    },
+    {
+      "role": "OLED_DC",
+      "pin": "PA5",
+      "port": "A",
+      "number": 5,
+      "func": "GPIO_OUTPUT",
+      "kind": "gpio_output",
+      "af": null,
+      "pull": null,
+      "alt": []
+    },
+    {
+      "role": "USER_KEY",
+      "pin": "PA6",
+      "port": "A",
+      "number": 6,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "pull": "UP",
+      "alt": []
+    },
+    {
+      "role": "SENSE",
+      "pin": "PA7",
+      "port": "A",
+      "number": 7,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "pull": "DOWN",
+      "alt": []
+    }
+  ],
+  "alt_configs": [],
+  "flash": [],
+  "ram": [
+    {
+      "region": "CCM",
+      "start": 268435456,
+      "size": 16384
+    },
+    {
+      "region": "RAM",
+      "start": 536870912,
+      "size": 65536
+    }
+  ],
+  "serial": [],
+  "devices": [
+    {
+      "device": "DISPLAY0",
+      "kind": "DISPLAY",
+      "type": "SSD1306",
+      "bus": "SOFT_SPI",
+      "peripheral": null,
+      "pins": [
+        "OLED_SCL",
+        "OLED_SDA",
+        "OLED_RST",
+        "OLED_DC"
+      ],
+      "address": null,
+      "rotation": "NONE"
+    }
+  ],
+  "storage": [],
+  "actuators": [],
+  "revision": null,
+  "actuator_power": null,
+  "user_key": {
+    "pin": "USER_KEY",
+    "pressed": "LOW"
+  },
+  "clock": null,
+  "peripherals": [],
+  "dma": []
+}

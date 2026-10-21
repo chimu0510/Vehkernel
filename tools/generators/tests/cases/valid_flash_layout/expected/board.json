@@ -10,6 +10,7 @@
       "func": "GPIO_OUTPUT",
       "kind": "gpio_output",
       "af": null,
+      "pull": null,
       "alt": []
     }
   ],
@@ -62,6 +63,7 @@
   "actuators": [],
   "revision": null,
   "actuator_power": null,
+  "user_key": null,
   "clock": null,
   "peripherals": [],
   "dma": []

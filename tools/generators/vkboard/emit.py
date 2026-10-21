@@ -18,6 +18,9 @@ def _pin_type(p: Pin, f: Function) -> str:
     if f.kind == "analog":
         return f'vk::hal::AnalogPin<{port}, {p.number}, "{f.func}">'
     if f.kind == "gpio_input":
+        # The pull belongs to the pin's default function only.
+        if f == p.default and p.pull is not None:
+            return f"vk::hal::GpioInput<{port}, {p.number}, vk::hal::Pull::{p.pull.capitalize()}>"
         return f"vk::hal::GpioInput<{port}, {p.number}>"
     return f"vk::hal::GpioOutput<{port}, {p.number}>"
 
@@ -73,6 +76,7 @@ def board_header(board: Board) -> str:
     out += _actuators_namespace(board)
     out += _revision_namespace(board)
     out += _actuator_power_namespace(board)
+    out += _user_key_namespace(board)
     out += _defaults_namespace(board)
     out += ["}  // namespace vk::board", ""]
     return "\n".join(out)
@@ -233,6 +237,17 @@ def _actuator_power_namespace(board: Board) -> list[str]:
             "}  // namespace actuator_power", ""]
 
 
+def _user_key_namespace(board: Board) -> list[str]:
+    key = board.hardware.user_key
+    if key is None:
+        return []
+    return ["// User key (ADR-0022): operates the local display and the local menu.",
+            "namespace user_key {",
+            f"using pin = pins::{key.pin};",
+            f"inline constexpr bool pressed_high = {'true' if key.pressed == 'HIGH' else 'false'};",
+            "}  // namespace user_key", ""]
+
+
 def _default_constant(name: str, value: object) -> str:
     if isinstance(value, bool):
         return f"inline constexpr bool {name} = {'true' if value else 'false'};"
@@ -306,6 +321,7 @@ def board_symbols(board: Board) -> list[str]:
         if r.name in ("PARAMS", "EVENTLOG"):
             symbols.add(f"BOARD_HAS_FLASH_{r.name}")
     for d in board.hardware.devices:
+        symbols.add(f"BOARD_HAS_{d.kind}")
         symbols.add(f"BOARD_HAS_{d.type}")
         symbols.add(f"BOARD_{d.kind}_BUS_{d.bus}")
     for s in board.hardware.storage:
@@ -316,6 +332,8 @@ def board_symbols(board: Board) -> list[str]:
         symbols.add("BOARD_HAS_REVISION_ID")
     if board.hardware.actuator_power is not None:
         symbols.add("BOARD_HAS_ACTUATOR_POWER_SENSE")
+    if board.hardware.user_key is not None:
+        symbols.add("BOARD_HAS_USER_KEY")
     # A serial port with both lines whose default use is a Link (spec 0003).
     if any(p.function == "LINK" and p.tx and p.rx for p in board.hardware.serial):
         symbols.add("BOARD_HAS_LINK_PORT")
@@ -360,7 +378,7 @@ def board_json(board: Board) -> str:
         "mcu": board.mcu,
         "pins": [
             {"role": p.role, "pin": p.pin, "port": p.port, "number": p.number,
-             "func": p.func, "kind": p.kind, "af": p.af,
+             "func": p.func, "kind": p.kind, "af": p.af, "pull": p.pull,
              "alt": [{"config": config, "role": f.role, "func": f.func, "kind": f.kind, "af": f.af}
                      for config, f in p.alt]}
             for p in board.pins
@@ -381,6 +399,8 @@ def board_json(board: Board) -> str:
             "pins": list(board.hardware.revision.pins), "value": board.hardware.revision.value},
         "actuator_power": None if board.hardware.actuator_power is None else {
             "pin": board.hardware.actuator_power.pin, "powered": board.hardware.actuator_power.powered},
+        "user_key": None if board.hardware.user_key is None else {
+            "pin": board.hardware.user_key.pin, "pressed": board.hardware.user_key.pressed},
         "clock": None if board.clock is None else {
             "hse_hz": board.clock.hse_hz, "sysclk_hz": board.clock.sysclk_hz, "pll_m": board.clock.pll_m,
             "pll_n": board.clock.pll_n, "pll_p": board.clock.pll_p, "pll_q": board.clock.pll_q,
