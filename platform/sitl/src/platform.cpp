@@ -6,6 +6,7 @@
 #include <vk/sim/i2c_bus.hpp>
 #include <vk/sim/icm20948.hpp>
 #include <vk/sim/motion.hpp>
+#include <vk/sim/ssd1306.hpp>
 
 #include <vk/core/bus.hpp>
 #include <vk/hal/output_watchdog.hpp>
@@ -82,6 +83,7 @@ std::array<hal::MotorChannel, actuator_count> channels{};
 
 sim::I2cBus bus;
 sim::Icm20948 imu;
+sim::Ssd1306 oled;
 // A small gyroscope bias in the body frame.
 core::StaticInstance<sim::MotionImu> motion;
 
@@ -148,6 +150,11 @@ void init(sim::MotionProfile profile)
 sim::I2cBus& imu_bus()
 {
     return bus;
+}
+
+sim::Ssd1306& display()
+{
+    return oled;
 }
 
 void start_ground_truth(core::WorkQueue& queue)

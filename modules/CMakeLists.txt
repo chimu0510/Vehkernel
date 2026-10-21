@@ -44,6 +44,19 @@ if(CONFIG_LINK)
   vk_target_link_libraries(vk_modules INTERFACE vk_link)
 endif()
 
+if(CONFIG_LOCAL_DISPLAY)
+  # The local display (ADR-0022): page rendering uses neither the bus nor
+  # FreeRTOS and is tested on the development host; the work item wraps it.
+  vk_add_library(vk_local_display LAYER module STATIC
+    local_display/src/font.cpp
+    local_display/src/local_display.cpp
+    local_display/src/pages.cpp)
+  target_include_directories(vk_local_display PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/local_display/include)
+  vk_target_link_libraries(vk_local_display PUBLIC vk_msg_headers vk_core vk_hal vk_drivers vk_lib_estimation)
+  target_link_libraries(vk_local_display PRIVATE vk_warnings vk_cxx_subset)
+  vk_target_link_libraries(vk_modules INTERFACE vk_local_display)
+endif()
+
 if(CONFIG_ESTIMATOR_MAHONY)
   # Estimators (ADR-0014): work items over the math library in lib/estimation.
   vk_add_library(vk_estimation LAYER module STATIC estimation/src/attitude_estimator.cpp)

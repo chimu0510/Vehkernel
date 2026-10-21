@@ -33,6 +33,9 @@ config BOARD_HAS_ACTUATOR_POWER_SENSE
 config BOARD_HAS_DISPLAY
 	bool
 
+config BOARD_HAS_SSD1306
+	bool
+
 config BOARD_HAS_USER_KEY
 	bool
 
@@ -100,6 +103,21 @@ config BRINGUP_MOTORS
 
 endmenu
 
+menu "Local interface"
+
+config LOCAL_DISPLAY
+	bool "Local display"
+	depends on DRIVER_SSD1306 && (BOARD_HAS_DISPLAY || PLATFORM_SITL)
+	default y if PLATFORM_SITL
+	select MATH_QUATERNION
+	help
+	  Shows the vehicle's status, attitude and Links on the board's
+	  display, from a work item on wq:slow at most five times a second
+	  (ADR-0022). On by default in SITL only: a board turns it on in its
+	  defconfig once its platform implements the display bus.
+
+endmenu
+
 menu "Drivers"
 
 config DRIVER_CAN
@@ -113,6 +131,14 @@ config DRIVER_ICM20948
 	help
 	  TDK InvenSense ICM20948 accelerometer and gyroscope on I2C; the
 	  magnetometer inside it is not used yet.
+
+config DRIVER_SSD1306
+	bool "SSD1306 display"
+	depends on BOARD_HAS_SSD1306 || PLATFORM_SITL
+	default y if PLATFORM_SITL
+	help
+	  Solomon Systech SSD1306 128 x 64 OLED controller on a write-only
+	  display bus (ADR-0022).
 
 config SOFT_I2C
 	bool "Software I2C on two GPIO pins"

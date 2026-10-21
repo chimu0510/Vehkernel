@@ -242,6 +242,16 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600 drive 5,5,5,5 --duration 3
 
 The live view shows `vehicle_status`, `wheel_encoders` and `actuator_outputs`. On the board, use `--serial /dev/ttyACM0` instead of `--udp`. SITL simulates four motors and encoders; `--actuator-power-off` starts it with the simulated power cut, `sim-power on|off` cuts or restores it while it runs, and `--reversed-motor <output>` wires a motor the wrong way round. CI drives the simulated wheels through every one of these paths (`sitl_arming`, `sitl_actuators` and `sitl_bringup`).
 
+### Local display
+
+The local display shows the vehicle's status on the board's display, three pages of 21 columns by 8 lines refreshed at most five times a second (ADR-0022): status (mode, arming, the emergency stop, board verification, actuator power, skipped arming checks, the last arming refusal and disarm reason, output watchdog trips), attitude (roll, pitch and yaw in degrees) and Link (each Link's handshake, rate scale, drops and lost frames). SITL simulates an SSD1306; `--display <path>` writes what it shows to a PBM image after every change, which any image viewer opens:
+
+```bash
+build/sitl/app/vehkernel-sitl --duration 0 --display /tmp/vk-display.pbm
+```
+
+CI reads the status page back from that image (`sitl_display`).
+
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 
 ## Directory layout

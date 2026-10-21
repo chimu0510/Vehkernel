@@ -3,6 +3,7 @@
 // Usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]
 //                       [--motion still|tilt|rotate|shake] [--param-file <path>]
 //                       [--actuator-power-off] [--reversed-motor <output>]
+//                       [--display <path>]
 //
 // The run stops by itself after the duration (default 1 s; 0 runs until
 // interrupted) and prints a report: one line per topic instance and per work
@@ -18,6 +19,8 @@
 // cuts it at start; the Link's sim_actuator_power frame cuts or restores it.
 // Its four motors can be wired the wrong way round with --reversed-motor,
 // once per output, for the bring-up case.
+// Its display is a simulated SSD1306; --display writes what it shows to a
+// PBM file after every change (ADR-0022).
 #include <vk/config.h>
 
 #ifdef CONFIG_ACTUATOR_CONTROL
@@ -33,6 +36,11 @@
 #include <vk/estimation/attitude_estimator.hpp>
 #endif
 #include <vk/hal/i2c.hpp>
+#ifdef CONFIG_LOCAL_DISPLAY
+#include <vk/drivers/ssd1306.hpp>
+#include <vk/hal/display_bus.hpp>
+#include <vk/local_display/local_display.hpp>
+#endif
 #include <vk/msg/registry.hpp>
 #include <vk/params/params.hpp>
 #ifdef CONFIG_PARAM_STORAGE_FLASH
@@ -96,6 +104,7 @@ struct Options {
     const char* param_file = nullptr;  // nullptr: blank Flash in memory
     bool actuator_power = true;
     std::array<bool, vk::platform::actuator_count> reversed_motors{};
+    const char* display_file = nullptr;  // nullptr: the display's image stays in memory
 };
 
 bool parse_address(const char* argument, Options& options)
@@ -156,6 +165,8 @@ bool parse_options(std::span<char*> args, Options& options)
             }
         } else if (arg == "--param-file") {
             options.param_file = value;
+        } else if (arg == "--display") {
+            options.display_file = value;
         } else if (arg == "--reversed-motor") {
             char* end = nullptr;
             const unsigned long output = std::strtoul(value, &end, 10);
@@ -214,6 +225,22 @@ void start_actuators()
                              vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     actuator_control->start();
     vk::platform::start_output_watchdog(control_interval_us);
+}
+#endif
+
+#ifdef CONFIG_LOCAL_DISPLAY
+vk::core::StaticInstance<vk::drivers::Ssd1306> display_driver;
+vk::core::StaticInstance<vk::local_display::LocalDisplay> local_display;
+
+// The real driver against the simulated SSD1306, on wq:slow (ADR-0022).
+void start_local_display(const Options& options)
+{
+    if (options.display_file != nullptr) {
+        vk::platform::display().write_image_to(options.display_file);
+    }
+    display_driver.emplace(vk::hal::DisplayDevice(vk::platform::display()));
+    local_display.emplace(*display_driver, vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+    local_display->start();
 }
 #endif
 
@@ -340,7 +367,8 @@ int main(int argc, char** argv)
     if (!parse_options(std::span(argv, static_cast<std::size_t>(argc)), options)) {
         std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]\n"
                    "                      [--motion still|tilt|rotate|shake] [--param-file <path>]\n"
-                   "                      [--actuator-power-off] [--reversed-motor <output>]\n",
+                   "                      [--actuator-power-off] [--reversed-motor <output>]\n"
+                   "                      [--display <path>]\n",
                    stderr);
         return 2;
     }
@@ -362,6 +390,9 @@ int main(int argc, char** argv)
     start_commander();
 #ifdef CONFIG_ACTUATOR_CONTROL
     start_actuators();
+#endif
+#ifdef CONFIG_LOCAL_DISPLAY
+    start_local_display(options);
 #endif
 #ifdef CONFIG_LINK
     if (!start_link(options)) {

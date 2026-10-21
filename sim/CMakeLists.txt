@@ -6,7 +6,8 @@ vk_add_library(vk_sim LAYER platform STATIC
   src/icm20948.cpp
   src/motion.cpp
   src/motor.cpp
-  src/nor_flash.cpp)
+  src/nor_flash.cpp
+  src/ssd1306.cpp)
 target_include_directories(vk_sim PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 vk_target_link_libraries(vk_sim PUBLIC vk_hal vk_lib_estimation)
 target_link_libraries(vk_sim PRIVATE vk_warnings)

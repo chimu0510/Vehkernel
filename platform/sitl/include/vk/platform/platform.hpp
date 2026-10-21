@@ -6,6 +6,7 @@
 #include <vk/sim/motor.hpp>
 #include <vk/sim/i2c_bus.hpp>
 #include <vk/sim/motion.hpp>
+#include <vk/sim/ssd1306.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -20,6 +21,9 @@ inline constexpr std::uint32_t imu_rate_hz = 200;
 
 // The simulated I2C bus the IMU is attached to.
 sim::I2cBus& imu_bus();
+
+// SITL's display (ADR-0022): a simulated SSD1306, which is its own display bus.
+sim::Ssd1306& display();
 
 // Starts the microsecond clock and attaches the simulated devices, the IMU
 // following `motion`. Call once from the entry point, before anything else runs.

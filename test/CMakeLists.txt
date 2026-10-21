@@ -75,6 +75,13 @@ if(CONFIG_BRINGUP_MOTORS AND CONFIG_LINK_UDP)
       --msg-dir ${VK_MSG_PYTHON_DIR} --param-meta ${VK_PARAM_METADATA})
 endif()
 
+# L3 SITL display test (spec 0007): the status page on the simulated
+# SSD1306, read back from the image SITL writes with --display.
+if(CONFIG_LOCAL_DISPLAY)
+  add_test(NAME sitl_display
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_display.py $<TARGET_FILE:vehkernel-sitl>)
+endif()
+
 # Every SITL test judges timing on the host's clock, so none runs alongside
 # another test under ctest -j: another SITL, or a test that configures and
 # builds, contends for the host and stalls SITL's work queues.
