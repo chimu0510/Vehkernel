@@ -17,3 +17,4 @@ values = [
 unit = "bit/s"
 description = "Baud rate of SERIAL1. The Link on SERIAL1 falls back to the board default if the port cannot reach the rate."
 reboot_required = true
+menu = true

@@ -79,6 +79,14 @@ struct ParamInfo {
     float* float_value;                         // the struct member, for Float
 };
 
+// A parameter in the local menu (ADR-0022). The parameter generator emits one
+// for each parameter whose definition sets menu = true, in table order.
+struct MenuParam {
+    std::uint16_t index;  // in the parameter table
+    ParamValue step;      // of + and -, for a number; unused for an enum
+    std::span<const std::string_view> value_names;  // an enum's, in the order of ParamInfo::enum_values
+};
+
 // Why a change was refused; also what a Link reports back.
 enum class ParamResult : std::uint8_t {
     Ok = 0,

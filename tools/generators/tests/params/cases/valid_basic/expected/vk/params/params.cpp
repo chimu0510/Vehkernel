@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string_view>
 
 namespace vk::params {
 
@@ -81,6 +82,9 @@ constinit const std::array<core::ParamInfo, 5> entries{{
     },
 }};
 
+constinit const std::array<core::MenuParam, 0> menu_entries{{
+}};
+
 }  // namespace
 
 std::span<const core::ParamInfo> table()
@@ -92,6 +96,11 @@ core::Parameters& parameters()
 {
     static core::Parameters instance(entries);
     return instance;
+}
+
+std::span<const core::MenuParam> menu()
+{
+    return menu_entries;
 }
 
 }  // namespace vk::params

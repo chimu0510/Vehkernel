@@ -1,6 +1,8 @@
 # Parameters of the commander: modes, arming and setpoint arbitration
 # (ADR-0005, ADR-0012).
 prefix = "COM"
+# Arming checks, timeouts and failsafes never change from the local menu (ADR-0022).
+menu = false
 
 [[param]]
 name = "COM_ARM_CHECK"

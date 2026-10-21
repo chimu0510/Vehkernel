@@ -1,0 +1,12 @@
+prefix = "EB"
+menu = false
+
+[[param]]
+name = "EB_GAIN"
+type = "FLOAT"
+default = 0.5
+min = 0.0
+max = 2.0
+description = "A gain in a group kept out of the menu."
+menu = true
+menu_step = 0.1

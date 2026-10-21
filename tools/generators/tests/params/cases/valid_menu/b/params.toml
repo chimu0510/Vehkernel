@@ -1,0 +1,11 @@
+# A group kept out of the local menu.
+prefix = "MB"
+menu = false
+
+[[param]]
+name = "MB_LIMIT"
+type = "FLOAT"
+default = 0.3
+min = 0.0
+max = 1.0
+description = "A limit the local menu never changes."

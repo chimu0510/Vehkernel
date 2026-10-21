@@ -21,6 +21,11 @@ name = "LINK", bit = 0 }, ...]``); a boolean is an enum with two values. Enum
 values may carry their own ``kconfig`` symbol. ``reboot_required`` and
 ``locked_when_armed`` are the safety attributes.
 
+``menu = true`` puts a parameter in the local menu (ADR-0022); a number then
+needs ``menu_step``, the step of + and -, while an enum steps through its
+values. A file that sets ``menu = false`` at the top keeps its whole group out
+of the menu, and a ``menu = true`` inside it is an error.
+
 Every definition in the repository is checked, compiled in or not: prefixes,
 names, hash collisions and defaults. Only the compiled-in ones are emitted.
 """
@@ -43,9 +48,9 @@ TYPES = ("INT32", "FLOAT")
 MAX_NAME_LENGTH = 16  # MAVLink parameter protocol (ADR-0012)
 INT32_MIN, INT32_MAX = -(1 << 31), (1 << 31) - 1
 
-TOP_LEVEL_KEYS = {"prefix", "kconfig", "param"}
+TOP_LEVEL_KEYS = {"prefix", "kconfig", "menu", "param"}
 PARAM_KEYS = {"name", "type", "default", "min", "max", "unit", "description", "values", "bits",
-              "reboot_required", "locked_when_armed"}
+              "reboot_required", "locked_when_armed", "menu", "menu_step"}
 VALUE_KEYS = {"name", "value", "kconfig"}
 BIT_KEYS = {"name", "bit"}
 
@@ -93,6 +98,8 @@ class Param:
     loc: Loc
     member: str = ""
     default_name: str | None = None  # enum default as written
+    menu: bool = False  # in the local menu (ADR-0022)
+    menu_step: int | float | None = None  # step of + and -, numbers only
 
     @property
     def hash(self) -> int:
@@ -115,6 +122,7 @@ class Group:
     doc: list[str]
     params: list[Param] = field(default_factory=list)
     prefix_line: int | None = None
+    menu_allowed: bool = True  # False when the file sets menu = false
 
     @property
     def type_name(self) -> str:
@@ -334,12 +342,44 @@ def _parse_param(entry, prefix: str, loc: Loc, diag: Diagnostics) -> Param | Non
             diag.error(f"{name}: default {default} is outside its range [{minimum}, {maximum}]", loc)
             return None
 
+    menu, menu_step = _parse_menu(entry, name, type_, bool(values), bool(bits), loc, diag)
     if len(diag.errors) != errors_before:
         return None
     return Param(name=name, type=type_, default=default, minimum=minimum, maximum=maximum, unit=unit,
                  description=description.strip(), values=values, bits=bits,
                  reboot_required=flags["reboot_required"], locked_when_armed=flags["locked_when_armed"],
-                 loc=loc, member=_member(prefix, name), default_name=default_name)
+                 loc=loc, member=_member(prefix, name), default_name=default_name,
+                 menu=menu, menu_step=menu_step)
+
+
+def _parse_menu(entry: dict, name: str, type_: str, is_enum: bool, is_bitmask: bool, loc: Loc,
+                diag: Diagnostics) -> tuple[bool, int | float | None]:
+    """The local menu attributes (ADR-0022): whether it is in the menu, and its step."""
+    menu = entry.get("menu", False)
+    if not isinstance(menu, bool):
+        diag.error(f"{name}: menu must be true or false", loc)
+        return False, None
+    step = entry.get("menu_step")
+    if not menu:
+        if step is not None:
+            diag.error(f"{name}: menu_step needs menu = true", loc)
+        return False, None
+    if is_bitmask:
+        diag.error(f"{name}: a bitmask cannot be in the local menu", loc)
+        return False, None
+    if is_enum:
+        if step is not None:
+            diag.error(f"{name}: an enum steps through its values; drop menu_step", loc)
+        return True, None
+    if step is None:
+        diag.error(f"{name}: a menu parameter that is a number needs menu_step", loc)
+        return True, None
+    valid = _is_int(step) if type_ == "INT32" else _is_number(step)
+    if not valid or step <= 0:
+        kind = "a positive integer" if type_ == "INT32" else "a positive number"
+        diag.error(f"{name}: menu_step must be {kind}, got {step!r}", loc)
+        return True, None
+    return True, float(step) if type_ == "FLOAT" else step
 
 
 def parse_file(path: Path, display: str, diag: Diagnostics) -> Group | None:
@@ -368,6 +408,13 @@ def parse_file(path: Path, display: str, diag: Diagnostics) -> Group | None:
         return None
     kconfig = _symbol(data.get("kconfig"), "kconfig", Loc(display, (_key_lines(text, "kconfig") or [None])[0]),
                       diag)
+    menu_allowed = data.get("menu", True)
+    menu_loc = Loc(display, (_key_lines(text, "menu") or [None])[0])
+    if menu_allowed is not False:
+        if "menu" in data:
+            diag.error(f"a file-level menu can only be false, keeping the group out of the local menu, "
+                       f"got {str(menu_allowed).lower() if isinstance(menu_allowed, bool) else repr(menu_allowed)}", menu_loc)
+        menu_allowed = True
     entries = data.get("param", [])
     if not isinstance(entries, list) or not entries:
         diag.error("a parameter definition file needs at least one [[param]]")
@@ -376,10 +423,15 @@ def parse_file(path: Path, display: str, diag: Diagnostics) -> Group | None:
     # [[param]] tables keep 'name' on its own line; enum values and bits are
     # inline tables, so their 'name' never starts a line.
     lines = name_lines if len(name_lines) == len(entries) else [None] * len(entries)
-    group = Group(prefix=prefix, kconfig=kconfig, source=display, doc=_doc(text), prefix_line=prefix_loc.line)
+    group = Group(prefix=prefix, kconfig=kconfig, source=display, doc=_doc(text), prefix_line=prefix_loc.line,
+                  menu_allowed=menu_allowed)
     for entry, line in zip(entries, lines):
         param = _parse_param(entry, prefix, Loc(display, line), diag)
         if param is None:
+            continue
+        if param.menu and not menu_allowed:
+            diag.error(f"{param.name}: group {prefix} is kept out of the local menu (menu = false, "
+                       f"line {menu_loc.line}), so it cannot set menu = true", param.loc)
             continue
         for other in group.params:
             if other.name == param.name:
@@ -463,7 +515,8 @@ def compiled_in(groups: list[Group], enabled: set[str] | None) -> list[Group]:
                                  "minimum": min(v.value for v in values),
                                  "maximum": max(v.value for v in values)})
             params.append(param)
-        result.append(Group(group.prefix, group.kconfig, group.source, group.doc, params, group.prefix_line))
+        result.append(Group(group.prefix, group.kconfig, group.source, group.doc, params, group.prefix_line,
+                            group.menu_allowed))
     if errors:
         raise ParamsError(errors)
     return result
@@ -541,6 +594,11 @@ def metadata(param: Param) -> dict:
         entry["values"] = [{"name": v.name, "value": v.value} for v in param.values]
     if param.is_bitmask:
         entry["bits"] = [{"name": b.name, "bit": b.bit} for b in param.bits]
+    # Only menu parameters carry the menu keys, so other parameters' metadata is unchanged.
+    if param.menu:
+        entry["menu"] = True
+        if param.menu_step is not None:
+            entry["menu_step"] = param.menu_step
     return entry
 
 

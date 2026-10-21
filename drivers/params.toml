@@ -29,3 +29,4 @@ values = [
 ]
 description = "Board orientation: how the board sits in the vehicle, applied after each device's mounting rotation on the board. Numbered as ArduPilot's and PX4's rotation table."
 reboot_required = true
+menu = true

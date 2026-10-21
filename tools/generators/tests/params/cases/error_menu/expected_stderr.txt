@@ -1,0 +1,8 @@
+a/params.toml:4: error: EA_NO_STEP: a menu parameter that is a number needs menu_step
+a/params.toml:13: error: EA_ENUM_STEP: an enum steps through its values; drop menu_step
+a/params.toml:22: error: EA_ZERO_STEP: menu_step must be a positive number, got 0.0
+a/params.toml:32: error: EA_HALF_STEP: menu_step must be a positive integer, got 0.5
+a/params.toml:42: error: EA_STEP_ONLY: menu_step needs menu = true
+a/params.toml:51: error: EA_BITS: a bitmask cannot be in the local menu
+b/params.toml:5: error: EB_GAIN: group EB is kept out of the local menu (menu = false, line 2), so it cannot set menu = true
+c/params.toml:2: error: a file-level menu can only be false, keeping the group out of the local menu, got true

@@ -13,6 +13,8 @@
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <string_view>
+#include <vector>
 
 namespace {
 
@@ -243,6 +245,50 @@ TEST(GeneratedParameters, AttitudeGainsStartAtTheirDefaults)
     EXPECT_EQ(vk::params::att.kp, 1.0F);
     EXPECT_EQ(vk::params::att.ki, 0.05F);
     EXPECT_EQ(vk::params::att.acc_rej, 0.1F);
+}
+
+// The local menu's parameters (ADR-0022): the whitelist this build compiles
+// in, in table order, with steps for numbers and value names for enums.
+TEST(GeneratedParameters, MenuListsTheWhitelistedParameters)
+{
+    const auto table = vk::params::table();
+    std::vector<std::string_view> names;
+    std::size_t previous = 0;
+    for (const vk::core::MenuParam& entry : vk::params::menu()) {
+        ASSERT_LT(entry.index, table.size());
+        if (!names.empty()) {
+            EXPECT_GT(entry.index, previous);
+        }
+        previous = entry.index;
+        const ParamInfo& info = table[entry.index];
+        names.push_back(info.name);
+        if (info.enum_values.empty()) {
+            EXPECT_EQ(entry.step.type, info.type) << info.name;
+            EXPECT_TRUE(entry.value_names.empty()) << info.name;
+        } else {
+            EXPECT_EQ(entry.value_names.size(), info.enum_values.size()) << info.name;
+        }
+    }
+    // SERIAL1_BAUD is a menu parameter too, but only the STM32F4 platform compiles it in.
+    EXPECT_EQ(names, (std::vector<std::string_view>{"ATT_ACC_REJ", "ATT_KI", "ATT_KP", "SENS_BOARD_ROT"}));
+
+    const auto& rot = vk::params::menu().back();
+    const ParamInfo& info = table[rot.index];
+    ASSERT_EQ(info.enum_values.size(), rot.value_names.size());
+    const auto yaw90 = std::ranges::find(rot.value_names, "YAW_90");
+    ASSERT_NE(yaw90, rot.value_names.end());
+    EXPECT_EQ(info.enum_values[static_cast<std::size_t>(yaw90 - rot.value_names.begin())], 2);
+    EXPECT_FLOAT_EQ(vk::params::menu().front().step.as_float(), 0.01F);
+}
+
+TEST(GeneratedParameters, NoActuatorOrCommanderParameterIsInTheMenu)
+{
+    const auto table = vk::params::table();
+    for (const vk::core::MenuParam& entry : vk::params::menu()) {
+        const std::string_view name = table[entry.index].name;
+        EXPECT_FALSE(name.starts_with("MOT")) << name;
+        EXPECT_FALSE(name.starts_with("COM")) << name;
+    }
 }
 
 }  // namespace

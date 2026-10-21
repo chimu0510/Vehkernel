@@ -23,4 +23,7 @@ std::span<const core::ParamInfo> table();
 // The build's parameter runtime over table().
 core::Parameters& parameters();
 
+// The parameters in the local menu, in table order (ADR-0022).
+std::span<const core::MenuParam> menu();
+
 }  // namespace vk::params

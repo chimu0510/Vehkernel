@@ -1,0 +1,91 @@
+{
+  "generator": "tools/generators/generate_params.py",
+  "set_hash": "0x217E20EF7C38F533",
+  "parameters": [
+    {
+      "name": "MA_COUNT",
+      "hash": 2344445715,
+      "type": "INT32",
+      "default": 3,
+      "min": 0,
+      "max": 10,
+      "unit": null,
+      "description": "A count in the local menu.",
+      "reboot_required": false,
+      "locked_when_armed": false,
+      "menu": true,
+      "menu_step": 2
+    },
+    {
+      "name": "MA_GAIN",
+      "hash": 1972599855,
+      "type": "FLOAT",
+      "default": 0.5,
+      "min": 0.0,
+      "max": 2.0,
+      "unit": null,
+      "description": "A gain in the local menu.",
+      "reboot_required": false,
+      "locked_when_armed": false,
+      "menu": true,
+      "menu_step": 0.1
+    },
+    {
+      "name": "MA_HIDDEN",
+      "hash": 1604523488,
+      "type": "INT32",
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "unit": null,
+      "description": "An enum outside the local menu, whose names stay out of the firmware.",
+      "reboot_required": false,
+      "locked_when_armed": false,
+      "values": [
+        {
+          "name": "NO",
+          "value": 0
+        },
+        {
+          "name": "YES",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "MA_MODE",
+      "hash": 4087260655,
+      "type": "INT32",
+      "default": 0,
+      "min": -1,
+      "max": 0,
+      "unit": null,
+      "description": "A mode in the local menu; FAST is not compiled in, so its name is not either.",
+      "reboot_required": false,
+      "locked_when_armed": false,
+      "values": [
+        {
+          "name": "SLOW",
+          "value": 0
+        },
+        {
+          "name": "OFF",
+          "value": -1
+        }
+      ],
+      "menu": true
+    },
+    {
+      "name": "MB_LIMIT",
+      "hash": 4117992158,
+      "type": "FLOAT",
+      "default": 0.3,
+      "min": 0.0,
+      "max": 1.0,
+      "unit": null,
+      "description": "A limit the local menu never changes.",
+      "reboot_required": false,
+      "locked_when_armed": false
+    }
+  ]
+}

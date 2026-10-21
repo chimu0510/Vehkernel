@@ -1,0 +1,44 @@
+# Menu parameters of a test module (ADR-0022).
+prefix = "MA"
+
+[[param]]
+name = "MA_GAIN"
+type = "FLOAT"
+default = 0.5
+min = 0.0
+max = 2.0
+description = "A gain in the local menu."
+menu = true
+menu_step = 0.1
+
+[[param]]
+name = "MA_COUNT"
+type = "INT32"
+default = 3
+min = 0
+max = 10
+description = "A count in the local menu."
+menu = true
+menu_step = 2
+
+[[param]]
+name = "MA_MODE"
+type = "INT32"
+default = "SLOW"
+values = [
+  { name = "SLOW", value = 0 },
+  { name = "FAST", value = 1, kconfig = "TEST_FAST" },
+  { name = "OFF", value = -1 },
+]
+description = "A mode in the local menu; FAST is not compiled in, so its name is not either."
+menu = true
+
+[[param]]
+name = "MA_HIDDEN"
+type = "INT32"
+default = "NO"
+values = [
+  { name = "NO", value = 0 },
+  { name = "YES", value = 1 },
+]
+description = "An enum outside the local menu, whose names stay out of the firmware."

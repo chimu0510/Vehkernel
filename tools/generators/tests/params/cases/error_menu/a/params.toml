@@ -1,0 +1,56 @@
+prefix = "EA"
+
+[[param]]
+name = "EA_NO_STEP"
+type = "FLOAT"
+default = 0.5
+min = 0.0
+max = 2.0
+description = "A number without a step."
+menu = true
+
+[[param]]
+name = "EA_ENUM_STEP"
+type = "INT32"
+default = "A"
+values = [{ name = "A", value = 0 }, { name = "B", value = 1 }]
+description = "An enum with a step."
+menu = true
+menu_step = 1
+
+[[param]]
+name = "EA_ZERO_STEP"
+type = "FLOAT"
+default = 0.5
+min = 0.0
+max = 2.0
+description = "A zero step."
+menu = true
+menu_step = 0.0
+
+[[param]]
+name = "EA_HALF_STEP"
+type = "INT32"
+default = 1
+min = 0
+max = 5
+description = "An integer with a fractional step."
+menu = true
+menu_step = 0.5
+
+[[param]]
+name = "EA_STEP_ONLY"
+type = "FLOAT"
+default = 0.5
+min = 0.0
+max = 2.0
+description = "A step without menu."
+menu_step = 0.1
+
+[[param]]
+name = "EA_BITS"
+type = "INT32"
+default = 1
+bits = [{ name = "ONE", bit = 0 }]
+description = "A bitmask in the menu."
+menu = true

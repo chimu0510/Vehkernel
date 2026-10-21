@@ -3,6 +3,8 @@
 # defaults to the board definition's value for its stock motors.
 prefix = "MOT"
 kconfig = "ACTUATOR_CONTROL"
+# Actuator wiring and tuning never change from the local menu (ADR-0022).
+menu = false
 
 [[param]]
 name = "MOT1_REV"
