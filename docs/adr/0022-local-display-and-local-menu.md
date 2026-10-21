@@ -7,7 +7,7 @@ A board with a display and a user key shows the vehicle's status on the display 
 - The local display subscribes to topics on the bus and publishes nothing the control chain reads. Producing modules never know it exists, as with the logger (ADR-0019).
 - It runs on the lowest-priority work queue, never on `wq:ctrl`. A display on GPIO lines busy-waits for every byte, so it refreshes at a bounded rate and redraws only what changed; the timing monitor measures its cost (ADR-0015).
 - Pages: status (mode, arming state, emergency stop, refused and skipped arming checks, board verified), attitude, and Link status. Later milestones add their own pages, such as battery.
-- A display that is missing or does not answer is reported over a Link and affects nothing else. It is not part of verifying the board at boot (ADR-0010) and not an arming check.
+- A display that is missing or does not answer is reported over a Link where its bus can tell; on a write-only bus, such as the C50C's, the firmware cannot know. Either way it affects nothing else: it is not part of verifying the board at boot (ADR-0010) and not an arming check.
 - While armed the user key only switches status pages.
 
 **Local menu**
@@ -27,7 +27,7 @@ Arming and disarming, mode changes, engaging or releasing the emergency stop, st
 
 **Firmware metadata**
 
-Short labels and enumeration value names are compiled into the firmware for menu parameters only; every other parameter keeps only what validation needs (ADR-0012). The whitelist bounds the Flash this costs.
+The local menu shows each parameter by its name, which the firmware already holds. Enumeration value names are compiled into the firmware for menu parameters only; every other parameter keeps only what validation needs (ADR-0012). The whitelist bounds the Flash this costs.
 
 **Board definition**
 
@@ -39,6 +39,6 @@ A display is a board device in the board definition (ADR-0011), with its control
 - **The user key as an emergency stop source**: not adopted for now. Engaging is the safe direction, but the key is shared with the menu, so a press would mean two things, and an on-board key is out of reach on a moving vehicle. Revisit with the remote control.
 - **Editing while armed parameters that are not `locked_when_armed`**: rejected. Live tuning over a Link has a tool and an operator at a distance; the local menu has neither.
 - **A blacklist of parameters the menu must not show**: rejected. Every new parameter would appear in the menu by default, and forgetting to list one fails unsafe.
-- **Every parameter's labels and enumeration names in the firmware**: rejected for the reasons in ADR-0012; only menu parameters need them on the board.
+- **Every parameter's enumeration names in the firmware**: rejected for the reasons in ADR-0012; only menu parameters need them on the board.
 - **A reboot item in the menu**: not adopted in the first version. The menu marks what needs a reboot, and a power cycle does the rest.
 - **Resetting every parameter from the menu**: rejected. It would also reset parameters outside the whitelist, such as `MOT` and `COM`, which the menu must not change.
