@@ -64,13 +64,21 @@ Flash the C50C over SWD with an ST-Link on header HDR2 (pin 4 GND, pin 6 PA13/SW
 openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program build/c50c-v1_1/app/vehkernel.elf verify reset exit"
 ```
 
-Without an ST-Link, flash over the one-key download port (SERIAL2, USART1 to its own CH9102F) with [`stm32flash`](https://sourceforge.net/projects/stm32flash/) (`sudo apt install stm32flash`). The adapter's RTS drives BOOT0 and its DTR, with RTS, drives NRST, so `stm32flash` starts the STM32 system bootloader, writes the firmware and resets the board into it on its own, in about 20 s at 115200 baud:
+Without an ST-Link, flash over the one-key download port (SERIAL2, USART1 to its own CH9102F). The adapter's RTS drives BOOT0 and its DTR, with RTS, drives NRST, so the STM32 system bootloader is entered and left without touching the board. `tools/flash/flash_serial.py` runs [`stm32flash`](https://sourceforge.net/projects/stm32flash/) (`sudo apt install stm32flash`) with that sequence and takes the Flash layout from the build's board definition. It reads `build/c50c-v1_1` and `/dev/ttyACM0` unless given `--build` and `--port`.
+
+A new board, or one still running its vendor firmware, is flashed once with `new-board`. The command backs up the whole chip into `<board>_flash_<time>.bin` in the current directory, or the file given with `--backup`. It then erases the whole chip and writes `vehkernel.hex`, the boot stub and the firmware. Nothing of the vendor firmware, its settings or old parameters is left. The command takes about 2 minutes at 115200 baud. Nothing is erased if the backup fails or comes back short, and an existing backup file is never overwritten. Keep each board's backup outside the repository: vendor firmware differs from board to board.
 
 ```bash
-stm32flash -b 115200 -i '-dtr,rts,,dtr,,-rts:-dtr,rts,,-rts' -S 0x08010000 -w build/c50c-v1_1/app/vehkernel.bin -v /dev/ttyACM0
+tools/flash/flash_serial.py new-board
 ```
 
-This writes `vehkernel.bin` from S4 only, so the stored parameters survive. Never flash it without `-S 0x08010000`, and never erase the whole chip. The boot stub in S0 changes only with the Flash layout; write `vehkernel-boot.bin` to `0x08000000` then. The `-i` sequence enters the bootloader with NRST held low and BOOT0 high, then releases NRST, and leaves it with BOOT0 low.
+Every later update writes `vehkernel.bin` from the FIRMWARE region (S4) on, so the stored parameters survive. An update takes about 20 s:
+
+```bash
+tools/flash/flash_serial.py update
+```
+
+`backup <file>` only reads the chip, and `reset` restarts the firmware. An update on a board that still has its vendor firmware in S0 leaves that firmware running, so a new board needs `new-board` first. The tool fails with exit code 1 when `stm32flash` fails, and with 2 when an image does not fit its region or the build is missing.
 
 The firmware runs a Link on SERIAL1, the Type-C port (USART3 to a CH9102F USB serial adapter), and another on SERIAL2, the one-key download port, so one cable both flashes and connects. Both are 8N1 with DMA both ways, at the `SERIAL1_BAUD` and `SERIAL2_BAUD` parameters: 921600 baud by default, as the board definition's `baud` for each port sets it. A changed rate takes effect at the next boot; pass the same rate to the monitor with `--baud`. A rate the port cannot reach falls back to the board default. Plug a USB cable into either port and the adapter appears on the host as a serial device, usually `/dev/ttyACM0` (your user needs the `dialout` group). Opening the port asserts DTR and RTS, which on the download port would hold BOOT0 high, so the monitor releases both at once; a board reset while it is connected still starts the firmware. Run the Link monitor on the host, with the Python decoders of the firmware build:
 
@@ -303,6 +311,9 @@ This is the initial skeleton and may change during implementation.
 | `tools/mcudb/` | Offline converter that regenerates an MCU database from the stm32-data source committed under `mcu/<mcu>/source/` | 0011, 0016 |
 | `tools/kconfig/` | Layered Kconfig solve and `menuconfig` with overlay saving | 0017 |
 | `tools/generators/` | Schema (including ULog format definitions), board, parameter and log profile generators | 0006, 0011, 0012, 0019 |
+| `tools/link/` | Link monitor: live view, checks, parameters and vehicle commands | 0002, 0006 |
+| `tools/flash/` | Serial flasher through the STM32 system bootloader | 0020 |
+| `tools/bringup/` | Bring-up runner for the hardware cases over SWD | 0018 |
 | `app/` | Entry points: firmware image and SITL executable | — |
 | `third_party/` | Pinned submodules: FreeRTOS kernel, CMSIS core, STM32F4 device headers and LL drivers | 0004, 0016 |
 | `bridge/` | ROS2 Bridge for the companion computer | 0002, 0003 |
