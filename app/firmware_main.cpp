@@ -51,6 +51,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string_view>
 
 #ifndef CONFIG_PLATFORM_STM32F4
 #error "the Kconfig layers must select the STM32F4 platform for firmware builds"
@@ -199,42 +200,57 @@ void start_imu()
 #endif
 
 #ifdef CONFIG_LINK_SERIAL
-// The Link's serial port: SERIAL1, the Type-C port, 8N1 at SERIAL1_BAUD
-// (spec 0005), whose default the board definition gives. The port stays
-// fixed until SERIALn_FUNCTION exists.
-using LinkPort = vk::board::ports::SERIAL1;
-static_assert(vk::board::defaults::SERIAL1_FUNCTION == "LINK", "SERIAL1 must be a Link port");
+// A Link on a board serial port, 8N1 at its SERIALn_BAUD (spec 0005), whose
+// default the board definition gives. Each Link is a link_status instance and
+// a source for setpoint arbitration (ADR-0005). The ports stay fixed until
+// SERIALn_FUNCTION exists.
+template <class Port>
+struct SerialLink {
+    using Uart = vk::platform::DmaUart<Port, vk::link::serial_transmit_buffer_size>;
+    static_assert(vk::hal::Uart<Uart>);
 
-using LinkUart = vk::platform::DmaUart<LinkPort>;
-static_assert(vk::hal::Uart<LinkUart>);
+    Uart uart;  // in .bss, normal SRAM, where the DMA reaches its buffers
+    vk::core::StaticInstance<vk::hal::UartTransport> transport;
+    vk::core::StaticInstance<vk::link::Link> link;
 
-LinkUart link_uart;  // in .bss, normal SRAM, where the DMA reaches its buffers
-vk::core::StaticInstance<vk::hal::UartTransport> link_transport;
-vk::core::StaticInstance<vk::link::Link> serial_link;
-
-void start_link()
-{
-    // A rate the USART cannot reach falls back to the board default, so a bad
-    // parameter never costs the Link that could change it back.
-    auto baud = static_cast<std::uint32_t>(vk::params::serial.serial1_baud);
-    if (!link_uart.configure(baud)) {
-        baud = static_cast<std::uint32_t>(vk::board::defaults::SERIAL1_BAUD);
-        if (!link_uart.configure(baud)) {
-            vk::core::fail("the Link's baud rate is out of the USART's reach");
+    void start(std::string_view name, std::uint8_t instance, std::int32_t baud_parameter, std::int32_t board_baud)
+    {
+        // A rate the USART cannot reach falls back to the board default, so a bad
+        // parameter never costs the Link that could change it back.
+        auto baud = static_cast<std::uint32_t>(baud_parameter);
+        if (!uart.configure(baud)) {
+            baud = static_cast<std::uint32_t>(board_baud);
+            if (!uart.configure(baud)) {
+                vk::core::fail("a Link's baud rate is out of the USART's reach");
+            }
         }
-    }
-    link_transport.emplace(link_uart, baud);
-    serial_link.emplace("link0", *link_transport,
-                        vk::link::default_topic_map(static_cast<float>(vk::board::timing::base_rate_hz)),
-                        vk::link::Link::Config{.parameters = {.parameters = &vk::params::parameters(),
-                                                              .set_hash = vk::params::set_hash,
+        transport.emplace(uart, baud);
+        link.emplace(name, *transport,
+                     vk::link::default_topic_map(static_cast<float>(vk::board::timing::base_rate_hz), instance),
+                     vk::link::Link::Config{.instance = instance,
+                                            .parameters = {.parameters = &vk::params::parameters(),
+                                                           .set_hash = vk::params::set_hash,
 #ifdef CONFIG_PARAM_STORAGE_FLASH
-                                                              .storage = &*param_storage,
+                                                           .storage = &*param_storage,
 #endif
-                                                              },
-                                               .control = {.control = &*commander}},
-                        vk::core::work_queue(vk::core::WorkQueueTier::Io));
-    serial_link->start();
+                                                           },
+                                            .control = {.control = &*commander}},
+                     vk::core::work_queue(vk::core::WorkQueueTier::Io));
+        link->start();
+    }
+};
+
+// SERIAL1 is the Type-C port (USART3); SERIAL2 the one-key download port
+// (USART1), which also flashes the board through the system bootloader.
+static_assert(vk::board::defaults::SERIAL1_FUNCTION == "LINK" && vk::board::defaults::SERIAL2_FUNCTION == "LINK",
+              "SERIAL1 and SERIAL2 must be Link ports");
+SerialLink<vk::board::ports::SERIAL1> serial1_link;
+SerialLink<vk::board::ports::SERIAL2> serial2_link;
+
+void start_links()
+{
+    serial1_link.start("link0", 0, vk::params::serial.serial1_baud, vk::board::defaults::SERIAL1_BAUD);
+    serial2_link.start("link1", 1, vk::params::serial.serial2_baud, vk::board::defaults::SERIAL2_BAUD);
 }
 #endif
 
@@ -318,7 +334,7 @@ int main()
     start_local_display();
 #endif
 #ifdef CONFIG_LINK_SERIAL
-    start_link();
+    start_links();
 #endif
     vk::core::start_scheduler();  // Never returns.
 }

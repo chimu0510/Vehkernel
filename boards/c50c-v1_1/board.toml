@@ -62,7 +62,11 @@ pins = [
   { pin = "PD2",  role = "SBUS_RX", func = "UART5_RX" },
 
   # Serial ports: USART3 to the Type-C CH9102F, USART1 to the one-key
-  # download CH9102F (DTR/RTS drive BOOT0 and NRST), UART4 to Bluetooth.
+  # download CH9102F, UART4 to Bluetooth. On the one-key download port RTS
+  # drives BOOT0 through a PNP (RTS asserted, its pin low: BOOT0 high), and
+  # DTR pulls NRST low through an NPN whose emitter is on RTS (DTR released
+  # and RTS asserted: in reset), so the STM32 system bootloader on USART1
+  # flashes the board over that port (README).
   { pin = "PB10", role = "SERIAL1_TX", func = "USART3_TX" },
   { pin = "PB11", role = "SERIAL1_RX", func = "USART3_RX" },
   { pin = "PA9",  role = "SERIAL2_TX", func = "USART1_TX" },
@@ -106,7 +110,7 @@ pins = [
 
 serial = [
   { port = "SERIAL1", tx = "SERIAL1_TX", rx = "SERIAL1_RX", function = "LINK", baud = 921600 },
-  { port = "SERIAL2", tx = "SERIAL2_TX", rx = "SERIAL2_RX", function = "LINK" },
+  { port = "SERIAL2", tx = "SERIAL2_TX", rx = "SERIAL2_RX", function = "LINK", baud = 921600 },
   { port = "SERIAL3", tx = "SERIAL3_TX", rx = "SERIAL3_RX", function = "NONE" },
   { port = "SERIAL4", rx = "SBUS_RX", function = "RC_INPUT" },
 ]

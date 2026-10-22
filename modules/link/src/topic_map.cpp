@@ -21,6 +21,17 @@ float wire_bytes(const TopicStream& stream)
 
 }  // namespace
 
+std::size_t topic_map_burst(TopicMap map)
+{
+    std::size_t burst = 0;
+    for (const TopicStream* stream : map) {
+        if (!stream->inbound()) {
+            burst += static_cast<std::size_t>(wire_bytes(*stream));
+        }
+    }
+    return burst;
+}
+
 float topic_map_load(TopicMap map)
 {
     float load = 0.0F;

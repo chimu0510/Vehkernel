@@ -529,6 +529,29 @@ TEST(TopicMapScaling, TheDefaultMapFitsEitherRateItIsScaledTo)
     }
 }
 
+TEST(TopicMapScaling, ASerialLinksTransmitBufferHoldsTheDefaultMapsBurst)
+{
+    // When every work item's status and every Link's status fall due in one
+    // run, with the faster streams, and a frame of the last run still in it.
+    const vk::link::TopicMap map = vk::link::default_topic_map(200.0F, 0);
+    EXPECT_LE(vk::link::topic_map_burst(map) + vk::link::max_frame_size, vk::link::serial_transmit_buffer_size);
+}
+
+TEST(TopicMapScaling, EachLinkHasItsOwnDefaultMap)
+{
+    const vk::link::TopicMap first = vk::link::default_topic_map(200.0F, 0);
+    const vk::link::TopicMap second = vk::link::default_topic_map(200.0F, 1);
+    ASSERT_EQ(first.size(), second.size());
+    for (const TopicStream* stream : first) {
+        EXPECT_EQ(std::ranges::find(second, stream), second.end());
+    }
+    // Scaling one Link's map to a slow port leaves the other's rates alone.
+    const float first_load = vk::link::topic_map_load(first);
+    EXPECT_LT(vk::link::scale_to_baud(second, 57'600), 100);
+    EXPECT_EQ(vk::link::topic_map_load(first), first_load);
+    EXPECT_LT(vk::link::topic_map_load(second), 57'600.0F / 10.0F * vk::link::max_port_load * 1.001F);
+}
+
 TEST_F(LinkTest, ASerialLinkScaledToItsBaudRateDropsNoFrame)
 {
     TopicStreamOf<Sample<28, 8>> stream(vk::link::every_sample, 0, 1000.0F);

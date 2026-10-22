@@ -18,3 +18,19 @@ unit = "bit/s"
 description = "Baud rate of SERIAL1. The Link on SERIAL1 falls back to the board default if the port cannot reach the rate."
 reboot_required = true
 menu = true
+
+[[param]]
+name = "SERIAL2_BAUD"
+type = "INT32"
+default = "B115200"
+values = [
+  { name = "B57600", value = 57600 },
+  { name = "B115200", value = 115200 },
+  { name = "B230400", value = 230400 },
+  { name = "B460800", value = 460800 },
+  { name = "B921600", value = 921600 },
+]
+unit = "bit/s"
+description = "Baud rate of SERIAL2. The Link on SERIAL2 falls back to the board default if the port cannot reach the rate."
+reboot_required = true
+menu = true

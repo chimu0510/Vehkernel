@@ -169,6 +169,17 @@ inline constexpr float max_port_load = 0.8F;
 // header, CRC, worst-case COBS overhead and delimiter.
 float topic_map_load(TopicMap map);
 
+// The bytes one run of a Link writes when every outbound stream of `map` is
+// due at once, as the 1 Hz status streams are when the timing monitor
+// publishes every work item's status together: what a transport's transmit
+// buffer must hold on top of what is still draining.
+std::size_t topic_map_burst(TopicMap map);
+
+// The transmit buffer a Link's serial port needs for the default map's burst
+// (topic_map_burst) with a frame of the run before still in it. A frame that
+// does not fit is dropped whole and counted in link_status.
+inline constexpr std::size_t serial_transmit_buffer_size = 2048;
+
 // Scales `map` down to fit a port at `baud` bits a second (8N1, 10 bits a
 // byte); returns the common factor in percent, 100 when nothing was scaled
 // or the transport has no baud rate (0).
@@ -180,6 +191,8 @@ std::uint8_t scale_to_baud(TopicMap map, std::uint32_t baud);
 // every instance of work_item_status and link_status at 1 Hz; actuator_setpoint
 // comes in, as a setpoint.
 // `imu_rate_hz` is imu_sample's publish rate, from the board's timing preset.
-TopicMap default_topic_map(float imu_rate_hz);
+// Each Link, 0 to link_status's instances - 1, gets its own streams, so
+// Links on ports at different baud rates scale their rates apart.
+TopicMap default_topic_map(float imu_rate_hz, std::size_t link = 0);
 
 }  // namespace vk::link

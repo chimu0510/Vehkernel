@@ -1,5 +1,7 @@
 #include <vk/link/topic_map.hpp>
 
+#include <vk/core/static_instance.hpp>
+
 #include <vk/msg/actuator_outputs.hpp>
 #include <vk/msg/actuator_setpoint.hpp>
 #include <vk/msg/imu_sample.hpp>
@@ -14,7 +16,6 @@
 
 #include <array>
 #include <cstddef>
-#include <tuple>
 #include <utility>
 
 namespace vk::link {
@@ -44,29 +45,41 @@ std::array<TopicStream*, N + sizeof...(I) + sizeof...(J)> make_map(const std::ar
     return {first[F]..., &a[I]..., &b[J]...};
 }
 
+// One Link's streams: each stream keeps its own subscriptions and rates, so
+// every Link needs its own (scale_to_baud changes a stream's rate).
+struct DefaultStreams {
+    explicit DefaultStreams(float imu_rate_hz) : imu(every_sample, 0, imu_rate_hz) {}
+
+    TopicStreamOf<msg::ImuSample> imu;
+    TopicStreamOf<msg::VehicleAttitude> attitude{MaxRate{50.0F}, 0};
+    TopicStreamOf<msg::VehicleAttitudeGroundtruth> truth{MaxRate{50.0F}, 0};  // SITL only
+    TopicStreamOf<msg::ParameterStatus> parameters{status_rate, 0};           // with parameter storage
+    TopicStreamOf<msg::VehicleStatus> vehicle{MaxRate{5.0F}, 0};
+    TopicStreamOf<msg::WheelEncoders> wheels{MaxRate{50.0F}, 0};
+    TopicStreamOf<msg::ActuatorOutputs> outputs{MaxRate{50.0F}, 0};
+    TopicStreamOf<msg::ActuatorSetpoint> setpoint{Inbound{.setpoint = true}, 0};
+    TopicStreamOf<msg::LocalMenu> menu{MaxRate{5.0F}, 0};  // with the local menu
+    std::array<TopicStreamOf<msg::WorkItemStatus>, msg::WorkItemStatus::instances> work_items =
+        make_status_streams<msg::WorkItemStatus>();
+    std::array<TopicStreamOf<msg::LinkStatus>, msg::LinkStatus::instances> links = make_status_streams<msg::LinkStatus>();
+    std::array<TopicStream*, 9> first{&imu, &attitude, &truth, &parameters, &vehicle, &wheels, &outputs, &setpoint, &menu};
+    std::array<TopicStream*, 9 + msg::WorkItemStatus::instances + msg::LinkStatus::instances> map =
+        make_map(first, std::make_index_sequence<9>{}, work_items,
+                 std::make_index_sequence<msg::WorkItemStatus::instances>{}, links,
+                 std::make_index_sequence<msg::LinkStatus::instances>{});
+};
+
 }  // namespace
 
-TopicMap default_topic_map(float imu_rate_hz)
+TopicMap default_topic_map(float imu_rate_hz, std::size_t link)
 {
     // Created on first use, after the bus storage is in place.
-    static TopicStreamOf<msg::ImuSample> imu(every_sample, 0, imu_rate_hz);
-    static TopicStreamOf<msg::VehicleAttitude> attitude(MaxRate{50.0F}, 0);
-    static TopicStreamOf<msg::VehicleAttitudeGroundtruth> truth(MaxRate{50.0F}, 0);  // SITL only
-    static TopicStreamOf<msg::ParameterStatus> parameters(status_rate, 0);           // with parameter storage
-    static TopicStreamOf<msg::VehicleStatus> vehicle(MaxRate{5.0F}, 0);
-    static TopicStreamOf<msg::WheelEncoders> wheels(MaxRate{50.0F}, 0);
-    static TopicStreamOf<msg::ActuatorOutputs> outputs(MaxRate{50.0F}, 0);
-    static TopicStreamOf<msg::ActuatorSetpoint> setpoint(Inbound{.setpoint = true}, 0);
-    static TopicStreamOf<msg::LocalMenu> menu(MaxRate{5.0F}, 0);                       // with the local menu
-    static auto work_items = make_status_streams<msg::WorkItemStatus>();
-    static auto links = make_status_streams<msg::LinkStatus>();
-    static const std::array<TopicStream*, 9> first{&imu,    &attitude, &truth,    &parameters, &vehicle,
-                                                   &wheels, &outputs,  &setpoint, &menu};
-    static const auto map =
-        make_map(first, std::make_index_sequence<std::tuple_size_v<decltype(first)>>{}, work_items,
-                 std::make_index_sequence<std::tuple_size_v<decltype(work_items)>>{}, links,
-                 std::make_index_sequence<std::tuple_size_v<decltype(links)>>{});
-    return map;
+    static std::array<core::StaticInstance<DefaultStreams>, msg::LinkStatus::instances> streams;
+    auto& instance = streams.at(link);
+    if (!instance.has_value()) {
+        instance.emplace(imu_rate_hz);
+    }
+    return instance->map;
 }
 
 }  // namespace vk::link

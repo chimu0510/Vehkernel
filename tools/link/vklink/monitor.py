@@ -10,12 +10,14 @@ generator writes into the build tree, and sends direct-actuator setpoints
 
 from __future__ import annotations
 
+import fcntl
 import importlib.util
 import json
 import math
 import os
 import select
 import socket
+import struct
 import termios
 import time
 import tty
@@ -93,9 +95,25 @@ class SerialConnection:
             mode[4] = mode[5] = speed
             termios.tcsetattr(self._fd, termios.TCSANOW, mode)
             termios.tcflush(self._fd, termios.TCIOFLUSH)  # bytes from before we opened it
+            self._release_modem_lines()
         except BaseException:
             os.close(self._fd)
             raise
+
+    def _release_modem_lines(self) -> None:
+        """Releases DTR and RTS, which opening the port asserts.
+
+        On a port wired for one-key download, such as the C50C's SERIAL2, RTS
+        asserted holds BOOT0 high, so a reset while the monitor is connected
+        would start the system bootloader. Both are released in one request:
+        DTR released first, with RTS still asserted, would reset the board.
+        A pty has no modem lines.
+        """
+        lines = struct.pack("I", termios.TIOCM_DTR | termios.TIOCM_RTS)
+        try:
+            fcntl.ioctl(self._fd, termios.TIOCMBIC, lines)
+        except OSError:
+            pass
 
     def send(self, data: bytes) -> None:
         while data:

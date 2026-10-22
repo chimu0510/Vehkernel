@@ -354,6 +354,7 @@ inline constexpr std::int32_t MOT4_CPR = 36000;
 inline constexpr std::int32_t MOT_PWM_FREQ = 10000;
 inline constexpr std::int32_t SERIAL1_BAUD = 921600;
 inline constexpr std::string_view SERIAL1_FUNCTION = "LINK";
+inline constexpr std::int32_t SERIAL2_BAUD = 921600;
 inline constexpr std::string_view SERIAL2_FUNCTION = "LINK";
 inline constexpr std::string_view SERIAL3_FUNCTION = "NONE";
 inline constexpr std::string_view SERIAL4_FUNCTION = "RC_INPUT";

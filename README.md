@@ -64,7 +64,15 @@ Flash the C50C over SWD with an ST-Link on header HDR2 (pin 4 GND, pin 6 PA13/SW
 openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program build/c50c-v1_1/app/vehkernel.elf verify reset exit"
 ```
 
-The firmware runs a Link on SERIAL1, the Type-C port (USART3 to the CH9102F USB serial adapter), 8N1 with DMA both ways, at the `SERIAL1_BAUD` parameter: 921600 baud by default, as the board definition's `baud` for SERIAL1 sets it. A changed rate takes effect at the next boot; pass the same rate to the monitor with `--baud`. A rate the port cannot reach falls back to the board default. Plug a USB cable into the Type-C port and the adapter appears on the host as a serial device, usually `/dev/ttyACM0` (your user needs the `dialout` group). Run the Link monitor on the host, with the Python decoders of the firmware build:
+Without an ST-Link, flash over the one-key download port (SERIAL2, USART1 to its own CH9102F) with [`stm32flash`](https://sourceforge.net/projects/stm32flash/) (`sudo apt install stm32flash`). The adapter's RTS drives BOOT0 and its DTR, with RTS, drives NRST, so `stm32flash` starts the STM32 system bootloader, writes the firmware and resets the board into it on its own, in about 20 s at 115200 baud:
+
+```bash
+stm32flash -b 115200 -i '-dtr,rts,,dtr,,-rts:-dtr,rts,,-rts' -S 0x08010000 -w build/c50c-v1_1/app/vehkernel.bin -v /dev/ttyACM0
+```
+
+This writes `vehkernel.bin` from S4 only, so the stored parameters survive. Never flash it without `-S 0x08010000`, and never erase the whole chip. The boot stub in S0 changes only with the Flash layout; write `vehkernel-boot.bin` to `0x08000000` then. The `-i` sequence enters the bootloader with NRST held low and BOOT0 high, then releases NRST, and leaves it with BOOT0 low.
+
+The firmware runs a Link on SERIAL1, the Type-C port (USART3 to a CH9102F USB serial adapter), and another on SERIAL2, the one-key download port, so one cable both flashes and connects. Both are 8N1 with DMA both ways, at the `SERIAL1_BAUD` and `SERIAL2_BAUD` parameters: 921600 baud by default, as the board definition's `baud` for each port sets it. A changed rate takes effect at the next boot; pass the same rate to the monitor with `--baud`. A rate the port cannot reach falls back to the board default. Plug a USB cable into either port and the adapter appears on the host as a serial device, usually `/dev/ttyACM0` (your user needs the `dialout` group). Opening the port asserts DTR and RTS, which on the download port would hold BOOT0 high, so the monitor releases both at once; a board reset while it is connected still starts the firmware. Run the Link monitor on the host, with the Python decoders of the firmware build:
 
 ```bash
 tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/c50c-v1_1/generated/schema/python
@@ -258,7 +266,7 @@ The user key drives the display and the local menu (ADR-0022). A short press (re
 - In an edit, the screen shows the current value (NOW) and a staged value (NEW). A short press moves the caret through `+`, `-`, `DEF`, `SAVE` and `CANCEL`; a long press runs the one under it. `+` and `-` step by the parameter's menu step within its range, or through an enum's values, and repeat every 0.2 s while the key stays held. `DEF` stages the default. Nothing is written until `SAVE`, which goes through the same parameter checks as a Link and shows `SAVED` or why it was refused; every connected Link sees the change. A changed parameter that needs a reboot shows `REBOOT`.
 - The menu closes by itself after 30 s without a key press, discarding a staged edit, and at once if the vehicle is armed.
 
-The menu parameters are `SENS_BOARD_ROT`, `SERIAL1_BAUD` (on the board), `ATT_KP`, `ATT_KI` and `ATT_ACC_REJ`; a parameter enters the menu only with `menu = true` and a `menu_step` in its definition. Nothing in the `MOT` or `COM` groups ever does: the menu never arms, changes the mode, touches the emergency stop or moves an actuator. Changing `SERIAL1_BAUD` from the menu recovers a board set to a rate the host cannot use.
+The menu parameters are `SENS_BOARD_ROT`, `SERIAL1_BAUD` and `SERIAL2_BAUD` (on the board), `ATT_KP`, `ATT_KI` and `ATT_ACC_REJ`; a parameter enters the menu only with `menu = true` and a `menu_step` in its definition. Nothing in the `MOT` or `COM` groups ever does: the menu never arms, changes the mode, touches the emergency stop or moves an actuator. Changing `SERIAL1_BAUD` or `SERIAL2_BAUD` from the menu recovers a board set to a rate the host cannot use.
 
 In SITL the Link monitor presses the simulated user key, then prints the menu's state, which the live view also shows:
 
