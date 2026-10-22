@@ -28,6 +28,7 @@ Other board revisions and boards get their own board definitions when needed ([A
 - **Hardware support**:
   - Board definitions are written in TOML; the generator validates pins against the MCU database and solves DMA assignments ([0011](docs/adr/0011-toml-board-definition-toolchain.md)).
   - The HAL picks its form of polymorphism by when each choice is made ([0009](docs/adr/0009-layered-hal.md)).
+  - Firmware updates use the ArduPilot and PX4 bootloader protocol: boards that ship with that bootloader keep it, and boards without one get a compatible Vehkernel bootloader (proposed, [0023](docs/adr/0023-bootloader.md)).
 - **Configuration**:
   - Kconfig decides which features are compiled in; parameters decide which one is enabled at runtime ([0017](docs/adr/0017-kconfig-build-configuration.md), [0012](docs/adr/0012-parameter-system.md)).
   - Third-party packages are allowed but must be pinned ([0016](docs/adr/0016-dependency-policy.md)).

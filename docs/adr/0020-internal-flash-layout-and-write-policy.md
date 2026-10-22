@@ -6,13 +6,14 @@ The STM32F407 Flash has a single bank. During an erase or write, every instructi
 
 | Sector | Size | Use |
 |---|---|---|
-| S0 | 16 KB | Reserved for a future bootloader; for now holds only a stub that jumps to the firmware |
+| S0 | 16 KB | Bootloader (ADR-0023); until it exists, a stub that jumps to the firmware |
 | S1–S2 | 16 KB × 2 | Parameter storage, two alternating sectors (ADR-0012) |
 | S3 | 16 KB | Event log (ADR-0019) |
 | S4–S7 | 64 KB + 128 KB × 3 | Firmware, 448 KB contiguous; VTOR points the vector table at S4 |
 
 - The board TOML declares the layout, and the sector table comes from the MCU database (ADR-0011). The generator derives the linker script memory regions from it and uses the firmware region size as the Flash budget of ADR-0017.
-- Flashing works over SWD without any bootloader. When firmware updates over a Link are added, a new ADR decides what goes into S0, with no change to the layout.
+- The table is the C50C's. Every board declares its own layout. A board that keeps an ArduPilot or PX4 bootloader declares the layout that bootloader expects, for example a 128 KB bootloader region on STM32H743 boards (ADR-0023).
+- The bootloader erases only the firmware region, so the parameter and event log sectors survive firmware updates. Until the bootloader exists, SWD and the STM32 system bootloader write the firmware region only, and a new board's whole chip is erased once.
 
 **Write policy**
 

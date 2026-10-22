@@ -112,6 +112,28 @@ _Avoid_: host, Pi
 The computer that runs builds, tests, SITL and flashing tools, such as a developer's machine or a CI runner.
 _Avoid_: PC, workstation
 
+### Firmware update
+
+**Bootloader**:
+The program at the start of Flash that checks and starts the firmware and writes new firmware over the ArduPilot and PX4 bootloader protocol.
+_Avoid_: BL, loader
+
+**System Bootloader**:
+The STM32's own bootloader in ROM, entered through BOOT0, used only to install the bootloader and to rescue a board.
+_Avoid_: ROM bootloader, DFU mode
+
+**Board ID**:
+The number that tells which board a firmware image is for, from the list ArduPilot and PX4 share.
+_Avoid_: board type, APJ ID
+
+**App Descriptor**:
+The record inside a firmware image that gives its board ID, size, CRCs and version, checked by the bootloader before it starts the firmware.
+_Avoid_: firmware header
+
+**Boot Window**:
+The short wait at every boot during which the bootloader accepts a flashing tool before it starts the firmware.
+_Avoid_: bootloader timeout
+
 ### Operation
 
 **Standalone**:
