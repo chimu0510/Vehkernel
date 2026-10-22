@@ -4,6 +4,7 @@
 #include <vk/msg/actuator_setpoint.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/link_status.hpp>
+#include <vk/msg/local_menu.hpp>
 #include <vk/msg/parameter_status.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
 #include <vk/msg/vehicle_attitude_groundtruth.hpp>
@@ -56,10 +57,11 @@ TopicMap default_topic_map(float imu_rate_hz)
     static TopicStreamOf<msg::WheelEncoders> wheels(MaxRate{50.0F}, 0);
     static TopicStreamOf<msg::ActuatorOutputs> outputs(MaxRate{50.0F}, 0);
     static TopicStreamOf<msg::ActuatorSetpoint> setpoint(Inbound{.setpoint = true}, 0);
+    static TopicStreamOf<msg::LocalMenu> menu(MaxRate{5.0F}, 0);                       // with the local menu
     static auto work_items = make_status_streams<msg::WorkItemStatus>();
     static auto links = make_status_streams<msg::LinkStatus>();
-    static const std::array<TopicStream*, 8> first{&imu,    &attitude, &truth,   &parameters,
-                                                   &vehicle, &wheels,  &outputs, &setpoint};
+    static const std::array<TopicStream*, 9> first{&imu,    &attitude, &truth,    &parameters, &vehicle,
+                                                   &wheels, &outputs,  &setpoint, &menu};
     static const auto map =
         make_map(first, std::make_index_sequence<std::tuple_size_v<decltype(first)>>{}, work_items,
                  std::make_index_sequence<std::tuple_size_v<decltype(work_items)>>{}, links,

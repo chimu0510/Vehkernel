@@ -109,7 +109,27 @@ TEST_F(CommanderTest, RefusesEachArmingCheckWithItsReasonInOrder)
     inputs.actuators_started = false;
     step();
     EXPECT_EQ(commander.request_arming(now, link0, true), ArmingResult::ActuatorsNotStarted);
+    inputs.actuators_started = true;
+
+    inputs.local_menu_open = true;
+    step();
+    EXPECT_EQ(commander.request_arming(now, link0, true), ArmingResult::LocalMenuOpen);
     EXPECT_FALSE(commander.state().armed);
+}
+
+// ADR-0022: arming is refused while the local menu is open, a check
+// COM_ARM_CHECK cannot skip, and accepted once it closes.
+TEST_F(CommanderTest, TheLocalMenuOpenRefusesArmingEvenWithEveryCheckSkipped)
+{
+    settings.arm_check = 0;
+    ready();
+    inputs.local_menu_open = true;
+    step();
+    EXPECT_EQ(commander.request_arming(now, link0, true), ArmingResult::LocalMenuOpen);
+    EXPECT_EQ(commander.state().arming_refusal, ArmingResult::LocalMenuOpen);
+    inputs.local_menu_open = false;
+    step();
+    EXPECT_EQ(commander.request_arming(now, link0, true), ArmingResult::Ok);
 }
 
 TEST_F(CommanderTest, ModeChangesOnlyWhileDisarmed)

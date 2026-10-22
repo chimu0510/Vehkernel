@@ -20,7 +20,8 @@
 // Its four motors can be wired the wrong way round with --reversed-motor,
 // once per output, for the bring-up case.
 // Its display is a simulated SSD1306; --display writes what it shows to a
-// PBM file after every change (ADR-0022).
+// PBM file after every change (ADR-0022). Its user key is pressed and
+// released by the Link's sim_user_key frame.
 #include <vk/config.h>
 
 #ifdef CONFIG_ACTUATOR_CONTROL
@@ -40,6 +41,9 @@
 #include <vk/drivers/ssd1306.hpp>
 #include <vk/hal/display_bus.hpp>
 #include <vk/local_display/local_display.hpp>
+#endif
+#ifdef CONFIG_LOCAL_MENU
+#include <vk/local_display/local_menu_task.hpp>
 #endif
 #include <vk/msg/registry.hpp>
 #include <vk/params/params.hpp>
@@ -231,15 +235,26 @@ void start_actuators()
 #ifdef CONFIG_LOCAL_DISPLAY
 vk::core::StaticInstance<vk::drivers::Ssd1306> display_driver;
 vk::core::StaticInstance<vk::local_display::LocalDisplay> local_display;
+#ifdef CONFIG_LOCAL_MENU
+vk::core::StaticInstance<vk::local_display::LocalMenuTask> local_menu;
+#endif
 
-// The real driver against the simulated SSD1306, on wq:slow (ADR-0022).
+// The real driver against the simulated SSD1306, and the local menu on the
+// simulated user key, both on wq:slow (ADR-0022).
 void start_local_display(const Options& options)
 {
     if (options.display_file != nullptr) {
         vk::platform::display().write_image_to(options.display_file);
     }
+    const vk::local_display::LocalMenu* menu = nullptr;
+#ifdef CONFIG_LOCAL_MENU
+    local_menu.emplace(vk::local_display::LocalMenuTask::Config{.key_pressed = &vk::platform::user_key_pressed},
+                       vk::params::parameters(), vk::params::menu(), vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+    local_menu->start();
+    menu = &local_menu->menu();
+#endif
     display_driver.emplace(vk::hal::DisplayDevice(vk::platform::display()));
-    local_display.emplace(*display_driver, vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+    local_display.emplace(*display_driver, menu, vk::core::work_queue(vk::core::WorkQueueTier::Slow));
     local_display->start();
 }
 #endif
@@ -319,7 +334,8 @@ bool start_link(const Options& options)
                                                             .set_hash = vk::params::set_hash,
                                                             .storage = stored_parameters()},
                                              .control = {.control = &*commander,
-                                                         .set_sim_actuator_power = &vk::platform::set_actuator_power}},
+                                                         .set_sim_actuator_power = &vk::platform::set_actuator_power,
+                                                         .set_sim_user_key = &vk::platform::set_user_key}},
                       vk::core::work_queue(vk::core::WorkQueueTier::Io));
     host_link->start();
     return true;

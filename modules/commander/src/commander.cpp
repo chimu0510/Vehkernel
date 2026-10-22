@@ -164,6 +164,9 @@ core::ArmingResult Commander::arming_check(std::uint64_t now_us, core::ControlSo
     if (!inputs_.actuators_started) {
         return core::ArmingResult::ActuatorsNotStarted;
     }
+    if (inputs_.local_menu_open) {
+        return core::ArmingResult::LocalMenuOpen;
+    }
     return core::ArmingResult::Ok;
 }
 

@@ -916,6 +916,12 @@ void set_sim_power(bool powered)
     sim_power = powered;
 }
 
+bool sim_key = false;
+void set_sim_key(bool pressed)
+{
+    sim_key = pressed;
+}
+
 struct Reply {
     FrameType type{};
     std::vector<std::uint8_t> body;
@@ -951,7 +957,8 @@ protected:
     FakeControl control;
     MockSink sink;
     Session session{{}, Session::default_peer_timeout_us, {}, {.control = &control, .source = 2,
-                                                              .set_sim_actuator_power = &set_sim_power}};
+                                                              .set_sim_actuator_power = &set_sim_power,
+                                                              .set_sim_user_key = &set_sim_key}};
 };
 
 TEST_F(SessionControl, ModeRequestIsAnsweredWithTheModeOrTheRefusal)
@@ -1013,6 +1020,15 @@ TEST_F(SessionControl, SimActuatorPowerGoesToTheHookWithoutAReply)
     EXPECT_TRUE(sink.sent.empty());
 }
 
+TEST_F(SessionControl, SimUserKeyGoesToTheHookWithoutAReply)
+{
+    request(session, FrameType::SimUserKey, 1);
+    EXPECT_TRUE(sim_key);
+    request(session, FrameType::SimUserKey, 0);
+    EXPECT_FALSE(sim_key);
+    EXPECT_TRUE(sink.sent.empty());
+}
+
 TEST_F(SessionControl, WithoutVehicleControlRequestsGoUnanswered)
 {
     Session bare{{}, Session::default_peer_timeout_us};
@@ -1021,6 +1037,7 @@ TEST_F(SessionControl, WithoutVehicleControlRequestsGoUnanswered)
     request(bare, FrameType::ArmingRequest, 1);
     request(bare, FrameType::EstopRequest, 1);
     request(bare, FrameType::SimActuatorPower, 0);
+    request(bare, FrameType::SimUserKey, 1);
     EXPECT_TRUE(sink.sent.empty());
 }
 

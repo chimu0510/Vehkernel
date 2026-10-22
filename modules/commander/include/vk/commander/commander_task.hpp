@@ -7,7 +7,8 @@
 // revision-ID pins has passed and the IMU has answered with its first sample.
 // It follows the setpoints that arbitration accepted on actuator_setpoint,
 // starts bring-up cases on bringup_command and follows them on
-// bringup_status.
+// bringup_status. It refuses arming while local_menu shows the local menu
+// open (ADR-0022).
 //
 // It is also the vehicle control service the Links call from their own work
 // queue; requests and cycles take turns in short critical sections.
@@ -22,6 +23,7 @@
 #include <vk/msg/bringup_command.hpp>
 #include <vk/msg/bringup_status.hpp>
 #include <vk/msg/imu_sample.hpp>
+#include <vk/msg/local_menu.hpp>
 #include <vk/msg/vehicle_status.hpp>
 
 #include <cstdint>
@@ -68,6 +70,8 @@ private:
     core::Subscription<msg::ActuatorSetpoint> setpoint_{0};
     msg::ActuatorSetpoint last_setpoint_{};
     core::Subscription<msg::BringupStatus> bringup_status_{0};
+    core::Subscription<msg::LocalMenu> local_menu_{0};
+    bool local_menu_open_ = false;
     core::Publication<msg::BringupCommand> bringup_publication_;
     bool bringup_running_ = false;
     core::Publication<msg::ArmingState> arming_publication_;

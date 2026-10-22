@@ -23,6 +23,8 @@ The mode, arm, disarm and estop commands change the mode, arm or disarm, and
 engage or release the emergency stop (spec 0006), print the state now in
 effect and exit non-zero when the MCU refuses. arm warns when arming checks
 are skipped. sim-power cuts or restores SITL's simulated actuator power.
+key presses SITL's simulated user key (spec 0007): short for 0.1 s, long for
+1.1 s, or hold for the given time; it prints the local menu's state after.
 bringup motors runs the motor-to-encoder bring-up case in test mode while
 armed, prints each output's result and what to change, and exits non-zero
 unless every output passes.
@@ -36,6 +38,7 @@ non-zero when the vehicle disarms on the way.
     link_monitor.py --udp 127.0.0.1:15600 mode test
     link_monitor.py --udp 127.0.0.1:15600 arm
     link_monitor.py --udp 127.0.0.1:15600 estop on
+    link_monitor.py --udp 127.0.0.1:15600 key long
     link_monitor.py --udp 127.0.0.1:15600 drive 10,10,10,10 --duration 3
     link_monitor.py --udp 127.0.0.1:15600 drive --duration 2 -- -5,nan,nan,nan
 """
@@ -52,6 +55,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from vklink.monitor import (  # noqa: E402
     LinkMonitor,
+    local_menu_line,
     speeds_text,
     ParamMetadata,
     RateExpectation,
@@ -204,6 +208,31 @@ def run_bringup(monitor: LinkMonitor, args: argparse.Namespace) -> int:
     return 0 if all(item.passed for item in reply.outputs) else 1
 
 
+# How long the key command holds the simulated user key down: a short press
+# releases before 1 s, a long press holds past it (spec 0007).
+KEY_SHORT_S = 0.1
+KEY_LONG_S = 1.1
+# How long to listen after a release, for local_menu to report the result.
+KEY_SETTLE_S = 0.5
+
+
+def run_key(monitor: LinkMonitor, args: argparse.Namespace) -> int:
+    """The key command: press SITL's simulated user key, then print the local menu's state."""
+    duration = {"short": KEY_SHORT_S, "long": KEY_LONG_S}.get(args.press, args.hold_s)
+    if duration is None or duration <= 0:
+        print("error: key hold needs a positive duration in seconds", file=sys.stderr)
+        return 2
+    monitor.press_key(duration)
+    monitor.run(KEY_SETTLE_S)
+    print(f"key press={args.press} duration_s={duration:g}")
+    menus = monitor.latest("local_menu")
+    if not menus:
+        print("FAIL: no local_menu from the MCU; is the local menu built in?", file=sys.stderr)
+        return 1
+    print(local_menu_line(menus[0][1]))
+    return 0
+
+
 def run_control(monitor: LinkMonitor, args: argparse.Namespace) -> int:
     """The mode, arm, disarm, estop and sim-power commands, once the handshake is done."""
     if args.command == "sim-power":
@@ -309,6 +338,9 @@ def main() -> int:
     bringup.add_argument("case", choices=list(BRINGUP_CASES))
     sim_power = commands.add_parser("sim-power", help="SITL only: cut or restore the simulated actuator power")
     sim_power.add_argument("state", choices=["on", "off"])
+    key = commands.add_parser("key", help="SITL only: press the simulated user key")
+    key.add_argument("press", choices=["short", "long", "hold"])
+    key.add_argument("hold_s", type=float, nargs="?", metavar="SECONDS", help="how long to hold, with hold")
     drive = commands.add_parser("drive", help="arm and drive the wheels for a while, then disarm")
     drive.add_argument("speeds", type=parse_speeds, metavar="W1,W2,W3,W4",
                        help="wheel speeds in rad/s by output number, nan for none; put -- before a negative first one")
@@ -352,6 +384,8 @@ def main() -> int:
             return run_drive(monitor, args)
         if args.command == "bringup":
             return run_bringup(monitor, args)
+        if args.command == "key":
+            return run_key(monitor, args)
         if args.command is not None:
             return run_control(monitor, args)
         if args.check:

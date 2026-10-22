@@ -116,6 +116,16 @@ config LOCAL_DISPLAY
 	  (ADR-0022). On by default in SITL only: a board turns it on in its
 	  defconfig once its platform implements the display bus.
 
+config LOCAL_MENU
+	bool "Local menu on the user key"
+	depends on LOCAL_DISPLAY && (BOARD_HAS_USER_KEY || PLATFORM_SITL)
+	default y if PLATFORM_SITL
+	help
+	  The user key switches the local display's pages and, while
+	  disarmed, opens a menu that changes the menu parameters (ADR-0022).
+	  Arming is refused while the menu is open. Without it the commander
+	  never sees the menu open.
+
 endmenu
 
 menu "Drivers"

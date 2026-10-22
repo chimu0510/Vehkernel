@@ -20,8 +20,8 @@ void take(core::Subscription<T>& subscription, std::optional<T>& latest)
 
 }  // namespace
 
-LocalDisplay::LocalDisplay(drivers::Ssd1306& display, core::WorkQueue& queue)
-    : core::WorkItem("local_display", queue), display_(display)
+LocalDisplay::LocalDisplay(drivers::Ssd1306& display, const LocalMenu* menu, core::WorkQueue& queue)
+    : core::WorkItem("local_display", queue), display_(display), menu_(menu)
 {
 }
 
@@ -37,7 +37,11 @@ void LocalDisplay::run()
     for (std::size_t instance = 0; instance < links_.size(); ++instance) {
         take(links_.at(instance), inputs_.links.at(instance));
     }
-    render(page_.load(), inputs_, screen_);
+    if (menu_ != nullptr && menu_->state() != MenuState::Closed) {
+        render_menu(*menu_, screen_);
+    } else {
+        render(menu_ != nullptr ? menu_->page() : Page::Status, inputs_, screen_);
+    }
     screen_.draw(display_.frame());
     display_.update(hal::SystemClock::now_us());
 }

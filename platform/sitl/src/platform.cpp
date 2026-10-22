@@ -29,6 +29,7 @@ std::array<StackType_t, configMINIMAL_STACK_SIZE> stop_stack;
 std::uint64_t stop_duration_us = 0;
 
 std::atomic<bool> simulated_actuator_power{true};
+std::atomic<bool> simulated_user_key{false};
 
 core::StaticInstance<hal::OutputWatchdog> watchdog;
 StaticTask_t watchdog_tcb;
@@ -155,6 +156,16 @@ sim::I2cBus& imu_bus()
 sim::Ssd1306& display()
 {
     return oled;
+}
+
+bool user_key_pressed()
+{
+    return simulated_user_key.load();
+}
+
+void set_user_key(bool pressed)
+{
+    simulated_user_key.store(pressed);
 }
 
 void start_ground_truth(core::WorkQueue& queue)

@@ -32,6 +32,10 @@ void CommanderTask::run()
     while (bringup_status_.copy(bringup)) {
         bringup_running_ = bringup.state == 1;  // running
     }
+    msg::LocalMenu menu{};
+    while (local_menu_.copy(menu)) {
+        local_menu_open_ = menu.state != 0;  // list or edit
+    }
     const bool idle = std::ranges::all_of(last_setpoint_.wheel_speed,
                                           [](float target) { return std::isnan(target) || target == 0.0F; });
     const Inputs inputs{
@@ -42,6 +46,7 @@ void CommanderTask::run()
         .setpoints_idle = idle,
         .bringup_running = bringup_running_,
         .bringup_available = config_.bringup,
+        .local_menu_open = local_menu_open_,
         .last_setpoint_us = last_setpoint_.timestamp,
         .output_watchdog_trips = config_.output_watchdog_trips == nullptr ? 0 : config_.output_watchdog_trips(),
     };

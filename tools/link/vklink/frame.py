@@ -48,6 +48,8 @@ class FrameType(enum.IntEnum):
     BRINGUP_RESULT = 0x4A
     # SITL only: cuts or restores the simulated actuator power.
     SIM_ACTUATOR_POWER = 0x70
+    # SITL only: presses or releases the simulated user key.
+    SIM_USER_KEY = 0x71
 
 
 @dataclass(frozen=True)

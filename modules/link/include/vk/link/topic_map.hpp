@@ -176,7 +176,7 @@ std::uint8_t scale_to_baud(TopicMap map, std::uint32_t baud);
 
 // The default topic map: imu_sample instance 0 at every sample,
 // vehicle_attitude, (in SITL) vehicle_attitude_groundtruth, wheel_encoders and
-// actuator_outputs at 50 Hz, vehicle_status at 5 Hz, and parameter_status and
+// actuator_outputs at 50 Hz, vehicle_status and local_menu at 5 Hz, and parameter_status and
 // every instance of work_item_status and link_status at 1 Hz; actuator_setpoint
 // comes in, as a setpoint.
 // `imu_rate_hz` is imu_sample's publish rate, from the board's timing preset.

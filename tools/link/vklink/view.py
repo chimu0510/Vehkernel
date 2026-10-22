@@ -7,6 +7,7 @@ from .monitor import (
     LinkMonitor,
     actuator_outputs_line,
     euler_degrees,
+    local_menu_line,
     vehicle_status_line,
     wheel_encoders_line,
     work_item_name,
@@ -14,7 +15,7 @@ from .monitor import (
 
 # Topics shown in their own lines or tables rather than by their raw values.
 STATUS_TOPICS = ("link_status", "work_item_status", "parameter_status", "vehicle_status", "wheel_encoders",
-                 "actuator_outputs")
+                 "actuator_outputs", "local_menu")
 
 
 def format_value(value: object) -> str:
@@ -70,6 +71,8 @@ def render(monitor: LinkMonitor, target: str, width: int = 120) -> list[str]:
         )
     for _, status in monitor.latest("vehicle_status"):
         lines.append("vehicle        " + vehicle_status_line(status).removeprefix("vehicle_status "))
+    for _, menu in monitor.latest("local_menu"):
+        lines.append("menu           " + local_menu_line(menu).removeprefix("local_menu "))
     for _, encoders in monitor.latest("wheel_encoders"):
         lines.append("wheels         " + wheel_encoders_line(encoders).removeprefix("wheel_encoders "))
     for _, outputs in monitor.latest("actuator_outputs"):

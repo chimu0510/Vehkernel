@@ -48,6 +48,9 @@ void Session::handle(const Frame& frame, std::uint64_t now_us, FrameSink& sink)
     case FrameType::SimActuatorPower:
         on_sim_actuator_power(BodyReader(frame.body));
         break;
+    case FrameType::SimUserKey:
+        on_sim_user_key(BodyReader(frame.body));
+        break;
     default:
         break;  // Frames only the MCU sends, or not meant for a session.
     }
@@ -285,6 +288,14 @@ void Session::on_sim_actuator_power(BodyReader body)
     const std::uint8_t powered = body.u8();
     if (body.ok() && control_.set_sim_actuator_power != nullptr) {
         control_.set_sim_actuator_power(powered != 0);
+    }
+}
+
+void Session::on_sim_user_key(BodyReader body)
+{
+    const std::uint8_t pressed = body.u8();
+    if (body.ok() && control_.set_sim_user_key != nullptr) {
+        control_.set_sim_user_key(pressed != 0);
     }
 }
 

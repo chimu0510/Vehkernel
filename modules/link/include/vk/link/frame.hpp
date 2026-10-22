@@ -65,6 +65,8 @@ enum class FrameType : std::uint8_t {
     BringupResult = 0x4A,
     // SITL only: cuts or restores the simulated actuator power.
     SimActuatorPower = 0x70,
+    // SITL only: presses or releases the simulated user key.
+    SimUserKey = 0x71,
 };
 
 constexpr std::optional<FrameType> to_frame_type(std::uint8_t raw)
@@ -116,6 +118,8 @@ constexpr std::optional<FrameType> to_frame_type(std::uint8_t raw)
         return FrameType::BringupResult;
     case static_cast<std::uint8_t>(FrameType::SimActuatorPower):
         return FrameType::SimActuatorPower;
+    case static_cast<std::uint8_t>(FrameType::SimUserKey):
+        return FrameType::SimUserKey;
     default:
         return std::nullopt;
     }

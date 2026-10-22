@@ -56,6 +56,10 @@ def test_estop_and_sim_power_frames():
     assert control.emergency_stop
     assert exchange(mcu, host.make_sim_actuator_power(False)) == []
     assert not control.sim_actuator_power
+    assert exchange(mcu, host.make_sim_user_key(True)) == []
+    assert control.sim_user_key
+    assert exchange(mcu, host.make_sim_user_key(False)) == []
+    assert not control.sim_user_key
 
 
 def run_cli(port: int, tmp_path: Path, *command: str) -> subprocess.CompletedProcess:

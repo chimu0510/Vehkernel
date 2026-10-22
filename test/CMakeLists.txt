@@ -82,6 +82,14 @@ if(CONFIG_LOCAL_DISPLAY)
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_display.py $<TARGET_FILE:vehkernel-sitl>)
 endif()
 
+# L3 SITL local menu test (spec 0007): the simulated user key opens the menu,
+# edits and saves parameters, refuses arming while open and times out.
+if(CONFIG_LOCAL_MENU AND CONFIG_LINK_UDP)
+  add_test(NAME sitl_local_menu
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_local_menu.py $<TARGET_FILE:vehkernel-sitl>
+      --msg-dir ${VK_MSG_PYTHON_DIR})
+endif()
+
 # Every SITL test judges timing on the host's clock, so none runs alongside
 # another test under ctest -j: another SITL, or a test that configures and
 # builds, contends for the host and stalls SITL's work queues.

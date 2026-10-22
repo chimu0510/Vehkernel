@@ -30,6 +30,7 @@ from .session import (
     ARMING_REJECT_REASONS,
     DISARM_REASONS,
     MODES,
+    REJECT_REASONS,
     BringupReply,
     ControlReply,
     HostSession,
@@ -150,6 +151,25 @@ def vehicle_status_line(status) -> str:
             f"arming_refusal={ARMING_REJECT_REASONS.get(status.arming_refusal, 'none').replace(' ', '_')} "
             f"disarm_reason={DISARM_REASONS.get(status.disarm_reason, status.disarm_reason).replace(' ', '_')} "
             f"output_watchdog_trips={status.output_watchdog_trips}")
+
+
+# The local menu's states (local_menu.state) and what its last Save returned.
+MENU_STATES = {0: "closed", 1: "list", 2: "edit"}
+NO_MENU_ITEM = 0xFFFF
+NO_MENU_RESULT = 0xFF
+
+
+def local_menu_line(menu) -> str:
+    """local_menu as a space-separated key=value line."""
+    item = "none" if menu.item == NO_MENU_ITEM else str(menu.item)
+    if menu.last_result == NO_MENU_RESULT:
+        result = "none"
+    else:
+        result = "ok" if menu.last_result == 0 else REJECT_REASONS.get(menu.last_result, str(menu.last_result))
+    parameter = "none" if menu.last_parameter == NO_MENU_ITEM else str(menu.last_parameter)
+    return (f"local_menu state={MENU_STATES.get(menu.state, menu.state)} item={item} "
+            f"last_result={result.replace(' ', '_')} last_parameter={parameter} "
+            f"reboot_required={int(menu.reboot_required)}")
 
 
 def speeds_text(values) -> str:
@@ -580,6 +600,12 @@ class LinkMonitor:
         """SITL only: cuts or restores the simulated actuator power. The MCU does not answer."""
         self.connection.send(self.session.make_sim_actuator_power(powered))
 
+    def press_key(self, duration_s: float) -> None:
+        """SITL only: holds the simulated user key down for the duration, keeping the Link alive."""
+        self.connection.send(self.session.make_sim_user_key(True))
+        self.run(duration_s)
+        self.connection.send(self.session.make_sim_user_key(False))
+
     def send_topic(self, name: str, message: object, instance: int = 0) -> None:
         """Sends a message as inbound topic data; the MCU drops it unless its topic map declares it inbound.
 
@@ -670,6 +696,8 @@ class LinkMonitor:
             lines.append(param_status_line(status))
         for _, status in self.latest("vehicle_status"):
             lines.append(vehicle_status_line(status))
+        for _, menu in self.latest("local_menu"):
+            lines.append(local_menu_line(menu))
         for _, encoders in self.latest("wheel_encoders"):
             lines.append(wheel_encoders_line(encoders))
         for _, outputs in self.latest("actuator_outputs"):

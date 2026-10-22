@@ -38,6 +38,7 @@ ARMING_REJECT_REASONS = {
     6: "bring-up running",
     7: "actuator power off",
     8: "actuators not started",
+    9: "local menu open",
 }
 DISARM_REASONS = {
     0: "none",
@@ -279,6 +280,9 @@ class HostSession:
     def make_sim_actuator_power(self, powered: bool) -> bytes:
         return self.writer.write(FrameType.SIM_ACTUATOR_POWER, struct.pack("<B", int(powered)))
 
+    def make_sim_user_key(self, pressed: bool) -> bytes:
+        return self.writer.write(FrameType.SIM_USER_KEY, struct.pack("<B", int(pressed)))
+
     def make_topic_data(self, name: str, message: bytes, instance: int = 0) -> bytes:
         """Encodes an inbound TopicData frame for a topic the MCU announced at the handshake.
 
@@ -365,6 +369,7 @@ class McuControl:
     mode_result: int = 0    # vk::core::ModeResult
     arming_result: int = 0  # vk::core::ArmingResult
     sim_actuator_power: bool = True
+    sim_user_key: bool = False
     bringup_result: int = 0  # vk::core::BringupStart
     # What a case reports at once when it is accepted: (result, encoder, sign) per output.
     bringup_outputs: tuple[tuple[int, int, int], ...] = ((0, 1, 1),)
@@ -446,6 +451,8 @@ class McuSession:
             return [self._send(FrameType.ESTOP_REPLY, struct.pack("<B", int(control.emergency_stop)))]
         if frame.type == FrameType.SIM_ACTUATOR_POWER:
             control.sim_actuator_power = bool(value)
+        if frame.type == FrameType.SIM_USER_KEY:
+            control.sim_user_key = bool(value)
         if frame.type == FrameType.BRINGUP_RUN:
             if control.bringup_result != 0:
                 return [self._send(FrameType.BRINGUP_REJECT, struct.pack("<B", control.bringup_result))]

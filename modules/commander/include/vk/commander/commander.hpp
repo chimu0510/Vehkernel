@@ -47,6 +47,7 @@ struct Inputs {
     bool setpoints_idle = true;                 // every target of the last setpoint NaN or zero
     bool bringup_running = false;
     bool bringup_available = false;             // the bring-up case is built in
+    bool local_menu_open = false;               // the local menu is open (ADR-0022)
     std::uint64_t last_setpoint_us = 0;         // when the last setpoint was accepted, 0 for never
     std::uint32_t output_watchdog_trips = 0;    // times the platform's output watchdog turned the outputs off
 };

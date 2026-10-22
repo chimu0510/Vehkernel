@@ -90,6 +90,7 @@ struct ControlAccess {
     core::VehicleControl* control = nullptr;
     core::ControlSource source = 0;                     // this Link, as the source of its requests
     void (*set_sim_actuator_power)(bool) = nullptr;     // SITL only: sim_actuator_power frames
+    void (*set_sim_user_key)(bool) = nullptr;           // SITL only: sim_user_key frames
 };
 
 class Session {
@@ -150,6 +151,7 @@ private:
     void on_estop_request(BodyReader body, FrameSink& sink);
     void on_bringup_run(BodyReader body, FrameSink& sink);
     void on_sim_actuator_power(BodyReader body);
+    void on_sim_user_key(BodyReader body);
     [[nodiscard]] std::size_t parameter_count() const
     {
         return parameters_.parameters == nullptr ? 0 : parameters_.parameters->count();

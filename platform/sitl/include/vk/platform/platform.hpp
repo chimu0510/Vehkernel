@@ -25,6 +25,11 @@ sim::I2cBus& imu_bus();
 // SITL's display (ADR-0022): a simulated SSD1306, which is its own display bus.
 sim::Ssd1306& display();
 
+// SITL's user key (ADR-0022): released at start, pressed and released by the
+// Link's sim_user_key frame.
+bool user_key_pressed();
+void set_user_key(bool pressed);
+
 // Starts the microsecond clock and attaches the simulated devices, the IMU
 // following `motion`. Call once from the entry point, before anything else runs.
 void init(sim::MotionProfile motion = sim::MotionProfile::Still);

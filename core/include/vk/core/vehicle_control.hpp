@@ -38,6 +38,7 @@ enum class ArmingResult : std::uint8_t {
     BringupRunning = 6,
     ActuatorPowerOff = 7,     // unpowered or still settling, and the check is not skipped
     ActuatorsNotStarted = 8,
+    LocalMenuOpen = 9,        // ADR-0022
 };
 
 // Why the vehicle last disarmed.

@@ -50,9 +50,15 @@ if(CONFIG_LOCAL_DISPLAY)
   vk_add_library(vk_local_display LAYER module STATIC
     local_display/src/font.cpp
     local_display/src/local_display.cpp
+    local_display/src/local_menu.cpp
     local_display/src/pages.cpp)
+  if(CONFIG_LOCAL_MENU)
+    target_sources(vk_local_display PRIVATE
+      local_display/src/local_menu_task.cpp
+      local_display/src/user_key.cpp)
+  endif()
   target_include_directories(vk_local_display PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/local_display/include)
-  vk_target_link_libraries(vk_local_display PUBLIC vk_msg_headers vk_core vk_hal vk_drivers vk_lib_estimation)
+  vk_target_link_libraries(vk_local_display PUBLIC vk_msg_headers vk_core vk_hal vk_drivers vk_lib_estimation vk_params)
   target_link_libraries(vk_local_display PRIVATE vk_warnings vk_cxx_subset)
   vk_target_link_libraries(vk_modules INTERFACE vk_local_display)
 endif()
