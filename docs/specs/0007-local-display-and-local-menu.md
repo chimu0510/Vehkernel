@@ -16,7 +16,7 @@ This milestone runs while #50 is still open, so it must not depend on, or change
 
 Deliver the seventh milestone: **the vehicle's status on the local display, and a local menu that changes menu parameters with the user key, in SITL and on the C50C V1.1**. Afterwards:
 
-- The local display shows three pages, status, attitude and Link, refreshed at most 5 Hz from topics on the bus, on `wq:slow`. A short press of the user key switches pages.
+- The local display shows three pages, status, attitude and Link, on `wq:slow`, with values from topics on the bus changing at most 5 Hz. A short press of the user key switches pages, and what a key press changes is on the panel within 50 ms.
 - A long press while disarmed opens the local menu, which lists the menu parameters by name with their current values. A parameter is edited in a staged value and written only on Save, through the same parameter service as a Link, so the same checks apply and every Link sees the change.
 - Arming is refused with the reason `LOCAL_MENU_OPEN` while the menu is open; the menu closes after 30 s without a key press.
 - Parameter definitions mark menu parameters with `menu = true` and a `menu_step`; the `MOT` and `COM` groups declare `menu = false` and the generator rejects any menu parameter inside them. The first menu parameters are `SENS_BOARD_ROT`, `SERIAL1_BAUD`, `ATT_KP`, `ATT_KI` and `ATT_ACC_REJ`.
@@ -30,7 +30,7 @@ Deliver the seventh milestone: **the vehicle's status on the local display, and 
 2. As a C50C user, I want an attitude page with roll, pitch and yaw in degrees, so that I can check the board orientation by tilting the vehicle.
 3. As a C50C user, I want a Link page showing whether a Link is connected, its rate scale and its drop counts, so that I can tell a cable problem from a firmware problem.
 4. As a C50C user, I want a short press of the user key to switch pages, armed or disarmed, so that the key is useful while the wheels turn without being able to change anything.
-5. As a firmware developer, I want the local display to run on `wq:slow`, refresh at most 5 Hz and redraw only the pages of the screen that changed, so that a display busy-waiting on GPIO lines never delays `wq:ctrl` or a Link (ADR-0022).
+5. As a firmware developer, I want the local display to run on `wq:slow`, show topic values at most 5 Hz and redraw only the pages of the screen that changed, so that a display busy-waiting on GPIO lines never delays `wq:ctrl` or a Link (ADR-0022).
 6. As a firmware developer, I want the timing monitor to report the display's work item, so that its cost on the board is measured, not guessed (ADR-0015).
 7. As a firmware developer, I want a display that is missing to change nothing, so that a board without its OLED fitted still verifies and arms (ADR-0010, ADR-0022).
 8. As a C50C user, I want a long press while disarmed to open the local menu, so that I can change a parameter on the bench without a host.
@@ -71,9 +71,9 @@ Deliver the seventh milestone: **the vehicle's status on the local display, and 
   - The generator emits, for menu parameters only, the list of their indices and their enumeration value names, compiled into the firmware; the metadata file gains `menu` and `menu_step`. The parameter set hash covers them, as it covers all metadata.
   - Menu parameters: `SENS_BOARD_ROT` and `SERIAL1_BAUD` (enumerations), `ATT_KP` (step 0.1), `ATT_KI` (step 0.01) and `ATT_ACC_REJ` (step 0.01).
 - **Interface layer contracts**: a write-only display bus (drive the reset line, write command bytes, write data bytes), satisfied on the STM32F4 by a software SPI on four GPIO lines and in SITL by the SSD1306 model; and the existing GPIO input, now with the declared pull applied at start (ADR-0009).
-- **SSD1306 driver (driver layer)**: initialises the controller with the vendor firmware's command sequence and turns the display on; holds a 1 KB frame buffer; writes only the pages (8 rows of 128 columns) that changed since the last write, at most two pages per run so each run's busy-wait stays bounded. It reports nothing about presence: the bus cannot answer.
+- **SSD1306 driver (driver layer)**: initialises the controller with the vendor firmware's command sequence and turns the display on; holds a 1 KB frame buffer; writes only the pages (8 rows of 128 columns) that changed since the last write, at most a caller-given number per call (two by default) so each call's busy-wait stays bounded. It reports nothing about presence: the bus cannot answer.
 - **Font**: a 5 × 7 ASCII font in 6 × 8 cells, giving 21 columns and 8 lines, drawn for the project and written in the source as rows of `#` and `.`; the vendor's font table is not copied.
-- **Local display (module)**: a work item on `wq:slow` running every 200 ms. It reads the latest `vehicle_status`, `vehicle_attitude`, `link_status` and `local_menu`, renders the current page into the frame buffer and lets the driver write the changed pages. Pages:
+- **Local display (module)**: a work item on `wq:slow` running every 50 ms. It takes the latest `vehicle_status`, `vehicle_attitude` and `link_status` at most every 200 ms, so values change at most 5 Hz and stay readable, renders the current page or the open menu into the frame buffer every run and lets the driver write every changed page in that run, so a key press is on the panel within one run and never half drawn. A full screen busy-waits about 3 ms on the C50C; a run that changes nothing writes nothing. Each glyph column is written as one frame byte, since a text line is one display page. Pages:
   - Status: mode, armed or disarmed, the emergency stop, board verified, actuator power, the skipped arming checks and the last arming refusal or disarm reason, by name.
   - Attitude: roll, pitch and yaw in degrees, one decimal, from the quaternion in `vehicle_attitude`.
   - Link: per Link instance, the handshake state, `rate_scale`, and the `drops` and `lost` counts.

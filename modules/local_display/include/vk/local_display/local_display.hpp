@@ -1,13 +1,15 @@
 // The local display as a work item on wq:slow (ADR-0022).
 //
-// Every 200 ms it takes the latest vehicle_status, vehicle_attitude and
-// link_status, renders the current page and lets the SSD1306 driver write the
-// pages of the screen that changed, at most two per run, so a display that
-// busy-waits on GPIO lines never delays wq:ctrl or a Link. With a local menu
-// it shows the menu's page, or the menu itself while it is open; the menu
-// runs on the same work queue, so it never changes during a run. It publishes
-// nothing: producing modules never know it exists, and a display that is
-// missing changes nothing.
+// Every 50 ms it renders the current page, or the menu while it is open, and
+// lets the SSD1306 driver write every page of the screen that changed in the
+// same run, so a key press is on the panel within one run and never half
+// drawn. The vehicle_status, vehicle_attitude and link_status it shows are
+// taken at most every 200 ms, so values change at most 5 Hz and stay
+// readable. A run that changes nothing writes nothing; a full screen costs
+// about 3 ms of busy-waiting on GPIO lines, on the lowest-priority queue, so
+// it never delays wq:ctrl or a Link. The menu runs on the same work queue,
+// so it never changes during a run. It publishes nothing: producing modules
+// never know it exists, and a display that is missing changes nothing.
 #pragma once
 
 #include <vk/core/bus.hpp>
@@ -26,7 +28,8 @@ namespace vk::local_display {
 
 class LocalDisplay final : public core::WorkItem {
 public:
-    static constexpr std::uint32_t interval_us = 200'000;  // at most 5 Hz (ADR-0022)
+    static constexpr std::uint32_t interval_us = 50'000;        // how soon a key press shows
+    static constexpr std::uint64_t topic_interval_us = 200'000;  // values change at most 5 Hz (ADR-0022)
 
     // `menu`, if any, must run on the same work queue.
     LocalDisplay(drivers::Ssd1306& display, const LocalMenu* menu, core::WorkQueue& queue);
@@ -45,6 +48,7 @@ private:
     std::array<core::Subscription<msg::LinkStatus>, msg::LinkStatus::instances> links_{
         core::Subscription<msg::LinkStatus>{0}, core::Subscription<msg::LinkStatus>{1}};
     Inputs inputs_;
+    std::uint64_t next_topics_us_ = 0;
     TextScreen screen_;
 };
 

@@ -218,16 +218,18 @@ std::string_view TextScreen::line(std::size_t line) const
 
 void TextScreen::draw(drivers::MonoFrame& frame) const
 {
+    // A cell is as tall as a frame page and a glyph column's bits are its rows,
+    // as a frame byte's are, so each glyph column is one byte of its line's page.
+    static_assert(cell_height == 8 && lines == drivers::MonoFrame::pages);
+    static_assert(1 + (columns * cell_width) <= drivers::MonoFrame::width);
     frame.clear();
     for (std::size_t line = 0; line < lines; ++line) {
+        auto& page = frame.bytes.at(line);
         for (std::size_t column = 0; column < columns; ++column) {
             const Glyph& g = glyph(text_.at(line).at(column));
             const std::size_t x0 = 1 + (column * cell_width);
-            const std::size_t y0 = line * cell_height;
             for (std::size_t x = 0; x < font_width; ++x) {
-                for (std::size_t y = 0; y < font_height; ++y) {
-                    frame.set(x0 + x, y0 + y, ((g.at(x) >> y) & 1U) != 0);
-                }
+                page.at(x0 + x) = g.at(x);
             }
         }
     }

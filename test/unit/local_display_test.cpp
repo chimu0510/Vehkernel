@@ -1,16 +1,25 @@
 // The local display's pages (ADR-0022): the text each page shows for given
-// topic values, and the image the panel shows, against golden PBM files.
+// topic values, the image the panel shows, against golden PBM files, and the
+// work item's timing on a fake clock: a key press on the panel within one run,
+// topic values at most 5 Hz.
 // Run with VK_UPDATE_GOLDEN=1 to rewrite the images after an intended change,
 // then review them.
+#include <vk/core/bus.hpp>
+#include <vk/core/work_queue.hpp>
 #include <vk/drivers/ssd1306.hpp>
 #include <vk/hal/display_bus.hpp>
 #include <vk/local_display/font.hpp>
+#include <vk/local_display/local_display.hpp>
+#include <vk/local_display/local_menu.hpp>
 #include <vk/local_display/pages.hpp>
+#include <vk/local_display/user_key.hpp>
+#include <vk/params/params.hpp>
 #include <vk/sim/ssd1306.hpp>
 
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -181,5 +190,88 @@ INSTANTIATE_TEST_SUITE_P(Pages, LocalDisplayImages,
                                            std::pair{Page::Attitude, std::string_view("attitude")},
                                            std::pair{Page::Link, std::string_view("link")}),
                          [](const auto& test) { return std::string(test.param.second); });
+
+std::uint64_t fake_now = 0;
+
+std::uint64_t fake_clock() noexcept
+{
+    return fake_now;
+}
+
+// The work item with a local menu, driving a simulated panel, fed the sample topics.
+class LocalDisplayWorkItemTest : public ::testing::Test {
+protected:
+    using LocalDisplay = vk::local_display::LocalDisplay;
+
+    void SetUp() override
+    {
+        fake_now = 1'000'000;
+        publish(sample_inputs());
+        display.start();
+        step(400'000);  // reset, initialisation and the first screen
+        panel.take_written_pages();
+    }
+
+    void publish(const Inputs& inputs)
+    {
+        if (inputs.status) {
+            status.publish(*inputs.status);
+        }
+        if (inputs.attitude) {
+            attitude.publish(*inputs.attitude);
+        }
+        if (const auto& first_link = inputs.links.at(0)) {
+            link.publish(*first_link);
+        }
+    }
+
+    // Runs the queue every run interval for `duration_us`; returns the runs that wrote the panel.
+    int step(std::uint64_t duration_us, const Inputs* changing = nullptr)
+    {
+        int writes = 0;
+        for (std::uint64_t end = fake_now + duration_us; fake_now < end;) {
+            fake_now += LocalDisplay::interval_us;
+            if (changing != nullptr) {
+                Inputs inputs = *changing;
+                if (inputs.attitude) {
+                    inputs.attitude->accel_rejected = static_cast<std::uint32_t>(fake_now / LocalDisplay::interval_us);
+                }
+                publish(inputs);
+            }
+            queue.process();
+            writes += panel.take_written_pages() != 0 ? 1 : 0;
+        }
+        return writes;
+    }
+
+    vk::core::WorkQueue queue{"wq:test", 1, &fake_clock};
+    vk::sim::Ssd1306 panel;
+    vk::drivers::Ssd1306 driver{vk::hal::DisplayDevice(panel)};
+    vk::local_display::LocalMenu menu{vk::params::parameters(), {}};
+    LocalDisplay display{driver, &menu, queue};
+    vk::core::Publication<vk::msg::VehicleStatus> status{0};
+    vk::core::Publication<vk::msg::VehicleAttitude> attitude{0};
+    vk::core::Publication<vk::msg::LinkStatus> link{0};
+};
+
+TEST_F(LocalDisplayWorkItemTest, AKeyPressIsWhollyOnThePanelAfterOneRun)
+{
+    menu.on_key(vk::local_display::KeyEvent::Short, fake_now, false);
+    step(LocalDisplay::interval_us);
+    EXPECT_EQ(panel.pbm(), panel_image(Page::Attitude, sample_inputs()));
+}
+
+TEST_F(LocalDisplayWorkItemTest, TopicValuesChangeAtMostFiveTimesASecond)
+{
+    menu.on_key(vk::local_display::KeyEvent::Short, fake_now, false);
+    step(LocalDisplay::interval_us);
+    panel.take_written_pages();
+
+    // accel_rejected, on the attitude page, changes before every run.
+    const Inputs inputs = sample_inputs();
+    const int writes = step(1'000'000, &inputs);
+    EXPECT_GE(writes, 4);
+    EXPECT_LE(writes, 5);
+}
 
 }  // namespace

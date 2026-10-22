@@ -244,7 +244,7 @@ The live view shows `vehicle_status`, `wheel_encoders` and `actuator_outputs`. O
 
 ### Local display
 
-The local display shows the vehicle's status on the board's display, three pages of 21 columns by 8 lines refreshed at most five times a second (ADR-0022): status (mode, arming, the emergency stop, board verification, actuator power, skipped arming checks, the last arming refusal and disarm reason, output watchdog trips), attitude (roll, pitch and yaw in degrees) and Link (each Link's handshake, rate scale, drops and lost frames). SITL simulates an SSD1306; `--display <path>` writes what it shows to a PBM image after every change, which any image viewer opens:
+The local display shows the vehicle's status on the board's display, three pages of 21 columns by 8 lines whose values change at most five times a second, while what the user key changes is on the panel within 50 ms (ADR-0022): status (mode, arming, the emergency stop, board verification, actuator power, skipped arming checks, the last arming refusal and disarm reason, output watchdog trips), attitude (roll, pitch and yaw in degrees) and Link (each Link's handshake, rate scale, drops and lost frames). SITL simulates an SSD1306; `--display <path>` writes what it shows to a PBM image after every change, which any image viewer opens:
 
 ```bash
 build/sitl/app/vehkernel-sitl --duration 0 --display /tmp/vk-display.pbm
@@ -270,7 +270,7 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600 key hold 5
 
 CI opens the menu, saves parameters, sees arming refused while it is open and the menu time out (`sitl_local_menu`).
 
-On the C50C V1.1 the display is the SSD1306 OLED on the 6-pin connector (U11 or J4), clocked by software SPI on `PD7` (clock), `PD6` (data), `PD5` (reset) and `PD4` (data/command) with each half clock period at least 100 ns, and the user key is S3 on `PC5`, which reads low while pressed through the internal pull-up. The driver holds the OLED in reset for 100 ms after boot, then initialises it. Nothing reads the display back, so a board with the OLED unplugged boots, verifies and arms as usual. Both cost about 12 KB of Flash and 3 KB of RAM, and the display's work item busy-waits for about 0.6 ms while it writes its two pages in a run on `wq:slow`.
+On the C50C V1.1 the display is the SSD1306 OLED on the 6-pin connector (U11 or J4), clocked by software SPI on `PD7` (clock), `PD6` (data), `PD5` (reset) and `PD4` (data/command) with each half clock period at least 100 ns, and the user key is S3 on `PC5`, which reads low while pressed through the internal pull-up. The driver holds the OLED in reset for 100 ms after boot, then initialises it. Nothing reads the display back, so a board with the OLED unplugged boots, verifies and arms as usual. Both cost about 12 KB of Flash and 3 KB of RAM. The display's work item runs every 50 ms on `wq:slow` and busy-waits only while it writes changed pages, about 3 ms for a full screen such as a page switch; the timing monitor shows its cost as `local_display`.
 
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 
