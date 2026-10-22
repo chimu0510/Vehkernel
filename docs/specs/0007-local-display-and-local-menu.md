@@ -1,6 +1,6 @@
 # Spec 0007: local display and local menu
 
-**Status**: in progress. Issue: [#51](https://github.com/chimu0510/Vehkernel/issues/51); tickets #52 to #57, with the hardware check in #57.
+**Status**: done. Issue: [#51](https://github.com/chimu0510/Vehkernel/issues/51); tickets #52 to #57. The local display and the local menu were confirmed on the C50C in [#57](https://github.com/chimu0510/Vehkernel/issues/57).
 
 This file and the issue carry the same spec; update both when the spec changes.
 
@@ -73,7 +73,7 @@ Deliver the seventh milestone: **the vehicle's status on the local display, and 
 - **Interface layer contracts**: a write-only display bus (drive the reset line, write command bytes, write data bytes), satisfied on the STM32F4 by a software SPI on four GPIO lines and in SITL by the SSD1306 model; and the existing GPIO input, now with the declared pull applied at start (ADR-0009).
 - **SSD1306 driver (driver layer)**: initialises the controller with the vendor firmware's command sequence and turns the display on; holds a 1 KB frame buffer; writes only the pages (8 rows of 128 columns) that changed since the last write, at most a caller-given number per call (two by default) so each call's busy-wait stays bounded. It reports nothing about presence: the bus cannot answer.
 - **Font**: a 5 × 7 ASCII font in 6 × 8 cells, giving 21 columns and 8 lines, drawn for the project and written in the source as rows of `#` and `.`; the vendor's font table is not copied.
-- **Local display (module)**: a work item on `wq:slow` running every 50 ms. It takes the latest `vehicle_status`, `vehicle_attitude` and `link_status` at most every 200 ms, so values change at most 5 Hz and stay readable, renders the current page or the open menu into the frame buffer every run and lets the driver write every changed page in that run, so a key press is on the panel within one run and never half drawn. A full screen busy-waits about 3 ms on the C50C; a run that changes nothing writes nothing. Each glyph column is written as one frame byte, since a text line is one display page. Pages:
+- **Local display (module)**: a work item on `wq:slow` running every 50 ms. It takes the latest `vehicle_status`, `vehicle_attitude` and `link_status` at most every 200 ms, so values change at most 5 Hz and stay readable, renders the current page or the open menu into the frame buffer every run and lets the driver write every changed page in that run, so a key press is on the panel within one run and never half drawn. A full screen busy-waits about 4.5 ms on the C50C, measured at 5.5 ms with preemption; a run that changes nothing writes nothing. Each glyph column is written as one frame byte, since a text line is one display page. Pages:
   - Status: mode, armed or disarmed, the emergency stop, board verified, actuator power, the skipped arming checks and the last arming refusal or disarm reason, by name.
   - Attitude: roll, pitch and yaw in degrees, one decimal, from the quaternion in `vehicle_attitude`.
   - Link: per Link instance, the handshake state, `rate_scale`, and the `drops` and `lost` counts.

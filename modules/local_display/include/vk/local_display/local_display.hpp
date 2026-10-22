@@ -6,7 +6,7 @@
 // drawn. The vehicle_status, vehicle_attitude and link_status it shows are
 // taken at most every 200 ms, so values change at most 5 Hz and stay
 // readable. A run that changes nothing writes nothing; a full screen costs
-// about 3 ms of busy-waiting on GPIO lines, on the lowest-priority queue, so
+// about 4.5 ms of busy-waiting on the C50C's GPIO lines, on the lowest-priority queue, so
 // it never delays wq:ctrl or a Link. The menu runs on the same work queue,
 // so it never changes during a run. It publishes nothing: producing modules
 // never know it exists, and a display that is missing changes nothing.
