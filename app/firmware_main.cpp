@@ -39,6 +39,16 @@
 #include <vk/platform/soft_i2c.hpp>
 #endif
 
+#ifdef CONFIG_LOCAL_DISPLAY
+#include <vk/drivers/ssd1306.hpp>
+#include <vk/hal/display_bus.hpp>
+#include <vk/local_display/local_display.hpp>
+#include <vk/platform/soft_spi.hpp>
+#endif
+#ifdef CONFIG_LOCAL_MENU
+#include <vk/local_display/local_menu_task.hpp>
+#endif
+
 #include <array>
 #include <cstdint>
 
@@ -240,6 +250,48 @@ void start_estimator()
 }
 #endif
 
+#ifdef CONFIG_LOCAL_DISPLAY
+using Display = vk::board::devices::DISPLAY0;
+static_assert(Display::type == "SSD1306" && Display::bus == "SOFT_SPI",
+              "the C50C's display is an SSD1306 on software SPI");
+
+using DisplayBus = vk::platform::SoftSpiDisplayOn<Display::pins>;
+static_assert(vk::hal::DisplayBus<DisplayBus>);
+
+DisplayBus display_bus;
+vk::core::StaticInstance<vk::drivers::Ssd1306> display_driver;
+vk::core::StaticInstance<vk::local_display::LocalDisplay> local_display;
+
+#ifdef CONFIG_LOCAL_MENU
+using UserKey = vk::platform::InputLine<vk::board::user_key::pin>;
+vk::core::StaticInstance<vk::local_display::LocalMenuTask> local_menu;
+
+bool user_key_pressed()
+{
+    return UserKey::is_high() == vk::board::user_key::pressed_high;
+}
+#endif
+
+// The local display on the board's OLED and the local menu on the user key,
+// both on wq:slow (ADR-0022). Nothing reads the display back, so an unplugged
+// OLED changes nothing else.
+void start_local_display()
+{
+    const vk::local_display::LocalMenu* menu = nullptr;
+#ifdef CONFIG_LOCAL_MENU
+    UserKey::init();
+    local_menu.emplace(vk::local_display::LocalMenuTask::Config{.key_pressed = &user_key_pressed},
+                       vk::params::parameters(), vk::params::menu(), vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+    local_menu->start();
+    menu = &local_menu->menu();
+#endif
+    display_bus.init();
+    display_driver.emplace(vk::hal::DisplayDevice(display_bus));
+    local_display.emplace(*display_driver, menu, vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+    local_display->start();
+}
+#endif
+
 }  // namespace
 
 int main()
@@ -261,6 +313,9 @@ int main()
 #endif
 #ifdef CONFIG_ESTIMATOR_MAHONY
     start_estimator();
+#endif
+#ifdef CONFIG_LOCAL_DISPLAY
+    start_local_display();
 #endif
 #ifdef CONFIG_LINK_SERIAL
     start_link();

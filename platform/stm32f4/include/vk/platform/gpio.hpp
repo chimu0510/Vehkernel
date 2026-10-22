@@ -67,17 +67,48 @@ struct OpenDrain {
     static bool is_high() { return LL_GPIO_IsInputPinSet(detail::gpio_port(Pin::port), mask) != 0U; }
 };
 
-// An input line on a GPIO_INPUT pin, without pull resistors: the board
-// drives it, as with revision-ID straps or a sense input.
+// A push-pull line on a GPIO_OUTPUT pin, such as a software SPI signal.
+template <hal::GpioOutputPin Pin>
+struct PushPull {
+    static constexpr std::uint32_t mask = 1U << Pin::number;
+
+    // Starts driving the line at `high`.
+    static void init(bool high)
+    {
+        detail::enable_gpio_clock(Pin::port);
+        GPIO_TypeDef* const port = detail::gpio_port(Pin::port);
+        write(high);  // At its level before it starts driving.
+        LL_GPIO_SetPinOutputType(port, mask, LL_GPIO_OUTPUT_PUSHPULL);
+        LL_GPIO_SetPinSpeed(port, mask, LL_GPIO_SPEED_FREQ_HIGH);
+        LL_GPIO_SetPinPull(port, mask, LL_GPIO_PULL_NO);
+        LL_GPIO_SetPinMode(port, mask, LL_GPIO_MODE_OUTPUT);
+    }
+
+    static void write(bool high)
+    {
+        if (high) {
+            LL_GPIO_SetOutputPin(detail::gpio_port(Pin::port), mask);
+        } else {
+            LL_GPIO_ResetOutputPin(detail::gpio_port(Pin::port), mask);
+        }
+    }
+};
+
+// An input line on a GPIO_INPUT pin, with the pull resistor the board
+// definition declares: none where the board drives it, as with revision-ID
+// straps or a sense input, the internal pull-up for the C50C's user key.
 template <hal::GpioInputPin Pin>
 struct InputLine {
     static constexpr std::uint32_t mask = 1U << Pin::number;
+    static constexpr std::uint32_t pull = Pin::pull == hal::Pull::Up     ? LL_GPIO_PULL_UP
+                                          : Pin::pull == hal::Pull::Down ? LL_GPIO_PULL_DOWN
+                                                                         : LL_GPIO_PULL_NO;
 
     static void init()
     {
         detail::enable_gpio_clock(Pin::port);
         GPIO_TypeDef* const port = detail::gpio_port(Pin::port);
-        LL_GPIO_SetPinPull(port, mask, LL_GPIO_PULL_NO);
+        LL_GPIO_SetPinPull(port, mask, pull);
         LL_GPIO_SetPinMode(port, mask, LL_GPIO_MODE_INPUT);
     }
 

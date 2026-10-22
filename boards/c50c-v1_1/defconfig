@@ -2,3 +2,7 @@
 CONFIG_VEHICLE_MODEL_ACKERMANN=y
 # Its STM32F4 platform drives the motors and reads the encoders (spec 0006).
 CONFIG_ACTUATOR_CONTROL=y
+# Its STM32F4 platform drives the OLED on software SPI and reads the user key (spec 0007).
+CONFIG_DRIVER_SSD1306=y
+CONFIG_LOCAL_DISPLAY=y
+CONFIG_LOCAL_MENU=y

@@ -1,6 +1,7 @@
 #include <vk/local_display/local_menu.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -99,7 +100,9 @@ ValueText format_value(const core::ParamInfo& info, const core::MenuParam& entry
         return text.add(static_cast<std::uint64_t>(number < 0 ? -static_cast<std::int64_t>(number) : number)).result();
     }
     const unsigned decimals = decimals_of(entry.step.as_float());
-    const double scale = std::pow(10.0, decimals);
+    // A table rather than std::pow, which would cost the firmware 3 KB of Flash.
+    constexpr std::array<double, 5> scales{1.0, 10.0, 100.0, 1000.0, 10000.0};
+    const double scale = scales[decimals];
     const double rounded = std::round(static_cast<double>(value.as_float()) * scale);
     if (!std::isfinite(rounded)) {
         return text.add("---").result();

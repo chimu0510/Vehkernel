@@ -270,6 +270,8 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600 key hold 5
 
 CI opens the menu, saves parameters, sees arming refused while it is open and the menu time out (`sitl_local_menu`).
 
+On the C50C V1.1 the display is the SSD1306 OLED on the 6-pin connector (U11 or J4), clocked by software SPI on `PD7` (clock), `PD6` (data), `PD5` (reset) and `PD4` (data/command) with each half clock period at least 100 ns, and the user key is S3 on `PC5`, which reads low while pressed through the internal pull-up. The driver holds the OLED in reset for 100 ms after boot, then initialises it. Nothing reads the display back, so a board with the OLED unplugged boots, verifies and arms as usual. Both cost about 12 KB of Flash and 3 KB of RAM, and the display's work item busy-waits for about 0.6 ms while it writes its two pages in a run on `wq:slow`.
+
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 
 ## Directory layout
