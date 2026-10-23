@@ -9,6 +9,7 @@ dependencies = [
     "cmake==3.31.6",
     "kconfiglib==14.1.0",
     "ninja==1.13.0",
+    "pyserial==3.5",
     "pytest==8.4.2",
 ]
 

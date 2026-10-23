@@ -123,6 +123,6 @@ Deliver the eighth milestone: **a Vehkernel bootloader on the C50C V1.1 that Ard
 ## Further Notes
 
 - **Why board ID 22083**: ArduPilot manages 1000 to 19999 and asks that IDs there be allocated only through its list. Other vendors use larger numbers, such as ModalAI's 41775. 22083 (0x5643) is outside that range and in no entry of the list at commit `f48fabc`.
-- **Why 1 s**: ArduPilot's bootloader listens for about 1 s when the firmware is good. `uploader.py` keeps sending `GET_SYNC`, so a power cycle while it waits is caught.
+- **Why 1 s**: on a board without USB power sensing, ArduPilot's bootloader waits `HAL_BOOTLOADER_TIMEOUT`, 5 s by default, before starting a good firmware; its CAN bootloader waits 1 s. Vehkernel waits 1 s to keep the boot short. `uploader.py` keeps sending `GET_SYNC`, so a power cycle while it waits is caught, and a reboot request holds the bootloader without any window.
 - **Why the SITL bootloader matters**: the hardware check runs once, but CI runs `uploader.py` against the port on every push, so a protocol difference is caught where it is made.
 - **Protocol version 4**: the reboot request is a new control message, so the custom protocol's version rises (ADR-0002). Host tools come from the same build.

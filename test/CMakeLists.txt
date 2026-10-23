@@ -57,6 +57,13 @@ if(CONFIG_LINK_UDP)
       --msg-dir ${VK_MSG_PYTHON_DIR} --param-meta ${VK_PARAM_METADATA})
 endif()
 
+# L3 SITL bootloader test (spec 0008): ArduPilot's uploader.py flashes the
+# SITL bootloader, which refuses another board's image, stays after a cut-off
+# upload and follows the boot request.
+add_test(NAME sitl_bootloader
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_bootloader.py
+    $<TARGET_FILE:vehkernel-sitl-bootloader>)
+
 # L3 SITL reboot test (spec 0008): a reboot refused while armed, and SITL
 # ending with the bootloader or firmware exit status once one is accepted.
 if(CONFIG_LINK_UDP)
