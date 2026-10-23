@@ -19,7 +19,7 @@ jobs:
       - name: Build presets, run L0 checks and host tests
         run: |
           docker run --rm -v "$PWD:/work" -w /work vehkernel-dev bash -euo pipefail -c '
-            for preset in c50c-v1_1 sitl test; do
+            for preset in c50c-v1_1 c50c-v1_1-bringup sitl test; do
               cmake --preset "$preset"
               cmake --build --preset "$preset"
             done
