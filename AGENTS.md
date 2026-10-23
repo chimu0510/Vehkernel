@@ -17,3 +17,7 @@ Default five-role vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `
 ### Domain docs
 
 Single-context: root `GLOSSARY.md` plus `docs/adr/`. See `docs/agents/domain.md`.
+
+### Handoff
+
+Progress lives in the issues and specs, not in agent memory. When starting a session, finishing a ticket or ending a session, follow `docs/agents/handoff.md`.
