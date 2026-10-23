@@ -1,8 +1,8 @@
 # Internal Flash layout and write policy: write but never erase while armed
 
-The STM32F407 Flash has a single bank. During an erase or write, every instruction or constant fetch from Flash stalls, including ISRs and `wq:ctrl`. Writing one 32-bit word stalls for only about 16 µs, but erasing a sector takes hundreds of milliseconds up to 2 seconds, long enough to stall the control chain. Parameter storage (ADR-0012) and the event log (ADR-0019) both write internal Flash, so they need one layout and one set of write rules.
+On a single-bank MCU such as the STM32F407, every instruction or constant fetch from Flash stalls during an erase or write, including ISRs and `wq:ctrl`. Writing one 32-bit word stalls for only about 16 µs, but erasing a sector takes hundreds of milliseconds up to 2 seconds, long enough to stall the control chain. Parameter storage (ADR-0012) and the event log (ADR-0019) both write internal Flash, so they need one layout and one set of write rules. The rules below assume this worst case. A dual-bank MCU such as the STM32H743 keeps running from one bank while the other is erased, and a board may store parameters outside internal Flash, for example in FRAM; the board's ADR says what it relaxes or changes (ADR-0010).
 
-**Layout**
+**Layout** (the C50C V1.1)
 
 | Sector | Size | Use |
 |---|---|---|

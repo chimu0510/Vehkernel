@@ -6,13 +6,13 @@
 
 ## Target hardware
 
-| Item | Supported |
+Vehkernel targets the boards ArduPilot and PX4 run on, and follows their conventions for board definitions, bootloaders and tools. Boards are added one at a time, each with its own board definition, ADR and spec ([ADR-0010](docs/adr/0010-board-revision-policy.md)).
+
+| Item | Supported now |
 |---|---|
 | MCU | STM32F407VET6 |
-| Board | C50C V1.1 (ICM20948, USB gamepad, no RS-485) |
+| Board | C50C V1.1 (ICM20948, USB gamepad, no RS-485), the first development board |
 | Companion computer | Raspberry Pi 5 (ROS2) |
-
-Other board revisions and boards get their own board definitions when needed ([ADR-0010](docs/adr/0010-board-revision-policy.md)).
 
 ## Architecture highlights
 
@@ -59,13 +59,13 @@ cmake --build --preset c50c-v1_1
 
 Every firmware build prints the usage of each memory region; outgrowing a region fails the link (ADR-0017, ADR-0020).
 
-Flash the C50C over SWD with an ST-Link on header HDR2 (pin 4 GND, pin 6 PA13/SWDIO, pin 8 PA14/SWCLK; pin 2 is 3.3 V for the probe's voltage sense only, the board stays on its own supply). OpenOCD runs on the host, since the probe is a USB device:
+Flash the C50C over SWD with an ST-Link on header HDR2 (pin 4 GND, pin 6 PA13/SWDIO, pin 8 PA14/SWCLK; pin 2 is 3.3 V for the probe's voltage sense only, the board stays on its own supply). OpenOCD runs on the host, outside the devcontainer, since the probe is a USB device; the project uses OpenOCD 0.12.0 (ADR-0016):
 
 ```bash
 openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program build/c50c-v1_1/app/vehkernel.elf verify reset exit"
 ```
 
-Without an ST-Link, flash over the one-key download port (SERIAL2, USART1 to its own CH9102F). The adapter's RTS drives BOOT0 and its DTR, with RTS, drives NRST, so the STM32 system bootloader is entered and left without touching the board. `tools/flash/flash_serial.py` runs [`stm32flash`](https://sourceforge.net/projects/stm32flash/) (`sudo apt install stm32flash`) with that sequence and takes the Flash layout from the build's board definition. It reads `build/c50c-v1_1` and `/dev/ttyACM0` unless given `--build` and `--port`.
+Without an ST-Link, flash over the one-key download port (SERIAL2, USART1 to its own CH9102F). The adapter's RTS drives BOOT0 and its DTR, with RTS, drives NRST, so the STM32 system bootloader is entered and left without touching the board. `tools/flash/flash_serial.py` runs [`stm32flash`](https://sourceforge.net/projects/stm32flash/) 0.7 on the host (`sudo apt install stm32flash`, ADR-0016) with that sequence and takes the Flash layout from the build's board definition. It reads `build/c50c-v1_1` and `/dev/ttyACM0` unless given `--build` and `--port`.
 
 A new board, or one still running its vendor firmware, is flashed once with `new-board`. The command backs up the whole chip into `<board>_flash_<time>.bin` in the current directory, or the file given with `--backup`. It then erases the whole chip and writes `vehkernel.hex`, the boot stub and the firmware. Nothing of the vendor firmware, its settings or old parameters is left. The command takes about 2 minutes at 115200 baud. Nothing is erased if the backup fails or comes back short, and an existing backup file is never overwritten. Keep each board's backup outside the repository: vendor firmware differs from board to board.
 
