@@ -48,7 +48,7 @@ The development environment is [`.devcontainer/`](.devcontainer/); every tool th
 
 | Preset | Output |
 |---|---|
-| `c50c-v1_1` | C50C V1.1 firmware: `vehkernel.elf`, `vehkernel.hex` (boot stub and firmware), `vehkernel-boot.bin` (S0) and `vehkernel.bin` (firmware only, from S4) |
+| `c50c-v1_1` | C50C V1.1 firmware: `vehkernel.elf`, `vehkernel.hex` (boot stub and firmware), `vehkernel-boot.bin` (S0), `vehkernel.bin` (firmware only, from S4) and `vehkernel.apj` (ArduPilot's firmware file, ADR-0023). Every image carries ArduPilot's app descriptor, filled after linking with its CRCs, size, git hash, version and board ID |
 | `sitl` | SITL executable for the development host: `vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]` runs the firmware on the FreeRTOS POSIX port with a Link over UDP (or a pty), stops after the duration (default 1 s, 0 runs until interrupted) and prints a report (see below) |
 | `test` | Host tests, run with `ctest --preset test` |
 

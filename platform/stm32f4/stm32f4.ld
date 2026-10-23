@@ -29,6 +29,10 @@ SECTIONS
     .text :
     {
         . = ALIGN(4);
+        /* The app descriptor near the start of the image, as ArduPilot places
+           it, so a bootloader searching for its signature finds it first
+           (ADR-0023). */
+        KEEP(*(.app_descriptor))
         *(.text .text.*)
         *(.rodata .rodata.*)
         KEEP(*(.init))

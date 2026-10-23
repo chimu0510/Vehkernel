@@ -3,6 +3,7 @@
 vk_add_library(vk_platform LAYER platform OBJECT
   startup_stm32f407.c
   boot_stub.c
+  src/app_descriptor.cpp
   src/clock_tree.cpp
   src/freertos_hooks.cpp
   src/internal_flash.cpp
@@ -10,6 +11,8 @@ vk_add_library(vk_platform LAYER platform OBJECT
   src/output_watchdog.cpp
   src/platform.cpp)
 target_include_directories(vk_platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(vk_platform PRIVATE
+  VK_VERSION_MAJOR=${PROJECT_VERSION_MAJOR} VK_VERSION_MINOR=${PROJECT_VERSION_MINOR})
 vk_target_link_libraries(vk_platform PUBLIC vk_hal vk_core vk_board)
 target_link_libraries(vk_platform PUBLIC st_ll_f4)
 target_link_libraries(vk_platform PRIVATE freertos_kernel vk_warnings vk_cxx_subset)
