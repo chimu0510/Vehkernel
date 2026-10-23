@@ -1,0 +1,5 @@
+# The gear selected.
+@type int8
+REVERSE = -1          @short R   # backwards
+NEUTRAL = 0           @short N
+DRIVE = 1             @short D

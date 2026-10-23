@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Why a reboot request was refused.
+@type uint8
+OK = 0
+ARMED = 1                         # a reboot happens only while disarmed (ADR-0005)
+UNKNOWN_ACTION = 2
+NOT_AVAILABLE = 3                 # the platform cannot reset

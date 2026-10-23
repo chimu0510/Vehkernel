@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The state of the actuator power the commander senses. Short names fit the
+# local display's status page (ADR-0022).
+@type uint8
+NOT_AVAILABLE = 0          @short N/A         # the board cannot sense it
+UNPOWERED = 1              @short OFF
+SETTLING = 2               @short WAIT        # powered, but not yet for long enough
+POWERED = 3                @short ON

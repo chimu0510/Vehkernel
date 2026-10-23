@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Bring-up cases run in test mode (ADR-0018).
+@type uint8
+MOTORS = 1                        # motor-to-encoder mapping and direction

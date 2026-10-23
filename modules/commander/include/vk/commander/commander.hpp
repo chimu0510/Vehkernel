@@ -27,6 +27,7 @@
 #pragma once
 
 #include <vk/core/vehicle_control.hpp>
+#include <vk/msg/enums.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -53,12 +54,8 @@ struct Inputs {
     std::uint32_t output_watchdog_trips = 0;    // times the platform's output watchdog turned the outputs off
 };
 
-enum class ActuatorPower : std::uint8_t {
-    NotAvailable = 0,
-    Unpowered = 1,
-    Settling = 2,
-    Powered = 3,
-};
+// The sensed actuator power state, declared in schema/enum/actuator_power.enum.
+using ActuatorPower = msg::ActuatorPower;
 
 struct State {
     core::Mode mode = core::Mode::Standby;

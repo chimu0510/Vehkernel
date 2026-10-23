@@ -299,7 +299,7 @@ _Avoid_: interface, port
 The configuration declaring which topics travel over a Link, in which direction and at what rate; inbound topics are accepted only when the map declares them.
 
 **Schema**:
-The single source of truth for topics and message types, from which MCU, Bridge and tool code is generated.
+The single source of truth for topics, message types and the enums whose values cross the wire, from which MCU, Bridge and tool code is generated.
 
 **Schema Hash**:
 A hash computed from the schema for each message type, used to confirm that both ends of a connection share the same message definitions.

@@ -42,6 +42,13 @@ path = [
 SPDX-FileCopyrightText = "Vehkernel contributors"
 SPDX-License-Identifier = "GPL-3.0-or-later"
 
+# Generated from the schema and kept in the tree for the Link tools; the
+# schema generator tests compare it byte for byte with the generator output.
+[[annotations]]
+path = "tools/link/vklink/enums.py"
+SPDX-FileCopyrightText = "Vehkernel contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
 # Copied unchanged below its header from ArduPilot (GPL-3.0-or-later).
 [[annotations]]
 path = "tools/generators/vkboard/board_types.txt"

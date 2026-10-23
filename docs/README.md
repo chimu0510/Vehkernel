@@ -35,6 +35,7 @@
 | `boards/` | Board definitions (TOML) and board defconfigs | 0010, 0011, 0017 |
 | `mcu/` | One subdirectory per MCU: the MCU database (AF map, DMA request map, Flash sector table, as JSON) and the Kconfig MCU defaults (`defconfig`) | 0011, 0017, 0020 |
 | `schema/msg/` | Topic schemas (`.msg`) | 0006 |
+| `schema/enum/` | Enums whose values cross the wire (`.enum`) | 0006 |
 | `cmake/` | Toolchain, Kconfig integration, generator invocation and the layering rules | 0009, 0017 |
 | `hal/` | Interface layer: HAL interfaces (C++20 concepts and runtime interfaces) | 0009 |
 | `platform/stm32f4/` | Platform layer: STM32F4 implementation (ST LL), startup, linker script, boot stub and the serial port parameters | 0009, 0020 |

@@ -1,0 +1,4 @@
+@type uint8
+@type uint16
+@size 2
+OK = 0

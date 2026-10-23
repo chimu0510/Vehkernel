@@ -3,7 +3,7 @@
 # state changes. Results are by output number, output 1 first.
 uint64 timestamp
 uint16 run                              # counts every case started since boot
-uint8 bringup_case                      # 1 motor-to-encoder mapping and direction
+uint8 bringup_case  @enum bringup_case
 uint8 source                            # Link instance that asked for it
 uint8 state                             # 0 idle, 1 running, 2 done, 3 aborted
 uint8 outputs                           # how many outputs the case covered

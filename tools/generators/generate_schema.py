@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Schema generator entry point: validates .msg files and emits typed C++ topics (ADR-0006)."""
+"""Schema generator entry point: validates .msg and .enum files and emits typed C++ topics and enums (ADR-0006)."""
 
 import sys
 from pathlib import Path

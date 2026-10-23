@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Why a bring-up request was refused, in the order the checks run.
+@type uint8
+OK = 0
+NOT_AVAILABLE = 1                 # not built in
+UNKNOWN_CASE = 2
+WRONG_MODE = 3
+NOT_ARMED = 4
+NOT_IN_CONTROL = 5
+EMERGENCY_STOP = 6
+ALREADY_RUNNING = 7               # a case is already running

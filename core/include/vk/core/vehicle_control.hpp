@@ -9,82 +9,26 @@
 // one it got no reply to.
 #pragma once
 
+#include <vk/msg/enums.hpp>
+
 #include <cstdint>
 
 namespace vk::core {
 
-enum class Mode : std::uint8_t {
-    Standby = 0,  // no source in control; nothing can be armed
-    Test = 1,     // the development host in control, direct-actuator setpoints only (ADR-0018)
-};
+// The commander's enums are part of the wire protocol, so they are declared
+// in the schema (schema/enum/, ADR-0006) and generated with their names.
+using Mode = msg::Mode;                  // the mode decides who is in control
+using ModeResult = msg::ModeResult;      // why a mode request was refused
+using ArmingResult = msg::ArmingResult;  // why an arm request was refused
+using RebootAction = msg::RebootAction;  // numbered as MAVLink's (ADR-0023)
+using RebootResult = msg::RebootResult;  // why a reboot request was refused
+using DisarmReason = msg::DisarmReason;  // why the vehicle last disarmed
+using BringupCase = msg::BringupCase;    // bring-up cases run in test mode (ADR-0018)
+using BringupStart = msg::BringupStart;  // why a bring-up request was refused
 
 // A Link instance, or later the remote control or the Bridge.
 using ControlSource = std::uint8_t;
 inline constexpr ControlSource no_source = 0xFF;
-
-enum class ModeResult : std::uint8_t {
-    Ok = 0,
-    Armed = 1,        // the mode changes only while disarmed
-    UnknownMode = 2,
-};
-
-// Why an arm request was refused, in the order the checks run.
-enum class ArmingResult : std::uint8_t {
-    Ok = 0,
-    BoardNotVerified = 1,     // ADR-0010
-    EmergencyStop = 2,        // engaged
-    WrongMode = 3,            // only TEST can be armed for now
-    NotInControl = 4,         // the request did not come from the source in control
-    SetpointsActive = 5,      // a setpoint is neither NaN nor zero
-    BringupRunning = 6,
-    ActuatorPowerOff = 7,     // unpowered or still settling, and the check is not skipped
-    ActuatorsNotStarted = 8,
-    LocalMenuOpen = 9,        // ADR-0022
-    Rebooting = 10,           // a reboot was accepted and is about to happen
-};
-
-// Reboot actions, numbered as MAVLink's MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN
-// param1, so MAVLink maps onto them directly (ADR-0023).
-enum class RebootAction : std::uint8_t {
-    Reboot = 1,      // start the firmware again
-    Bootloader = 3,  // stay in the bootloader until flashed or reset
-};
-
-// Why a reboot request was refused.
-enum class RebootResult : std::uint8_t {
-    Ok = 0,
-    Armed = 1,          // a reboot happens only while disarmed (ADR-0005)
-    UnknownAction = 2,
-    NotAvailable = 3,   // the platform cannot reset
-};
-
-// Why the vehicle last disarmed.
-enum class DisarmReason : std::uint8_t {
-    None = 0,
-    Request = 1,
-    EmergencyStop = 2,       // engaged for 5 s while armed
-    ActuatorPowerLost = 3,
-    SetpointTimeout = 4,
-    Idle = 5,
-    BringupAbort = 6,
-};
-
-// Bring-up cases run in test mode (ADR-0018).
-enum class BringupCase : std::uint8_t {
-    Motors = 1,  // motor-to-encoder mapping and direction
-};
-
-// Why a bring-up request was refused, in the order the checks run.
-enum class BringupStart : std::uint8_t {
-    Ok = 0,
-    NotAvailable = 1,   // not built in
-    UnknownCase = 2,
-    WrongMode = 3,
-    NotArmed = 4,
-    NotInControl = 5,
-    EmergencyStop = 6,
-    Running = 7,        // a case is already running
-};
 
 // Bits of COM_ARM_CHECK: checks of hardware state that can be skipped.
 namespace arm_checks {

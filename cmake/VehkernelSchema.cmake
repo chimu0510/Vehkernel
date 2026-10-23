@@ -7,12 +7,14 @@
 
 # vk_generate_schema() creates the vk_msg target holding the typed topics
 # generated from schema/msg/*.msg, and vk_msg_headers with the message types
-# alone. Call it before core/, which publishes topics of its own.
+# and the enums of schema/enum/*.enum alone. Call it before core/, which publishes topics of its own.
 function(vk_generate_schema)
   set(out_dir ${CMAKE_BINARY_DIR}/generated/schema)
   set(generator ${CMAKE_SOURCE_DIR}/tools/generators/generate_schema.py)
   file(GLOB messages RELATIVE ${CMAKE_SOURCE_DIR} CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/schema/msg/*.msg)
   list(SORT messages)
+  file(GLOB enums RELATIVE ${CMAKE_SOURCE_DIR} CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/schema/enum/*.enum)
+  list(SORT enums)
   file(GLOB generator_sources CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/tools/generators/vkschema/*.py
     ${CMAKE_SOURCE_DIR}/tools/generators/vkboard/diagnostics.py)
@@ -22,7 +24,9 @@ function(vk_generate_schema)
     ${out_dir}/vk/msg/registry.cpp
     ${out_dir}/vk/msg/topics.hpp
     ${out_dir}/vk/msg/wire.hpp
-    ${out_dir}/python/vkmsg.py)
+    ${out_dir}/vk/msg/enums.hpp
+    ${out_dir}/python/vkmsg.py
+    ${out_dir}/python/vkenums.py)
   foreach(message IN LISTS messages)
     get_filename_component(name ${message} NAME_WE)
     list(APPEND headers ${out_dir}/vk/msg/${name}.hpp)
@@ -30,13 +34,13 @@ function(vk_generate_schema)
 
   add_custom_command(
     OUTPUT ${headers}
-    COMMAND ${Python3_EXECUTABLE} -I ${generator} ${messages} --output-dir ${out_dir}
+    COMMAND ${Python3_EXECUTABLE} -I ${generator} ${messages} ${enums} --output-dir ${out_dir}
     # The generator leaves unchanged files alone; touch them so the outputs
     # are newer than the inputs and the command does not run again.
     COMMAND ${CMAKE_COMMAND} -E touch ${headers}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    DEPENDS ${messages} ${generator} ${generator_sources}
-    COMMENT "Generating topics from the schema"
+    DEPENDS ${messages} ${enums} ${generator} ${generator_sources}
+    COMMENT "Generating topics and enums from the schema"
     VERBATIM)
 
   add_custom_target(vk_msg_generate DEPENDS ${headers})
