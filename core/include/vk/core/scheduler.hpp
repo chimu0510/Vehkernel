@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Starting and stopping the RTOS scheduler (ADR-0004).
 //
 // Entry points start the scheduler through core/ so that only core/ and the

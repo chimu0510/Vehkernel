@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Internal Flash layout and memory regions (ADR-0020).
 
 A board's ``flash`` array splits internal Flash into named regions, each a

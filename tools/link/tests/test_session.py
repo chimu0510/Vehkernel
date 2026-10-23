@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests for Link session (ADR-0002).
 
 Covers handshake negotiation, schema hash comparisons, time synchronization,

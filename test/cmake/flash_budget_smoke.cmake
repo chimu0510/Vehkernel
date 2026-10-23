@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Configures the C50C V1.1 firmware with VK_FILL_FLASH_KB large enough to
 # overflow its 448K FIRMWARE region, and expects the link to fail.
 execute_process(

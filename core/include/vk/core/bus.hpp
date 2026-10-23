@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The bus: typed topics, publications and subscriptions (ADR-0008).
 //
 // Every topic is generated from the schema (ADR-0006). Its storage, one

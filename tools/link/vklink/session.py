@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Link session management (ADR-0002).
 
 Implements both Host-side Link session and MCU-side Link session for tools and tests.

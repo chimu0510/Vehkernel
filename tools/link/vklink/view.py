@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The Link monitor's live view: a terminal table refreshed in place (spec 0003)."""
 
 from __future__ import annotations

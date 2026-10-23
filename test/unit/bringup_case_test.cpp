@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Unit tests for the motor-to-encoder bring-up case (ADR-0018, spec 0006)
 // against four simulated motors, with each wiring fault it must find.
 #include <vk/actuators/bringup_case.hpp>

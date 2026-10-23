@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """L3 SITL parameter test (ADR-0018, spec 0005): parameters over the Link.
 
 First, with SITL at rest, the Link monitor's param command lists every

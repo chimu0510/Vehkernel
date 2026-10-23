@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Actuator output capabilities (ADR-0009): what actuator control drives and
 // reads directly, without a driver in between.
 //

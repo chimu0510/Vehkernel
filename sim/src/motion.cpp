@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/sim/motion.hpp>
 
 #include <vk/estimation/models/accelerometer_model.hpp>

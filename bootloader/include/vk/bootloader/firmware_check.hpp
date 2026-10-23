@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The check that a firmware image may start (ADR-0023), after ArduPilot's
 // check_good_firmware_unsigned (libraries/AP_CheckFirmware): its app
 // descriptor is present, its size fits, its board ID is the board's and its

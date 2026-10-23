@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # A bring-up case the commander accepted (ADR-0018), for actuator control to
 # run: published once per bringup_run request that passes its checks.
 uint64 timestamp

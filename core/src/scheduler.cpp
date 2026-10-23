@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/core/scheduler.hpp>
 
 #include <vk/core/static_instance.hpp>

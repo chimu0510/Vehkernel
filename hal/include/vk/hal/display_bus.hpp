@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Write-only display bus contract (ADR-0009, ADR-0022).
 //
 // A display controller such as the SSD1306 on a bus that only goes towards

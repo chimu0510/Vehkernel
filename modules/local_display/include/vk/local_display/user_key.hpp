@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The user key's presses (ADR-0022), from samples taken every 10 ms.
 //
 // A level counts once three samples in a row agree (30 ms debounce). A key

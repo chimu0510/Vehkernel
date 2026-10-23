@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """L3 SITL smoke test (ADR-0018): run SITL for a fixed time and check its report.
 
 Fails when any work item overran or never ran, or when a topic instance given

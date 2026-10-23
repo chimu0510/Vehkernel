@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Mahony complementary filter (ADR-0014): attitude from the gyro, with roll
 // and pitch corrected from the accelerometer.
 //

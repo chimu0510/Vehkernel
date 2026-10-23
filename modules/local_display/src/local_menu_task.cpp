@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/local_display/local_menu_task.hpp>
 
 namespace vk::local_display {

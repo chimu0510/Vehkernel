@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Estimation math components, independent of the bus and HAL (ADR-0014):
 # math/ utilities, models/ process and measurement models, filters/ filter
 # algorithms. Header-only, so code that does not use them costs nothing.

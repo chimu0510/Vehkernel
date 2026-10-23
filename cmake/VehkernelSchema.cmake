@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Schema generator integration (ADR-0006, ADR-0017).
 #
 # Runs as a custom command, so editing a .msg file regenerates its topics at

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Measurement model: the accelerometer at rest (ADR-0014).
 //
 // An accelerometer measures specific force: acceleration minus gravity. At

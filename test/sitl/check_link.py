@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """L3 SITL Link test (ADR-0018, spec 0003): SITL's Link checked by the Link monitor.
 
 Starts SITL with its UDP Link on a free port, or with --link pty on a pty,

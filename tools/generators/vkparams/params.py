@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Load and validate parameter definitions (ADR-0012).
 
 Each module or driver with settings has a ``params.toml`` next to it::

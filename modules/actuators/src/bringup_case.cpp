@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/actuators/bringup_case.hpp>
 
 #include <algorithm>

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Diagnostics in compiler style: ``file:line: error: message``."""
 
 from __future__ import annotations

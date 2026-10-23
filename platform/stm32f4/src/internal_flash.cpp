@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The STM32F4 Flash controller (RM0090 section 3): sector erase and 32-bit
 // programming with PSIZE x32, which needs a supply of 2.7 V to 3.6 V, as on
 // the C50C.

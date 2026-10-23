@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """DMA stream and channel assignment for STM32F4-style DMA (ADR-0011).
 
 The F4 has no DMAMUX: each request can use only the few stream/channel pairs

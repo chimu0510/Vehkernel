@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // DMA assignments emitted by the board generator (ADR-0011).
 #pragma once
 

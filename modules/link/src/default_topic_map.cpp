@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/link/topic_map.hpp>
 
 #include <vk/core/static_instance.hpp>

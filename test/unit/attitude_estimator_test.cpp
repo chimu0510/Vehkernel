@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The attitude estimator work item on a fake clock (ADR-0008, ADR-0014):
 // alignment, draining the IMU queue, what it publishes, and the ATT_*
 // parameters (ADR-0012).

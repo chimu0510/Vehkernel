@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Parameter generator entry point: validates params.toml files and emits parameter groups (ADR-0012)."""
 
 import sys

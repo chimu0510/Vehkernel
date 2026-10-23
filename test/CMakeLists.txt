@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 add_subdirectory(unit)
 
 # L3 SITL smoke test (ADR-0018): the IMU sample topic is published at the
@@ -128,6 +129,14 @@ add_test(NAME flash_budget_smoke
   COMMAND ${CMAKE_COMMAND} -DVK_SOURCE_DIR=${CMAKE_SOURCE_DIR}
     -DVK_BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}/flash_budget_smoke -DVK_GENERATOR=${CMAKE_GENERATOR}
     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/flash_budget_smoke.cmake)
+
+# License check (L0, ADR-0018): every file carries an SPDX-License-Identifier
+# line or is listed in REUSE.toml. reuse asks git which files are tracked, so
+# the checkout is trusted even when its owner differs from the container user.
+add_test(NAME reuse_lint
+  COMMAND ${Python3_EXECUTABLE} -m reuse --root ${CMAKE_SOURCE_DIR} lint)
+set_tests_properties(reuse_lint PROPERTIES ENVIRONMENT
+  "GIT_CONFIG_COUNT=1;GIT_CONFIG_KEY_0=safe.directory;GIT_CONFIG_VALUE_0=*")
 
 # Host tool tests (pytest), through each tool's command line.
 add_test(NAME mcudb

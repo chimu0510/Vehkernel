@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The local display's font (ADR-0022): printable ASCII, 5 x 7 pixels in a
 // 6 x 8 cell, so 21 columns by 8 lines fit the 128 x 64 display.
 #pragma once

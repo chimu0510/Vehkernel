@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Prints every schema message, filled with deterministic values and encoded,
 // as "<topic name> <hex bytes>" lines for test_wire_cross_language.py.
 #include "wire_values.hpp"

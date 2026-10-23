@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # SITL platform on the FreeRTOS POSIX port (ADR-0018). An OBJECT library so
 # the FreeRTOS hooks are always linked in.
 vk_add_library(vk_platform LAYER platform OBJECT

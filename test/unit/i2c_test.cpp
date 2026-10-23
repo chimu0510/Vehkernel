@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The I2C contract (ADR-0009): an I2cDevice forwards to whichever I2cBus it
 // was bound to, with its own address.
 #include <vk/hal/gpio.hpp>

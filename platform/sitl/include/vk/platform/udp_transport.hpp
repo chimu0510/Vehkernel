@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // UDP Link transport for SITL (ADR-0018).
 //
 // One frame per datagram on a non-blocking socket bound to a local address.

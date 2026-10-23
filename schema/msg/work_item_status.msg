@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Timing monitor statistics of one work item (ADR-0015). Each work item
 # publishes on its own instance.
 @instances 16

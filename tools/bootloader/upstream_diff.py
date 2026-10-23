@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Lists the upstream ArduPilot changes the Vehkernel bootloader may need to follow (ADR-0023).
 
 The bootloader ports the structure of ArduPilot's Tools/AP_Bootloader and

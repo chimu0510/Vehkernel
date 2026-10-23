@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Ports, board devices, storage, timing and board default parameters (ADR-0011).
 
 - ``serial``: logical ports such as SERIAL1 with their TX/RX pins, default

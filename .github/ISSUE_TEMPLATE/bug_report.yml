@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 name: Bug report
 description: Something in the firmware, SITL, the tools or the docs does not work as documented.
 labels: [bug, needs-triage]

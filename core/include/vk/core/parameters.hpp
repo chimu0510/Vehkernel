@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The parameter runtime (ADR-0012).
 //
 // Parameters are plain struct members in RAM, generated per parameter group

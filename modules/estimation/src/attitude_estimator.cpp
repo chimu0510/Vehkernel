@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/estimation/attitude_estimator.hpp>
 
 #include <vk/params/params.hpp>

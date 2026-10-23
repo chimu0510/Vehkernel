@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/local_display/pages.hpp>
 
 #include <vk/estimation/math/quaternion.hpp>

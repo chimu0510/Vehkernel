@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Work queues, work items and the timing monitor at their public interfaces
 // (ADR-0008, ADR-0015). The queues run on a fake clock and are driven by
 // calling process(), as their task does when it wakes.

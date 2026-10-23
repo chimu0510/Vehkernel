@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // SITL bootloader (ADR-0018, ADR-0023): the Vehkernel bootloader on the
 // development host, so CI flashes it with ArduPilot's uploader.py.
 //

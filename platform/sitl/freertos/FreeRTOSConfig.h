@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  * FreeRTOS configuration for SITL (POSIX port, ADR-0018).
  *

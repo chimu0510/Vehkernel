@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Restarting the board (ADR-0023). Every platform provides a reset that
 // starts the firmware again or stops in the bootloader, leaving the request
 // where the board's bootloader reads it: on the STM32 an RTC backup register

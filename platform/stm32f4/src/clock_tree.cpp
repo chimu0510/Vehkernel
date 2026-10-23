@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Clock tree set-up from the board definition's solved values (ADR-0011).
 //
 // The board generator has already checked that the values are reachable; this

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """STM32F4 clock tree from a board's crystal and target system clock.
 
 Solves the main PLL (M, N, P, Q) for an exact system clock and an exact

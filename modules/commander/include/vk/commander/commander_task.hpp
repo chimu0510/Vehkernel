@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The commander as a work item on wq:ctrl (ADR-0005, ADR-0008).
 //
 // Each control cycle it samples the board's inputs, runs the commander's

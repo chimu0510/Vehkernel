@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # The attitude of the vehicle from the primary estimator (ADR-0014): body
 # frame x forward, y right, z down, relative to the local level frame
 # (north-east-down, yaw relative to the start without a magnetometer).

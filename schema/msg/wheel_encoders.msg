@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Each actuator output's wheel, from its quadrature encoder (ADR-0013), every
 # control cycle. Outputs the board does not have are not valid.
 @rate 200

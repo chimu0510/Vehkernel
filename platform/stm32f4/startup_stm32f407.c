@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  * Minimal Cortex-M4F startup for STM32F407: vector table, memory init, FPU
  * enable, then main(). Exceptions and interrupts without a handler go to

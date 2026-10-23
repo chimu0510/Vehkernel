@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # L1 unit tests on the development host (ADR-0018).
 find_package(GTest CONFIG REQUIRED)
 include(GoogleTest)

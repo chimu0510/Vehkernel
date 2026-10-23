@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Unit quaternions for attitude (ADR-0014).
 //
 // A quaternion q maps vectors from the body frame (x forward, y right,

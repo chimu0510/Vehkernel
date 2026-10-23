@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Parameter access over the Link, protocol version 2 (spec 0005): the frames,
 the Link monitor library, and its param command against a fake MCU."""
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # The bring-up case actuator control runs (ADR-0018), published whenever its
 # state changes. Results are by output number, output 1 first.
 uint64 timestamp

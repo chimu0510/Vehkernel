@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Parameter storage in Flash (ADR-0012, ADR-0020), against the NOR Flash
 // model: values survive reboots and power loss at any word, compaction,
 // entries skipped at boot, and the write rules while armed.

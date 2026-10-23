@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Kconfig integration (ADR-0017).
 #
 # Runs at configure time, after the board generator, because CMake itself

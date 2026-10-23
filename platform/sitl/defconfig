@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # SITL defaults: the first configuration layer in place of MCU defaults (ADR-0017).
 CONFIG_PLATFORM_SITL=y
 CONFIG_VEHICLE_MODEL_ACKERMANN=y

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The user key and the local menu as a work item on wq:slow (ADR-0022).
 //
 // Every 10 ms it samples the user key, turns its presses into menu actions

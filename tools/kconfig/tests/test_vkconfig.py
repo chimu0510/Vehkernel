@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests for the layered Kconfig solve, run through tools/kconfig/vkconfig.py."""
 
 import subprocess

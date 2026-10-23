@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Typed pin descriptions emitted by the board generator (ADR-0009, ADR-0011).
 //
 // Each board role becomes its own type, so passing a pin to code expecting a

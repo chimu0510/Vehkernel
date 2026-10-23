@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The commander work item's reboot service on a fake clock (ADR-0023): a
 // reboot is refused while armed, happens reboot_delay_us after it is
 // accepted so the reply leaves first, and arming is refused meanwhile.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # STM32F4 platform on ST LL (ADR-0009). An OBJECT library so the vector table
 # and the FreeRTOS hooks are always linked in.
 vk_add_library(vk_platform LAYER platform OBJECT

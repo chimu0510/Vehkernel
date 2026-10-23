@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Layer enforcement for ADR-0009.
 #
 # Every Vehkernel library belongs to one layer. vk_target_link_libraries()

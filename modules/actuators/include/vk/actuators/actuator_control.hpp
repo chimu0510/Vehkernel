@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Actuator control (ADR-0013): the last layer of the control chain, a wheel
 // speed PI per motor output on its encoder. No bus, no FreeRTOS and no
 // hardware, so it runs on the development host in tests; ActuatorTask runs

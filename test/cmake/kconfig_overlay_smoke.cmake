@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Configures SITL with a debug overlay enabling CONFIG_DRIVER_CAN, which
 # depends on BOARD_HAS_CAN, and expects configuration to fail.
 execute_process(

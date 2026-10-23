@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Model of the parameter sectors of NOR Flash, as on the STM32F407 (ADR-0020).
 //
 // One model serves as the fake Flash of the parameter storage unit tests and

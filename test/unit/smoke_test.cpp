@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Placeholder until real units exist: proves the test preset builds and runs GoogleTest.
 #include <gtest/gtest.h>
 

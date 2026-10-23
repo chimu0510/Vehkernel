@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Board defaults as compile-time constants (ADR-0012, ADR-0015), checked
 // against the C50C V1.1 board header the board generator emits (its golden copy).
 #include <board.hpp>

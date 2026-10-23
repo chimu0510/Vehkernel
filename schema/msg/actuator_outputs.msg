@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # What actuator control applied to each output (ADR-0013), every control
 # cycle: the duty, its sign the direction, and the speed target after
 # clamping, NaN for an output left uncontrolled.

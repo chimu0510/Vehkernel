@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Software I2C on two GPIO_OUTPUT pins (ADR-0015).
 //
 // The CPU busy-waits through every bit, so one transfer blocks its work

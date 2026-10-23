@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The Vehkernel bootloader (ADR-0023): a port of the structure of
 // ArduPilot's Tools/AP_Bootloader at the commit in bootloader/UPSTREAM,
 // written for any Platform (platform.hpp).

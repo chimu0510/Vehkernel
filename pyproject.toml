@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Host-side tools for building and checking Vehkernel. Versions are exact and
 # resolved through uv.lock (ADR-0016).
 [project]
@@ -11,6 +12,7 @@ dependencies = [
     "ninja==1.13.0",
     "pyserial==3.5",
     "pytest==8.4.2",
+    "reuse[charset-normalizer]==6.2.0",
 ]
 
 [tool.uv]

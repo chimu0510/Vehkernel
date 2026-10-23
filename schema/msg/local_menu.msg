@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # The local menu's state (ADR-0022), published by the local menu on every
 # change and once a second. A topic never published reads as closed, and the
 # commander refuses arming while it is open.

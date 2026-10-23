@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """finalize_image.py tests, through its command line, on small images that
 hold an app descriptor as the firmware's linker places it."""
 

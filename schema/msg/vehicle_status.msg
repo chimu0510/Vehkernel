@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # The vehicle's mode, arming state and arming checks (ADR-0005), published by
 # the commander five times a second and whenever they change.
 @rate 5

@@ -2,7 +2,7 @@
 
 Tests are split into six layers, from static checks to ROS2 integration. SITL runs the complete firmware on the FreeRTOS POSIX port, so scheduling behaves as on hardware and the whole ROS2 stack can be tested without hardware. The layers:
 
-- **L0 static checks**: `-Werror`, clang-tidy, generator determinism (the same input produces the same output) and board definition validation.
+- **L0 static checks**: `-Werror`, clang-tidy, license tags (`reuse lint`), generator determinism (the same input produces the same output) and board definition validation.
 - **L1 unit tests**: GoogleTest + gmock on the development host, as in Betaflight and PX4.
   - Driver tests point `platform::` at a fake peripheral bus containing a register model of the device (ADR-0009).
   - Link decoders are fuzzed with libFuzzer.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Simulated I2C peripheral bus (ADR-0018).
 //
 // SITL's I2C bus, and the fake peripheral bus of unit tests: register models

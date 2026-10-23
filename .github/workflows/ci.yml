@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Builds every preset inside the devcontainer image, so CI matches local builds (ADR-0018).
 name: CI
 

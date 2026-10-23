@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Storage for an object created once at start-up and never destroyed.
 //
 // Firmware objects live for the whole run, and main()'s stack is reused once

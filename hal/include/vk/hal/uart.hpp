@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // UART contract (ADR-0009).
 //
 // A platform's UART class satisfies Uart: 8 data bits, no parity, one stop

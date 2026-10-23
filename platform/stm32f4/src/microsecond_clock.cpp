@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Microsecond clock on TIM7 (ADR-0008).
 //
 // TIM7 is a basic timer no board function can use, so the board definition

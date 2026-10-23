@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // ICM20948 IMU driver (ADR-0009, ADR-0015).
 //
 // A timer-triggered work item: each run reads one sample of accelerometer,

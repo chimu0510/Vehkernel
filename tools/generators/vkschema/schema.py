@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Parse and validate .msg files.
 
 A .msg file defines one message; its file name is the topic name. The syntax
@@ -12,7 +13,7 @@ follows ROS .msg files, with annotations on their own lines::
 Message annotations are ``@queue N`` (a queue of N samples instead of the
 latest value), ``@instances N`` and ``@rate HZ`` (nominal publish rate). A
 field may carry ``@unit <unit>``. ``#`` starts a comment; comment lines before
-the first field document the message.
+the first field document the message, except ``SPDX-`` license tags.
 """
 
 from __future__ import annotations
@@ -236,7 +237,8 @@ def parse_message(path: Path, display: str, diag: Diagnostics) -> Message | None
         text, _, comment = raw.partition("#")
         text, comment = text.strip(), comment.strip() or None
         if not text:
-            if comment is not None and first_field_line is None and not message.fields:
+            if (comment is not None and first_field_line is None and not message.fields
+                    and not comment.startswith("SPDX-")):
                 message.doc.append(comment)
             continue
         if text.startswith("@"):

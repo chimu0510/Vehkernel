@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Restarting the board (ADR-0023). The request for the bootloader goes into
 // RTC backup register 0, where both ArduPilot's and PX4's bootloaders read
 // it on the STM32F4, with the value of the bootloader the board has:

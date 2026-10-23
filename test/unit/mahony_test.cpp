@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The Mahony filter against synthetic motion with a known true attitude
 // (ADR-0014). The IMU is simulated from the truth: the gyro reads the true
 // body rate plus a bias, the accelerometer the specific force of the true

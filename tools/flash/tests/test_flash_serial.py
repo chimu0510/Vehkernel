@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Serial flasher tests, through its command line, with a fake stm32flash that
 records its calls and a build directory holding only what the tool reads."""
 

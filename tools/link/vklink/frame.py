@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Link frames of the custom protocol (ADR-0002).
 
 Wire format:

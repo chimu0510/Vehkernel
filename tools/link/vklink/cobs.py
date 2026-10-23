@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Consistent Overhead Byte Stuffing (COBS, ADR-0002).
 
 Removes every zero byte from a payload so a zero can delimit frames on the wire.

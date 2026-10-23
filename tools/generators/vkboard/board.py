@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Load a board definition and validate it against the MCU database (ADR-0010, ADR-0011).
 
 A board definition may ``extends`` another board in a sibling directory. The

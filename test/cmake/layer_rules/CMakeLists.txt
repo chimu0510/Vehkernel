@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Scratch project for the layer rule tests: links layer VK_FROM to VK_TO.
 cmake_minimum_required(VERSION 3.25)
 project(VehkernelLayerRules NONE)

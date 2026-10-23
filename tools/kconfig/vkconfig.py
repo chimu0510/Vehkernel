@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Solve Vehkernel's layered Kconfig configuration (ADR-0017).
 
 Fragments are merged in order (MCU or SITL defaults, board defaults, debug

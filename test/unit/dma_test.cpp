@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // DMA assignment types from the interface layer, as the board generator emits them.
 #include <gtest/gtest.h>
 

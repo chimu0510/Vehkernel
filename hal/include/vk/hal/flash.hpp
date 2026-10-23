@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Parameter Flash contract (ADR-0009, ADR-0020).
 //
 // The parameter region of internal Flash is a few equal sectors, two on the

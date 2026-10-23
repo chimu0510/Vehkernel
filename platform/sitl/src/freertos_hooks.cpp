@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // FreeRTOS application hooks for SITL (ADR-0004, ADR-0018).
 #include <FreeRTOS.h>
 #include <task.h>

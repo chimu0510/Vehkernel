@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The local display's font (ADR-0022): ASCII 0x20 to 0x7E, 5 x 7 pixels in a
 // 6 x 8 cell, drawn for Vehkernel. Each glyph is written as seven rows, top
 // first, '#' lit; glyph_columns() turns them into columns at compile time.

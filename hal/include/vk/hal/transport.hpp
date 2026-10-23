@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Link transport contract (ADR-0002, ADR-0009).
 //
 // A transport carries a Link's bytes: a UART on a board, a UDP socket or a

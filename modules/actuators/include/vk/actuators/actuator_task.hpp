@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Actuator control as a work item on wq:ctrl at the base rate (ADR-0008,
 // ADR-0013).
 //

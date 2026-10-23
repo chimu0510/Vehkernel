@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The firmware image's app descriptor (ADR-0023), placed right after the
 // vector table by the linker script. The build fills the CRCs, the size and
 // the git hash after linking; the version and the board ID are known here.

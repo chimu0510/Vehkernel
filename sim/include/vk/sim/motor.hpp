@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // A simulated DC motor with its gearbox, wheel and quadrature encoder, for
 // SITL and unit tests (ADR-0018), as the ICM20948 and NOR Flash models are.
 //

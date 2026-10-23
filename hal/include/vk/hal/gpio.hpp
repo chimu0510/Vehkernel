@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // GPIO line contracts (ADR-0009), built on the generated typed pins.
 //
 // A platform drives a pin through a class template taking the pin's type;

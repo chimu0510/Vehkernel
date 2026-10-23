@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // I2C bus contract (ADR-0009).
 //
 // A platform's I2C bus class, hardware, software or simulated, satisfies

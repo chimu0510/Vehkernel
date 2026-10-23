@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The local display's pages (ADR-0022): text rendered from the latest topics.
 //
 // Rendering uses neither the bus nor FreeRTOS, so it is tested on the

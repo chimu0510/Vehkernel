@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Consistent Overhead Byte Stuffing (ADR-0002): removes every zero byte from
 // a frame, so a zero can mark the end of each frame on the wire.
 #pragma once

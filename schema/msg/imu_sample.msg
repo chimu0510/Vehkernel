@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # One IMU sample, rotated into the body frame and in SI units (ADR-0014).
 # Queued so a batch of samples read at once is never overwritten (ADR-0015);
 # the nominal rate comes from the board's timing preset, not the schema.

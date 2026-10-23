@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The timing monitor (ADR-0015): publishes every work item's timing
 // statistics on the work_item_status topic, one instance per work item.
 #pragma once

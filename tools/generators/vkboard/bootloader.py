@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Board ID and bootloader (ADR-0023).
 
 - ``board_id``: the number a firmware image's app descriptor and ``.apj`` file

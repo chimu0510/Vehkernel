@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // SSD1306 display driver (ADR-0009, ADR-0022).
 //
 // Drives a 128 x 64 SSD1306 over the write-only display bus contract. It is

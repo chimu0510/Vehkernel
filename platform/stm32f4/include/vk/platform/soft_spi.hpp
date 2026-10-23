@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Software SPI display bus on four GPIO_OUTPUT pins (ADR-0009, ADR-0022).
 //
 // A write-only bus towards a display controller such as the C50C's SSD1306:

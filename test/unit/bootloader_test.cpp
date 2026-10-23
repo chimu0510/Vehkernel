@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The Vehkernel bootloader core (ADR-0023) against a fake platform: each
 // command and its replies, the guards against erasing on noise, the held
 // lead words, the firmware check and the boot decision at its boundaries.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Firmware entry point: bring up the platform, start the drivers on their
 // work queues, then hand over to FreeRTOS.
 #include <board.hpp>

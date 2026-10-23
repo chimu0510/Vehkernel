@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Convert an stm32-data chip description into a Vehkernel MCU database.
 
 Runs offline on a chip JSON downloaded from embassy-rs/stm32-data-generated and

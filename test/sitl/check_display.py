@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """L3 SITL display test (ADR-0018, spec 0007): the local display's status page.
 
 Runs SITL with --display for a few seconds and reads the text on the image the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  * Jump stub for the BOOT region (ADR-0020). Until a bootloader exists, S0
  * holds only this: a two-entry vector table whose reset handler points VTOR at

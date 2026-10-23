@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Unit tests for actuator control (ADR-0013, spec 0006): the wheel speed PI
 // against the simulated motor, its clamps and anti-windup, NaN and disabled
 // outputs, the reversal settings and 16-bit encoder wrap.

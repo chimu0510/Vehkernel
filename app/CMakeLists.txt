@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Entry points: the firmware image for STM32 boards, or the SITL executable.
 if(VK_PLATFORM STREQUAL "stm32f4")
   if(CONFIG_BRINGUP_TESTS)

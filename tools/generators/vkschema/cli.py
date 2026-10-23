@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Command line of the schema generator."""
 
 from __future__ import annotations

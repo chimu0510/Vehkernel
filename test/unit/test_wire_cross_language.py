@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The C++ and Python encoders generated from the schema agree byte for byte
 (ADR-0006). wire_vectors prints every message encoded by C++, filled with the
 values of wire_values.hpp; this test computes the same values in Python,
