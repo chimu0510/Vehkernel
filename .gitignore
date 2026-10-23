@@ -1,7 +1,21 @@
+# Build output and local Kconfig overlays (build/<preset>/debug.config).
 /build/
+
+# Python tooling.
 /.venv/
+__pycache__/
+.pytest_cache/
+
 # Vendor schematics, datasheets and firmware are kept locally and not redistributed.
 /vendor/
 *_vendor_backup*.bin
 *_flash_*.bin
-__pycache__/
+
+# Personal editor and agent state. Shared editor settings live in .devcontainer/ and .editorconfig.
+/.vscode/
+/.idea/
+*.swp
+*~
+.DS_Store
+/.claude/settings.local.json
+/.claude/worktrees/

@@ -1,0 +1,17 @@
+# Normalize line endings; scripts and build files must stay LF on every platform.
+* text=auto eol=lf
+
+# Binary files.
+*.bin binary
+*.hex binary
+*.elf binary
+*.apj binary
+*.ulg binary
+*.png binary
+*.jpg binary
+*.pdf binary
+
+# Keep pinned third-party and lock files out of language statistics and diffs.
+third_party/** linguist-vendored
+tools/bootloader/third_party/** linguist-vendored
+uv.lock linguist-generated -diff
