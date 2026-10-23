@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """L3 SITL local menu test (ADR-0018, ADR-0022, spec 0007): the menu on SITL's user key.
 
 Presses SITL's simulated user key over the Link and checks, against

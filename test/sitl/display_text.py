@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Read the text on SITL's display image (ADR-0022).
 
 SITL's --display writes what the simulated SSD1306 shows as a binary PBM

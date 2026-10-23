@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The local display's pages (ADR-0022): the text each page shows for given
 // topic values, the image the panel shows, against golden PBM files, and the
 // work item's timing on a fake clock: a key press on the panel within one run,

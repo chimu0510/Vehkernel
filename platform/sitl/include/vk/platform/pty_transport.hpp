@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Pseudo-terminal Link transport for SITL (ADR-0018).
 //
 // Creates a pty in raw mode; tools open its path as they would a board's

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The output watchdog (ADR-0005): every platform turns the actuator outputs
 // off when actuator control has not refreshed them for a few control
 // periods, so a stalled wq:ctrl cannot leave a motor running on its last

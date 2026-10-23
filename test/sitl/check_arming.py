@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """L3 SITL arming test (ADR-0018, spec 0006): modes, arming checks and the emergency stop.
 
 SITL starts with its simulated actuator power off. Each refusal's reason

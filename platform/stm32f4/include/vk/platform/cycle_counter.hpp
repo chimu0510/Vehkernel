@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Busy-wait delays from the Cortex-M4 cycle counter (DWT CYCCNT).
 //
 // vk::platform::init() starts the counter. Only for delays far shorter than

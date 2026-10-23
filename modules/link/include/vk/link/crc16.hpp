@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // CRC-16/CCITT-FALSE (polynomial 0x1021, initial value 0xFFFF, no reflection,
 // no final XOR), which protects every Link frame (ADR-0002).
 #pragma once

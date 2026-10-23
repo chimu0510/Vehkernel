@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Register model of the TDK InvenSense ICM20948 (datasheet DS-000189).
 //
 // One model serves as the fake device of the driver's unit tests and as the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Extending a 16-bit hardware timer to the 64-bit microsecond clock.
 //
 // The timer counts microseconds and its overflow interrupt counts wraps. A

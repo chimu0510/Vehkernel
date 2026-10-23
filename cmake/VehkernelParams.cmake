@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Parameter generator integration (ADR-0012, ADR-0017).
 #
 # Runs as a custom command after the Kconfig solve: every params.toml in the

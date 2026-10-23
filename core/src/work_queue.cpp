@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/core/work_queue.hpp>
 
 #include <vk/core/critical_section.hpp>

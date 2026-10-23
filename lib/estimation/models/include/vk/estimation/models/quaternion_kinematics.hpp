@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Process model: quaternion kinematics (ADR-0014). The attitude turns with
 // the body angular rate; q_next = q ⊗ exp(ω·dt/2).
 #pragma once

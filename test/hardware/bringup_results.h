@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  * Result block of the bring-up test build (ADR-0018, L4).
  *

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Finalize a firmware image after linking (ADR-0023).
 
 Fills the app descriptor that the firmware carries in ArduPilot's unsigned

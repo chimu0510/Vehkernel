@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 name: Feature or design proposal
 description: Propose a feature, a new board, driver or Link protocol, or a change to an ADR.
 labels: [enhancement, needs-triage]

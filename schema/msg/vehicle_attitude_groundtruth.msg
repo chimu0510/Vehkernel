@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # The true attitude of the simulated vehicle, published by SITL only
 # (ADR-0018), to check estimators against: same frames as vehicle_attitude.
 uint64 timestamp                          # time of the IMU sample it belongs to

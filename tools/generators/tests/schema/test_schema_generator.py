@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Schema generator tests, run through its command line.
 
 Each directory under ``cases/`` holds .msg files and the expected result:
@@ -102,3 +103,16 @@ def test_schema_hash_tracks_the_wire_definition(tmp_path: Path, changed: str, sa
     base = schema_hash(write(tmp_path / "a", "topic", "uint64 timestamp\nfloat32 value\n"), tmp_path / "out_a", "topic")
     other = schema_hash(write(tmp_path / "b", "topic", changed), tmp_path / "out_b", "topic")
     assert (base == other) is same
+
+
+def test_license_tag_is_not_documentation(tmp_path: Path):
+    doc = "# The topic.\nuint64 timestamp\nfloat32 value\n"
+    plain = write(tmp_path / "plain", "topic", doc)
+    # Split so that reuse lint does not take it for this file's own tag.
+    tag = "SPDX-" + "License-Identifier: GPL-3.0-or-later"
+    tagged = write(tmp_path / "tagged", "topic", f"# {tag}\n" + doc)
+    assert generate(plain, tmp_path / "out_plain").returncode == 0
+    assert generate(tagged, tmp_path / "out_tagged").returncode == 0
+    assert files_in(tmp_path / "out_plain") == files_in(tmp_path / "out_tagged")
+    for name in files_in(tmp_path / "out_plain"):
+        assert (tmp_path / "out_plain" / name).read_bytes() == (tmp_path / "out_tagged" / name).read_bytes()

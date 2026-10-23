@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // A board serial port on an STM32F4 USART, with DMA both ways (ADR-0009).
 //
 // Receive runs one circular DMA transfer into a ring buffer for good; read()

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """L3 SITL bring-up test (ADR-0018, spec 0006): the motor-to-encoder case.
 
 SITL starts with output 2's motor wired the wrong way round. In TEST and

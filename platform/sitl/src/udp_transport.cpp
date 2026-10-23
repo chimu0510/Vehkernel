@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/platform/udp_transport.hpp>
 
 #include <arpa/inet.h>

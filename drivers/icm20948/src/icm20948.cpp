@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/drivers/icm20948.hpp>
 
 #include <array>

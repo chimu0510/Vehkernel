@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests for CRC-16/CCITT-FALSE (ADR-0002)."""
 
 from vklink.crc16 import crc16

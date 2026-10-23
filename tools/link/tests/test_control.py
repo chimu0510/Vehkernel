@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Mode, arming, emergency stop (spec 0006) and reboot (spec 0008) requests: frames, the monitor and the
 command line."""
 

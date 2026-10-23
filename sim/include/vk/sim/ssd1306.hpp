@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Simulated SSD1306 display controller (ADR-0018, ADR-0022).
 //
 // SITL's display, and the display of unit tests: it satisfies the display

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Scripted motion of SITL's simulated IMU, with its true attitude (ADR-0018).
 //
 // A profile is a few segments of constant body rate, plus linear

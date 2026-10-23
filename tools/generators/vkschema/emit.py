@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Emit generator outputs. Identical schemas produce byte-identical files."""
 
 from __future__ import annotations

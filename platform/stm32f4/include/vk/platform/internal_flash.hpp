@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The parameter region of the STM32F4's internal Flash (ADR-0020).
 //
 // `Region` is a Flash region of the board header, such as

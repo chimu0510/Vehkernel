@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The attitude estimator (ADR-0014): the Mahony filter as a work item on
 // wq:ctrl, woken by each imu_sample publication (ADR-0008).
 //

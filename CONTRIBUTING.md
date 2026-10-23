@@ -38,6 +38,7 @@ and build every firmware preset you touched, for example `c50c-v1_1`. The `sitl`
 - Hardware facts belong in the board definition, runtime choices in parameters, build-time choices in Kconfig ([ADR-0011](docs/adr/0011-toml-board-definition-toolchain.md), [ADR-0012](docs/adr/0012-parameter-system.md), [ADR-0017](docs/adr/0017-kconfig-build-configuration.md)).
 - Third-party code is pinned and declared centrally ([ADR-0016](docs/adr/0016-dependency-policy.md)).
 - Match the surrounding code: its naming, its comment density, and a reference to the ADR a file implements at the top of the file. [`.editorconfig`](.editorconfig) sets whitespace.
+- New files start with an `SPDX-License-Identifier` line for `GPL-3.0-or-later` in their own comment syntax (after a shebang), with no copyright line; files that cannot hold a comment are listed in [`REUSE.toml`](REUSE.toml), and `reuse lint` checks both.
 - Do not commit vendor datasheets, schematics, firmware or flash dumps: they are not ours to redistribute. Keep them under the ignored `vendor/` directory.
 
 ## Decisions and milestones

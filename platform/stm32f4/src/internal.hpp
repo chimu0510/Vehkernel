@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Start-up steps shared between the STM32F4 platform sources.
 #pragma once
 

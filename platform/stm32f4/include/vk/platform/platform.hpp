@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Platform start-up for STM32F4 (ADR-0009).
 #pragma once
 

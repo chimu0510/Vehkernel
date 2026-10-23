@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """L3 SITL attitude test (ADR-0018, spec 0004): the estimate against the truth.
 
 Starts SITL with a motion profile and its UDP Link on a free port, and reads

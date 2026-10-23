@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # The state of parameter storage in Flash (ADR-0012, ADR-0020), once a second.
 @rate 1
 uint64 timestamp

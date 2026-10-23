@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The motor-to-encoder mapping and direction bring-up case (ADR-0018): a
 // state machine with no bus, no FreeRTOS and no hardware, run by
 // ActuatorTask in test mode.

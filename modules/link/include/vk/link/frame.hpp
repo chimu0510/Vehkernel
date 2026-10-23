@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Link frames of the custom protocol (ADR-0002).
 //
 // On the wire every frame is COBS-encoded and ends with a zero byte. Before

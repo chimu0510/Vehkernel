@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Simulated peripherals: the simulated I2C bus and device register models,
 # shared by SITL and the unit tests (ADR-0018). Part of the platform layer:
 # drivers never see it, only the I2C contract.

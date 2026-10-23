@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Direct-actuator setpoints (spec 0006): inbound topic data, the monitor's drive and the drive command."""
 
 import math

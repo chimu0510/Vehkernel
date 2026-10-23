@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Deterministic field values for encoding tests. test_wire_cross_language.py
 // computes the same values in Python; keep the two in step.
 #pragma once

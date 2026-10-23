@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The local display as a work item on wq:slow (ADR-0022).
 //
 // Every 50 ms it renders the current page, or the menu while it is open, and

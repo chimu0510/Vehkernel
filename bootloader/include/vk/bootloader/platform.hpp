@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // What the Vehkernel bootloader needs from a platform (ADR-0023), after
 // ArduPilot's Tools/AP_Bootloader/support.h.
 //

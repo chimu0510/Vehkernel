@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Short critical sections for the bus (ADR-0008).
 //
 // Masks the interrupts that may call FreeRTOS and stops the scheduler from

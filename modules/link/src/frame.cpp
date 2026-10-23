@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/link/frame.hpp>
 
 #include <vk/link/crc16.hpp>

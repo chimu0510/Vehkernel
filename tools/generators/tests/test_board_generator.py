@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Board generator tests, run through its command line.
 
 Each directory under ``cases/`` holds a ``board.toml`` and the expected result:

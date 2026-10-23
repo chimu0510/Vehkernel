@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // FreeRTOS application hooks for STM32F4 (ADR-0004, ADR-0008).
 //
 // Task stacks go into CCM, leaving normal SRAM for DMA (ADR-0008).

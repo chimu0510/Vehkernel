@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Rotations (ADR-0014): each is a proper rotation, numbered as ArduPilot's
 // table, a few known cases, and the composition of two.
 #include <vk/hal/rotation.hpp>

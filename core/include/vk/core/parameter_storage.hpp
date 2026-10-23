@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Parameter storage in internal Flash (ADR-0012, ADR-0020).
 //
 // Non-default values are stored entry by entry, keyed by the parameter

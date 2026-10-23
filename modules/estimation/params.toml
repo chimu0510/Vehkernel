@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Parameters of the attitude estimator: the Mahony filter's gains and its
 # accelerometer rejection (ADR-0012, ADR-0014). Changes apply from the next
 # IMU sample.

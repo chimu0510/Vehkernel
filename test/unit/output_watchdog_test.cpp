@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Unit tests for the output watchdog (ADR-0005, spec 0006).
 #include <vk/hal/output_watchdog.hpp>
 

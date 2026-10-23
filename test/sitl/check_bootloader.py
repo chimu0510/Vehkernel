@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """L3 SITL bootloader test (ADR-0018, ADR-0023, spec 0008): ArduPilot's uploader.py against the Vehkernel bootloader.
 
 The SITL bootloader serves the bootloader protocol on a pty, over a file

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The Link monitor against a fake MCU over UDP on the loopback (spec 0003)."""
 
 import math

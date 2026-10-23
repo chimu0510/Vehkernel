@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Driver layer: device drivers (ADR-0009). Drivers depend only on the
 # interface layer and core/, never on the platform layer. Kconfig decides
 # which drivers are built (ADR-0017).

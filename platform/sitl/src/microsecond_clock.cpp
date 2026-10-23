@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Microsecond clock for SITL: host monotonic time since the first reading.
 #include <vk/hal/clock.hpp>
 

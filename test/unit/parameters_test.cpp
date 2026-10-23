@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The parameter runtime (ADR-0012): lookup, validation, the safety
 // attributes and parameter_update, over a table built here; and the table
 // the parameter generator emits for this build.

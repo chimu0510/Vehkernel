@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Parameters of actuator control: each motor output's wiring and encoder, and
 # the wheel speed loop (ADR-0012, ADR-0013). An output's encoder resolution
 # defaults to the board definition's value for its stock motors.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """CRC-16/CCITT-FALSE (ADR-0002).
 
 Polynomial 0x1021, initial value 0xFFFF, no reflection, no final XOR.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Actuator outputs on STM32F4 (ADR-0009, spec 0006): an H-bridge driven by a
 // PWM channel of an advanced timer (TIM1 or TIM8) and two GPIO direction
 // lines, and a quadrature encoder on CH1 and CH2 of a general-purpose timer.

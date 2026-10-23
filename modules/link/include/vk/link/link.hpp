@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // A Link (ADR-0002): a topic map, the custom protocol and a transport, run as
 // one work item on wq:io (ADR-0008).
 //

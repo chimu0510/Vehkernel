@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The commander (ADR-0005): modes, arming, arming checks and the emergency
 // stop, as a state machine with no bus, no FreeRTOS and no hardware, so it
 // runs on the development host in tests. CommanderTask runs it as a work item.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The local menu (ADR-0022): the user key's presses become page changes, and
 // while disarmed, edits of the menu parameters.
 //

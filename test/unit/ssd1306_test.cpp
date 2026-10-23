@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The SSD1306 driver against the simulated controller (ADR-0022): reset and
 // the vendor firmware's initialisation, the frame's coordinates on the panel,
 // and writing only changed pages, at most two per update.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/sim/nor_flash.hpp>
 
 #include <fcntl.h>

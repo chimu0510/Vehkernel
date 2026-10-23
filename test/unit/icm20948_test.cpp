@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // ICM20948 driver against the device's register model on the simulated
 // peripheral bus (ADR-0018 L1). The driver's work queue runs on a fake clock.
 #include <vk/core/bus.hpp>

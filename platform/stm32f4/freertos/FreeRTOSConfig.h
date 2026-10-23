@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  * FreeRTOS configuration for STM32F4 (Cortex-M4F port, ADR-0004).
  *

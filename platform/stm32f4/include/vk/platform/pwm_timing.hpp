@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // PWM timer settings for STM32F4 motor outputs (spec 0006).
 //
 // Free of hardware access, so it is unit-tested on the development host.

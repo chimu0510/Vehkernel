@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Monotonic microsecond clock contract (ADR-0008, ADR-0009).
 //
 // Every topic message carries a 64-bit microsecond timestamp taken from this

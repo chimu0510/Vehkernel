@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Parameters of the IMU processing every IMU driver shares (ADR-0012, ADR-0014).
 prefix = "SENS"
 

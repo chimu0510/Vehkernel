@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // GPIO lines on STM32F4 (ADR-0009), through ST LL.
 #pragma once
 

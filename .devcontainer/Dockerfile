@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Development and CI environment for Vehkernel. Every tool that affects build
 # output is pinned (ADR-0016); bump versions here and rebuild the container.
 FROM ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac

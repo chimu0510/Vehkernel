@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Published on every parameter change (ADR-0012). Consumers check updated()
 # and read their parameter group again.
 uint64 timestamp

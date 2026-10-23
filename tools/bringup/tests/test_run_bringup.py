@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Bring-up runner tests, through its command line, with a fake OpenOCD and a
 minimal ELF file holding the result block symbol."""
 

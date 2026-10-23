@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The output watchdog on TIM6 (ADR-0005, spec 0006).
 //
 // TIM6 is a basic timer no board function can use. It interrupts every

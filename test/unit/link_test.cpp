@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Unit tests for the custom protocol: COBS, CRC16, FrameReader/Writer, and Session (ADR-0002).
 #include <vk/link/cobs.hpp>
 #include <vk/link/crc16.hpp>

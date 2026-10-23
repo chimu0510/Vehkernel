@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The Link work item over a fake transport (ADR-0002, ADR-0008): the
 // handshake, topic map rates, every-sample queued topics and drops. The
 // development host's side is played with the protocol's own frame reader and

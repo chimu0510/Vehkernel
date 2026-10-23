@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Parameters of the board serial ports (ADR-0011, ADR-0012). A port's
 # default baud rate comes from the board definition.
 prefix = "SERIAL"

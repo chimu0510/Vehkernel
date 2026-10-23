@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Three-component vectors for estimation (ADR-0014): plain values in single
 // precision, which the Cortex-M4 FPU computes in hardware.
 #pragma once

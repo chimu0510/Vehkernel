@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The user key's presses and the local menu (ADR-0022, spec 0007): debounce,
 // short and long presses and repeats; opening, stepping, saving through the
 // parameter service, the idle close and closing on arming; and what the menu

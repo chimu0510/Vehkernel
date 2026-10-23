@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The bus at its public interface (ADR-0008): publications, subscriptions,
 // queued topics, instances and the topic list.
 #include <vk/core/bus.hpp>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The vehicle control service (ADR-0005): mode, arming, emergency stop and
 // reboot (ADR-0023) requests. Like the parameter runtime (ADR-0012) it is protocol
 // independent, so the custom protocol now and MAVLink and the Bridge later

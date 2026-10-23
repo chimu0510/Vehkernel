@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Microsecond clock (ADR-0008): the SITL clock, and the STM32F4 counter
 // extension logic, which is free of hardware access.
 #include <vk/hal/clock.hpp>

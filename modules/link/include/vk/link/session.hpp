@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The MCU side of a Link session (ADR-0002): the handshake, the peer timeout
 // and time synchronization replies. Independent of the transport and of
 // FreeRTOS, so it runs on the development host in tests.

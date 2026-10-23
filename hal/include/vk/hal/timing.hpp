@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Timing preset dimensions (ADR-0015); the board generator emits them.
 #pragma once
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The UART contract, its Link transport binding, and the STM32F4 baud rate
 // arithmetic (ADR-0009).
 #include <vk/hal/uart.hpp>

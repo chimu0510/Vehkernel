@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Link protocol package for host-side tools (ADR-0002)."""
 
 from .cobs import cobs_decode, cobs_encode, cobs_max_encoded_size

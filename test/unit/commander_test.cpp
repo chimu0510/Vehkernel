@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Unit tests for the commander's state machine (ADR-0005, spec 0006): modes,
 // arming checks, actuator power sense, the emergency stop and the timers.
 #include <vk/commander/commander.hpp>

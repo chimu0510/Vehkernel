@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Unit tests for the STM32F4 motor PWM settings (spec 0006): the prescaler
 // and period for each MOT_PWM_FREQ, and the advanced timer's output state
 // when its main outputs are disabled.

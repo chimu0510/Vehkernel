@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Board generator integration (ADR-0011, ADR-0017).
 #
 # The generator runs at configure time rather than as a custom command: a

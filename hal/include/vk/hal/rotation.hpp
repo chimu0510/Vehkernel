@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Rotations of a board device (ADR-0014): the mounting rotation of a device
 // on the board, a hardware fact the board generator emits, and the board
 // orientation in the vehicle, the SENS_BOARD_ROT parameter. Names and numbers

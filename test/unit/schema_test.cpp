@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Topics generated from schema/msg at build time (ADR-0006).
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/work_item_status.hpp>

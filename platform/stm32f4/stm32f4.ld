@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /*
  * Linker script for STM32F4 firmware. The board generator emits memory.ld
  * with the board's Flash layout and the MCU's RAM (ADR-0020); every region

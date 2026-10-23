@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Link monitor: watch the topics a Vehkernel Link sends (spec 0003).
 
 Connects over UDP (SITL's default) or a serial port (a board's USB serial

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests for COBS encoding and decoding (ADR-0002)."""
 
 import pytest

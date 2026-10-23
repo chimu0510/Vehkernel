@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Third-party C code, pinned as git submodules at exact releases (ADR-0016).
 #
 # These targets have no layer, so the layering rules do not check them. Only

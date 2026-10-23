@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Generated encoders and decoders (ADR-0006): packed little-endian, fields in
 // schema order, and every schema message round-trips.
 #include "wire_values.hpp"

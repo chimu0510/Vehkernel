@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Platform start-up for SITL (ADR-0009, ADR-0018).
 #pragma once
 

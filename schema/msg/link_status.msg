@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Statistics of one Link since boot (ADR-0002). Each Link publishes on its
 # own instance, and the topic map sends it to the peer.
 @instances 2

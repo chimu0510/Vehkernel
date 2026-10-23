@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests for the MCU database and its offline converter, run through the command line."""
 
 import json

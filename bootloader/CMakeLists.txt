@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # The Vehkernel bootloader (ADR-0023). Its core is header-only and needs only
 # the app descriptor's layout from core, not core's FreeRTOS-based runtime,
 # so it adds core's headers rather than linking vk_core.

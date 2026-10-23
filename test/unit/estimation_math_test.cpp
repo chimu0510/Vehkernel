@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The estimation math library and its first models (ADR-0014), against
 // closed forms and known angles.
 #include <vk/estimation/math/quaternion.hpp>

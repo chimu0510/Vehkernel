@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The app descriptor (ADR-0023): ArduPilot's unsigned layout from
 // libraries/AP_CheckFirmware/AP_CheckFirmware.h, so ArduPilot's bootloader
 // and the Vehkernel bootloader check the same record.

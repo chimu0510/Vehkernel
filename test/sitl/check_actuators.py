@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """L3 SITL actuator test (ADR-0018, spec 0006): direct-actuator setpoints turn the simulated wheels.
 
 Starts SITL with its UDP Link on a free port and drives it through the Link

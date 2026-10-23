@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Topic maps (ADR-0002): which topic instances leave through a Link, and how
 // often.
 //

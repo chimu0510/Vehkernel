@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Link monitor for the development host (spec 0003).
 
 Connects to a Link, performs the handshake and time synchronization, decodes

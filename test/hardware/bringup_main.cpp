@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Bring-up test build (ADR-0018, L4): runs the bring-up cases once at boot,
 // writes the results to vk_bringup_results and idles. The bring-up runner on
 // the development host flashes this image over SWD and reads the block back.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // USART baud rate register values for STM32F4, at 16x oversampling.
 //
 // Free of hardware access, so it is unit-tested on the development host.
