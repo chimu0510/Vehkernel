@@ -36,9 +36,10 @@
 namespace vk::link {
 
 // Protocol version; peers negotiate it with hello (ADR-0002). Version 2 added
-// parameter access, version 3 mode, arming and emergency stop requests; the
-// MCU offers only the current version.
-inline constexpr std::uint8_t protocol_version = 3;
+// parameter access, version 3 mode, arming and emergency stop requests,
+// version 4 reboot requests (ADR-0023); the MCU offers only the current
+// version.
+inline constexpr std::uint8_t protocol_version = 4;
 
 enum class FrameType : std::uint8_t {
     TopicData = 0x01,
@@ -63,6 +64,9 @@ enum class FrameType : std::uint8_t {
     BringupRun = 0x48,
     BringupReject = 0x49,
     BringupResult = 0x4A,
+    RebootRequest = 0x4B,
+    RebootReply = 0x4C,
+    RebootReject = 0x4D,
     // SITL only: cuts or restores the simulated actuator power.
     SimActuatorPower = 0x70,
     // SITL only: presses or releases the simulated user key.
@@ -116,6 +120,12 @@ constexpr std::optional<FrameType> to_frame_type(std::uint8_t raw)
         return FrameType::BringupReject;
     case static_cast<std::uint8_t>(FrameType::BringupResult):
         return FrameType::BringupResult;
+    case static_cast<std::uint8_t>(FrameType::RebootRequest):
+        return FrameType::RebootRequest;
+    case static_cast<std::uint8_t>(FrameType::RebootReply):
+        return FrameType::RebootReply;
+    case static_cast<std::uint8_t>(FrameType::RebootReject):
+        return FrameType::RebootReject;
     case static_cast<std::uint8_t>(FrameType::SimActuatorPower):
         return FrameType::SimActuatorPower;
     case static_cast<std::uint8_t>(FrameType::SimUserKey):

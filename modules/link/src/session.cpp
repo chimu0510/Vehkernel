@@ -45,6 +45,9 @@ void Session::handle(const Frame& frame, std::uint64_t now_us, FrameSink& sink)
     case FrameType::BringupRun:
         on_bringup_run(BodyReader(frame.body), sink);
         break;
+    case FrameType::RebootRequest:
+        on_reboot_request(BodyReader(frame.body), sink);
+        break;
     case FrameType::SimActuatorPower:
         on_sim_actuator_power(BodyReader(frame.body));
         break;
@@ -266,6 +269,28 @@ void Session::on_bringup_run(BodyReader body, FrameSink& sink)
     }
     std::array<std::uint8_t, 1> reply{static_cast<std::uint8_t>(result)};
     send(FrameType::BringupReject, reply, sink);
+}
+
+// reboot_request: the action (core::RebootAction). The reply echoes it; the
+// reject gives the reason (core::RebootResult). The board resets after the reply.
+void Session::on_reboot_request(BodyReader body, FrameSink& sink)
+{
+    const std::uint8_t action = body.u8();
+    if (!body.ok() || control_.control == nullptr) {
+        return;
+    }
+    const bool known = action == static_cast<std::uint8_t>(core::RebootAction::Reboot) ||
+                       action == static_cast<std::uint8_t>(core::RebootAction::Bootloader);
+    const core::RebootResult result = known ? control_.control->request_reboot(static_cast<core::RebootAction>(action))
+                                            : core::RebootResult::UnknownAction;
+    std::array<std::uint8_t, 1> reply{};
+    if (result != core::RebootResult::Ok) {
+        reply[0] = static_cast<std::uint8_t>(result);
+        send(FrameType::RebootReject, reply, sink);
+        return;
+    }
+    reply[0] = action;
+    send(FrameType::RebootReply, reply, sink);
 }
 
 bool Session::send_bringup_result(const msg::BringupStatus& status, FrameSink& sink)

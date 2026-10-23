@@ -13,7 +13,7 @@ from .crc16 import crc16
 
 # Version 2 added parameter access (ADR-0012), version 3 mode, arming and
 # emergency stop requests (ADR-0005); the MCU offers only its current version.
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 4
 
 HEADER_SIZE = 4
 CRC_SIZE = 2
@@ -46,6 +46,9 @@ class FrameType(enum.IntEnum):
     BRINGUP_RUN = 0x48
     BRINGUP_REJECT = 0x49
     BRINGUP_RESULT = 0x4A
+    REBOOT_REQUEST = 0x4B
+    REBOOT_REPLY = 0x4C
+    REBOOT_REJECT = 0x4D
     # SITL only: cuts or restores the simulated actuator power.
     SIM_ACTUATOR_POWER = 0x70
     # SITL only: presses or releases the simulated user key.

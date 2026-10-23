@@ -23,6 +23,9 @@ The mode, arm, disarm and estop commands change the mode, arm or disarm, and
 engage or release the emergency stop (spec 0006), print the state now in
 effect and exit non-zero when the MCU refuses. arm warns when arming checks
 are skipped. sim-power cuts or restores SITL's simulated actuator power.
+reboot restarts the board, and reboot --bootloader restarts it into the
+bootloader (ADR-0023); both are refused while armed, and the board resets
+just after it replies.
 key presses SITL's simulated user key (spec 0007): short for 0.1 s, long for
 1.1 s, or hold for the given time; it prints the local menu's state after.
 bringup motors runs the motor-to-encoder bring-up case in test mode while
@@ -39,6 +42,7 @@ non-zero when the vehicle disarms on the way.
     link_monitor.py --udp 127.0.0.1:15600 arm
     link_monitor.py --udp 127.0.0.1:15600 estop on
     link_monitor.py --udp 127.0.0.1:15600 key long
+    link_monitor.py --serial /dev/ttyACM0 reboot --bootloader
     link_monitor.py --udp 127.0.0.1:15600 drive 10,10,10,10 --duration 3
     link_monitor.py --udp 127.0.0.1:15600 drive --duration 2 -- -5,nan,nan,nan
 """
@@ -72,6 +76,7 @@ from vklink.session import (  # noqa: E402
     BRINGUP_RESULTS,
     DISARM_REASONS,
     MODES,
+    REBOOT_ACTIONS,
     BringupOutput,
     ControlReply,
     ParamReject,
@@ -234,7 +239,7 @@ def run_key(monitor: LinkMonitor, args: argparse.Namespace) -> int:
 
 
 def run_control(monitor: LinkMonitor, args: argparse.Namespace) -> int:
-    """The mode, arm, disarm, estop and sim-power commands, once the handshake is done."""
+    """The mode, arm, disarm, estop, reboot and sim-power commands, once the handshake is done."""
     if args.command == "sim-power":
         monitor.sim_actuator_power(args.state == "on")
         print(f"sim_actuator_power={args.state}")
@@ -245,6 +250,9 @@ def run_control(monitor: LinkMonitor, args: argparse.Namespace) -> int:
         reply = monitor.request_mode(mode, PARAM_TIMEOUT_S)
     elif args.command in ("arm", "disarm"):
         reply = monitor.request_arming(args.command == "arm", PARAM_TIMEOUT_S)
+    elif args.command == "reboot":
+        action = REBOOT_ACTIONS["bootloader" if args.bootloader else "reboot"]
+        reply = monitor.request_reboot(action, PARAM_TIMEOUT_S)
     else:
         reply = monitor.request_estop(args.state == "on", PARAM_TIMEOUT_S)
     if reply is None:
@@ -260,6 +268,8 @@ def run_control(monitor: LinkMonitor, args: argparse.Namespace) -> int:
         print(f"armed={reply.value} skipped_checks={','.join(skipped) or 'none'}")
         if args.command == "arm" and skipped:
             print(f"warning: arming checks skipped: {', '.join(skipped)}", file=sys.stderr)
+    elif args.command == "reboot":
+        print(f"reboot={'bootloader' if reply.value == REBOOT_ACTIONS['bootloader'] else 'firmware'}")
     else:
         print(f"emergency_stop={reply.value}")
     return 0
@@ -334,6 +344,8 @@ def main() -> int:
     commands.add_parser("disarm", help="disarm")
     estop = commands.add_parser("estop", help="engage or release the emergency stop")
     estop.add_argument("state", choices=["on", "off"])
+    reboot = commands.add_parser("reboot", help="restart the board; only while disarmed")
+    reboot.add_argument("--bootloader", action="store_true", help="stay in the bootloader, ready to be flashed")
     bringup = commands.add_parser("bringup", help="run a bring-up case; needs TEST and armed")
     bringup.add_argument("case", choices=list(BRINGUP_CASES))
     sim_power = commands.add_parser("sim-power", help="SITL only: cut or restore the simulated actuator power")

@@ -20,6 +20,8 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 
 namespace vk::platform {
 namespace {
@@ -179,6 +181,15 @@ void stop_after(std::uint64_t duration_us)
     stop_duration_us = duration_us;
     xTaskCreateStatic(stop_task, "sitl_stop", stop_stack.size(), nullptr, configMAX_PRIORITIES - 1,
                       stop_stack.data(), &stop_tcb);
+}
+
+void reset(hal::BootTarget target)
+{
+    const bool bootloader = target == hal::BootTarget::Bootloader;
+    std::printf("reset target=%s\n", bootloader ? "bootloader" : "firmware");
+    std::fflush(stdout);
+    // At once, from whichever task asked: FreeRTOS threads must not run exit handlers.
+    std::_Exit(bootloader ? reset_bootloader_exit_status : reset_firmware_exit_status);
 }
 
 bool actuator_power()

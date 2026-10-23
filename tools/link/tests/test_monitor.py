@@ -8,7 +8,7 @@ import types
 
 import pytest
 
-from vklink import FrameReader, McuSession, TopicDescription
+from vklink import PROTOCOL_VERSION, FrameReader, McuSession, TopicDescription
 from vklink.monitor import (LinkMonitor, RateExpectation, TopicStats, UdpConnection, WorkItemOverruns, check,
                             euler_degrees)
 from vklink.view import render
@@ -107,7 +107,7 @@ def test_handshake_and_rate_check_pass():
     assert result.passed, result.failures
     assert monitor.topics[("sample", 0)].messages > 10
     summary = monitor.summary()
-    assert summary[0].startswith("link handshake=ok version=3 mismatches=0")
+    assert summary[0].startswith(f"link handshake=ok version={PROTOCOL_VERSION} mismatches=0")
     assert any(line.startswith("topic name=sample instance=0") and "rate_hz=100.00" in line for line in summary)
     assert monitor.time_sync is not None
 

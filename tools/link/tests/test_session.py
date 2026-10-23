@@ -19,7 +19,7 @@ def test_handshake_picks_highest_shared_version():
             "imu_sample": 0x1122334455667788,
             "status": 0x99AABBCCDDEEFF00,
         },
-        supported_versions=[1, 2, 3],
+        supported_versions=list(range(1, PROTOCOL_VERSION + 1)),
     )
 
     # Host initiates handshake

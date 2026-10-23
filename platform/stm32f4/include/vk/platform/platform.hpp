@@ -1,6 +1,8 @@
 // Platform start-up for STM32F4 (ADR-0009).
 #pragma once
 
+#include <vk/hal/reset.hpp>
+
 #include <cstdint>
 
 namespace vk::platform {
@@ -15,5 +17,9 @@ void init();
 // outputs have not been refreshed for three periods.
 void start_output_watchdog(std::uint32_t period_us, void (*stop)());
 std::uint32_t output_watchdog_trips();
+
+// Restarts the board into the firmware or the bootloader (ADR-0023); a
+// hal::Reset.
+[[noreturn]] void reset(hal::BootTarget target);
 
 }  // namespace vk::platform

@@ -79,7 +79,13 @@ Every later update writes `vehkernel.bin` from the FIRMWARE region (S4) on, so t
 tools/flash/flash_serial.py update
 ```
 
-`backup <file>` only reads the chip, and `reset` restarts the firmware. An update on a board that still has its vendor firmware in S0 leaves that firmware running, so a new board needs `new-board` first. The tool fails with exit code 1 when `stm32flash` fails, and with 2 when an image does not fit its region or the build is missing.
+`backup <file>` only reads the chip, and `reset` restarts the firmware.
+
+The Link monitor restarts a disarmed board over any Link with `reboot`, or into the bootloader with `reboot --bootloader`, ready for ArduPilot's `uploader.py` (ADR-0023); both are refused while armed, and the board resets about 0.1 s after it replies. The request goes into RTC backup register 0 with ArduPilot's values (`RTC_BOOT_HOLD` for the bootloader, `RTC_BOOT_FAST` otherwise), or PX4's on a board that keeps PX4's bootloader. In SITL a reboot ends the run with exit status 10, or 11 for the bootloader (`sitl_reboot`).
+
+```bash
+tools/link/link_monitor.py --serial /dev/ttyACM0 reboot --bootloader
+``` An update on a board that still has its vendor firmware in S0 leaves that firmware running, so a new board needs `new-board` first. The tool fails with exit code 1 when `stm32flash` fails, and with 2 when an image does not fit its region or the build is missing.
 
 The firmware runs a Link on SERIAL1, the Type-C port (USART3 to a CH9102F USB serial adapter), and another on SERIAL2, the one-key download port, so one cable both flashes and connects. Both are 8N1 with DMA both ways, at the `SERIAL1_BAUD` and `SERIAL2_BAUD` parameters: 921600 baud by default, as the board definition's `baud` for each port sets it. A changed rate takes effect at the next boot; pass the same rate to the monitor with `--baud`. A rate the port cannot reach falls back to the board default. Plug a USB cable into either port and the adapter appears on the host as a serial device, usually `/dev/ttyACM0` (your user needs the `dialout` group). Opening the port asserts DTR and RTS, which on the download port would hold BOOT0 high, so the monitor releases both at once; a board reset while it is connected still starts the firmware. Run the Link monitor on the host, with the Python decoders of the firmware build:
 

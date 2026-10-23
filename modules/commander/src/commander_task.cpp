@@ -54,12 +54,17 @@ void CommanderTask::run()
                             .setpoint_timeout_s = params::com.sp_timeout,
                             .disarm_idle_s = params::com.disarm_idle};
     State state;
+    std::optional<PendingReboot> reboot;
     {
         const core::CriticalSection lock;
         commander_.update(now, inputs, settings);
         state = commander_.state();
+        reboot = reboot_;
     }
     publish(now, state);
+    if (reboot && now >= reboot->at_us && !state.armed) {
+        config_.reset(reboot->target);  // Does not return.
+    }
 }
 
 void CommanderTask::publish(std::uint64_t now_us, const State& state)
@@ -98,7 +103,30 @@ core::ModeResult CommanderTask::request_mode(core::ControlSource source, core::M
 core::ArmingResult CommanderTask::request_arming(core::ControlSource source, bool arm)
 {
     const core::CriticalSection lock;
+    if (arm && reboot_) {
+        return core::ArmingResult::Rebooting;
+    }
     return commander_.request_arming(queue().now_us(), source, arm);
+}
+
+core::RebootResult CommanderTask::request_reboot(core::RebootAction action)
+{
+    if (config_.reset == nullptr) {
+        return core::RebootResult::NotAvailable;
+    }
+    const core::CriticalSection lock;
+    if (commander_.state().armed) {
+        return core::RebootResult::Armed;
+    }
+    const hal::BootTarget target =
+        action == core::RebootAction::Bootloader ? hal::BootTarget::Bootloader : hal::BootTarget::Firmware;
+    // A repeated request keeps the first deadline, so retries cannot postpone it.
+    if (!reboot_) {
+        reboot_ = PendingReboot{.target = target, .at_us = queue().now_us() + reboot_delay_us};
+    } else {
+        reboot_->target = target;
+    }
+    return core::RebootResult::Ok;
 }
 
 bool CommanderTask::request_emergency_stop(bool engage)

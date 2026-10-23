@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <optional>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -897,7 +898,16 @@ public:
         return bringup_result;
     }
     void source_lost(vk::core::ControlSource source) override { lost = source; }
+    vk::core::RebootResult request_reboot(vk::core::RebootAction action) override
+    {
+        if (reboot_result == vk::core::RebootResult::Ok) {
+            reboot = action;
+        }
+        return reboot_result;
+    }
 
+    vk::core::RebootResult reboot_result = vk::core::RebootResult::Ok;
+    std::optional<vk::core::RebootAction> reboot;
     vk::core::BringupStart bringup_result = vk::core::BringupStart::Ok;
     vk::core::ControlSource lost = vk::core::no_source;
 
@@ -1069,6 +1079,30 @@ TEST_F(SessionControl, BringupRunIsRefusedAtOnceOrAnsweredWithItsResultLater)
     EXPECT_EQ(got[0].body, (std::vector<std::uint8_t>{4}));
     EXPECT_EQ(got[1].type, FrameType::BringupResult);
     EXPECT_EQ(got[1].body, (std::vector<std::uint8_t>{1, 2, 2, 0, 1, 1, 2, 2, 0xFF}));
+}
+
+TEST_F(SessionControl, RebootRequestIsAnsweredWithTheActionOrTheRefusal)
+{
+    request(session, FrameType::RebootRequest, 3);
+    EXPECT_EQ(control.reboot, std::optional{vk::core::RebootAction::Bootloader});
+    control.reboot_result = vk::core::RebootResult::Armed;
+    request(session, FrameType::RebootRequest, 1);
+    const auto got = replies(sink.sent);
+    ASSERT_EQ(got.size(), 2U);
+    EXPECT_EQ(got[0].type, FrameType::RebootReply);
+    EXPECT_EQ(got[0].body, (std::vector<std::uint8_t>{3}));
+    EXPECT_EQ(got[1].type, FrameType::RebootReject);
+    EXPECT_EQ(got[1].body, (std::vector<std::uint8_t>{1}));
+}
+
+TEST_F(SessionControl, AnUnknownRebootActionIsRefusedWithoutAsking)
+{
+    request(session, FrameType::RebootRequest, 2);
+    const auto got = replies(sink.sent);
+    ASSERT_EQ(got.size(), 1U);
+    EXPECT_EQ(got[0].type, FrameType::RebootReject);
+    EXPECT_EQ(got[0].body, (std::vector<std::uint8_t>{2}));  // unknown action
+    EXPECT_FALSE(control.reboot.has_value());
 }
 
 }  // namespace

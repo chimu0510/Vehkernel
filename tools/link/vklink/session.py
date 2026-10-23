@@ -39,7 +39,12 @@ ARMING_REJECT_REASONS = {
     7: "actuator power off",
     8: "actuators not started",
     9: "local menu open",
+    10: "rebooting",
 }
+# Reboot actions, numbered as MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN's param1, and
+# why a reboot was refused; vk::core::RebootAction and RebootResult.
+REBOOT_ACTIONS = {"reboot": 1, "bootloader": 3}
+REBOOT_REJECT_REASONS = {1: "armed", 2: "unknown action", 3: "not available"}
 DISARM_REASONS = {
     0: "none",
     1: "request",
@@ -112,7 +117,7 @@ def check_names(mask: int) -> list[str]:
 
 @dataclass(frozen=True)
 class ControlReply:
-    """A reply to a mode, arming or emergency stop request."""
+    """A reply to a mode, arming, emergency stop or reboot request."""
 
     type: FrameType
     value: int        # the mode, armed or engaged now in effect; for a reject, the reason
@@ -121,11 +126,12 @@ class ControlReply:
 
     @property
     def refused(self) -> bool:
-        return self.type in (FrameType.MODE_REJECT, FrameType.ARMING_REJECT)
+        return self.type in (FrameType.MODE_REJECT, FrameType.ARMING_REJECT, FrameType.REBOOT_REJECT)
 
     @property
     def reason_text(self) -> str:
-        reasons = MODE_REJECT_REASONS if self.type == FrameType.MODE_REJECT else ARMING_REJECT_REASONS
+        reasons = {FrameType.MODE_REJECT: MODE_REJECT_REASONS,
+                   FrameType.REBOOT_REJECT: REBOOT_REJECT_REASONS}.get(self.type, ARMING_REJECT_REASONS)
         return reasons.get(self.value, f"reason {self.value}")
 
     @classmethod
@@ -135,7 +141,8 @@ class ControlReply:
             return cls(frame.type, body[0], mode=body[1])
         if frame.type == FrameType.ARMING_REPLY and len(body) >= 5:
             return cls(frame.type, body[0], skipped=struct.unpack("<I", body[1:5])[0])
-        if frame.type in (FrameType.MODE_REPLY, FrameType.ARMING_REJECT, FrameType.ESTOP_REPLY) and body:
+        if frame.type in (FrameType.MODE_REPLY, FrameType.ARMING_REJECT, FrameType.ESTOP_REPLY,
+                          FrameType.REBOOT_REPLY, FrameType.REBOOT_REJECT) and body:
             return cls(frame.type, body[0])
         return None
 
@@ -277,6 +284,9 @@ class HostSession:
     def make_bringup_run(self, bringup_case: int) -> bytes:
         return self.writer.write(FrameType.BRINGUP_RUN, struct.pack("<B", bringup_case))
 
+    def make_reboot_request(self, action: int) -> bytes:
+        return self.writer.write(FrameType.REBOOT_REQUEST, struct.pack("<B", action))
+
     def make_sim_actuator_power(self, powered: bool) -> bytes:
         return self.writer.write(FrameType.SIM_ACTUATOR_POWER, struct.pack("<B", int(powered)))
 
@@ -371,6 +381,8 @@ class McuControl:
     sim_actuator_power: bool = True
     sim_user_key: bool = False
     bringup_result: int = 0  # vk::core::BringupStart
+    reboot_result: int = 0   # vk::core::RebootResult
+    reboot_action: int = 0   # the last accepted reboot action, 0 for none
     # What a case reports at once when it is accepted: (result, encoder, sign) per output.
     bringup_outputs: tuple[tuple[int, int, int], ...] = ((0, 1, 1),)
 
@@ -449,6 +461,11 @@ class McuSession:
         if frame.type == FrameType.ESTOP_REQUEST:
             control.emergency_stop = bool(value)
             return [self._send(FrameType.ESTOP_REPLY, struct.pack("<B", int(control.emergency_stop)))]
+        if frame.type == FrameType.REBOOT_REQUEST:
+            if control.reboot_result != 0:
+                return [self._send(FrameType.REBOOT_REJECT, struct.pack("<B", control.reboot_result))]
+            control.reboot_action = value
+            return [self._send(FrameType.REBOOT_REPLY, struct.pack("<B", value))]
         if frame.type == FrameType.SIM_ACTUATOR_POWER:
             control.sim_actuator_power = bool(value)
         if frame.type == FrameType.SIM_USER_KEY:

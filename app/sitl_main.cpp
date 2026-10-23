@@ -22,6 +22,9 @@
 // Its display is a simulated SSD1306; --display writes what it shows to a
 // PBM file after every change (ADR-0022). Its user key is pressed and
 // released by the Link's sim_user_key frame.
+// A reboot request over the Link ends the run at once, without the report,
+// with exit status 10 to start the firmware again or 11 for the bootloader
+// (ADR-0023).
 #include <vk/config.h>
 
 #ifdef CONFIG_ACTUATOR_CONTROL
@@ -207,7 +210,8 @@ void start_commander()
                                                            .actuator_power = &vk::platform::actuator_power,
                                                            .actuators_started = actuators,
                                                            .bringup = bringup,
-                                                           .output_watchdog_trips = &vk::platform::output_watchdog_trips},
+                                                           .output_watchdog_trips = &vk::platform::output_watchdog_trips,
+                                                           .reset = &vk::platform::reset},
                       vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     commander->start();
 }

@@ -62,7 +62,8 @@ Deliver the eighth milestone: **a Vehkernel bootloader on the C50C V1.1 that Ard
 - **Reboot service** (ADR-0023, ADR-0002):
   - A protocol-independent request with two actions, reboot and reboot to the bootloader, refused while armed with the reason in the reply.
   - The custom protocol carries it as a control message. This raises the protocol to version 4. MAVLink's mapping comes with MAVLink.
-  - Before resetting, the platform writes the board's bootloader value to the RTC backup register where that bootloader reads it: ArduPilot's `RTC_BOOT_HOLD` (0xb0070001) for `VEHKERNEL` and `ARDUPILOT`, PX4's `BOOT_RTC_SIGNATURE` (0xb007b007) for `PX4`. A plain reboot clears it.
+  - Before resetting, the platform writes the board's bootloader value to RTC backup register 0, where that bootloader reads it: ArduPilot's `RTC_BOOT_HOLD` (0xb0070001) for `VEHKERNEL` and `ARDUPILOT`, PX4's `BOOT_RTC_SIGNATURE` (0xb007b007) for `PX4`. A plain reboot writes ArduPilot's `RTC_BOOT_FAST` (0xb0070002), as ArduPilot does, so the bootloader starts the firmware without its boot window, or clears the register for `PX4`.
+  - The reset happens 0.1 s after the request is accepted, from the commander's cycle, so the reply leaves first, as ArduPilot acknowledges before rebooting. Arming is refused meanwhile with `REBOOTING`. An unknown action is refused by the Link without asking the commander, as an unknown mode is.
   - The Link monitor gains `reboot` and `reboot --bootloader`.
   - In SITL, a reboot ends the process with an exit code that tells the two actions apart.
 - **Vehkernel bootloader, core**:

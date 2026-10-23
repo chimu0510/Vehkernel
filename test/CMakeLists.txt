@@ -57,6 +57,15 @@ if(CONFIG_LINK_UDP)
       --msg-dir ${VK_MSG_PYTHON_DIR} --param-meta ${VK_PARAM_METADATA})
 endif()
 
+# L3 SITL reboot test (spec 0008): a reboot refused while armed, and SITL
+# ending with the bootloader or firmware exit status once one is accepted.
+if(CONFIG_LINK_UDP)
+  add_test(NAME sitl_reboot
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_reboot.py
+      $<TARGET_FILE:vehkernel-sitl> ${CMAKE_SOURCE_DIR}/tools/link/link_monitor.py
+      --msg-dir ${VK_MSG_PYTHON_DIR} --param-meta ${VK_PARAM_METADATA})
+endif()
+
 # L3 SITL actuator test (spec 0006): direct-actuator setpoints turn the
 # simulated wheels at 10 rad/s, and the setpoint timeout, actuator power loss,
 # the emergency stop, a skipped power check and the idle disarm stop them.

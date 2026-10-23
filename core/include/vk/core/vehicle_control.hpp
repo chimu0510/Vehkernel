@@ -1,5 +1,5 @@
-// The vehicle control service (ADR-0005): mode, arming and emergency stop
-// requests. Like the parameter runtime (ADR-0012) it is protocol
+// The vehicle control service (ADR-0005): mode, arming, emergency stop and
+// reboot (ADR-0023) requests. Like the parameter runtime (ADR-0012) it is protocol
 // independent, so the custom protocol now and MAVLink and the Bridge later
 // reach the commander through the same interface.
 //
@@ -39,6 +39,22 @@ enum class ArmingResult : std::uint8_t {
     ActuatorPowerOff = 7,     // unpowered or still settling, and the check is not skipped
     ActuatorsNotStarted = 8,
     LocalMenuOpen = 9,        // ADR-0022
+    Rebooting = 10,           // a reboot was accepted and is about to happen
+};
+
+// Reboot actions, numbered as MAVLink's MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN
+// param1, so MAVLink maps onto them directly (ADR-0023).
+enum class RebootAction : std::uint8_t {
+    Reboot = 1,      // start the firmware again
+    Bootloader = 3,  // stay in the bootloader until flashed or reset
+};
+
+// Why a reboot request was refused.
+enum class RebootResult : std::uint8_t {
+    Ok = 0,
+    Armed = 1,          // a reboot happens only while disarmed (ADR-0005)
+    UnknownAction = 2,
+    NotAvailable = 3,   // the platform cannot reset
 };
 
 // Why the vehicle last disarmed.
@@ -109,6 +125,10 @@ public:
 
     // `source` fell silent: a bring-up case it runs is aborted and the vehicle disarmed.
     virtual void source_lost(ControlSource source) = 0;
+
+    // Reboots the board, or reboots it into the bootloader, from any source,
+    // while disarmed. The reply goes out before the board resets.
+    virtual RebootResult request_reboot(RebootAction action) = 0;
 };
 
 }  // namespace vk::core

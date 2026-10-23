@@ -9,7 +9,8 @@ vk_add_library(vk_platform LAYER platform OBJECT
   src/internal_flash.cpp
   src/microsecond_clock.cpp
   src/output_watchdog.cpp
-  src/platform.cpp)
+  src/platform.cpp
+  src/reset.cpp)
 target_include_directories(vk_platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(vk_platform PRIVATE
   VK_VERSION_MAJOR=${PROJECT_VERSION_MAJOR} VK_VERSION_MINOR=${PROJECT_VERSION_MINOR})

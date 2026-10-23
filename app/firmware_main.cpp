@@ -161,7 +161,8 @@ void start_actuators()
 void start_commander()
 {
     vk::commander::CommanderTask::Config config{.interval_us = control_interval_us,
-                                                .revision_ok = revision_matches()};
+                                                .revision_ok = revision_matches(),
+                                                .reset = &vk::platform::reset};
 #ifdef CONFIG_ACTUATOR_CONTROL
     config.actuators_started = true;
     config.output_watchdog_trips = &vk::platform::output_watchdog_trips;

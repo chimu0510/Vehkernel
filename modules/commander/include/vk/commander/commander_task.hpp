@@ -11,13 +11,16 @@
 // open (ADR-0022).
 //
 // It is also the vehicle control service the Links call from their own work
-// queue; requests and cycles take turns in short critical sections.
+// queue; requests and cycles take turns in short critical sections. A reboot
+// accepted while disarmed (ADR-0023) happens reboot_delay_us later, from a
+// cycle, so the Link's reply leaves first; arming is refused meanwhile.
 #pragma once
 
 #include <vk/commander/commander.hpp>
 #include <vk/core/bus.hpp>
 #include <vk/core/vehicle_control.hpp>
 #include <vk/core/work_queue.hpp>
+#include <vk/hal/reset.hpp>
 #include <vk/msg/actuator_setpoint.hpp>
 #include <vk/msg/arming_state.hpp>
 #include <vk/msg/bringup_command.hpp>
@@ -27,12 +30,14 @@
 #include <vk/msg/vehicle_status.hpp>
 
 #include <cstdint>
+#include <optional>
 
 namespace vk::commander {
 
 class CommanderTask final : public core::WorkItem, public core::VehicleControl {
 public:
     static constexpr std::uint32_t status_interval_us = 200'000;
+    static constexpr std::uint64_t reboot_delay_us = 100'000;  // a constant
 
     struct Config {
         std::uint32_t interval_us = 5'000;   // the control cycle
@@ -41,6 +46,7 @@ public:
         bool actuators_started = false;      // actuator outputs and encoders are running
         bool bringup = false;                // the motor bring-up case is built in
         std::uint32_t (*output_watchdog_trips)() = nullptr;  // the platform's count; nullptr without one
+        hal::Reset reset = nullptr;          // the platform's reset; nullptr if it cannot
     };
 
     CommanderTask(const Config& config, core::WorkQueue& queue);
@@ -57,6 +63,7 @@ public:
     [[nodiscard]] bool accepts_setpoint(core::ControlSource source) const override;
     core::BringupStart request_bringup(core::ControlSource source, std::uint8_t bringup_case) override;
     void source_lost(core::ControlSource source) override;
+    core::RebootResult request_reboot(core::RebootAction action) override;
 
 protected:
     void run() override;
@@ -80,6 +87,11 @@ private:
     bool published_ = false;
     State last_state_{};
     std::uint64_t next_status_us_ = 0;
+    struct PendingReboot {
+        hal::BootTarget target;
+        std::uint64_t at_us;
+    };
+    std::optional<PendingReboot> reboot_;  // guarded by the critical section
 };
 
 }  // namespace vk::commander

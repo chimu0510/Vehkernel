@@ -88,8 +88,9 @@ std::string_view mode_name(std::uint8_t mode)
 
 std::string_view refusal_name(std::uint8_t reason)
 {
-    static constexpr std::array<std::string_view, 9> names{
-        "-", "BOARD", "ESTOP", "WRONG_MODE", "NO_CONTROL", "SETPOINTS", "BRINGUP", "ACT_POWER", "ACTUATORS"};
+    static constexpr std::array<std::string_view, 11> names{
+        "-",         "BOARD",     "ESTOP",     "WRONG_MODE", "NO_CONTROL", "SETPOINTS",
+        "BRINGUP",   "ACT_POWER", "ACTUATORS", "MENU_OPEN",  "REBOOTING"};
     return reason < names.size() ? names.at(reason) : "?";
 }
 

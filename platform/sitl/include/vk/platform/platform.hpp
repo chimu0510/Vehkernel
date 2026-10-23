@@ -3,6 +3,7 @@
 
 #include <vk/core/work_queue.hpp>
 #include <vk/hal/actuator.hpp>
+#include <vk/hal/reset.hpp>
 #include <vk/sim/motor.hpp>
 #include <vk/sim/i2c_bus.hpp>
 #include <vk/sim/motion.hpp>
@@ -59,5 +60,12 @@ std::uint32_t output_watchdog_trips();
 
 // Stops the scheduler after the given run time, so a SITL run ends on its own.
 void stop_after(std::uint64_t duration_us);
+
+// A reset ends SITL at once with an exit status that tells the targets apart
+// (ADR-0023): whoever started it decides whether to start it again, or to
+// run the SITL bootloader. It prints "reset target=firmware|bootloader" first.
+inline constexpr int reset_firmware_exit_status = 10;
+inline constexpr int reset_bootloader_exit_status = 11;
+[[noreturn]] void reset(hal::BootTarget target);
 
 }  // namespace vk::platform

@@ -150,6 +150,7 @@ private:
     void on_arming_request(BodyReader body, FrameSink& sink);
     void on_estop_request(BodyReader body, FrameSink& sink);
     void on_bringup_run(BodyReader body, FrameSink& sink);
+    void on_reboot_request(BodyReader body, FrameSink& sink);
     void on_sim_actuator_power(BodyReader body);
     void on_sim_user_key(BodyReader body);
     [[nodiscard]] std::size_t parameter_count() const

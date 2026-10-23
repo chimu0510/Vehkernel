@@ -1,4 +1,5 @@
-"""Mode, arming and emergency stop requests (spec 0006): frames, the monitor and the command line."""
+"""Mode, arming, emergency stop (spec 0006) and reboot (spec 0008) requests: frames, the monitor and the
+command line."""
 
 import subprocess
 import sys
@@ -60,6 +61,16 @@ def test_estop_and_sim_power_frames():
     assert control.sim_user_key
     assert exchange(mcu, host.make_sim_user_key(False)) == []
     assert not control.sim_user_key
+
+
+def test_reboot_request_frames():
+    control = McuControl()
+    mcu, host = connected_pair(control)
+    assert exchange(mcu, host.make_reboot_request(3)) == [ControlReply(FrameType.REBOOT_REPLY, 3)]
+    assert control.reboot_action == 3
+    control.reboot_result = 1
+    [reject] = exchange(mcu, host.make_reboot_request(1))
+    assert reject.refused and reject.reason_text == "armed"
 
 
 def run_cli(port: int, tmp_path: Path, *command: str) -> subprocess.CompletedProcess:
@@ -125,3 +136,18 @@ def test_bringup_frames_and_cli(tmp_path: Path):
     assert passed.returncode == 0, passed.stderr
     assert passed.stdout.splitlines()[0] == "bringup output=1 result=pass encoder=1 sign=+1"
     assert refused.returncode == 1 and "FAIL: bringup refused: not armed" in refused.stderr
+
+
+def test_cli_reboots_into_the_bootloader_and_fails_while_armed(tmp_path: Path):
+    control = McuControl()
+    with FakeMcu(control=control) as mcu:
+        bootloader = run_cli(mcu.port, tmp_path, "reboot", "--bootloader")
+        action = control.reboot_action
+        plain = run_cli(mcu.port, tmp_path, "reboot")
+        control.reboot_result = 1
+        refused = run_cli(mcu.port, tmp_path, "reboot", "--bootloader")
+    assert (bootloader.returncode, bootloader.stdout) == (0, "reboot=bootloader\n"), bootloader.stderr
+    assert action == 3
+    assert (plain.returncode, plain.stdout) == (0, "reboot=firmware\n")
+    assert refused.returncode == 1
+    assert "FAIL: reboot refused: armed" in refused.stderr

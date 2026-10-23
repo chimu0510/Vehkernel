@@ -374,7 +374,8 @@ class Mismatch:
 
 # Replies to mode, arming and emergency stop requests.
 CONTROL_REPLIES = (FrameType.MODE_REPLY, FrameType.MODE_REJECT, FrameType.ARMING_REPLY,
-                   FrameType.ARMING_REJECT, FrameType.ESTOP_REPLY)
+                   FrameType.ARMING_REJECT, FrameType.ESTOP_REPLY, FrameType.REBOOT_REPLY,
+                   FrameType.REBOOT_REJECT)
 
 
 class LinkMonitor:
@@ -409,7 +410,7 @@ class LinkMonitor:
         # Parameter replies, as they arrive.
         self.params: dict[str, ParamValue] = {}
         self.param_rejects: list[ParamReject] = []
-        # Mode, arming and emergency stop replies, as they arrive.
+        # Mode, arming, emergency stop and reboot replies, as they arrive.
         self.control_replies: list[ControlReply] = []
         self.bringup_replies: list[BringupReply] = []
 
@@ -613,6 +614,14 @@ class LinkMonitor:
         """Engages or releases the emergency stop; the reply says whether it is engaged."""
         return self._await_control(lambda: self.session.make_estop_request(engage),
                                    (FrameType.ESTOP_REPLY,), timeout_s)
+
+    def request_reboot(self, action: int, timeout_s: float) -> ControlReply | None:
+        """Reboots the board, or reboots it into the bootloader; the reply echoes the action, or says why not.
+
+        Sent again until a reply comes: a repeat while the reboot is pending changes nothing.
+        """
+        return self._await_control(lambda: self.session.make_reboot_request(action),
+                                   (FrameType.REBOOT_REPLY, FrameType.REBOOT_REJECT), timeout_s)
 
     def sim_actuator_power(self, powered: bool) -> None:
         """SITL only: cuts or restores the simulated actuator power. The MCU does not answer."""
