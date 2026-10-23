@@ -66,7 +66,7 @@ Deliver the sixth milestone: **the first wheel motion, from a direct-actuator se
 36. As a SITL user, I want to start SITL with actuator power off and to cut or restore it while running, with the simulated motors stopping when it is off, so that CI tests arming refusal, power loss under motion and a skipped check.
 37. As a maintainer, I want CI to arm, drive, time out, engage the emergency stop, cut actuator power, skip the power check and find a reversed motor in SITL (L3), so that every safety path is covered on every push.
 38. As a C50C user, I want a documented hardware check with the wheels lifted, so that mapping, direction, speed control, the emergency stop, the drive power check, the setpoint timeout, the output watchdog and the PWM frequency are confirmed on the board (ADR-0018 L4).
-39. As a new contributor, I want the README to explain how to arm and drive the wheels in SITL and on the board, and the safety conditions that apply, so that I can make a wheel turn in minutes and safely.
+39. As a new contributor, I want the documentation to explain how to arm and drive the wheels in SITL and on the board, and the safety conditions that apply, so that I can make a wheel turn in minutes and safely.
 
 ## Implementation Decisions
 
