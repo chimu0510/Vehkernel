@@ -53,5 +53,5 @@ If your output contradicts an existing ADR, surface it explicitly rather than si
 ## This repo's conventions
 
 - All docs are in English (ADR-0021); use the glossary's English terms exactly as defined.
-- When a later decision changes an earlier ADR, edit that ADR in place so its body always reads as the current decision; git history keeps the old text. Cite ADRs as `ADR-NNNN`.
-- Implementing a decision does not shorten its ADR: keep the whole discussion, the considered options and what implementation showed. Remove only text that a later decision rejected or changed, as in the rule above.
+- ADRs are living records, edited in place; their format, editing rules and index are in `docs/adr/README.md`. Read it before writing or changing an ADR.
+- Specs follow `docs/specs/README.md`.

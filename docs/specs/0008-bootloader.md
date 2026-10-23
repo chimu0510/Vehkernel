@@ -2,6 +2,8 @@
 
 **Status**: in progress. Issue: [#61](https://github.com/chimu0510/Vehkernel/issues/61); tickets #62 to #67, with the hardware check in #67.
 
+Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
+
 ## Problem Statement
 
 The seventh milestone left Vehkernel on the C50C V1.1 with a local display and menu, and two Links: SERIAL1 on the Type-C port and SERIAL2 on the one-key download port. Firmware reaches the board in two ways. SWD needs a debug probe. `tools/flash/flash_serial.py` drives the STM32 system bootloader through the download port's DTR/RTS circuit. S0 holds only a stub that jumps to the firmware.

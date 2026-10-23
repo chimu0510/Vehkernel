@@ -2,7 +2,7 @@
 
 **Status**: done. Issue: [#14](https://github.com/chimu0510/Vehkernel/issues/14); tickets #15 to #22. The IMU wiring and read rate were confirmed on hardware in [#20](https://github.com/chimu0510/Vehkernel/issues/20), and IMU samples at 200 Hz on the C50C in [#22](https://github.com/chimu0510/Vehkernel/issues/22).
 
-This is the spec as written before implementation. Later decisions live in the ADRs and the code; where they differ, they win.
+This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 
 ## Problem Statement
 

@@ -2,7 +2,7 @@
 
 **Status**: done. Issue: [#51](https://github.com/chimu0510/Vehkernel/issues/51); tickets #52 to #57. The local display and the local menu were confirmed on the C50C in [#57](https://github.com/chimu0510/Vehkernel/issues/57).
 
-This file and the issue carry the same spec; update both when the spec changes.
+This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 
 ## Problem Statement
 

@@ -2,7 +2,7 @@
 
 **Status**: done. Issue: [#23](https://github.com/chimu0510/Vehkernel/issues/23); tickets #24 to #29. The serial Link was confirmed on the C50C over USB in [#28](https://github.com/chimu0510/Vehkernel/issues/28).
 
-This file and the issue carry the same spec; update both when the spec changes.
+This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 
 ## Problem Statement
 

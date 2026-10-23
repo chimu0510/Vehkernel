@@ -30,7 +30,7 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 Create a GitHub issue.
 
-A spec (from `/to-spec`) is also saved as `docs/specs/NNNN-slug.md`, numbered after the highest existing file, with a status line linking its issue. Keep the file and the issue in step; tickets stay issue-only.
+A spec (from `/to-spec`) is also saved as `docs/specs/NNNN-slug.md`; its status line, its lifecycle and tickets outside a spec follow `docs/specs/README.md`. Tickets stay issue-only.
 
 ## When a skill says "fetch the relevant ticket"
 

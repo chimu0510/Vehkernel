@@ -2,7 +2,7 @@
 
 **Status**: done. Issue: [#4](https://github.com/chimu0510/Vehkernel/issues/4); tickets #5 to #13. The boot path was confirmed on hardware in [#10](https://github.com/chimu0510/Vehkernel/issues/10).
 
-This is the spec as written before implementation. Later decisions live in the ADRs and the code; where they differ, they win.
+This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 
 ## Problem Statement
 

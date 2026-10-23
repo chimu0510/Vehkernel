@@ -1,8 +1,8 @@
 # Spec 0006: first wheel motion
 
-**Status**: in progress. Issue: [#43](https://github.com/chimu0510/Vehkernel/issues/43); tickets #44 to #50, with the hardware check in #50.
+**Status**: deferred. Issue: [#43](https://github.com/chimu0510/Vehkernel/issues/43); tickets #44 to #50. Every ticket but the hardware check in #50 is done; the maintainer deferred #50 on 2026-10-22 while specs 0007 and 0008 went ahead, and the `PE4` powered level, `MOTn_CPR` and the speed loop defaults are still to be measured there.
 
-This file and the issue carry the same spec; update both when the spec changes.
+Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
 
 ## Problem Statement
 
