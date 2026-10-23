@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .diagnostics import BoardError, Diagnostics, Loc
+from .bootloader import Bootloader, check_board_id, check_bootloader, check_unique_id
 from .dma import DmaAssignment, assign, collect_requests
 from .clock import CLOCK_KEYS, Clock, solve_clock
 from .flash import FlashRegion, RamRegion, check_layout, ram_regions
@@ -33,10 +34,10 @@ PULLS = ("UP", "DOWN")
 ALT_KEYS = {"config", "role", "func"}
 TOP_LEVEL_KEYS = {"name", "mcu", "extends", "remove", "pins", "dma", "flash",
                   "serial", "devices", "storage", "clock", "timing", "defaults",
-                  "revision", "actuator_power", "actuators", "user_key"}
+                  "revision", "actuator_power", "actuators", "user_key", "board_id", "bootloader"}
 ARRAY_SECTIONS = {"pins": "pin", "dma": "request", "flash": "region", "serial": "port",
                   "devices": "device", "storage": "storage", "actuators": "output"}
-TABLE_SECTIONS = ("clock", "timing", "defaults", "revision", "actuator_power", "user_key")
+TABLE_SECTIONS = ("clock", "timing", "defaults", "revision", "actuator_power", "user_key", "bootloader")
 
 _ROLE_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _PIN_RE = re.compile(r"^P([A-K])(\d+)$")
@@ -86,6 +87,8 @@ class Board:
     hardware: Hardware = Hardware()
     clock: Clock | None = None
     peripherals: tuple[tuple[str, dict], ...] = ()  # (instance, MCU database entry), sorted
+    board_id: int | None = None
+    bootloader: Bootloader | None = None
 
 
 @dataclass
@@ -100,6 +103,7 @@ class _Resolved:
     mcu: object
     arrays: dict[str, list[_Entry]]  # by section name, see ARRAY_SECTIONS
     tables: dict[str, _Entry]  # see TABLE_SECTIONS
+    board_id: _Entry | None = None  # never inherited: each board has its own
 
 
 def _entry_lines(text: str, key: str, count: int) -> list[int | None]:
@@ -160,12 +164,13 @@ def _resolve(path: Path, shown: str, diag: Diagnostics,
     tables = {section: _Entry(data[section], Loc(shown, _key_line(text, section)))
               for section in TABLE_SECTIONS if section in data}
     removed = data.get("remove", [])
+    board_id = _Entry(data["board_id"], Loc(shown, _key_line(text, "board_id"))) if "board_id" in data else None
 
     base_name = data.get("extends")
     if base_name is None:
         if removed:
             diag.error("'remove' needs 'extends'", top)
-        return _Resolved(data.get("name"), data.get("mcu"), arrays, tables)
+        return _Resolved(data.get("name"), data.get("mcu"), arrays, tables, board_id)
 
     if not isinstance(base_name, str) or not _BOARD_NAME_RE.match(base_name):
         diag.error("'extends' must name a board directory", top)
@@ -214,7 +219,7 @@ def _resolve(path: Path, shown: str, diag: Diagnostics,
             merged_tables[section] = _Entry({**base.tables["defaults"].data, **entry.data}, entry.loc)
         else:
             merged_tables[section] = entry
-    return _Resolved(data.get("name"), data.get("mcu", base.mcu), merged, merged_tables)
+    return _Resolved(data.get("name"), data.get("mcu", base.mcu), merged, merged_tables, board_id)
 
 
 def _key_line(text: str, key: str) -> int | None:
@@ -270,6 +275,8 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
                               (table("actuator_power").data, table("actuator_power").loc),
                               [(e.data, e.loc) for e in arrays["actuators"]],
                               (table("user_key").data, table("user_key").loc))
+    board_id, bootloader = _check_firmware_identity(resolved, table("bootloader"), hardware, pins, flash,
+                                                    path, Loc(shown), diag)
     clock = _check_clock(table("clock"), database, diag)
     used = {f.func.rsplit("_", 1)[0] for p in pins for f in (p.default, *(fn for _, fn in p.alt))
             if f.kind in ("af", "analog")}
@@ -283,7 +290,30 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
         raise BoardError(diag.errors)
     return Board(name=name, mcu=mcu, source=shown, pins=tuple(pins), dma=tuple(dma),
                  alt_configs=tuple(configs), flash=flash, ram=ram_regions(database),
-                 hardware=hardware, clock=clock, peripherals=peripherals)
+                 hardware=hardware, clock=clock, peripherals=peripherals, board_id=board_id,
+                 bootloader=bootloader)
+
+
+def _check_firmware_identity(resolved: _Resolved, entry: _Entry, hardware: Hardware, pins: list[Pin],
+                             flash: tuple, path: Path, top: Loc,
+                             diag: Diagnostics) -> tuple[int | None, Bootloader | None]:
+    """The board ID and bootloader; a board with a Flash layout builds firmware and needs both."""
+    if resolved.arrays["flash"]:
+        if resolved.board_id is None:
+            diag.error("a board with a Flash layout needs a 'board_id' (ADR-0023)", top)
+        if entry.data is None:
+            diag.error("a board with a Flash layout needs a 'bootloader' table (ADR-0023)", top)
+    bootloader = None
+    if entry.data is not None:
+        bootloader = check_bootloader(entry.data, entry.loc, {p.port for p in hardware.serial},
+                                      {p.role: p for p in pins}, diag)
+    board_id = None
+    if resolved.board_id is not None:
+        board_id = check_board_id(resolved.board_id.data, bootloader.kind if bootloader else None,
+                                  resolved.board_id.loc, diag)
+        if board_id is not None:
+            check_unique_id(board_id, path, resolved.board_id.loc, diag)
+    return board_id, bootloader
 
 
 def _check_clock(entry: _Entry, database: dict, diag: Diagnostics) -> Clock | None:

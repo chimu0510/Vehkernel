@@ -1,0 +1,9 @@
+name = "demo"
+mcu = "testmcu"
+
+pins = []
+
+flash = [
+  { region = "BOOT",     start = 0x08000000, size = "16K" },
+  { region = "FIRMWARE", start = 0x08010000, size = "64K" },
+]

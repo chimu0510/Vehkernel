@@ -1,0 +1,1 @@
+board.toml:4: error: board ID 51 is used by a board in ArduPilot's list; a board with the Vehkernel bootloader needs an unused one

@@ -39,6 +39,8 @@
       "size": 65536
     }
   ],
+  "board_id": null,
+  "bootloader": null,
   "serial": [],
   "devices": [],
   "storage": [],

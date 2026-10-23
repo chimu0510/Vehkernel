@@ -1,0 +1,1 @@
+board.toml:4: error: board ID 115 lies in IDs 110-119, which ArduPilot's list reserves for a vendor

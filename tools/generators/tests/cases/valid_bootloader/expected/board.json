@@ -1,0 +1,173 @@
+{
+  "name": "demo",
+  "mcu": "testmcu",
+  "pins": [
+    {
+      "role": "SERIAL1_TX",
+      "pin": "PA9",
+      "port": "A",
+      "number": 9,
+      "func": "USART1_TX",
+      "kind": "af",
+      "af": 7,
+      "pull": null,
+      "alt": []
+    },
+    {
+      "role": "SERIAL1_RX",
+      "pin": "PA10",
+      "port": "A",
+      "number": 10,
+      "func": "USART1_RX",
+      "kind": "af",
+      "af": 7,
+      "pull": null,
+      "alt": []
+    },
+    {
+      "role": "SERIAL2_TX",
+      "pin": "PA2",
+      "port": "A",
+      "number": 2,
+      "func": "USART2_TX",
+      "kind": "af",
+      "af": 7,
+      "pull": null,
+      "alt": []
+    },
+    {
+      "role": "BOOT_HOLD",
+      "pin": "PA6",
+      "port": "A",
+      "number": 6,
+      "func": "GPIO_INPUT",
+      "kind": "gpio_input",
+      "af": null,
+      "pull": "UP",
+      "alt": []
+    }
+  ],
+  "alt_configs": [],
+  "flash": [
+    {
+      "region": "BOOT",
+      "start": 134217728,
+      "size": 16384,
+      "first_sector": 0,
+      "last_sector": 0
+    },
+    {
+      "region": "PARAMS",
+      "start": 134234112,
+      "size": 32768,
+      "first_sector": 1,
+      "last_sector": 2
+    },
+    {
+      "region": "EVENTLOG",
+      "start": 134266880,
+      "size": 16384,
+      "first_sector": 3,
+      "last_sector": 3
+    },
+    {
+      "region": "FIRMWARE",
+      "start": 134283264,
+      "size": 65536,
+      "first_sector": 4,
+      "last_sector": 4
+    }
+  ],
+  "ram": [
+    {
+      "region": "CCM",
+      "start": 268435456,
+      "size": 16384
+    },
+    {
+      "region": "RAM",
+      "start": 536870912,
+      "size": 65536
+    }
+  ],
+  "board_id": 30001,
+  "bootloader": {
+    "kind": "VEHKERNEL",
+    "ports": [
+      "SERIAL2",
+      "SERIAL1"
+    ],
+    "stay": {
+      "pin": "BOOT_HOLD",
+      "active": "LOW"
+    }
+  },
+  "serial": [
+    {
+      "port": "SERIAL1",
+      "peripheral": "USART1",
+      "tx": "SERIAL1_TX",
+      "rx": "SERIAL1_RX",
+      "function": "LINK",
+      "download": null
+    },
+    {
+      "port": "SERIAL2",
+      "peripheral": "USART2",
+      "tx": "SERIAL2_TX",
+      "rx": null,
+      "function": "LOG",
+      "download": "DTR_RTS"
+    }
+  ],
+  "devices": [],
+  "storage": [],
+  "actuators": [],
+  "revision": null,
+  "actuator_power": null,
+  "user_key": null,
+  "clock": null,
+  "peripherals": [
+    {
+      "name": "USART1",
+      "address": 1073811456,
+      "kind": "usart",
+      "bus_clock": "PCLK2"
+    },
+    {
+      "name": "USART2",
+      "address": 1073759232,
+      "kind": "usart",
+      "bus_clock": "PCLK1"
+    }
+  ],
+  "dma": [
+    {
+      "request": "USART1_RX",
+      "controller": "DMA2",
+      "stream": 2,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART1_TX",
+      "controller": "DMA2",
+      "stream": 7,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    },
+    {
+      "request": "USART2_TX",
+      "controller": "DMA1",
+      "stream": 6,
+      "channel": 4,
+      "priority": 0,
+      "share": false,
+      "shared_with": []
+    }
+  ]
+}

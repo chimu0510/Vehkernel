@@ -76,6 +76,12 @@ def test_unchanged_outputs_are_not_rewritten(tmp_path: Path):
     assert header.stat().st_mtime == 0
 
 
+def test_two_boards_beside_each_other_cannot_share_a_board_id(tmp_path: Path):
+    result = generate(HERE / "fixtures" / "duplicate_ids" / "second", tmp_path)
+    assert result.returncode == 1
+    assert result.stderr == "board.toml:4: error: board ID 9 is already used by board first\n"
+
+
 REAL_BOARDS = sorted(p.parent.name for p in (REPO / "boards").glob("*/board.toml"))
 
 

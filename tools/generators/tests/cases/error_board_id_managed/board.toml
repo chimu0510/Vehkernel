@@ -1,0 +1,14 @@
+# Board ID 5000 is unused but in the range ArduPilot allocates.
+name = "demo"
+mcu = "testmcu"
+board_id = 5000
+bootloader = { kind = "VEHKERNEL", ports = ["SERIAL1"] }
+
+pins = [
+  { pin = "PA9",  role = "SERIAL1_TX", func = "USART1_TX" },
+  { pin = "PA10", role = "SERIAL1_RX", func = "USART1_RX" },
+]
+
+serial = [
+  { port = "SERIAL1", tx = "SERIAL1_TX", rx = "SERIAL1_RX", function = "LINK" },
+]

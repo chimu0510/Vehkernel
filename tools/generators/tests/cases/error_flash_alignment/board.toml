@@ -1,5 +1,7 @@
 name = "demo"
 mcu = "testmcu"
+board_id = 13
+bootloader = { kind = "PX4" }
 
 pins = []
 

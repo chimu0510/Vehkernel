@@ -1,0 +1,1 @@
+board.toml:4: error: board ID 30002 is not in ArduPilot's list; a board keeping an ArduPilot or PX4 bootloader uses the ID its existing firmware uses

@@ -1,0 +1,7 @@
+# Board ID 30002 is in no entry of the list.
+name = "demo"
+mcu = "testmcu"
+board_id = 30002
+bootloader = { kind = "PX4" }
+
+pins = []

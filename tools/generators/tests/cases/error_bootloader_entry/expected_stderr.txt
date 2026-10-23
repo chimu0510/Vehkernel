@@ -1,0 +1,5 @@
+board.toml:13: error: download circuit of SERIAL1 must be one of: DTR_RTS, got 'RTS_ONLY'
+board.toml:4: error: unknown key 'led' in bootloader
+board.toml:4: error: the bootloader lists serial ports the board does not define: SERIAL9
+board.toml:4: error: the bootloader lists a serial port twice
+board.toml:4: error: the bootloader's stay pin must be a pin role with the GPIO_INPUT function, not 'LED'

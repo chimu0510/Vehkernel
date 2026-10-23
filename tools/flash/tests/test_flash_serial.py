@@ -13,7 +13,7 @@ TOOL = HERE.parent / "flash_serial.py"
 SEQUENCE = "-dtr,rts,,dtr,,-rts:-dtr,rts,,-rts"
 
 
-def make_build(tmp_path: Path, firmware_size: int = 1000) -> Path:
+def make_build(tmp_path: Path, firmware_size: int = 1000, download: str | None = "DTR_RTS") -> Path:
     build = tmp_path / "build"
     (build / "generated" / "board").mkdir(parents=True)
     (build / "app").mkdir()
@@ -23,7 +23,9 @@ def make_build(tmp_path: Path, firmware_size: int = 1000) -> Path:
         {"region": "EVENTLOG", "start": 0x0800C000, "size": 16384},
         {"region": "FIRMWARE", "start": 0x08010000, "size": 458752},
     ]
-    (build / "generated" / "board" / "board.json").write_text(json.dumps({"name": "c50c-v1_1", "flash": flash}))
+    serial = [{"port": "SERIAL1", "download": None}, {"port": "SERIAL2", "download": download}]
+    (build / "generated" / "board" / "board.json").write_text(
+        json.dumps({"name": "c50c-v1_1", "flash": flash, "serial": serial}))
     (build / "app" / "vehkernel.bin").write_bytes(b"\0" * firmware_size)
     (build / "app" / "vehkernel.hex").write_text(":00000001FF\n")
     return build
@@ -116,4 +118,18 @@ def test_a_missing_build_is_a_usage_error(tmp_path):
     result, calls = run(tmp_path, "update", build=tmp_path / "nowhere")
     assert result.returncode == 2
     assert "a firmware build?" in result.stderr
+    assert calls == []
+
+
+def test_the_sequence_comes_from_the_board_definition(tmp_path):
+    result, calls = run(tmp_path, "update")
+    assert result.returncode == 0, result.stderr
+    assert "download port SERIAL2, DTR_RTS circuit" in result.stdout
+    assert f"-i {SEQUENCE} " in calls[0]
+
+
+def test_a_board_without_a_download_circuit_is_refused(tmp_path):
+    result, calls = run(tmp_path, "update", build=make_build(tmp_path, download=None))
+    assert result.returncode == 2
+    assert "declares no serial port with a download circuit" in result.stderr
     assert calls == []

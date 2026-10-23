@@ -1,0 +1,24 @@
+# The Vehkernel bootloader on two ports, with a stay input and a download circuit.
+name = "demo"
+mcu = "testmcu"
+board_id = 30001
+bootloader = { kind = "VEHKERNEL", ports = ["SERIAL2", "SERIAL1"], stay = { pin = "BOOT_HOLD", active = "LOW" } }
+
+pins = [
+  { pin = "PA9",  role = "SERIAL1_TX", func = "USART1_TX" },
+  { pin = "PA10", role = "SERIAL1_RX", func = "USART1_RX" },
+  { pin = "PA2",  role = "SERIAL2_TX", func = "USART2_TX" },
+  { pin = "PA6",  role = "BOOT_HOLD",  func = "GPIO_INPUT", pull = "UP" },
+]
+
+serial = [
+  { port = "SERIAL1", tx = "SERIAL1_TX", rx = "SERIAL1_RX", function = "LINK" },
+  { port = "SERIAL2", tx = "SERIAL2_TX", function = "LOG", download = "DTR_RTS" },
+]
+
+flash = [
+  { region = "BOOT",     start = 0x08000000, size = "16K" },
+  { region = "PARAMS",   start = 0x08004000, size = "32K" },
+  { region = "EVENTLOG", start = 0x0800C000, size = "16K" },
+  { region = "FIRMWARE", start = 0x08010000, size = "64K" },
+]

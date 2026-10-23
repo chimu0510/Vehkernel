@@ -39,6 +39,17 @@ config BOARD_HAS_SSD1306
 config BOARD_HAS_USER_KEY
 	bool
 
+# The board's bootloader (ADR-0023): exactly one is set for a board with a
+# Flash layout.
+config BOARD_BOOTLOADER_VEHKERNEL
+	bool
+
+config BOARD_BOOTLOADER_ARDUPILOT
+	bool
+
+config BOARD_BOOTLOADER_PX4
+	bool
+
 source "$(VK_BOARD_KCONFIG)"
 
 choice PLATFORM

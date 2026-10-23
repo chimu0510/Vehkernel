@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Serial flasher: flash a board through the STM32 system bootloader over
-its one-key download port (ADR-0020).
+its one-key download port (ADR-0020, ADR-0023).
 
-On the C50C V1.1 that port is SERIAL2, USART1 to its own CH9102F. The
-adapter's RTS drives BOOT0 (asserted: BOOT0 high) and its DTR, with RTS,
-drives NRST (DTR released and RTS asserted: in reset), so the bootloader is
-entered and left without touching the board. stm32flash does the bootloader
-protocol; this tool picks what to write and where from the build's board
-definition, so stored parameters survive an update and a new board loses
-nothing it had before it was backed up.
+The board definition names the port with a download circuit and its kind.
+On the C50C V1.1 that port is SERIAL2, USART1 to its own CH9102F, and the
+circuit is DTR_RTS: the adapter's RTS drives BOOT0 (asserted: BOOT0 high) and
+its DTR, with RTS, drives NRST (DTR released and RTS asserted: in reset), so
+the bootloader is entered and left without touching the board. stm32flash
+does the bootloader protocol; this tool picks what to write, where and with
+which DTR/RTS sequence from the build's board definition, so stored
+parameters survive an update and a new board loses nothing it had before it
+was backed up.
 
     tools/flash/flash_serial.py update                   # firmware only, parameters kept
     tools/flash/flash_serial.py new-board                # back up, erase the whole chip, write all
@@ -32,12 +34,12 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-# stm32flash -i: enter the bootloader with NRST held low and BOOT0 high, then
-# release NRST, then BOOT0; leave it with NRST held low and BOOT0 high, then
-# release both, BOOT0 falling first through NRST's RC. Entering with NRST
-# released while BOOT0 falls, as '-dtr,rts,,-rts:dtr' does, restarts the
-# firmware instead.
-GPIO_SEQUENCE = "-dtr,rts,,dtr,,-rts:-dtr,rts,,-rts"
+# stm32flash -i sequences by download circuit. DTR_RTS: enter the bootloader
+# with NRST held low and BOOT0 high, then release NRST, then BOOT0; leave it
+# with NRST held low and BOOT0 high, then release both, BOOT0 falling first
+# through NRST's RC. Entering with NRST released while BOOT0 falls, as
+# '-dtr,rts,,-rts:dtr' does, restarts the firmware instead.
+GPIO_SEQUENCES = {"DTR_RTS": "-dtr,rts,,dtr,,-rts:-dtr,rts,,-rts"}
 
 
 class FlashError(Exception):
@@ -60,13 +62,18 @@ class Build:
             raise FlashError(f"{board_file}: {error.strerror}; is {directory} a firmware build?") from None
         self.board = board["name"]
         self.regions = {region["region"]: region for region in board["flash"]}
+        downloads = [p for p in board.get("serial", []) if p.get("download")]
+        if not downloads:
+            raise FlashError(f"{board['name']} declares no serial port with a download circuit")
+        self.download_port = downloads[0]["port"]
+        self.circuit = downloads[0]["download"]
+        if self.circuit not in GPIO_SEQUENCES:
+            raise FlashError(f"this tool does not know the download circuit {self.circuit}")
         for name in ("BOOT", "FIRMWARE"):
             if name not in self.regions:
                 raise FlashError(f"{board['name']} has no {name} Flash region")
         self.flash_start = min(r["start"] for r in self.regions.values())
         self.flash_size = max(r["start"] + r["size"] for r in self.regions.values()) - self.flash_start
-        self.firmware_bin = self.image("vehkernel.bin")
-        self.hex = self.image("vehkernel.hex")
 
     def image(self, name: str) -> Path:
         path = self.directory / "app" / name
@@ -75,13 +82,21 @@ class Build:
         return path
 
     @property
+    def firmware_bin(self) -> Path:
+        return self.image("vehkernel.bin")
+
+    @property
+    def hex(self) -> Path:
+        return self.image("vehkernel.hex")
+
+    @property
     def firmware(self) -> dict:
         return self.regions["FIRMWARE"]
 
 
 class Stm32Flash:
-    def __init__(self, executable: str, port: str, baud: int):
-        self.base = [executable, "-b", str(baud), "-i", GPIO_SEQUENCE]
+    def __init__(self, executable: str, port: str, baud: int, circuit: str):
+        self.base = [executable, "-b", str(baud), "-i", GPIO_SEQUENCES[circuit]]
         self.port = port
 
     def run(self, *args: str) -> None:
@@ -107,8 +122,9 @@ class Stm32Flash:
         self.run("-o")
 
 
-def reset(port: str) -> None:
+def reset(port: str, circuit: str) -> None:
     """Restarts the firmware: NRST held low with BOOT0 high, then both released."""
+    assert circuit == "DTR_RTS", circuit
     try:
         fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
     except OSError as error:
@@ -130,8 +146,7 @@ def default_backup_name(board: str) -> Path:
     return Path(f"{board}_flash_{datetime.now():%Y%m%d_%H%M%S}.bin")
 
 
-def cmd_update(args: argparse.Namespace, flasher: Stm32Flash) -> None:
-    build = Build(args.build)
+def cmd_update(build: Build, flasher: Stm32Flash) -> None:
     size = build.firmware_bin.stat().st_size
     region = build.firmware
     if size > region["size"]:
@@ -140,8 +155,7 @@ def cmd_update(args: argparse.Namespace, flasher: Stm32Flash) -> None:
     flasher.write(build.firmware_bin, region["start"])
 
 
-def cmd_new_board(args: argparse.Namespace, flasher: Stm32Flash) -> None:
-    build = Build(args.build)
+def cmd_new_board(args: argparse.Namespace, build: Build, flasher: Stm32Flash) -> None:
     if args.no_backup:
         print("Not backing up: what the board holds now is lost")
     else:
@@ -158,8 +172,7 @@ def cmd_new_board(args: argparse.Namespace, flasher: Stm32Flash) -> None:
     flasher.write(build.hex)
 
 
-def cmd_backup(args: argparse.Namespace, flasher: Stm32Flash) -> None:
-    build = Build(args.build)
+def cmd_backup(args: argparse.Namespace, build: Build, flasher: Stm32Flash) -> None:
     if args.file.exists():
         raise FlashError(f"{args.file} exists")
     print(f"Backing up {build.flash_size // 1024} KB of Flash to {args.file}")
@@ -169,7 +182,8 @@ def cmd_backup(args: argparse.Namespace, flasher: Stm32Flash) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Flash a board through the STM32 system bootloader over its "
                                                  "one-key download port.")
-    parser.add_argument("--port", default="/dev/ttyACM0", help="the download port (default /dev/ttyACM0)")
+    parser.add_argument("--port", default="/dev/ttyACM0",
+                        help="the host device of the board's download port (default /dev/ttyACM0)")
     parser.add_argument("--baud", type=int, default=115200, help="bootloader baud rate (default 115200)")
     parser.add_argument("--build", type=Path, default=Path("build/c50c-v1_1"),
                         help="firmware build directory (default build/c50c-v1_1)")
@@ -185,16 +199,18 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("reset", help="restart the firmware")
     args = parser.parse_args(argv)
 
-    flasher = Stm32Flash(args.stm32flash, args.port, args.baud)
     try:
+        build = Build(args.build)
+        flasher = Stm32Flash(args.stm32flash, args.port, args.baud, build.circuit)
+        print(f"{build.board}: download port {build.download_port}, {build.circuit} circuit, on {args.port}")
         if args.command == "update":
-            cmd_update(args, flasher)
+            cmd_update(build, flasher)
         elif args.command == "new-board":
-            cmd_new_board(args, flasher)
+            cmd_new_board(args, build, flasher)
         elif args.command == "backup":
-            cmd_backup(args, flasher)
+            cmd_backup(args, build, flasher)
         else:
-            reset(args.port)
+            reset(args.port, build.circuit)
     except FlashError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

@@ -1,0 +1,6 @@
+name = "demo"
+mcu = "testmcu"
+board_id = 70000
+bootloader = { kind = "ARDUPILOT" }
+
+pins = []

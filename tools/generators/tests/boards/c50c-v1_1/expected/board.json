@@ -669,34 +669,47 @@
       "size": 131072
     }
   ],
+  "board_id": 22083,
+  "bootloader": {
+    "kind": "VEHKERNEL",
+    "ports": [
+      "SERIAL2",
+      "SERIAL1"
+    ],
+    "stay": null
+  },
   "serial": [
     {
       "port": "SERIAL1",
       "peripheral": "USART3",
       "tx": "SERIAL1_TX",
       "rx": "SERIAL1_RX",
-      "function": "LINK"
+      "function": "LINK",
+      "download": null
     },
     {
       "port": "SERIAL2",
       "peripheral": "USART1",
       "tx": "SERIAL2_TX",
       "rx": "SERIAL2_RX",
-      "function": "LINK"
+      "function": "LINK",
+      "download": "DTR_RTS"
     },
     {
       "port": "SERIAL3",
       "peripheral": "UART4",
       "tx": "SERIAL3_TX",
       "rx": "SERIAL3_RX",
-      "function": "NONE"
+      "function": "NONE",
+      "download": null
     },
     {
       "port": "SERIAL4",
       "peripheral": "UART5",
       "tx": null,
       "rx": "SBUS_RX",
-      "function": "RC_INPUT"
+      "function": "RC_INPUT",
+      "download": null
     }
   ],
   "devices": [

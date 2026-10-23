@@ -47,10 +47,10 @@ Deliver the eighth milestone: **a Vehkernel bootloader on the C50C V1.1 that Ard
 ## Implementation Decisions
 
 - **Board definition** (ADR-0011, ADR-0023):
-  - A required top-level `board_id`, an integer from 1 to 65535.
-  - A required `bootloader` table. `kind` is `VEHKERNEL`, `ARDUPILOT` or `PX4`. With `VEHKERNEL`, `ports` lists the logical serial ports it listens on in order, like ArduPilot's `SERIAL_ORDER`, and an optional `stay` names a `GPIO_INPUT` role that keeps the board in the bootloader while it reads its declared level.
+  - A top-level `board_id`, an integer from 1 to 65535, and a `bootloader` table, both required on a board with a Flash layout, since it builds a firmware image (ADR-0020); a board definition without one, such as a generator test case, may leave them out.
+  - `bootloader.kind` is `VEHKERNEL`, `ARDUPILOT` or `PX4`. With `VEHKERNEL`, `ports` lists the logical serial ports it listens on in order, like ArduPilot's `SERIAL_ORDER`, and an optional `stay = { pin = "<role>", active = "LOW" | "HIGH" }` names a `GPIO_INPUT` role that keeps the board in the bootloader while it reads that level.
   - A serial port entry gains an optional `download = "DTR_RTS"` for the C50C's circuit: RTS asserted holds BOOT0 high, and DTR released with RTS asserted holds NRST low.
-  - A copy of ArduPilot's `Tools/AP_Bootloader/board_types.txt` is committed with the upstream commit it came from (ADR-0016). The generator rejects a `VEHKERNEL` board whose ID is in it, an `ARDUPILOT` or `PX4` board whose ID is not, and two board definitions with the same ID.
+  - A copy of ArduPilot's `Tools/AP_Bootloader/board_types.txt` is committed with the upstream commit it came from (ADR-0016). The generator rejects a `VEHKERNEL` board whose ID is in it, lies in a range its comments reserve for a vendor, or lies in the range 1000 to 19999 ArduPilot allocates; an `ARDUPILOT` or `PX4` board whose ID is not in it; and two board definitions in sibling directories with the same ID.
   - The generator emits the board ID, the bootloader kind and ports, the stay input and the download circuit in `board.hpp`, `board.json` and Kconfig (`BOARD_BOOTLOADER_VEHKERNEL`, `BOARD_BOOTLOADER_ARDUPILOT`, `BOARD_BOOTLOADER_PX4`).
   - The C50C V1.1 declares `board_id = 22083` (0x5643, outside ArduPilot's managed range 1000 to 19999 and unused), `bootloader = { kind = "VEHKERNEL", ports = ["SERIAL2", "SERIAL1"] }` and `download = "DTR_RTS"` on SERIAL2. Nothing about its actuators changes.
 - **App descriptor**:

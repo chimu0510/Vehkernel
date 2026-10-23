@@ -138,20 +138,24 @@
       "size": 65536
     }
   ],
+  "board_id": null,
+  "bootloader": null,
   "serial": [
     {
       "port": "SERIAL1",
       "peripheral": "USART1",
       "tx": "SERIAL1_TX",
       "rx": "SERIAL1_RX",
-      "function": "LINK"
+      "function": "LINK",
+      "download": null
     },
     {
       "port": "SERIAL2",
       "peripheral": "USART2",
       "tx": "SERIAL2_TX",
       "rx": null,
-      "function": "LOG"
+      "function": "LOG",
+      "download": null
     }
   ],
   "devices": [

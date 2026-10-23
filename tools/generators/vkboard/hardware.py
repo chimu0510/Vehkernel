@@ -2,7 +2,8 @@
 
 - ``serial``: logical ports such as SERIAL1 with their TX/RX pins, default
   use and optional default baud rate, which the ``SERIALn_FUNCTION`` and
-  ``SERIALn_BAUD`` parameters change.
+  ``SERIALn_BAUD`` parameters change, and the download circuit of a port
+  whose adapter drives BOOT0 and NRST (ADR-0023).
 - ``devices``: board devices with kind, type, peripheral bus, pins, I2C
   address and mounting rotation (ADR-0014, ADR-0015).
 - ``storage``: storage devices that log sinks can use (ADR-0019).
@@ -28,7 +29,9 @@ from dataclasses import dataclass
 
 from .diagnostics import Diagnostics, Loc
 
-SERIAL_KEYS = {"port", "tx", "rx", "function", "baud"}
+SERIAL_KEYS = {"port", "tx", "rx", "function", "baud", "download"}
+# DTR_RTS: RTS asserted holds BOOT0 high; DTR released with RTS asserted holds NRST low.
+DOWNLOAD_CIRCUITS = ("DTR_RTS",)
 SERIAL_FUNCTIONS = ("NONE", "LINK", "RC_INPUT", "LOG")
 DEVICE_KEYS = {"device", "kind", "type", "bus", "pins", "address", "rotation"}
 DEVICE_BUSES = ("I2C", "SOFT_I2C", "SPI", "SOFT_SPI")
@@ -68,6 +71,7 @@ class SerialPort:
     rx: str | None
     function: str
     baud: int | None = None
+    download: str | None = None
 
 
 @dataclass(frozen=True)
@@ -168,6 +172,12 @@ def _serial(entries, roles: dict, diag: Diagnostics) -> list[SerialPort]:
         if baud is not None and (not isinstance(baud, int) or isinstance(baud, bool) or not 1200 <= baud <= 10_000_000):
             diag.error(f"baud of {port} must be an integer from 1200 to 10000000, got {baud!r}", loc)
             continue
+        download = entry.get("download")
+        if download is not None and download not in DOWNLOAD_CIRCUITS:
+            # The port itself is fine, so a bootloader listing it reports nothing more.
+            diag.error(f"download circuit of {port} must be one of: {', '.join(DOWNLOAD_CIRCUITS)}, "
+                       f"got {download!r}", loc)
+            download = None
         peripherals, ok = set(), True
         for direction in ("tx", "rx"):
             role = entry.get(direction)
@@ -185,7 +195,8 @@ def _serial(entries, roles: dict, diag: Diagnostics) -> list[SerialPort]:
             diag.error(f"tx and rx of {port} use different peripherals: {', '.join(sorted(peripherals))}", loc)
             ok = False
         if ok:
-            ports.append(SerialPort(port, peripherals.pop(), entry.get("tx"), entry.get("rx"), function, baud))
+            ports.append(SerialPort(port, peripherals.pop(), entry.get("tx"), entry.get("rx"), function, baud,
+                                    download))
     return ports
 
 

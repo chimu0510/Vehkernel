@@ -1,0 +1,14 @@
+name = "demo"
+mcu = "testmcu"
+board_id = 30004
+bootloader = { kind = "VEHKERNEL", ports = ["SERIAL1", "SERIAL9", "SERIAL1"], stay = { pin = "LED", active = "LOW" }, led = "LED" }
+
+pins = [
+  { pin = "PA9",  role = "SERIAL1_TX", func = "USART1_TX" },
+  { pin = "PA10", role = "SERIAL1_RX", func = "USART1_RX" },
+  { pin = "PA1",  role = "LED",        func = "GPIO_OUTPUT" },
+]
+
+serial = [
+  { port = "SERIAL1", tx = "SERIAL1_TX", rx = "SERIAL1_RX", function = "LINK", download = "RTS_ONLY" },
+]

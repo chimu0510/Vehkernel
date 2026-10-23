@@ -1,0 +1,2 @@
+board.toml: error: a board with a Flash layout needs a 'board_id' (ADR-0023)
+board.toml: error: a board with a Flash layout needs a 'bootloader' table (ADR-0023)

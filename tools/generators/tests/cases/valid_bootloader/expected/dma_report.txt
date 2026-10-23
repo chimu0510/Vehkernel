@@ -1,0 +1,6 @@
+DMA assignment for board demo, generated from board.toml.
+
+request    stream   channel  priority  notes  candidates
+USART1_RX  DMA2 S2  4        0         -      DMA2 S2 C4, DMA2 S5 C4
+USART1_TX  DMA2 S7  4        0         -      DMA2 S7 C4
+USART2_TX  DMA1 S6  4        0         -      DMA1 S6 C4

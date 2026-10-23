@@ -1,0 +1,6 @@
+name = "demo"
+mcu = "testmcu"
+board_id = 30003
+bootloader = { kind = "CHIBIOS" }
+
+pins = []

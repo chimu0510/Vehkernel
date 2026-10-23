@@ -1,0 +1,1 @@
+board.toml:3: error: 'board_id' must be an integer from 1 to 65535, got 70000

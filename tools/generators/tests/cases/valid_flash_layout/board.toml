@@ -1,6 +1,8 @@
 # ADR-0020-style layout on the test MCU: stub, parameters, event log, firmware.
 name = "demo"
 mcu = "testmcu"
+board_id = 9
+bootloader = { kind = "ARDUPILOT" }
 
 pins = [
   { pin = "PA1", role = "STATUS_LED", func = "GPIO_OUTPUT" },

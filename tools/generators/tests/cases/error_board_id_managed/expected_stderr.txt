@@ -1,0 +1,1 @@
+board.toml:4: error: board ID 5000 lies in the range 1000 to 19999 that ArduPilot allocates; a board with the Vehkernel bootloader needs one outside it
