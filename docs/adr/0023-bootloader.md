@@ -4,12 +4,12 @@ status: proposed
 
 # Bootloader: the ArduPilot and PX4 protocol, kept where a board has it, ported where it does not
 
-Flight controllers that ArduPilot and PX4 support ship with a bootloader that speaks one protocol: PX4 wrote it, and ArduPilot's `AP_Bootloader` keeps it compatible and shares its list of board IDs. QGroundControl, Mission Planner, ArduPilot's `uploader.py` and PX4's `px4_uploader.py` flash any board through it. Vehkernel is not limited to its first development board, so it joins this ecosystem rather than defining its own. Boards that already have such a bootloader keep it. Boards without one, such as the C50C, get a Vehkernel bootloader that speaks the same protocol. The STM32 system bootloader in ROM is kept only to install that bootloader and to rescue a board.
+Flight controllers that ArduPilot and PX4 support ship with a bootloader that speaks one protocol: PX4 wrote it, and ArduPilot's `AP_Bootloader` keeps it compatible and shares its list of board IDs. QGroundControl and Mission Planner flash boards through it over USB, and ArduPilot's `uploader.py` and PX4's `px4_uploader.py` over USB or a serial port. Vehkernel is not limited to its first development board, so it joins this ecosystem rather than defining its own. Boards that already have such a bootloader keep it. Boards without one, such as the C50C, get a Vehkernel bootloader that speaks the same protocol. The STM32 system bootloader in ROM is kept only to install that bootloader and to rescue a board.
 
 **Protocol and firmware file**
 
 - The bootloader protocol is the one in PX4's `bl.c` and ArduPilot's `bl_protocol.cpp`, at protocol revision 5. It erases only the firmware region, so stored parameters survive an update (ADR-0012, ADR-0020).
-- Every firmware image carries an **app descriptor** in ArduPilot's layout (`AP_CheckFirmware`): CRCs of the image, its size, the git hash, the version and the board ID. The bootloader checks it before starting the firmware.
+- Every firmware image carries an **app descriptor** in ArduPilot's layout (`AP_CheckFirmware`): CRCs of the image, its size, the git hash, the version and the board ID. ArduPilot's bootloader and the Vehkernel bootloader check it before starting the firmware; PX4's bootloader does not.
 - A build also produces an `.apj` file, the JSON firmware file ArduPilot's tools read: the board ID, the compressed image, its size, the largest image the board takes and the git identity. A board that uses the Vehkernel bootloader also gets a `_with_bl.hex` holding the bootloader and the firmware, for its first installation.
 
 **Board ID**
@@ -21,6 +21,7 @@ Flight controllers that ArduPilot and PX4 support ship with a bootloader that sp
 **Boards with an ArduPilot or PX4 bootloader**
 
 - The bootloader stays. Vehkernel never overwrites it, so the board can go back to ArduPilot or PX4 at any time.
+- The board definition says whether it is ArduPilot's or PX4's, since they differ in how the firmware asks them to stay in the bootloader.
 - The board definition declares the Flash layout that bootloader expects: the size of its region, where the firmware starts and where parameters are stored, for example a 128 KB bootloader region on the STM32H743 boards. The firmware links at that start address and carries the app descriptor.
 
 **Boards without one: the Vehkernel bootloader**
@@ -33,13 +34,14 @@ Flight controllers that ArduPilot and PX4 support ship with a bootloader that sp
 **Interfaces**
 
 - The protocol runs on UART and on USB CDC. The board definition lists the ports the Vehkernel bootloader listens on, like ArduPilot's `SERIAL_ORDER`; a board without MCU USB, such as the C50C, lists its UARTs only.
+- QGroundControl and Mission Planner find a board by its USB IDs, so a board without MCU USB is flashed with `uploader.py` or `px4_uploader.py` given its serial port.
 - DroneCAN firmware update, Ethernet and SD card updates, which `AP_Bootloader` also offers, are left to later decisions.
 
 **Entering the bootloader**
 
 All of these are refused or ignored while armed (ADR-0005).
 
-- **Reboot service.** One protocol-independent service reboots the board, or reboots it into the bootloader, as the parameter service does for parameters (ADR-0012). The custom protocol carries it as control messages (ADR-0002). MAVLink maps it to `MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN` with `param1` 1 or 3, as ArduPilot and PX4 do. The firmware leaves the request where ArduPilot's bootloader looks for it, the RTC backup register with ArduPilot's values, so it works with ArduPilot's bootloader as well as with Vehkernel's.
+- **Reboot service.** One protocol-independent service reboots the board, or reboots it into the bootloader, as the parameter service does for parameters (ADR-0012). The custom protocol carries it as control messages (ADR-0002). MAVLink maps it to `MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN` with `param1` 1 or 3, as ArduPilot and PX4 do. The firmware leaves the request in an RTC backup register, where the board's bootloader looks for it: ArduPilot's `RTC_BOOT_HOLD` value, which the Vehkernel bootloader also uses, or PX4's `BOOT_RTC_SIGNATURE` on a board that keeps PX4's bootloader.
 - **Boot window.** As in ArduPilot, the bootloader waits briefly at every boot before starting a valid firmware, and stays when the firmware is invalid. Replugging USB or power-cycling the board is enough to flash it, even when the firmware cannot run.
 - **Board inputs.** A board may declare a hardware way in: a stay-in-bootloader input, as ArduPilot's `HAL_GPIO_PIN_STAY_IN_BOOTLOADER`, or a download circuit such as the C50C's, where the adapter's RTS drives BOOT0 and its DTR drives NRST.
 - **System bootloader.** The firmware can restart into the STM32 system bootloader, as ArduPilot's `boot_to_dfu`, to rescue a board whose bootloader is damaged.

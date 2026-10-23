@@ -10,7 +10,7 @@ The build system is CMake + `CMakePresets.json` + Ninja, with one preset per bui
 - **`select` only for helper libraries that have no dependencies of their own**, such as `MATH_QUATERNION`; everything else uses `depends on`, because `select` does not check the dependencies of what it selects.
 - Generators (schema, parameters, and the ULog format definitions and log profile bandwidth estimates of ADR-0019) run as CMake custom commands. The board generator is the exception and runs at configure time: a wrong board definition must fail configuration, and Kconfig needs the board's symbols before the build starts. Generated code is never committed.
 - CMake target dependencies enforce the layering rules (ADR-0009).
-- Every build checks Flash, RAM and CCM usage and fails when the board budget is exceeded: each budget is a linker memory region the board generator emits, so the link itself fails.
+- Every build checks the usage of Flash and of every RAM region the MCU has, such as CCM on the F4, and fails when the board budget is exceeded: each budget is a linker memory region the board generator emits, so the link itself fails.
 
 ## Consequences
 

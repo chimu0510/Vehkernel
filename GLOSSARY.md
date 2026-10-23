@@ -119,11 +119,11 @@ The program at the start of Flash that checks and starts the firmware and writes
 _Avoid_: BL, loader
 
 **System Bootloader**:
-The STM32's own bootloader in ROM, entered through BOOT0, used only to install the bootloader and to rescue a board.
+The STM32's own bootloader in ROM, entered through BOOT0 or by a jump from the firmware, used only to install the bootloader and to rescue a board.
 _Avoid_: ROM bootloader, DFU mode
 
 **Board ID**:
-The number that tells which board a firmware image is for, from the list ArduPilot and PX4 share.
+The number that tells which board a firmware image is for, numbered as in the list ArduPilot and PX4 share.
 _Avoid_: board type, APJ ID
 
 **App Descriptor**:
