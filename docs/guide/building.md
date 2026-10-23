@@ -29,11 +29,11 @@ cmake --build --preset c50c-v1_1
 
 Every firmware build prints the usage of each memory region; outgrowing a region fails the link (ADR-0017, ADR-0020).
 
-The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
+The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds the `c50c-v1_1`, `sitl` and `test` presets and runs the tests inside the same devcontainer image; the `c50c-v1_1-bringup` image is built by hand when it is needed.
 
 ## Build configuration (Kconfig)
 
-Kconfig decides what each build contains (ADR-0017). The layers are the MCU defaults (`mcu/<mcu>/defconfig`, or `platform/sitl/defconfig` for SITL), the board defaults (`boards/<board>/defconfig`), and a local debug overlay, `build/<preset>/debug.config`, which is never committed. Edit the overlay by hand or interactively; the next build reconfigures:
+Kconfig decides what each build contains (ADR-0017). The layers are the MCU defaults (`mcu/<mcu>/defconfig`, or `platform/sitl/defconfig` for SITL), the board defaults (`boards/<board>/defconfig`), and the debug overlays: the local `build/<preset>/debug.config`, which is never committed, then any fragments listed in the `VK_DEBUG_OVERLAY` cache variable. The `c50c-v1_1-bringup` preset uses the latter for the committed `test/hardware/bringup.config`. Edit the local overlay by hand or interactively; the next build reconfigures:
 
 ```bash
 cmake --build --preset c50c-v1_1 --target menuconfig
