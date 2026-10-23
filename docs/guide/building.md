@@ -29,7 +29,7 @@ cmake --build --preset c50c-v1_1
 
 Every firmware build prints the usage of each memory region; outgrowing a region fails the link (ADR-0017, ADR-0020).
 
-The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds the `c50c-v1_1`, `sitl` and `test` presets and runs the tests inside the same devcontainer image; the `c50c-v1_1-bringup` image is built by hand when it is needed.
+The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 
 ## Build configuration (Kconfig)
 
