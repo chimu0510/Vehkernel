@@ -2,7 +2,7 @@
 
 **Vehkernel** (Vehicle + Kernel) is open-source MCU firmware with ROS2 support, built as a common core for any vehicle: one system drives many vehicles and frames. The MCU handles real-time state estimation, low-level control and safety, and keeps running without a companion computer; global localization and navigation are left to ROS2 applications above it. The first test platform is a UGV.
 
-**Status: first wheel motion, awaiting its hardware check.** Every decision is recorded in [`docs/adr/`](docs/adr/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary. The firmware runs FreeRTOS with the bus and rate-tiered work queues; on the C50C V1.1 the ICM20948 driver publishes IMU samples at 200 Hz over software I2C, and SITL runs the same driver against a simulated ICM20948. A Link with the custom protocol streams topics to the development host, over the Type-C port on the board and over UDP or a pty in SITL, where the Link monitor shows them live. An attitude estimator (a Mahony filter) turns the IMU samples into `vehicle_attitude`, which CI checks against SITL's ground truth. Parameters are defined in TOML, listed, read and set over the Link, and stored in internal Flash across power cycles. Modes, arming checks and an emergency stop gate four motor outputs, each with a wheel speed loop on its encoder, driven over the Link in test mode and checked in SITL; the hardware check on the C50C comes next. On the board, the OLED shows the vehicle's status and the user key opens a local menu that changes a few parameters without a host.
+**Status: the bootloader (spec 0008) is in progress; the hardware check of the first wheel motion (spec 0006) is deferred.** Every decision is recorded in [`docs/adr/`](docs/adr/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary. The firmware runs FreeRTOS with the bus and rate-tiered work queues; on the C50C V1.1 the ICM20948 driver publishes IMU samples at 200 Hz over software I2C, and SITL runs the same driver against a simulated ICM20948. A Link with the custom protocol streams topics to the development host, over the Type-C port on the board and over UDP or a pty in SITL, where the Link monitor shows them live. An attitude estimator (a Mahony filter) turns the IMU samples into `vehicle_attitude`, which CI checks against SITL's ground truth. Parameters are defined in TOML, listed, read and set over the Link, and stored in internal Flash across power cycles. Every image carries ArduPilot's app descriptor, the Link can reboot the board into its bootloader, and the Vehkernel bootloader runs in SITL against ArduPilot's `uploader.py`; on the C50C it comes next. Modes, arming checks and an emergency stop gate four motor outputs, each with a wheel speed loop on its encoder, driven over the Link in test mode and checked in SITL; their hardware check on the C50C is still to come. On the board, the OLED shows the vehicle's status and the user key opens a local menu that changes a few parameters without a host.
 
 ## Target hardware
 
@@ -11,7 +11,7 @@ Vehkernel targets the boards ArduPilot and PX4 run on, and follows their convent
 | Item | Supported now |
 |---|---|
 | MCU | STM32F407VET6 |
-| Board | C50C V1.1 (ICM20948, USB gamepad, no RS-485), the first development board |
+| Board | C50C V1.1 (ICM20948, USB gamepad, no RS-485), the first development board ([ADR-0024](docs/adr/0024-c50c-v1_1-board.md)) |
 | Companion computer | Raspberry Pi 5 (ROS2) |
 
 ## Architecture highlights
@@ -65,6 +65,8 @@ Flash the C50C over SWD with an ST-Link on header HDR2 (pin 4 GND, pin 6 PA13/SW
 openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program build/c50c-v1_1/app/vehkernel.elf verify reset exit"
 ```
 
+Only the boot stub (S0) and firmware (S4 onward) sectors are written; the parameter and event log sectors in between are left untouched. The STM32 built-in USB DFU is not practical on this board, because PA11/PA12 go to the USB gamepad port, not to a Type-C port.
+
 Without an ST-Link, flash over the one-key download port (SERIAL2, USART1 to its own CH9102F). The adapter's RTS drives BOOT0 and its DTR, with RTS, drives NRST, so the STM32 system bootloader is entered and left without touching the board; the board definition declares this circuit on the port (`download = "DTR_RTS"`). `tools/flash/flash_serial.py` runs [`stm32flash`](https://sourceforge.net/projects/stm32flash/) 0.7 on the host (`sudo apt install stm32flash`, ADR-0016) with that sequence and takes the Flash layout from the build's board definition. It reads `build/c50c-v1_1` and `/dev/ttyACM0` unless given `--build` and `--port`.
 
 A new board, or one still running its vendor firmware, is flashed once with `new-board`. The command backs up the whole chip into `<board>_flash_<time>.bin` in the current directory, or the file given with `--backup`. It then erases the whole chip and writes `vehkernel.hex`, the boot stub and the firmware. Nothing of the vendor firmware, its settings or old parameters is left. The command takes about 2 minutes at 115200 baud. Nothing is erased if the backup fails or comes back short, and an existing backup file is never overwritten. Keep each board's backup outside the repository: vendor firmware differs from board to board.
@@ -79,13 +81,13 @@ Every later update writes `vehkernel.bin` from the FIRMWARE region (S4) on, so t
 tools/flash/flash_serial.py update
 ```
 
-`backup <file>` only reads the chip, and `reset` restarts the firmware.
+`backup <file>` only reads the chip, and `reset` restarts the firmware. An update on a board that still has its vendor firmware in S0 leaves that firmware running, so a new board needs `new-board` first. The tool fails with exit code 1 when `stm32flash` fails, and with 2 when an image does not fit its region or the build is missing.
 
 The Link monitor restarts a disarmed board over any Link with `reboot`, or into the bootloader with `reboot --bootloader`, ready for ArduPilot's `uploader.py` (ADR-0023); both are refused while armed, and the board resets about 0.1 s after it replies. The request goes into RTC backup register 0 with ArduPilot's values (`RTC_BOOT_HOLD` for the bootloader, `RTC_BOOT_FAST` otherwise), or PX4's on a board that keeps PX4's bootloader. In SITL a reboot ends the run with exit status 10, or 11 for the bootloader (`sitl_reboot`).
 
 ```bash
 tools/link/link_monitor.py --serial /dev/ttyACM0 reboot --bootloader
-``` An update on a board that still has its vendor firmware in S0 leaves that firmware running, so a new board needs `new-board` first. The tool fails with exit code 1 when `stm32flash` fails, and with 2 when an image does not fit its region or the build is missing.
+```
 
 The firmware runs a Link on SERIAL1, the Type-C port (USART3 to a CH9102F USB serial adapter), and another on SERIAL2, the one-key download port, so one cable both flashes and connects. Both are 8N1 with DMA both ways, at the `SERIAL1_BAUD` and `SERIAL2_BAUD` parameters: 921600 baud by default, as the board definition's `baud` for each port sets it. A changed rate takes effect at the next boot; pass the same rate to the monitor with `--baud`. A rate the port cannot reach falls back to the board default. Plug a USB cable into either port and the adapter appears on the host as a serial device, usually `/dev/ttyACM0` (your user needs the `dialout` group). Opening the port asserts DTR and RTS, which on the download port would hold BOOT0 high, so the monitor releases both at once; a board reset while it is connected still starts the firmware. Run the Link monitor on the host, with the Python decoders of the firmware build:
 
@@ -118,8 +120,6 @@ cmake --preset c50c-v1_1-bringup
 cmake --build --preset c50c-v1_1-bringup
 tools/bringup/run_bringup.py build/c50c-v1_1-bringup/app/vehkernel.elf
 ```
-
-Only the boot stub (S0) and firmware (S4 onward) sectors are written; the parameter and event log sectors in between are left untouched. The STM32 built-in USB DFU is not practical on this board, because PA11/PA12 go to the USB gamepad port, not to a Type-C port.
 
 Kconfig decides what each build contains (ADR-0017). The layers are the MCU defaults (`mcu/<mcu>/defconfig`, or `platform/sitl/defconfig` for SITL), the board defaults (`boards/<board>/defconfig`), and a local debug overlay, `build/<preset>/debug.config`, which is never committed. Edit the overlay by hand or interactively; the next build reconfigures:
 
@@ -299,11 +299,9 @@ The `sitl` and `test` presets also run clang-tidy and treat every warning as an 
 
 ## Directory layout
 
-This is the initial skeleton and may change during implementation.
-
 | Directory | Contents | ADRs |
 |---|---|---|
-| `docs/` | ADRs (`adr/`), milestone specs (`specs/`) and agent docs (`agents/`) | 0021 |
+| `docs/` | ADRs (`adr/`, indexed in its README), milestone specs (`specs/`, with their rules in its README) and agent docs (`agents/`) | 0021 |
 | `boards/` | Board definitions (TOML) and board defconfigs | 0010, 0011, 0017 |
 | `mcu/` | One subdirectory per MCU: the MCU database (AF map, DMA request map, Flash sector table, as JSON) and the Kconfig MCU defaults (`defconfig`) | 0011, 0017, 0020 |
 | `schema/msg/` | Topic schemas (`.msg`) | 0006 |

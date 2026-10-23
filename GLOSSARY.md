@@ -131,8 +131,12 @@ The record inside a firmware image that gives its board ID, size, CRCs and versi
 _Avoid_: firmware header
 
 **Boot Window**:
-The short wait at every boot during which the bootloader accepts a flashing tool before it starts the firmware.
+The short wait at power-on and reset during which the bootloader accepts a flashing tool before it starts the firmware; a plain reboot skips it.
 _Avoid_: bootloader timeout
+
+**Boot Stub**:
+The minimal program in the bootloader region that only jumps to the firmware, used on a board until its bootloader is installed.
+_Avoid_: mini bootloader
 
 ### Operation
 
@@ -170,6 +174,18 @@ _Avoid_: failsafe mode
 The mechanism by which the MCU decides, from the mode and safety state, whose setpoints are in control.
 _Avoid_: command arbitration, priority switching
 
+**Source in Control**:
+The one setpoint source whose setpoints the current mode accepts: the Link, remote control or Bridge that requested the mode.
+_Avoid_: owner, master
+
+**Board Verification**:
+The check at boot that the board matches the board revision its firmware image was built for; until it passes, actuators stay disabled.
+_Avoid_: hardware check, self-test
+
+**Output Watchdog**:
+The platform-level guard that turns every actuator output off when actuator control stops refreshing it.
+_Avoid_: motor timeout
+
 ### Local interface
 
 **Local Display**:
@@ -201,6 +217,10 @@ _Avoid_: log level
 **Batch Message**:
 A topic that packs several consecutive samples into one message, for high-rate data.
 _Avoid_: FIFO topic
+
+**Event Log**:
+The record of the moments around an event, kept in RAM and written to internal Flash only when the event occurs.
+_Avoid_: crash log, black box
 
 ### Parameters
 
@@ -265,6 +285,22 @@ A hash computed from the schema for each message type, used to confirm that both
 The node on the companion computer that turns a Link into ROS2 topics, services and parameters.
 _Avoid_: driver node, agent
 
+**Custom Protocol**:
+Vehkernel's own Link protocol, with COBS and CRC16 framing, sequence numbers, time synchronization and version negotiation.
+_Avoid_: binary protocol, VK protocol
+
+**Handshake**:
+The exchange that opens a Link: the protocol version is negotiated and every topic's schema hash is compared.
+_Avoid_: connect, login
+
+**Parameter Service**:
+The protocol-independent service through which Links and the local menu list, read and set parameters.
+_Avoid_: parameter server
+
+**Reboot Service**:
+The protocol-independent service that reboots a disarmed board, or reboots it into its bootloader.
+_Avoid_: reset command
+
 ### Testing
 
 **Test Layer**:
@@ -273,6 +309,13 @@ One of six levels of testing by scope, numbered L0 to L5.
 **Bring-up**:
 A test that confirms the wiring, mapping and direction of a new board or new wiring.
 _Avoid_: power-on test
+
+**Bring-up Case**:
+One bring-up test, such as reading the IMU's identity or checking a motor's direction against its encoder.
+
+**Bring-up Image**:
+A separate firmware image that runs the bring-up cases needing no actuators and reports over SWD; it never configures actuator outputs.
+_Avoid_: test firmware, factory image
 
 **Test Mode**:
 A mode in which the test runner on the development host is in control, accepting only direct-actuator setpoints, used for bring-up cases and actuator tests.
@@ -297,3 +340,13 @@ _Avoid_: L0, BSP
 
 **Capability**:
 A platform-specific interface the interface layer offers as a concrete function, for example PWM output or a quadrature encoder.
+
+### Observability
+
+**Timing Monitor**:
+The core service that measures every work item's run time, jitter and overruns and publishes them on the bus.
+_Avoid_: profiler, scheduler stats
+
+**Link Monitor**:
+The development host tool that connects over a Link to show live topics and to send parameter changes and vehicle commands.
+_Avoid_: GCS, console
