@@ -1,13 +1,13 @@
 # Driving the wheels
 
-Actuators move only in test mode, armed, and only on direct-actuator setpoints: one wheel speed in rad/s per motor output (ADR-0005, ADR-0018). The commands below use the [Link monitor](link-monitor.md) against SITL; on a board, use `--serial /dev/ttyACM0` instead of `--udp`.
+Actuators move only in test mode, armed, and only on direct-actuator setpoints: one wheel speed in rad/s per motor output (ADR-0005, ADR-0018). The commands below use the [Link monitor](link-monitor.md) against SITL; on a board, use `--serial /dev/ttyACM0` instead of `--udp`, with the firmware build's `--msg-dir` and `--param-meta` ([Connecting](link-monitor.md#connecting)).
 
 ## Safety conditions
 
 Until a remote control exists, these conditions apply:
 
 - The vehicle boots in `STANDBY`; `mode test` makes the Link that asked the source in control. The mode changes only while disarmed.
-- `arm` runs the arming checks in turn and prints the first that fails: the board verified at boot (the IMU answered and, on boards that have them, the revision-ID pins read their value), the emergency stop released, `TEST`, the source in control, no setpoint still active, no bring-up case running, actuator power present on boards that sense it, actuator control started, and the local menu closed.
+- `arm` runs the arming checks in turn and prints the first that fails: the board verified at boot (the IMU answered and, on boards that have them, the revision-ID pins read their value), the emergency stop released, `TEST`, the source in control, no setpoint still active, no bring-up case running, actuator power present on boards that sense it, actuator control started, and the local menu closed. A reboot already accepted refuses arming before any of these.
 - `estop on` from any connected Link forces every output off at once. Released within 5 s with `estop off`, the wheels resume from the next setpoint; engaged for 5 s, the vehicle disarms.
 - Setpoints that stop for longer than `COM_SP_TIMEOUT` (0.5 s) stop and disarm the vehicle; an armed vehicle whose targets stay zero or unset for `COM_DISARM_IDLE` (10 s) disarms.
 - Outputs are capped at `MOT_OUT_MAX` (30 % duty by default) and change by at most `MOT_SLEWRATE` of full duty per second, though a stop is never slowed. A watchdog turns them off when actuator control stalls for three control periods.
@@ -33,7 +33,7 @@ bringup output=2 result=reversed encoder=2 sign=-1  fix: set MOT2_REV=REVERSED i
 
 ## Driving
 
-`drive` arms if needed, sends the wheel speeds at 20 Hz for the given time, then stops and disarms:
+`drive` requests `TEST` and arms if needed, sends one wheel speed in rad/s per output at 20 Hz for the given time (`nan` leaves an output uncontrolled; put `--` before a negative first speed), then stops and disarms:
 
 ```bash
 tools/link/link_monitor.py --udp 127.0.0.1:15600 drive 5,5,5,5 --duration 3

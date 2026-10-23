@@ -22,19 +22,24 @@ build/sitl/app/vehkernel-sitl --duration 5
 
 ## Report
 
-At the end of a run SITL prints one line per topic instance and per work item, as space-separated `key=value` pairs (topics never published are listed too, with `publications=0`):
+At the end of a run SITL prints one line per topic instance and per work item, as space-separated `key=value` pairs (topics never published are listed too, with `publications=0`). Shortened:
 
 ```text
 link transport=udp address=127.0.0.1:15600
 report duration_s=5.000
-topic name=imu_sample instance=0 publications=978 rate_hz=200.01 last_update_us=5000977
-topic name=work_item_status instance=0 publications=5 rate_hz=1.00 last_update_us=5000580
-work_item name=icm20948 queue=wq:ctrl runs=1000 overruns=0 run_time_last_us=4 run_time_max_us=12 run_time_mean_us=2 jitter_max_us=1137
-work_item name=link0 queue=wq:io runs=1000 overruns=0 run_time_last_us=5 run_time_max_us=227 run_time_mean_us=21 jitter_max_us=4447
-work_item name=timing_monitor queue=wq:slow runs=5 overruns=0 run_time_last_us=2 run_time_max_us=6 run_time_mean_us=3 jitter_max_us=809
+topic name=actuator_setpoint instance=0 publications=0 rate_hz=0.00 last_update_us=0
+topic name=imu_sample instance=0 publications=979 rate_hz=200.00 last_update_us=5000196
+topic name=vehicle_attitude instance=0 publications=778 rate_hz=200.04 last_update_us=5000240
+topic name=work_item_status instance=0 publications=5 rate_hz=1.00 last_update_us=5000532
+work_item name=icm20948 queue=wq:ctrl runs=1000 overruns=0 run_time_last_us=29 run_time_max_us=106 run_time_mean_us=16 jitter_max_us=2113
+work_item name=mahony_attitude queue=wq:ctrl runs=979 overruns=0 run_time_last_us=14 run_time_max_us=31 run_time_mean_us=10 jitter_max_us=59
+work_item name=commander queue=wq:ctrl runs=1000 overruns=0 run_time_last_us=15 run_time_max_us=26 run_time_mean_us=10 jitter_max_us=2156
+work_item name=local_display queue=wq:slow runs=100 overruns=0 run_time_last_us=24 run_time_max_us=53 run_time_mean_us=20 jitter_max_us=1125
+work_item name=link0 queue=wq:io runs=1000 overruns=0 run_time_last_us=9 run_time_max_us=26 run_time_mean_us=9 jitter_max_us=2900
+work_item name=timing_monitor queue=wq:slow runs=5 overruns=0 run_time_last_us=35 run_time_max_us=47 run_time_mean_us=36 jitter_max_us=949
 ```
 
-`rate_hz` is the average since the topic's first publication. `test/sitl/check_report.py` runs SITL and checks the report; CI runs it through `ctest` (the `sitl_smoke` test), failing when `imu_sample` is not published at 200 Hz within 5 % or any work item overruns. With the UDP Link, overruns count over a check window after start-up, and an interval in which most work items overran at once is a host stall of the whole SITL process, not counted. SITL tests run serially under `ctest -j`, since they judge timing on the shared host.
+`rate_hz` is the average since the topic's first publication. `test/sitl/check_report.py` runs SITL and checks the report; CI runs it through `ctest` (the `sitl_smoke` test), failing when `imu_sample` is not published at 200 Hz within 5 %, or any work item overruns or never runs. With the UDP Link, overruns count over a check window after start-up, and an interval in which most work items overran at once is a host stall of the whole SITL process, not counted. SITL tests run serially under `ctest -j`, since they judge timing on the shared host.
 
 ## Motion profiles
 
@@ -64,4 +69,4 @@ build/sitl/app/vehkernel-sitl --duration 0 --link pty
 tools/link/link_monitor.py --serial /dev/pts/3
 ```
 
-CI runs SITL and the monitor's check together through `ctest` (the `sitl_link` and `sitl_link_pty` tests, `test/sitl/check_link.py`), which also fail when the Link work item overruns or the pty is left behind.
+CI runs SITL and the monitor's check together through `ctest` (the `sitl_link` and `sitl_link_pty` tests, `test/sitl/check_link.py`), which also fail when a work item, the Link's included, overruns or never runs during the check, or the pty is left behind.

@@ -23,23 +23,25 @@ The monitor decodes topics with the Python module the schema generator writes in
 
 ## Checks
 
-With `--check` the monitor runs for `--duration` seconds, prints a summary as `key=value` lines and exits non-zero when the handshake fails, a schema hash differs, frames are lost or a rate given with `--expect-rate` is missed:
+With `--check` the monitor runs for `--duration` seconds, prints a summary as `key=value` lines and exits non-zero when the handshake fails, a schema hash differs, frames are lost or arrive with CRC errors, or a rate given with `--expect-rate` is missed (within 5 %, or `--tolerance`). Shortened:
 
 ```bash
 tools/link/link_monitor.py --check --duration 5 --expect-rate imu_sample:0=200
 ```
 
 ```text
-link handshake=ok version=1 mismatches=0 frames=1032 crc_errors=0 malformed=0 lost=0 rtt_us=5132 clock_offset_us=-213339289143
-topic name=imu_sample instance=0 messages=1004 rate_hz=199.99
+link handshake=ok version=4 mismatches=0 params=26 param_set_hash=0x71B05295612E4195 frames=2121 crc_errors=0 malformed=0 lost=0 rtt_us=4183 clock_offset_us=-45587244269
+topic name=imu_sample instance=0 messages=1004 rate_hz=200.01
 topic name=link_status instance=0 messages=5 rate_hz=1.00
+topic name=vehicle_attitude instance=0 messages=250 rate_hz=49.95
 topic name=work_item_status instance=0 messages=5 rate_hz=1.00
-mcu_link instance=0 frames_sent=1050 bytes_sent=50272 frames_received=12 bytes_received=182 drops=0 crc_errors=0 malformed=0 lost=0 handshake_state=connected
-work_item name=icm20948 runs=1000 overruns=0 run_time_last_us=5 run_time_max_us=11 run_time_mean_us=2 jitter_max_us=1166
-work_item name=link0 runs=1000 overruns=0 run_time_last_us=31 run_time_max_us=87 run_time_mean_us=19 jitter_max_us=1156
+mcu_link instance=0 frames_sent=1666 bytes_sent=87998 frames_received=9 bytes_received=138 drops=0 crc_errors=0 malformed=0 lost=0 handshake_state=connected rate_scale=100
+vehicle_status mode=STANDBY armed=0 source=none board_verified=1 emergency_stop=0 actuator_power=powered skipped_checks=none arming_refusal=none disarm_reason=none output_watchdog_trips=0
+work_item name=icm20948 runs=1000 overruns=0 run_time_last_us=14 run_time_max_us=40 run_time_mean_us=16 jitter_max_us=2885
+work_item name=link0 runs=1000 overruns=0 run_time_last_us=65 run_time_max_us=407 run_time_mean_us=60 jitter_max_us=2876
 ```
 
-`rate_hz` here follows the MCU's timestamps, so host scheduling does not skew it. The `link` line is the development host's side of the Link, `mcu_link` the MCU's: frames the transport could not take count as `drops`, frames missing from the peer's sequence as `lost`. The check also fails when the MCU dropped frames.
+`rate_hz` here follows the MCU's timestamps, so host scheduling does not skew it. The `link` line is the development host's side of the Link, with the parameter count and parameter set hash the MCU reported at the handshake; `mcu_link` is the MCU's side, with the rate scale it sends topics at: frames the transport could not take count as `drops`, frames missing from the peer's sequence as `lost`. The check also fails when the MCU dropped frames.
 
 The hardware check of a serial Link runs the check for a minute; it passes when `imu_sample` arrives at 200 Hz with no CRC errors and no lost frames:
 
@@ -50,10 +52,11 @@ tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/c50c-v1_1/gener
 
 ## Attitude
 
-The attitude estimator (ADR-0014) runs on `wq:ctrl` right after the IMU: a Mahony filter that aligns roll and pitch from the accelerometer once the vehicle has been still for 1 s (yaw starts at 0, and the gyro bias is the mean gyro reading), then publishes `vehicle_attitude` for every IMU sample. The Link sends it at 50 Hz, and the monitor shows it as roll, pitch and yaw in degrees, in the live view and as an `attitude` line in the `--check` summary:
+The attitude estimator (ADR-0014) runs on `wq:ctrl` right after the IMU: a Mahony filter that aligns roll and pitch from the accelerometer once the vehicle has been still for 1 s (yaw starts at 0, and the gyro bias is the mean gyro reading), then publishes `vehicle_attitude` for every IMU sample. The Link sends it at 50 Hz, and the monitor shows it as roll, pitch and yaw in degrees, in the live view and as an `attitude` line in the `--check` summary; in SITL the true attitude follows ([Motion profiles](sitl.md#motion-profiles)):
 
 ```text
-attitude name=vehicle_attitude instance=0 roll_deg=-0.01 pitch_deg=0.01 yaw_deg=-0.02
+attitude name=vehicle_attitude instance=0 roll_deg=-0.00 pitch_deg=-0.00 yaw_deg=-0.08
+attitude name=vehicle_attitude_groundtruth instance=0 roll_deg=0.00 pitch_deg=0.00 yaw_deg=0.00
 ```
 
 Without a magnetometer, yaw is relative to the start and drifts slowly with the remaining gyro bias.
@@ -75,7 +78,7 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600 param set ATT_KP 2.5
 ```
 
 ```text
-param name=ATT_KP value=2.5 type=FLOAT unit=1/s default=1 min=0 max=10 description="Attitude correction gain: how fast roll and pitch follow the accelerometer."
+param name=ATT_KP value=2.5 type=FLOAT unsaved=1 unit=1/s default=1 min=0 max=10 description="Attitude correction gain: how fast roll and pitch follow the accelerometer."
 ```
 
 On a board, pass the metadata of the firmware build:
@@ -91,7 +94,7 @@ Parameters that differ from their defaults are stored in internal Flash, entry b
 build/sitl/app/vehkernel-sitl --duration 0 --param-file /tmp/vk-params.bin
 ```
 
-The live view and the `--check` summary show `parameter_status`: the sector in use and its fill, changes not yet in Flash (`unsaved`), `reboot_required` changes waiting for a restart (`pending_reboot`), and stored entries skipped at boot because their parameter is gone, changed type, is out of range or was cut short by a power loss. `param list` and `param get` mark a parameter `pending_reboot=1` or `unsaved=1` the same way.
+The live view and the `--check` summary show the `parameter_status` topic as a `param_status` line: the sector in use and its fill, changes not yet in Flash (`unsaved`), `reboot_required` changes waiting for a restart (`pending_reboot`), and stored entries skipped at boot because their parameter is gone, changed type, is out of range or was cut short by a power loss. `param list`, `param get` and `param set` mark a parameter `pending_reboot=1` or `unsaved=1` the same way.
 
 CI runs `test/sitl/check_params.py` (the `sitl_params` test): the `param` command against SITL, refusals included; `ATT_KP` changed while the estimator runs under the shake profile; and values set over the Link found again after SITL restarts with the same `--param-file`.
 
