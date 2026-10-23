@@ -10,7 +10,7 @@ Each suits different hardware. The three dimensions:
 
 1. **Trigger source**: `IMU_EVENT` (data-ready or FIFO watermark interrupt) or `TIMER` (fixed rate).
 2. **Base rate + dividers**: `CTRL_RATE_HZ` is the base rate; estimation, angular rate control, and velocity and attitude control each set a divider. Timed work items set their own rates.
-3. **Sensor sampling method**: per-sample reads or batched FIFO reads. Drivers declare their maximum ODR and the peripheral bus cost of each read; the board definition declares the peripheral bus type. With batched reads the driver still publishes each sample individually, so the IMU's per-sample topic must be declared with `@queue N`, N at least the largest batch (ADR-0008), and the estimator drains the queue on every run.
+3. **Sensor sampling method**: per-sample reads (`PER_SAMPLE`) or batched FIFO reads (`FIFO`). Drivers declare their maximum ODR and the peripheral bus cost of each read; the board definition declares the peripheral bus type. With batched reads the driver still publishes each sample individually, so the IMU's per-sample topic must be declared with `@queue N`, N at least the largest batch (ADR-0008), and the estimator drains the queue on every run.
 
 A **timing preset** groups values for the three dimensions. Its defaults follow the layering of ADR-0012: provided by the board definition, overridable by the frame preset.
 

@@ -5,7 +5,8 @@
 #   1. MCU defaults (mcu/<mcu>/defconfig), or platform/sitl/defconfig for SITL
 #   2. Board defaults (boards/<board>/defconfig)
 #   3. Debug overlays: <build>/debug.config, written by the menuconfig target,
-#      and the files listed in VK_DEBUG_OVERLAY. Neither is ever committed.
+#      and never committed, then the files listed in VK_DEBUG_OVERLAY, such
+#      as the committed test/hardware/bringup.config of the bring-up preset.
 
 set(VK_DEBUG_OVERLAY "" CACHE STRING "Extra Kconfig fragments merged last, for local debugging")
 

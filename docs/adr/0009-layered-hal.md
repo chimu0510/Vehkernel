@@ -14,6 +14,8 @@ Two shared parts sit outside the layering. Every layer, including the platform l
 - **Between drivers and their consumers**: no interface at all; they are decoupled by the bus.
 - **Choices made at runtime**: Link transports and protocols, vehicle models and frames use virtual interfaces.
 
+Because drivers and modules are not templates, they reach a platform's concrete class through a small handle of the interface layer: a type-erased device handle bound to any class that satisfies the concept, such as `I2cDevice`, `DisplayDevice` and `FlashSectors`, or a capability interface. The concept still checks the platform class at build time; the handle costs one indirect call per access.
+
 The interface layer stays small and defines only what generic drivers need. Highly platform-specific features such as timers are offered as capabilities, for example `PwmOutput` and `QuadratureEncoder`.
 
 The platform layer is built on ST LL, using ST HAL only where needed (for example USB).
