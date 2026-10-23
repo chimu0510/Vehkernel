@@ -16,7 +16,7 @@ Flight controllers that ArduPilot and PX4 support ship with a bootloader that sp
 
 - The board definition declares the board ID (ADR-0011). The board generator rejects two board definitions with the same ID.
 - A board that ArduPilot or PX4 already supports uses the ID its existing firmware uses, for example 56 for the Pixhawk 6C and 1166 for the MicoAir743, so the ground station tools know it.
-- A development board, such as the C50C, picks an ID that is not registered with ArduPilot and is not registered later. A board sold to users would be registered in ArduPilot's `board_types.txt`; none is planned.
+- A development board, such as the C50C, picks an ID that no board in ArduPilot's `board_types.txt` uses, without registering it, so its firmware is never accepted by a board that ArduPilot or PX4 supports. A board sold to users would be registered there; none is planned.
 
 **Boards with an ArduPilot or PX4 bootloader**
 
