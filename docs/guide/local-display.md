@@ -9,7 +9,7 @@ The local display shows three pages of 21 columns by 8 lines, whose values chang
 | Page | Shows |
 |---|---|
 | Status | Mode, arming, the emergency stop, board verification, actuator power, skipped arming checks, the last arming refusal and disarm reason, output watchdog trips |
-| Attitude | Roll, pitch and yaw in degrees |
+| Attitude | Roll, pitch and yaw in degrees, and how many samples the accelerometer correction skipped |
 | Link | Each Link's handshake, rate scale, drops and lost frames |
 
 ## User key and local menu
@@ -22,7 +22,7 @@ A short press (released before 1 s) switches pages, armed or disarmed. A long pr
 
 ## Menu parameters
 
-The menu parameters are `SENS_BOARD_ROT`, `SERIAL1_BAUD` and `SERIAL2_BAUD` (on the board), `ATT_KP`, `ATT_KI` and `ATT_ACC_REJ`; a parameter enters the menu only with `menu = true` and a `menu_step` in its definition. Nothing in the `MOT` or `COM` groups ever does: the menu never arms, changes the mode, touches the emergency stop or moves an actuator. Changing `SERIAL1_BAUD` or `SERIAL2_BAUD` from the menu recovers a board set to a rate the host cannot use.
+The menu parameters are `SENS_BOARD_ROT`, `SERIAL1_BAUD` and `SERIAL2_BAUD` (on the board), `ATT_KP`, `ATT_KI` and `ATT_ACC_REJ`; a parameter enters the menu only with `menu = true` in its definition, plus a `menu_step` for a number; an enum steps through its values, and a bitmask never enters. Nothing in the `MOT` or `COM` groups ever does: the menu never arms, changes the mode, touches the emergency stop or moves an actuator. Changing `SERIAL1_BAUD` or `SERIAL2_BAUD` from the menu recovers a board set to a rate the host cannot use.
 
 ## In SITL
 
