@@ -2,4 +2,6 @@
 /.venv/
 # Vendor schematics, datasheets and firmware are kept locally and not redistributed.
 /vendor/
+*_vendor_backup*.bin
+*_flash_*.bin
 __pycache__/
