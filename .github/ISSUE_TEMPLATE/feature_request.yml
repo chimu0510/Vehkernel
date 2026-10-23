@@ -1,0 +1,31 @@
+name: Feature or design proposal
+description: Propose a feature, a new board, driver or Link protocol, or a change to an ADR.
+labels: [enhancement, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The MCU does real-time estimation, low-level control and safety; global localization and navigation belong to ROS2 applications above it (ADR-0001). Proposals that move navigation onto the MCU are out of scope.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you are trying to do and why the firmware does not support it today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How it could work, and how ArduPilot or PX4 solve the same problem if they do.
+    validations:
+      required: true
+  - type: input
+    id: adrs
+    attributes:
+      label: Related ADRs
+      description: ADRs this touches or would change, for example ADR-0008, ADR-0015.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

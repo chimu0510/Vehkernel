@@ -1,6 +1,12 @@
 # Vehkernel
 
+[![CI](https://github.com/chimu0510/Vehkernel/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/chimu0510/Vehkernel/actions/workflows/ci.yml)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
+
 **Vehkernel** (Vehicle + Kernel) is open-source MCU firmware with ROS2 support, built as a common core for any vehicle: one system drives many vehicles and frames. The MCU handles real-time state estimation, low-level control and safety, and keeps running without a companion computer; global localization and navigation are left to ROS2 applications above it. The first test platform is a UGV.
+
+> [!WARNING]
+> Vehkernel is in early development and has not been validated on a moving vehicle. It drives motors: test with the wheels off the ground, output power limited and an emergency stop within reach ([Driving the wheels](docs/guide/driving.md)). Interfaces, parameters and the wire protocol may change without notice.
 
 ## Status
 
@@ -84,37 +90,13 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600
 | [Testing](docs/guide/testing.md) | Test layers, `ctest`, bring-up image, hardware checks |
 | [C50C V1.1](docs/boards/c50c-v1_1.md) | The first board: connectors, ports and wiring |
 
-## Directory layout
+The [documentation index](docs/README.md) also lists the decision records, the milestone specs and the repository layout.
 
-| Directory | Contents | ADRs |
-|---|---|---|
-| `docs/` | User guides (`guide/`), board pages (`boards/`), ADRs (`adr/`), milestone specs (`specs/`) and agent docs (`agents/`) | 0021 |
-| `boards/` | Board definitions (TOML) and board defconfigs | 0010, 0011, 0017 |
-| `mcu/` | One subdirectory per MCU: the MCU database (AF map, DMA request map, Flash sector table, as JSON) and the Kconfig MCU defaults (`defconfig`) | 0011, 0017, 0020 |
-| `schema/msg/` | Topic schemas (`.msg`) | 0006 |
-| `cmake/` | Toolchains, Kconfig integration, generator invocation | 0017 |
-| `hal/` | Interface layer: HAL interfaces (C++20 concepts and runtime interfaces) | 0009 |
-| `platform/stm32f4/` | Platform layer: STM32F4 implementation (ST LL) | 0009 |
-| `platform/sitl/` | Platform implementation for SITL and tests | 0009, 0018 |
-| `drivers/` | Driver layer: device drivers | 0009 |
-| `core/` | Bus, work queues, parameter runtime, timing monitor | 0008, 0012, 0015 |
-| `modules/` | Module layer: estimators, control chain, vehicle models, Links, logging | 0002, 0013, 0014, 0019 |
-| `lib/estimation/` | Estimation math components: `models/`, `filters/`, `math/` | 0014 |
-| `bootloader/` | The Vehkernel bootloader: a port of ArduPilot's `AP_Bootloader` structure, and its SITL build | 0023 |
-| `tools/mcudb/` | Offline converter that regenerates an MCU database from the stm32-data source committed under `mcu/<mcu>/source/` | 0011, 0016 |
-| `tools/kconfig/` | Layered Kconfig solve and `menuconfig` with overlay saving | 0017 |
-| `tools/generators/` | Schema (including ULog format definitions), board, parameter and log profile generators | 0006, 0011, 0012, 0019 |
-| `tools/link/` | Link monitor: live view, checks, parameters and vehicle commands | 0002, 0006 |
-| `tools/flash/` | Serial flasher through the STM32 system bootloader | 0020 |
-| `tools/bootloader/` | ArduPilot's `uploader.py`, pinned, and the script listing upstream bootloader changes | 0023 |
-| `tools/bringup/` | Bring-up runner for the hardware cases over SWD | 0018 |
-| `app/` | Entry points: firmware image and SITL executable | — |
-| `third_party/` | Pinned submodules: FreeRTOS kernel, CMSIS core, STM32F4 device headers and LL drivers | 0004, 0016 |
-| `bridge/` | ROS2 Bridge for the companion computer | 0002, 0003 |
-| `sim/` | Built-in simulator and external simulator interface | 0018 |
-| `test/` | `unit/` (L1), `replay/` (L2), `sitl/` (L3), `hardware/` (L4 hardware tests), `ros2/` (L5); L0 static checks run from root config files and CI | 0018 |
+## Contributing
 
-Parameter definitions (`params.toml`) live in the directory of their module or driver, and log profiles live under the logging module, so they move or disappear together with their module (ADR-0012, ADR-0019).
+Contributions are welcome: bug reports, board support, drivers, tests and documentation. Start with [CONTRIBUTING.md](CONTRIBUTING.md), which covers the workflow, the coding rules and how decisions are recorded. Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+Report security and safety issues privately as described in [SECURITY.md](SECURITY.md), not in public issues.
 
 ## License
 

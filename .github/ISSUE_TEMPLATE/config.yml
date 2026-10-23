@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security or safety issue
+    url: https://github.com/chimu0510/Vehkernel/security/advisories/new
+    about: Report vulnerabilities and unsafe actuator behaviour privately, not in a public issue.
+  - name: Documentation
+    url: https://github.com/chimu0510/Vehkernel/blob/main/docs/README.md
+    about: Guides, board pages, ADRs and specs.
