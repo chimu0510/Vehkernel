@@ -76,6 +76,18 @@ _Avoid_: V4.1
 The TOML file holding a board's hardware facts: pins, peripherals, board devices and Flash layout.
 _Avoid_: hwdef, board config
 
+**Board Device**:
+A device mounted on the board and declared in its board definition with its peripheral bus and mounting rotation, for example the IMU or the display.
+_Avoid_: onboard sensor, peripheral
+
+**Port**:
+A logical serial port a board definition declares, such as `SERIAL1`, mapped to one UART of that board; its use, such as a Link or an RC receiver, is set by board default and later by parameter.
+_Avoid_: COM port, UART number
+
+**Download Circuit**:
+A board circuit through which a USB serial adapter's DTR and RTS lines drive BOOT0 and NRST, so the development host enters the system bootloader without touching the board, for example on the C50C's SERIAL2.
+_Avoid_: auto-reset, one-key download
+
 **Mounting Rotation**:
 The rotation of a board device's axes relative to the board, a hardware fact declared in the board definition.
 _Avoid_: IMU orientation, sensor rotation
@@ -174,13 +186,17 @@ _Avoid_: failsafe mode
 The mechanism by which the MCU decides, from the mode and safety state, whose setpoints are in control.
 _Avoid_: command arbitration, priority switching
 
+**Commander**:
+The module that holds the mode, arming, the arming checks, the emergency stop and setpoint arbitration, and decides when the vehicle disarms.
+_Avoid_: flight manager, state machine
+
 **Source in Control**:
 The one setpoint source whose setpoints the current mode accepts: the Link, remote control or Bridge that requested the mode.
 _Avoid_: owner, master
 
 **Board Verification**:
 The check at boot that the board matches the board revision its firmware image was built for; until it passes, actuators stay disabled.
-_Avoid_: hardware check, self-test
+_Avoid_: self-test, boot check
 
 **Output Watchdog**:
 The platform-level guard that turns every actuator output off when actuator control stops refreshing it.
@@ -232,8 +248,15 @@ _Avoid_: setting, config
 The set of parameters belonging to one module or driver.
 _Avoid_: PG
 
+**Safety Attribute**:
+A property of a parameter definition that limits when a change takes effect or is allowed: `reboot_required`, or `locked_when_armed`.
+
+**Parameter Set Hash**:
+A 64-bit hash over the parameter metadata file the build writes, reported at the handshake so a tool can tell whether its parameter metadata matches the firmware.
+_Avoid_: parameter version
+
 **Board Defaults**:
-The parameter and Kconfig defaults provided by a board definition.
+The parameter, Kconfig, port and timing preset defaults provided by a board definition; a frame preset and the user may override the parameter defaults.
 
 **Timing Preset**:
 A set of defaults for the trigger source, base rate, dividers and sampling method.
@@ -269,7 +292,7 @@ The part of a Link that encodes topics into a specific protocol, for example the
 _Avoid_: driver
 
 **Transport**:
-The physical or logical channel that carries a Link's bytes, for example UART, CAN or USB.
+The physical or logical channel that carries a Link's bytes, for example UART, CAN or USB, or UDP and a pty in SITL.
 _Avoid_: interface, port
 
 **Topic Map**:
@@ -292,6 +315,10 @@ _Avoid_: binary protocol, VK protocol
 **Handshake**:
 The exchange that opens a Link: the protocol version is negotiated and every topic's schema hash is compared.
 _Avoid_: connect, login
+
+**Control Message**:
+A message of the custom protocol itself rather than a topic, such as the handshake, time sync, parameter access, arming and mode requests, bring-up and reboot; its compatibility follows the protocol version, not the schema hash.
+_Avoid_: command frame
 
 **Parameter Service**:
 The protocol-independent service through which Links and the local menu list, read and set parameters.
@@ -317,13 +344,29 @@ One bring-up test, such as reading the IMU's identity or checking a motor's dire
 A separate firmware image that runs the bring-up cases needing no actuators and reports over SWD; it never configures actuator outputs.
 _Avoid_: test firmware, factory image
 
+**Bring-up Runner**:
+The development host tool that flashes the bring-up image over SWD and reads its results back.
+_Avoid_: test harness
+
+**Hardware Check**:
+The last ticket of a spec, in which a person confirms the milestone on the board and records the readings.
+_Avoid_: HIL test, board verification
+
+**SITL**:
+Software in the loop: the complete firmware running on the development host on the FreeRTOS POSIX port, with simulated devices in place of the board.
+_Avoid_: simulator build, emulator
+
+**Debug Overlay**:
+The last of the three Kconfig layers, after the MCU defaults and the board defaults, given as a config fragment at configure time, for example the one that selects the bring-up image.
+_Avoid_: product config, frame overlay
+
 **Test Mode**:
 A mode in which the test runner on the development host is in control, accepting only direct-actuator setpoints, used for bring-up cases and actuator tests.
 
 ### Software layers
 
 **Module Layer**:
-The layer holding functional modules such as estimators, the control chain, vehicle models, Links and logging.
+The layer holding functional modules such as the commander, estimators, actuator control, Links and the local display, and later the control chain, vehicle models and logging.
 _Avoid_: L3, application layer
 
 **Driver Layer**:
@@ -339,7 +382,7 @@ The implementation of the interface layer for a specific MCU or for SITL.
 _Avoid_: L0, BSP
 
 **Capability**:
-A platform-specific interface the interface layer offers as a concrete function, for example PWM output or a quadrature encoder.
+A platform-specific feature the interface layer offers as a small interface of its own, for example `PwmOutput` or `QuadratureEncoder`, rather than as a general peripheral contract such as a timer.
 
 ### Observability
 
