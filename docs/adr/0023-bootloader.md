@@ -1,7 +1,3 @@
----
-status: proposed
----
-
 # Bootloader: the ArduPilot and PX4 protocol, kept where a board has it, ported where it does not
 
 Flight controllers that ArduPilot and PX4 support ship with a bootloader that speaks one protocol: PX4 wrote it, and ArduPilot's `AP_Bootloader` keeps it compatible and shares its list of board IDs. QGroundControl and Mission Planner flash boards through it over USB, and ArduPilot's `uploader.py` and PX4's `px4_uploader.py` over USB or a serial port. Vehkernel is not limited to its first development board, so it joins this ecosystem rather than defining its own. Boards that already have such a bootloader keep it. Boards without one, such as the C50C, get a Vehkernel bootloader that speaks the same protocol. The STM32 system bootloader in ROM is kept only to install that bootloader and to rescue a board.
