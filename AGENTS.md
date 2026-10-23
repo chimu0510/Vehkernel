@@ -4,6 +4,10 @@
 
 Write everything in English: docs, ADRs, glossary, code, comments, diagnostics, commit messages, issues and pull requests, in the style of ArduPilot and PX4 documentation. Use the English terms defined in `GLOSSARY.md`. See `docs/adr/0021-english-project-language.md`.
 
+## Contributing
+
+The rules for every contributor, human or agent, are in `CONTRIBUTING.md`: the build and checks to run, the coding rules, and how decisions and milestones are recorded. This file adds what agents need on top.
+
 ## Agent skills
 
 ### Issue tracker

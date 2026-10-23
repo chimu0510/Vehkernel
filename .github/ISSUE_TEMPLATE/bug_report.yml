@@ -1,0 +1,56 @@
+name: Bug report
+description: Something in the firmware, SITL, the tools or the docs does not work as documented.
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Report security and unsafe actuator behaviour privately instead (see SECURITY.md).
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: Output of `git rev-parse --short HEAD`, or the firmware's git hash from the app descriptor.
+    validations:
+      required: true
+  - type: dropdown
+    id: target
+    attributes:
+      label: Target
+      options:
+        - SITL
+        - C50C V1.1
+        - Host tools (tools/)
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Presets, commands, parameters and Kconfig overlays changed from the defaults.
+      placeholder: |
+        1. cmake --preset sitl && cmake --build --preset sitl
+        2. build/sitl/app/vehkernel-sitl --duration 0
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and output
+      description: Build output, Link monitor output, SITL report, or attach the ULog file.
+      render: text
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware setup
+      description: For bugs on a board, the board revision, connected sensors and actuators, and the power supply.
