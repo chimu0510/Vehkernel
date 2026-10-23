@@ -18,7 +18,9 @@ The bootloader (spec 0008) is in progress; the hardware check of the first wheel
 - Parameters defined in TOML, set over the Link or the local menu, and stored in internal Flash.
 - Modes, arming checks and an emergency stop gating four motor outputs with wheel speed loops; checked in SITL, with the board's hardware check still to come.
 - The local display and local menu on the board's OLED and user key.
-- ArduPilot's app descriptor and `.apj` file, reboot into the bootloader over the Link, and the Vehkernel bootloader in SITL against ArduPilot's `uploader.py`.
+- ArduPilot's app descriptor and `.apj` file, reboot into the bootloader over the Link, and the Vehkernel bootloader in SITL against ArduPilot's `uploader.py`. On the board, S0 still holds a boot stub until the Vehkernel bootloader is ported to it.
+
+Decided but not built yet: the ROS2 Bridge (`bridge/` is a placeholder), the vehicle models and the control chain above the wheel speed loops, the remote control, logging, the replay (L2) and ROS2 (L5) test layers (`test/replay/` and `test/ros2/` are placeholders), and boards other than the C50C V1.1.
 
 Every decision is recorded in [`docs/adr/`](docs/adr/), each milestone in [`docs/specs/`](docs/specs/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary.
 
@@ -30,17 +32,19 @@ Vehkernel targets the boards ArduPilot and PX4 run on, and follows their convent
 |---|---|
 | MCU | STM32F407VET6 |
 | Board | C50C V1.1 (ICM20948, USB gamepad, no RS-485), the first development board ([board page](docs/boards/c50c-v1_1.md), [ADR-0024](docs/adr/0024-c50c-v1_1-board.md)) |
-| Companion computer | Raspberry Pi 5 (ROS2) |
+| Companion computer | Raspberry Pi 5 (ROS2), planned: the Bridge does not exist yet, so the development host talks to the board over a Link with the Link monitor |
 
 ## Architecture highlights
+
+The design as the ADRs decide it; [Status](#status) says which parts run today.
 
 - **Role**: the MCU is the companion computer's real-time coprocessor and safety gatekeeper, not an autopilot ([0001](docs/adr/0001-mcu-responsibility-boundary.md)).
 - **Communication**:
   - A publish/subscribe bus is the internal backbone and ROS2 is just one Link; a Link is made of a topic map, a protocol and a transport, all replaceable ([0002](docs/adr/0002-bus-backbone-and-pluggable-links.md)).
   - Messages are defined in a single schema and code is generated from it ([0006](docs/adr/0006-schema-and-wire-encoding.md)).
-- **ROS2 interface**:
-  - A vehicle-level topic API with three setpoint levels; ros2_control is optional ([0003](docs/adr/0003-vehicle-level-ros2-api.md)).
-  - The mode decides who is in control, and the remote control can always take over ([0005](docs/adr/0005-setpoint-arbitration.md)).
+- **ROS2 interface**: a vehicle-level topic API with three setpoint levels; ros2_control is optional ([0003](docs/adr/0003-vehicle-level-ros2-api.md)).
+- **Safety and local operation**:
+  - The mode decides who is in control, and the remote control can always take over; arming checks, an emergency stop and an output watchdog guard the outputs ([0005](docs/adr/0005-setpoint-arbitration.md)).
   - A local display shows the vehicle's status, and its local menu changes whitelisted parameters only while disarmed ([0022](docs/adr/0022-local-display-and-local-menu.md)).
 - **Runtime**: FreeRTOS, a C++20 subset, and rate-tiered work queues ([0004](docs/adr/0004-freertos.md), [0007](docs/adr/0007-cpp20-subset.md), [0008](docs/adr/0008-bus-and-work-queues.md)).
 - **Hardware support**:

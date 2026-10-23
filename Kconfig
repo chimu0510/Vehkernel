@@ -197,14 +197,14 @@ config LINK
 	  (ADR-0012).
 
 config LINK_SERIAL
-	bool "Link on a board serial port"
+	bool "Links on the board serial ports"
 	depends on LINK && PLATFORM_STM32F4 && BOARD_HAS_LINK_PORT
 	default y
 	help
-	  A Link on the board's first serial port whose function is LINK,
-	  SERIAL1 (the Type-C port) on the C50C V1.1, 8N1 at the SERIAL1_BAUD
-	  parameter, 921600 by default on that board. UART transmit and
-	  receive use DMA.
+	  A Link on each board serial port whose function is LINK: SERIAL1
+	  (the Type-C port) and SERIAL2 (the one-key download port) on the
+	  C50C V1.1, 8N1 at their SERIALn_BAUD parameters, 921600 by default
+	  on that board. UART transmit and receive use DMA.
 
 config LINK_UDP
 	bool "Link over UDP"
