@@ -10,7 +10,9 @@ build builds them (tools/firmware/finalize_image.py):
 1. An image for the board flashes, verifies and starts.
 2. An image for another board is refused before anything is erased.
 3. An upload cut off midway leaves an image that does not start: the next
-   boot stays in the bootloader, and a new upload recovers it.
+   boot stays in the bootloader, and a new upload recovers it. The cut is
+   made by a minimal client of the protocol, so it never races the end of
+   the upload.
 4. RTC_BOOT_HOLD keeps a valid image from starting; RTC_BOOT_FAST starts it
    at once; with no request it starts after the boot window.
 
@@ -20,11 +22,14 @@ build builds them (tools/firmware/finalize_image.py):
 from __future__ import annotations
 
 import argparse
+import os
+import select
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+import tty
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -119,6 +124,38 @@ def start_upload(pty: str, apj: Path) -> subprocess.Popen:
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
 
+def cut_upload(pty: str, image: bytes, cut_at: int) -> None:
+    """Uploads as uploader.py does, but stops after `cut_at` bytes, as a
+    pulled cable would: GET_SYNC, GET_DEVICE, CHIP_ERASE and PROG_MULTI,
+    never GET_CRC or BOOT. Cutting by the protocol, not by killing
+    uploader.py, makes the cut deterministic: a kill raced the end of the
+    upload, and lost when uploader.py had already sent BOOT (#80)."""
+    fd = os.open(pty, os.O_RDWR | os.O_NOCTTY)
+    tty.setraw(fd)
+
+    def command(data: bytes, reply_size: int = 0, timeout_s: float = 5.0) -> bytes:
+        os.write(fd, data + b"\x20")  # EOC
+        reply = b""
+        deadline = time.monotonic() + timeout_s
+        while len(reply) < reply_size + 2 and time.monotonic() < deadline:
+            if select.select([fd], [], [], 0.05)[0]:
+                reply += os.read(fd, reply_size + 2 - len(reply))
+        if reply[-2:] != b"\x12\x10":  # INSYNC, OK
+            raise RuntimeError(f"bootloader replied {reply.hex()} to {data[:2].hex()}")
+        return reply[:-2]
+
+    try:
+        command(b"\x21")  # GET_SYNC
+        for info in (1, 2, 4):  # bootloader revision, board ID, firmware size
+            command(bytes([0x22, info]), reply_size=4)
+        command(b"\x23", timeout_s=20.0)  # CHIP_ERASE
+        for offset in range(0, cut_at, 252):
+            chunk = image[offset:min(offset + 252, cut_at)]
+            command(bytes([0x27, len(chunk)]) + chunk)  # PROG_MULTI
+    finally:
+        os.close(fd)
+
+
 def upload(pty: str, apj: Path, stop_on: str = "") -> tuple[int | None, str]:
     """Runs uploader.py until it exits, or until a line holds `stop_on`; then it is stopped.
 
@@ -179,17 +216,15 @@ def main() -> int:
 
     print("3. an upload cut off midway does not start, and a new upload recovers it")
     bl = Bootloader(args.bootloader, str(flash), "--boot-signal", str(HOLD))
-    cut = start_upload(bl.pty, good)
-    deadline = time.monotonic() + UPLOAD_S
-    # Cut once programming has begun: the region was erased and holds part of the image.
-    while time.monotonic() < deadline and cut.poll() is None:
-        data = flash.read_bytes()
-        if data[:4] == b"\xff" * 4 and data[1000:1004] == image[1000:1004]:
-            break
-        time.sleep(0.05)
-    cut.kill()
-    cut.wait(timeout=10)
+    cut_at = 252 * 40  # about half of the image
+    try:
+        cut_upload(bl.pty, image, cut_at)
+    except RuntimeError as error:
+        failures.append(f"the cut-off upload failed before its cut: {error}")
     bl.stop()  # a power loss
+    data = flash.read_bytes()
+    if data[:32] != b"\xff" * 32 or data[32:cut_at] != image[32:cut_at] or data[cut_at:] != b"\xff" * (len(data) - cut_at):
+        failures.append("the cut-off upload did not leave the image's start written, without its lead words")
     bl = Bootloader(args.bootloader, str(flash))
     if not bl.read_until("bootloader stay: bad_crc", 5):
         failures.append(f"after a cut-off upload the bootloader did not stay: {bl.lines}")
