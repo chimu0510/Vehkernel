@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The state of the bring-up case actuator control runs (ADR-0018).
+@type uint8
+IDLE = 0
+RUNNING = 1
+DONE = 2
+ABORTED = 3

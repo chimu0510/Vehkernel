@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Why a parameter change was refused (ADR-0012); also what a Link reports back.
+@type uint8
+OK = 0
+UNKNOWN_NAME = 1
+WRONG_TYPE = 2
+OUT_OF_RANGE = 3
+LOCKED_WHILE_ARMED = 4

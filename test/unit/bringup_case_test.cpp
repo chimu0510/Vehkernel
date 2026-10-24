@@ -106,7 +106,7 @@ TEST_F(BringupTest, ADeadMotorMovesNoEncoder)
 {
     motors[0]->set_powered(false);
     run();
-    EXPECT_EQ(result(1).result, BringupResult::NotMoved);
+    EXPECT_EQ(result(1).result, BringupResult::NoEncoderMoved);
     EXPECT_EQ(result(1).encoder, 0);
     EXPECT_EQ(result(1).sign, 0);
 }
@@ -115,9 +115,9 @@ TEST_F(BringupTest, SwappedEncodersNameTheEncoderThatMoved)
 {
     encoder_of = {1, 0, 2, 3};
     run();
-    EXPECT_EQ(result(1).result, BringupResult::OtherEncoder);
+    EXPECT_EQ(result(1).result, BringupResult::AnotherEncoderMoved);
     EXPECT_EQ(result(1).encoder, 2);
-    EXPECT_EQ(result(2).result, BringupResult::OtherEncoder);
+    EXPECT_EQ(result(2).result, BringupResult::AnotherEncoderMoved);
     EXPECT_EQ(result(2).encoder, 1);
     EXPECT_EQ(result(3).result, BringupResult::Pass);
 }

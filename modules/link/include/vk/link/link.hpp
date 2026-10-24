@@ -20,6 +20,7 @@
 #include <vk/core/work_queue.hpp>
 #include <vk/hal/transport.hpp>
 #include <vk/msg/bringup_status.hpp>
+#include <vk/msg/enums.hpp>
 #include <vk/link/frame.hpp>
 #include <vk/link/session.hpp>
 #include <vk/link/topic_map.hpp>
@@ -32,11 +33,8 @@
 
 namespace vk::link {
 
-enum class HandshakeState : std::uint8_t {
-    Waiting = 0,     // no handshake yet
-    Connected = 1,   // handshake done, peer heard within the timeout
-    PeerSilent = 2,  // handshake done, peer not heard within the timeout
-};
+// Declared in schema/enum/handshake_state.enum (ADR-0006).
+using HandshakeState = msg::HandshakeState;
 
 // Statistics of one Link since boot.
 struct LinkStats {

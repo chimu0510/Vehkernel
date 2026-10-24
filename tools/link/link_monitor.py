@@ -58,6 +58,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from vklink.enums import BringupResult  # noqa: E402
 from vklink.monitor import (  # noqa: E402
     LinkMonitor,
     local_menu_line,
@@ -186,10 +187,10 @@ BRINGUP_TIMEOUT_S = 10.0
 
 def bringup_fix(output: int, item: BringupOutput) -> str:
     """What to change for an output that did not pass."""
-    if item.result == 2:
+    if item.result == BringupResult.REVERSED:
         return (f"set MOT{output}_REV=REVERSED if the wheel turned backwards, "
                 f"MOT{output}_ENC_REV=REVERSED if it turned forwards")
-    if item.result == 3:
+    if item.result == BringupResult.ANOTHER_ENCODER_MOVED:
         return f"encoder {item.encoder} moved instead: check which encoder is connected to output {output}"
     return "check the motor, its power and its encoder"
 

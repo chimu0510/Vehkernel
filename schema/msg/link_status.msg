@@ -12,7 +12,7 @@ uint32 drops                             # frames the transport could not take
 uint32 crc_errors                        # received frames dropped for a wrong CRC
 uint32 malformed                         # received bytes that were not a frame
 uint32 lost                              # frames missing from the peer's sequence
-uint8 handshake_state                    # 0 waiting for hello, 1 connected, 2 peer silent
+uint8 handshake_state  @enum handshake_state
 uint8 rate_scale                         # percent of the topic map's rates, scaled to fit the baud rate
 uint32 inbound_undeclared                # topic data from the peer for a topic the map does not declare inbound
 uint32 setpoints_rejected                # setpoints refused by setpoint arbitration

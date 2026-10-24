@@ -14,6 +14,7 @@
 #pragma once
 
 #include <vk/actuators/actuator_control.hpp>
+#include <vk/msg/enums.hpp>
 
 #include <array>
 #include <cstddef>
@@ -22,22 +23,13 @@
 
 namespace vk::actuators {
 
-enum class BringupState : std::uint8_t {
-    Idle = 0,
-    Running = 1,
-    Done = 2,
-    Aborted = 3,
-};
-
-enum class BringupResult : std::uint8_t {
-    Pass = 0,
-    NotMoved = 1,      // no encoder moved
-    Reversed = 2,      // its own encoder moved the wrong way
-    OtherEncoder = 3,  // another encoder moved most
-};
+// The case's state and each output's result, declared in
+// schema/enum/bringup_state.enum and bringup_result.enum (ADR-0006).
+using BringupState = msg::BringupState;
+using BringupResult = msg::BringupResult;
 
 struct OutputResult {
-    BringupResult result = BringupResult::NotMoved;
+    BringupResult result = BringupResult::NoEncoderMoved;
     std::uint8_t encoder = 0;  // the encoder that moved most, 1 to max_outputs, 0 for none
     std::int8_t sign = 0;
 };

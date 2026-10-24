@@ -71,13 +71,13 @@ void BringupCase::evaluate(const Settings& settings)
     }
     OutputResult& result = results_[current_];
     if (!any) {
-        result = {.result = BringupResult::NotMoved, .encoder = 0, .sign = 0};
+        result = {.result = BringupResult::NoEncoderMoved, .encoder = 0, .sign = 0};
         return;
     }
     const auto sign = static_cast<std::int8_t>(moved_[most] > 0 ? 1 : -1);
     const auto encoder = static_cast<std::uint8_t>(most + 1);
     if (most != current_) {
-        result = {.result = BringupResult::OtherEncoder, .encoder = encoder, .sign = sign};
+        result = {.result = BringupResult::AnotherEncoderMoved, .encoder = encoder, .sign = sign};
     } else {
         result = {.result = sign > 0 ? BringupResult::Pass : BringupResult::Reversed, .encoder = encoder, .sign = sign};
     }
