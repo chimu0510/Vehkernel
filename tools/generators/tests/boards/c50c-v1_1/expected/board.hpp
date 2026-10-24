@@ -351,6 +351,10 @@ namespace bootloader {
 enum class Kind : std::uint8_t { Vehkernel, ArduPilot, Px4 };
 inline constexpr Kind kind = Kind::Vehkernel;
 inline constexpr std::array<std::string_view, 2> ports{"SERIAL2", "SERIAL1"};
+// The same ports as types, in a list template of the bootloader's choosing.
+template <template <class...> class List> using port_list = List<ports::SERIAL2, ports::SERIAL1>;
+using stay_pin = void;  // no stay-in-bootloader input
+inline constexpr bool stay_active_high = false;
 }  // namespace bootloader
 
 // Board default parameters (ADR-0012), as compile-time constants until the

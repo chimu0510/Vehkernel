@@ -268,6 +268,12 @@ def _bootloader_namespace(board: Board) -> list[str]:
     if loader.ports:
         names = ", ".join(f'"{p}"' for p in loader.ports)
         out.append(f"inline constexpr std::array<std::string_view, {len(loader.ports)}> ports{{{names}}};")
+        types = ", ".join(f"ports::{p}" for p in loader.ports)
+        out += ["// The same ports as types, in a list template of the bootloader's choosing.",
+                f"template <template <class...> class List> using port_list = List<{types}>;"]
+    if loader.kind == "VEHKERNEL" and loader.stay is None:
+        out += ["using stay_pin = void;  // no stay-in-bootloader input",
+                "inline constexpr bool stay_active_high = false;"]
     if loader.stay is not None:
         out += [f"using stay_pin = pins::{loader.stay.pin};",
                 f"inline constexpr bool stay_active_high = {'true' if loader.stay.active == 'HIGH' else 'false'};"]
