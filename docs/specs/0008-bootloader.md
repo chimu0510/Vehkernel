@@ -1,8 +1,8 @@
 # Spec 0008: the bootloader
 
-**Status**: in progress. Issue: [#61](https://github.com/chimu0510/Vehkernel/issues/61); tickets #62 to #67, with the hardware check in #67.
+**Status**: done. Issue: [#61](https://github.com/chimu0510/Vehkernel/issues/61); tickets #62 to #67. The hardware check in #67 confirmed it on the C50C V1.1 on 2026-10-24, after #92 (fixed by #93) made updates over SERIAL2 work.
 
-Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
+This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 
 ## Problem Statement
 

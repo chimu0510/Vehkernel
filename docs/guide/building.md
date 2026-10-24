@@ -12,6 +12,8 @@ Tools that need the development host's USB devices run on the host, outside the 
 | [`stm32flash`](https://sourceforge.net/projects/stm32flash/) | 0.7 (`sudo apt install stm32flash`) | Flashing through the STM32 system bootloader ([Flashing](flashing.md)) |
 | [pyserial](https://pypi.org/project/pyserial/) | 3.5, as `pyproject.toml` pins it | ArduPilot's `uploader.py`, which updates the firmware through the bootloader ([Flashing](flashing.md)) |
 
+Disable ModemManager on the host (`sudo systemctl disable --now ModemManager`), and remove `brltty` if no braille display is used; `uploader.py` warns about both. ModemManager probes new `/dev/ttyACM*` devices and may drive their DTR and RTS lines, which on a download port can reset the board or hold BOOT0 high.
+
 ## Presets
 
 There is one CMake preset per build target:
