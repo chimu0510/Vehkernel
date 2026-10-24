@@ -14,19 +14,20 @@ from .schema import SchemaError, load_schema
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="generate_schema.py",
-        description="Validate .msg schema files and emit typed C++ topics.")
-    parser.add_argument("messages", type=Path, nargs="*", help=".msg files, for example schema/msg/imu_sample.msg")
+        description="Validate .msg and .enum schema files and emit typed C++ topics and enums.")
+    parser.add_argument("files", type=Path, nargs="*",
+                        help=".msg and .enum files, for example schema/msg/imu_sample.msg schema/enum/mode.enum")
     parser.add_argument("--output-dir", type=Path, required=True, help="directory for generated files")
     args = parser.parse_args(argv)
 
     try:
-        messages = load_schema(args.messages)
+        schema = load_schema(args.files)
     except SchemaError as error:
         for diagnostic in error.diagnostics:
             print(diagnostic, file=sys.stderr)
         return 1
 
-    for name, text in outputs(messages).items():
+    for name, text in outputs(schema).items():
         target = args.output_dir / name
         target.parent.mkdir(parents=True, exist_ok=True)
         # Leave unchanged files alone so the build does not recompile needlessly.

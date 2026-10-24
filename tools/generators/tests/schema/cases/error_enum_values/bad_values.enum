@@ -1,0 +1,12 @@
+@type uint8
+OK = 0
+lower_case = 1
+OK = 2
+TAKEN = 0
+NOT_A_NUMBER = 0x10
+QUOTED = 3  @short "Q"
+NOTED = 4  @label N
+TWICE = 5  @short A  @short B
+NEGATIVE = -1
+TOO_BIG = 256
+NO_VALUE

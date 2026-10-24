@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Parse and validate .msg files.
+"""Parse and validate .msg and .enum files.
 
 A .msg file defines one message; its file name is the topic name. The syntax
 follows ROS .msg files, with annotations on their own lines::
@@ -9,11 +9,24 @@ follows ROS .msg files, with annotations on their own lines::
     @rate 200
     uint64 timestamp            # time of sampling
     float32[3] accel  @unit m/s^2
+    uint8 mode  @enum mode
 
 Message annotations are ``@queue N`` (a queue of N samples instead of the
 latest value), ``@instances N`` and ``@rate HZ`` (nominal publish rate). A
-field may carry ``@unit <unit>``. ``#`` starts a comment; comment lines before
-the first field document the message, except ``SPDX-`` license tags.
+field may carry ``@unit <unit>`` and ``@enum <enum>``, the name of the enum
+whose values it takes; the field's integer type must hold every one of them.
+
+A .enum file defines one enum; its file name is the enum name. ``@type``
+gives the integer type of its values, and each value takes a line of its
+own, with an optional short name for narrow screens::
+
+    # Why the vehicle last disarmed.
+    @type uint8
+    NONE = 0              @short -
+    EMERGENCY_STOP = 2    @short ESTOP   # engaged for 5 s while armed
+
+``#`` starts a comment; comment lines before the first field or value document
+the message or the enum, except ``SPDX-`` license tags.
 """
 
 from __future__ import annotations
@@ -74,12 +87,35 @@ CPP_KEYWORDS = {
     "void", "volatile", "while", "xor",
 }
 
+# Integer schema type -> the range of its values, for enums.
+INTEGER_RANGES = {
+    "int8": (-(1 << 7), (1 << 7) - 1),
+    "int16": (-(1 << 15), (1 << 15) - 1),
+    "int32": (-(1 << 31), (1 << 31) - 1),
+    "int64": (-(1 << 63), (1 << 63) - 1),
+    "uint8": (0, (1 << 8) - 1),
+    "uint16": (0, (1 << 16) - 1),
+    "uint32": (0, (1 << 32) - 1),
+    "uint64": (0, (1 << 64) - 1),
+}
+
 NAME = re.compile(r"[a-z][a-z0-9_]*\Z")
-FIELD = re.compile(r"(?P<type>[a-z0-9]+)(?:\[(?P<len>[^\]]*)\])?\s+(?P<name>\S+)(?:\s+@unit\s+(?P<unit>\S+))?\Z")
+VALUE_NAME = re.compile(r"[A-Z][A-Z0-9_]*\Z")
+INTEGER = re.compile(r"-?[0-9]+\Z")
+NOTES = r"(?P<notes>(?:\s+@\S+\s+\S+)*)"
+FIELD = re.compile(r"(?P<type>[a-z0-9]+)(?:\[(?P<len>[^\]]*)\])?\s+(?P<name>\S+)" + NOTES + r"\Z")
+VALUE = re.compile(r"(?P<name>[^\s=]+)\s*=\s*(?P<value>\S+)" + NOTES + r"\Z")
+NOTE = re.compile(r"@(?P<key>\S+)\s+(?P<value>\S+)")
 ANNOTATION = re.compile(r"@(?P<key>\S+)(?:\s+(?P<value>\S+))?\Z")
 MAX_QUEUE = 255
-RESERVED_MESSAGES = {"registry"}
+# Names the generated files and declarations take for themselves.
+RESERVED_NAMES = {"registry", "enums", "wire", "topics", "enum_value", "enum_values", "topic_list"}
 MAX_INSTANCES = 32
+
+
+def type_name(name: str) -> str:
+    """The C++ and Python type of a message or an enum: imu_sample -> ImuSample."""
+    return "".join(part.capitalize() for part in name.split("_"))
 
 
 @dataclass(frozen=True)
@@ -90,6 +126,7 @@ class Field:
     unit: str | None
     comment: str | None
     line: int
+    enum: str | None = None  # name of the enum whose values the field takes
 
     @property
     def cpp_type(self) -> str:
@@ -126,7 +163,7 @@ class Message:
 
     @property
     def type_name(self) -> str:
-        return "".join(part.capitalize() for part in self.name.split("_"))
+        return type_name(self.name)
 
     @property
     def encoded_size(self) -> int:
@@ -136,9 +173,51 @@ class Message:
     def schema_hash(self) -> int:
         """64-bit hash of the definition as it appears on the wire: the message
         name and each field's type and name, in order. Comments, units and
-        MCU-side annotations do not change it."""
+        MCU-side annotations do not change it, nor does the enum a field takes
+        or that enum's values (ADR-0006)."""
         canonical = "\n".join([self.name] + [f"{f.schema_type} {f.name}" for f in self.fields])
         return int.from_bytes(hashlib.sha256(canonical.encode()).digest()[:8], "big")
+
+
+@dataclass(frozen=True)
+class EnumValue:
+    name: str
+    value: int
+    short: str | None
+    comment: str | None
+    line: int
+
+    @property
+    def cpp_name(self) -> str:
+        """BOARD_NOT_VERIFIED -> BoardNotVerified."""
+        return type_name(self.name.lower())
+
+    @property
+    def short_name(self) -> str:
+        return self.short or self.name
+
+
+@dataclass
+class Enum:
+    name: str
+    source: str
+    doc: list[str] = field(default_factory=list)
+    type: str | None = None
+    values: list[EnumValue] = field(default_factory=list)
+
+    @property
+    def type_name(self) -> str:
+        return type_name(self.name)
+
+    @property
+    def cpp_type(self) -> str:
+        return TYPES[self.type or "uint8"]
+
+
+@dataclass
+class Schema:
+    messages: list[Message]
+    enums: list[Enum]
 
 
 class SchemaError(Exception):
@@ -188,10 +267,30 @@ def _parse_annotation(message: Message, match: re.Match, loc: Loc, seen: dict[st
         diag.error(f"unknown annotation @{key}; expected @queue, @instances or @rate", loc)
 
 
+def _parse_notes(text: str, allowed: tuple[str, ...], loc: Loc, diag: Diagnostics) -> dict[str, str] | None:
+    """The ``@key value`` annotations after a field or an enum value."""
+    notes: dict[str, str] = {}
+    ok = True
+    for note in NOTE.finditer(text):
+        key, value = note["key"], note["value"]
+        if key not in allowed:
+            expected = " or ".join(f"@{a}" for a in allowed)
+            diag.error(f"unknown annotation @{key}; expected {expected}", loc)
+            ok = False
+        elif key in notes:
+            diag.error(f"@{key} is given twice", loc)
+            ok = False
+        else:
+            notes[key] = value
+    return notes if ok else None
+
+
 def _parse_field(match: re.Match, comment: str | None, loc: Loc, message: Message,
                  diag: Diagnostics) -> None:
-    type_, length_text, name, unit = match["type"], match["len"], match["name"], match["unit"]
-    ok = True
+    type_, length_text, name = match["type"], match["len"], match["name"]
+    notes = _parse_notes(match["notes"], ("unit", "enum"), loc, diag)
+    ok = notes is not None
+    notes = notes or {}
     if type_ not in TYPES:
         diag.error(f"unknown type '{type_}'; expected one of: {', '.join(TYPES)}", loc)
         ok = False
@@ -213,7 +312,8 @@ def _parse_field(match: re.Match, comment: str | None, loc: Loc, message: Messag
                 diag.error(f"field '{name}' is already defined on line {other.line}", loc)
                 ok = False
     if ok:
-        message.fields.append(Field(type_, length, name, unit, comment, loc.line))
+        message.fields.append(Field(type_, length, name, notes.get("unit"), comment, loc.line,
+                                    notes.get("enum")))
 
 
 def parse_message(path: Path, display: str, diag: Diagnostics) -> Message | None:
@@ -221,7 +321,7 @@ def parse_message(path: Path, display: str, diag: Diagnostics) -> Message | None
     message = Message(name=name, source=display)
     if not NAME.match(name):
         diag.error(f"message file name '{path.name}' must be lower_snake_case with the .msg suffix")
-    elif name in RESERVED_MESSAGES:
+    elif name in RESERVED_NAMES:
         diag.error(f"message name '{name}' is reserved for generated code")
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
@@ -270,13 +370,135 @@ def parse_message(path: Path, display: str, diag: Diagnostics) -> Message | None
     return message if len(diag.errors) == errors_before else None
 
 
-def load_schema(paths: list[Path]) -> list[Message]:
-    """Parse every .msg file, reporting all errors at once. Sorted by name."""
+def _parse_value(match: re.Match, comment: str | None, loc: Loc, enum: Enum, diag: Diagnostics) -> None:
+    name, value_text = match["name"], match["value"]
+    notes = _parse_notes(match["notes"], ("short",), loc, diag)
+    ok = notes is not None
+    notes = notes or {}
+    if not VALUE_NAME.match(name):
+        diag.error(f"value name '{name}' must be UPPER_SNAKE_CASE", loc)
+        ok = False
+    elif keyword.iskeyword(name):
+        diag.error(f"value name '{name}' is a reserved word", loc)
+        ok = False
+    if not INTEGER.match(value_text):
+        diag.error(f"value of '{name}' must be a decimal integer, got '{value_text}'", loc)
+        ok = False
+    short = notes.get("short")
+    if short is not None and not all(" " < c <= "~" and c not in "\"\\" for c in short):
+        diag.error(f"short name '{short}' must be printable ASCII without quotes or backslashes", loc)
+        ok = False
+    if not ok:
+        return
+    value = int(value_text)
+    for other in enum.values:
+        if other.name == name:
+            diag.error(f"value '{name}' is already defined on line {other.line}", loc)
+            return
+        if other.value == value:
+            diag.error(f"value {value} is already taken by '{other.name}' on line {other.line}", loc)
+            return
+    enum.values.append(EnumValue(name, value, short, comment, loc.line))
+
+
+def parse_enum(path: Path, display: str, diag: Diagnostics) -> Enum | None:
+    name = path.stem
+    enum = Enum(name=name, source=display)
+    if not NAME.match(name):
+        diag.error(f"enum file name '{path.name}' must be lower_snake_case with the .enum suffix")
+    elif name in RESERVED_NAMES:
+        diag.error(f"enum name '{name}' is reserved for generated code")
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        diag.error(error.strerror or str(error))
+        return None
+
+    errors_before = len(diag.errors)
+    type_line = None
+    for number, raw in enumerate(lines, start=1):
+        loc = Loc(display, number)
+        text, _, comment = raw.partition("#")
+        text, comment = text.strip(), comment.strip() or None
+        if not text:
+            if comment is not None and not enum.values and not comment.startswith("SPDX-"):
+                enum.doc.append(comment)
+            continue
+        if text.startswith("@"):
+            match = ANNOTATION.match(text)
+            if match is None:
+                diag.error(f"cannot parse annotation '{text}'", loc)
+            elif match["key"] != "type":
+                diag.error(f"unknown annotation @{match['key']}; expected @type", loc)
+            elif type_line is not None:
+                diag.error(f"@type is already set on line {type_line}", loc)
+            else:
+                type_line = number
+                if match["value"] in INTEGER_RANGES:
+                    enum.type = match["value"]
+                else:
+                    diag.error(f"@type needs an integer type: {', '.join(INTEGER_RANGES)}; "
+                               f"got '{match['value'] or ''}'", loc)
+            continue
+        match = VALUE.match(text)
+        if match is None:
+            diag.error(f"cannot parse '{text}'; expected '<NAME> = <value>'", loc)
+            continue
+        _parse_value(match, comment, loc, enum, diag)
+
+    if type_line is None:
+        diag.error("enum has no @type; it needs the integer type of its values")
+    elif enum.type is not None:
+        low, high = INTEGER_RANGES[enum.type]
+        for value in enum.values:
+            if not low <= value.value <= high:
+                diag.error(f"value {value.value} of '{value.name}' does not fit @type {enum.type}",
+                           Loc(display, value.line))
+    if not enum.values and len(diag.errors) == errors_before:
+        diag.error("enum has no values")
+    return enum if len(diag.errors) == errors_before else None
+
+
+def _check_enum_fields(message: Message, enums: dict[str, Enum], errors: list[Diagnostic]) -> None:
+    for f in message.fields:
+        if f.enum is None:
+            continue
+        enum = enums.get(f.enum)
+        if enum is None:
+            errors.append(Diagnostic(message.source, f.line, f"field '{f.name}' takes unknown enum '{f.enum}'"))
+        elif f.type not in INTEGER_RANGES:
+            errors.append(Diagnostic(message.source, f.line,
+                                     f"field '{f.name}' takes enum '{f.enum}' but its type {f.type} is not "
+                                     f"an integer type"))
+        else:
+            low, high = INTEGER_RANGES[f.type]
+            for value in enum.values:
+                if not low <= value.value <= high:
+                    errors.append(Diagnostic(message.source, f.line,
+                                             f"field '{f.name}' of type {f.type} cannot hold value "
+                                             f"{value.value} of enum '{f.enum}' ({value.name})"))
+                    break
+
+
+def load_schema(paths: list[Path]) -> Schema:
+    """Parse every .msg and .enum file, reporting all errors at once. Sorted by name."""
     errors: list[Diagnostic] = []
     messages: dict[str, Message] = {}
+    enums: dict[str, Enum] = {}
     for path in paths:
         display = str(path)
         diag = Diagnostics(display)
+        if path.suffix == ".enum":
+            enum = parse_enum(path, display, diag)
+            errors += diag.errors
+            if enum is None:
+                continue
+            if enum.name in enums:
+                errors.append(Diagnostic(display, None, f"enum '{enum.name}' is already defined in "
+                                                        f"{enums[enum.name].source}"))
+                continue
+            enums[enum.name] = enum
+            continue
         message = parse_message(path, display, diag)
         errors += diag.errors
         if message is None:
@@ -286,6 +508,11 @@ def load_schema(paths: list[Path]) -> list[Message]:
                                                     f"{messages[message.name].source}"))
             continue
         messages[message.name] = message
+    for name in sorted(set(enums) & set(messages)):
+        errors.append(Diagnostic(enums[name].source, None,
+                                 f"enum '{name}' has the name of the message in {messages[name].source}"))
+    for name in sorted(messages):
+        _check_enum_fields(messages[name], enums, errors)
     if errors:
         raise SchemaError(errors)
-    return [messages[name] for name in sorted(messages)]
+    return Schema([messages[name] for name in sorted(messages)], [enums[name] for name in sorted(enums)])

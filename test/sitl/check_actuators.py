@@ -321,7 +321,7 @@ def check_emergency_stop(vehicle: Vehicle, args, port: int, failures: list[str])
         if not EMERGENCY_STOP_DISARM_S - 0.01 <= after_s <= EMERGENCY_STOP_DISARM_S + 0.25:
             failures.append(f"the emergency stop disarmed {after_s:.3f} s after it was engaged, not 5 s")
     refused = second.monitor.request_arming(True, REPLY_S)
-    if refused is None or refused.reason_text != "emergency stop engaged":
+    if refused is None or refused.reason_text != "emergency stop":
         failures.append("arming with the emergency stop engaged was not refused for it")
     second.monitor.request_estop(False, REPLY_S)
     # Let the setpoints sent while disarmed go stale.

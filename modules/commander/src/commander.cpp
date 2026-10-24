@@ -119,7 +119,7 @@ core::BringupStart Commander::request_bringup(core::ControlSource source, std::u
         return core::BringupStart::EmergencyStop;
     }
     if (inputs_.bringup_running) {
-        return core::BringupStart::Running;
+        return core::BringupStart::AlreadyRunning;
     }
     return core::BringupStart::Ok;
 }

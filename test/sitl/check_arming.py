@@ -125,7 +125,7 @@ def main() -> int:
         # The emergency stop, from another connection than the one in control.
         if cli(args, address, "estop", "on").stdout != "emergency_stop=1\n":
             failures.append("estop on was not taken")
-        if not refused_as(cli(args, address, "arm"), "emergency stop engaged"):
+        if not refused_as(cli(args, address, "arm"), "emergency stop"):
             failures.append("arming with the emergency stop engaged was not refused for it")
         with Connected(args, port) as monitor:
             status = latest_status(monitor) if monitor else None

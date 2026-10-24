@@ -8,6 +8,17 @@ import enum
 import struct
 from dataclasses import dataclass
 
+from .enums import (
+    ActuatorPower,
+    ArmingResult,
+    BringupCase,
+    BringupStart,
+    DisarmReason,
+    Mode,
+    ModeResult,
+    RebootAction,
+    RebootResult,
+)
 from .frame import PROTOCOL_VERSION, Frame, FrameType, FrameWriter
 
 
@@ -27,50 +38,33 @@ REJECT_REASONS = {
 }
 
 
-# Modes and the reasons of mode, arming and emergency stop replies; vk::core.
-MODES = {0: "STANDBY", 1: "TEST"}
-MODE_REJECT_REASONS = {1: "armed", 2: "unknown mode"}
-ARMING_REJECT_REASONS = {
-    1: "board not verified",
-    2: "emergency stop engaged",
-    3: "wrong mode",
-    4: "not in control",
-    5: "setpoints active",
-    6: "bring-up running",
-    7: "actuator power off",
-    8: "actuators not started",
-    9: "local menu open",
-    10: "rebooting",
-}
-# Reboot actions, numbered as MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN's param1, and
-# why a reboot was refused; vk::core::RebootAction and RebootResult.
-REBOOT_ACTIONS = {"reboot": 1, "bootloader": 3}
-REBOOT_REJECT_REASONS = {1: "armed", 2: "unknown action", 3: "not available"}
-DISARM_REASONS = {
-    0: "none",
-    1: "request",
-    2: "emergency stop",
-    3: "actuator power lost",
-    4: "setpoint timeout",
-    5: "idle",
-    6: "bring-up abort",
-}
-ACTUATOR_POWER_STATES = {0: "not available", 1: "unpowered", 2: "settling", 3: "powered"}
+def value_texts(values: type[enum.IntEnum]) -> dict[int, str]:
+    """Readable names of an enum's values: EMERGENCY_STOP -> 'emergency stop'."""
+    return {value.value: value.name.lower().replace("_", " ") for value in values}
+
+
+def reason_texts(results: type[enum.IntEnum]) -> dict[int, str]:
+    """Readable names of the reasons a result enum gives, OK left out."""
+    return {number: text for number, text in value_texts(results).items() if number != 0}
+
+
+# Modes and the reasons of mode, arming, reboot and bring-up replies, from the
+# schema's enums (schema/enum/, ADR-0006).
+MODES = {value.value: value.name for value in Mode}
+MODE_REJECT_REASONS = reason_texts(ModeResult)
+ARMING_REJECT_REASONS = reason_texts(ArmingResult)
+# Reboot actions, numbered as MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN's param1.
+REBOOT_ACTIONS = {value.name.lower(): value.value for value in RebootAction}
+REBOOT_REJECT_REASONS = reason_texts(RebootResult)
+DISARM_REASONS = value_texts(DisarmReason)
+ACTUATOR_POWER_STATES = value_texts(ActuatorPower)
 # Bits of COM_ARM_CHECK.
 ARM_CHECK_BITS = {0: "ACT_POWER"}
 
 
-# The bring-up cases, why a bringup_run was refused, and each output's result; vk::core and vk::actuators.
-BRINGUP_CASES = {"motors": 1}
-BRINGUP_REJECT_REASONS = {
-    1: "not available",
-    2: "unknown case",
-    3: "wrong mode",
-    4: "not armed",
-    5: "not in control",
-    6: "emergency stop engaged",
-    7: "already running",
-}
+# The bring-up cases, why a bringup_run was refused, and each output's result; vk::actuators.
+BRINGUP_CASES = {value.name.lower(): value.value for value in BringupCase}
+BRINGUP_REJECT_REASONS = reason_texts(BringupStart)
 BRINGUP_RESULTS = {0: "pass", 1: "no encoder moved", 2: "reversed", 3: "another encoder moved"}
 
 

@@ -1,0 +1,6 @@
+notes.msg:2: error: @unit is given twice
+notes.msg:3: error: unknown annotation @range; expected @unit or @enum
+fields.msg:2: error: field 'unknown' takes unknown enum 'missing'
+fields.msg:3: error: field 'real' takes enum 'wide' but its type float32 is not an integer type
+fields.msg:4: error: field 'flag' takes enum 'wide' but its type bool is not an integer type
+fields.msg:5: error: field 'narrow' of type uint8 cannot hold value 300 of enum 'wide' (LARGE)

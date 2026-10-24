@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Reboot actions, numbered as MAVLink's MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN
+# param1, so MAVLink maps onto them directly (ADR-0023).
+@type uint8
+REBOOT = 1                        # start the firmware again
+BOOTLOADER = 3                    # stay in the bootloader until flashed or reset

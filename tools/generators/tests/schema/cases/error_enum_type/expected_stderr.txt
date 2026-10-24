@@ -1,0 +1,5 @@
+empty.enum: error: enum has no values
+float_type.enum:1: error: @type needs an integer type: int8, int16, int32, int64, uint8, uint16, uint32, uint64; got 'float32'
+no_type.enum: error: enum has no @type; it needs the integer type of its values
+twice.enum:2: error: @type is already set on line 1
+twice.enum:3: error: unknown annotation @size; expected @type

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Why an arm request was refused, in the order the checks run. Short names
+# fit the local display's status page (ADR-0022).
+@type uint8
+OK = 0                     @short -
+BOARD_NOT_VERIFIED = 1     @short BOARD       # ADR-0010
+EMERGENCY_STOP = 2         @short ESTOP       # engaged
+WRONG_MODE = 3                                # only TEST can be armed for now
+NOT_IN_CONTROL = 4         @short NO_CONTROL  # the request did not come from the source in control
+SETPOINTS_ACTIVE = 5       @short SETPOINTS   # a setpoint is neither NaN nor zero
+BRINGUP_RUNNING = 6        @short BRINGUP
+ACTUATOR_POWER_OFF = 7     @short ACT_POWER   # unpowered or still settling, and the check is not skipped
+ACTUATORS_NOT_STARTED = 8  @short ACTUATORS
+LOCAL_MENU_OPEN = 9        @short MENU_OPEN   # ADR-0022
+REBOOTING = 10                                # a reboot was accepted and is about to happen

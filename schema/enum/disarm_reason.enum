@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Why the vehicle last disarmed. Short names fit the local display's status
+# page (ADR-0022).
+@type uint8
+NONE = 0                   @short -
+REQUEST = 1
+EMERGENCY_STOP = 2         @short ESTOP       # engaged for 5 s while armed
+ACTUATOR_POWER_LOST = 3    @short POWER_LOST
+SETPOINT_TIMEOUT = 4       @short TIMEOUT
+IDLE = 5
+BRINGUP_ABORT = 6

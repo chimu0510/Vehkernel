@@ -1,0 +1,10 @@
+bad_values.enum:3: error: value name 'lower_case' must be UPPER_SNAKE_CASE
+bad_values.enum:4: error: value 'OK' is already defined on line 2
+bad_values.enum:5: error: value 0 is already taken by 'OK' on line 2
+bad_values.enum:6: error: value of 'NOT_A_NUMBER' must be a decimal integer, got '0x10'
+bad_values.enum:7: error: short name '"Q"' must be printable ASCII without quotes or backslashes
+bad_values.enum:8: error: unknown annotation @label; expected @short
+bad_values.enum:9: error: @short is given twice
+bad_values.enum:12: error: cannot parse 'NO_VALUE'; expected '<NAME> = <value>'
+bad_values.enum:10: error: value -1 of 'NEGATIVE' does not fit @type uint8
+bad_values.enum:11: error: value 256 of 'TOO_BIG' does not fit @type uint8

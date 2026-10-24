@@ -3,6 +3,7 @@
 
 #include <vk/estimation/math/quaternion.hpp>
 #include <vk/local_display/font.hpp>
+#include <vk/msg/enums.hpp>
 
 #include <array>
 #include <cmath>
@@ -73,39 +74,51 @@ private:
     std::size_t size_ = 0;
 };
 
-// Names short enough for their line, matching the commander's enums
-// (vk/core/vehicle_control.hpp) and vehicle_status.
+// The short names of the schema's enums (schema/enum/), `unknown` for a value
+// the schema does not name.
+template <class Enum>
+std::string_view short_name(std::uint8_t value, std::string_view unknown = "?")
+{
+    const std::string_view name = msg::enum_short_name(static_cast<Enum>(value));
+    return name.empty() ? unknown : name;
+}
+
+// Whether every short name of `Enum` fits in `width` columns.
+template <class Enum>
+constexpr bool fits(std::size_t width)
+{
+    for (const auto& entry : msg::EnumValues<Enum>::values) {
+        if (entry.short_name.size() > width) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Each name fits its line on the status page: after the label, or before " DISARMED".
+static_assert(fits<msg::Mode>(TextScreen::columns - 9));
+static_assert(fits<msg::ActuatorPower>(TextScreen::columns - 6));
+static_assert(fits<msg::ArmingResult>(TextScreen::columns - 8));
+static_assert(fits<msg::DisarmReason>(TextScreen::columns - 8));
+
 std::string_view mode_name(std::uint8_t mode)
 {
-    switch (mode) {
-    case 0:
-        return "STANDBY";
-    case 1:
-        return "TEST";
-    default:
-        return "MODE?";
-    }
+    return short_name<msg::Mode>(mode, "MODE?");
 }
 
 std::string_view refusal_name(std::uint8_t reason)
 {
-    static constexpr std::array<std::string_view, 11> names{
-        "-",         "BOARD",     "ESTOP",     "WRONG_MODE", "NO_CONTROL", "SETPOINTS",
-        "BRINGUP",   "ACT_POWER", "ACTUATORS", "MENU_OPEN",  "REBOOTING"};
-    return reason < names.size() ? names.at(reason) : "?";
+    return short_name<msg::ArmingResult>(reason);
 }
 
 std::string_view disarm_name(std::uint8_t reason)
 {
-    static constexpr std::array<std::string_view, 7> names{
-        "-", "REQUEST", "ESTOP", "POWER_LOST", "TIMEOUT", "IDLE", "BRINGUP_ABORT"};
-    return reason < names.size() ? names.at(reason) : "?";
+    return short_name<msg::DisarmReason>(reason);
 }
 
 std::string_view power_name(std::uint8_t state)
 {
-    static constexpr std::array<std::string_view, 4> names{"N/A", "OFF", "WAIT", "ON"};
-    return state < names.size() ? names.at(state) : "?";
+    return short_name<msg::ActuatorPower>(state);
 }
 
 void header(TextScreen& screen, std::string_view title, Page page)

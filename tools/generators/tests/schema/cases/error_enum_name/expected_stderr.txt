@@ -1,0 +1,3 @@
+BadName.enum: error: enum file name 'BadName.enum' must be lower_snake_case with the .enum suffix
+enums.enum: error: enum name 'enums' is reserved for generated code
+topic.enum: error: enum 'topic' has the name of the message in topic.msg

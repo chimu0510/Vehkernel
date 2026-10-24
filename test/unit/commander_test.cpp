@@ -325,7 +325,7 @@ TEST_F(CommanderTest, ABringupCaseNeedsToBeBuiltInAndNotRunning)
     inputs.bringup_available = true;
     inputs.bringup_running = true;
     step();
-    EXPECT_EQ(commander.request_bringup(link0, motors_case), BringupStart::Running);
+    EXPECT_EQ(commander.request_bringup(link0, motors_case), BringupStart::AlreadyRunning);
     // While it runs: no setpoints, no idle or setpoint timeout, no arming.
     EXPECT_FALSE(commander.accepts_setpoint(link0));
     step(static_cast<std::uint64_t>(settings.disarm_idle_s * 1e6F) + cycle_us);
