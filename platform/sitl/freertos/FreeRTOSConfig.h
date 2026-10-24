@@ -9,8 +9,6 @@
 #ifndef FREERTOS_CONFIG_H
 #define FREERTOS_CONFIG_H
 
-#include <assert.h>
-
 /* Scheduler. */
 #define configTICK_RATE_HZ            1000
 #define configUSE_PREEMPTION          1
@@ -54,6 +52,20 @@
 #define INCLUDE_xTaskGetSchedulerState      1
 #define INCLUDE_uxTaskGetStackHighWaterMark 1
 
-#define configASSERT(x) assert(x)
+/*
+ * A failed assertion goes to the fault stop (platform.cpp, ADR-0005), which
+ * turns the simulated outputs off and ends the run, as on hardware.
+ */
+#ifdef __cplusplus
+extern "C" {
+#endif
+void vk_assert_failed(void) __attribute__((noreturn));
+#ifdef __cplusplus
+}
+#endif
+#define configASSERT(x)     \
+    if ((x) == 0) {         \
+        vk_assert_failed(); \
+    }
 
 #endif /* FREERTOS_CONFIG_H */

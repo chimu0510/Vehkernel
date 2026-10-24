@@ -44,7 +44,7 @@ The design as the ADRs decide it; [Status](#status) says which parts run today.
   - Messages are defined in a single schema and code is generated from it ([0006](docs/adr/0006-schema-and-wire-encoding.md)).
 - **ROS2 interface**: a vehicle-level topic API with three setpoint levels; ros2_control is optional ([0003](docs/adr/0003-vehicle-level-ros2-api.md)).
 - **Safety and local operation**:
-  - The mode decides who is in control, and the remote control can always take over; arming checks, an emergency stop and an output watchdog guard the outputs ([0005](docs/adr/0005-setpoint-arbitration.md)).
+  - The mode decides who is in control, and the remote control can always take over; arming checks, an emergency stop, an output watchdog, a fault stop and the hardware watchdog guard the outputs ([0005](docs/adr/0005-setpoint-arbitration.md)).
   - A local display shows the vehicle's status, and its local menu changes whitelisted parameters only while disarmed ([0022](docs/adr/0022-local-display-and-local-menu.md)).
 - **Runtime**: FreeRTOS, a C++20 subset, and rate-tiered work queues ([0004](docs/adr/0004-freertos.md), [0007](docs/adr/0007-cpp20-subset.md), [0008](docs/adr/0008-bus-and-work-queues.md)).
 - **Hardware support**:

@@ -46,7 +46,7 @@ def main() -> int:
     print("display:")
     for line in lines:
         print(f"  |{line}|")
-    expected = {0: "STATUS            1/3", 1: "STANDBY DISARMED", 2: "ESTOP OFF BOARD OK", 3: "POWER ON"}
+    expected = {0: "STATUS            1/3", 1: "STANDBY DISARMED", 2: "ESTOP OFF BOARD OK", 3: "POWER ON   RST POWER"}
     failures = [f"line {n}: expected {text!r}, got {lines[n]!r}" for n, text in expected.items() if lines[n] != text]
     for failure in failures:
         print(f"FAIL: {failure}")

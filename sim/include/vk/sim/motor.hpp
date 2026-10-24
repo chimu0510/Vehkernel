@@ -40,6 +40,9 @@ public:
     // The encoder counter now.
     [[nodiscard]] std::uint16_t count();
 
+    // The duty it is driven with, for checks.
+    [[nodiscard]] float duty() const { return duty_; }
+
     // The wheel's true speed and angle now, for checks.
     [[nodiscard]] float speed();
     [[nodiscard]] double angle();

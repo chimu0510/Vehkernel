@@ -95,9 +95,13 @@ constexpr bool fits(std::size_t width)
     return true;
 }
 
+// The reset cause's column on the status page's power line.
+constexpr std::size_t reset_column = 11;
+
 // Each name fits its line on the status page: after the label, or before " DISARMED".
 static_assert(fits<msg::Mode>(TextScreen::columns - 9));
-static_assert(fits<msg::ActuatorPower>(TextScreen::columns - 6));
+static_assert(fits<msg::ActuatorPower>(reset_column - 7));
+static_assert(fits<msg::ResetCause>(TextScreen::columns - reset_column - 4));
 static_assert(fits<msg::ArmingResult>(TextScreen::columns - 8));
 static_assert(fits<msg::DisarmReason>(TextScreen::columns - 8));
 
@@ -121,6 +125,11 @@ std::string_view power_name(std::uint8_t state)
     return short_name<msg::ActuatorPower>(state);
 }
 
+std::string_view reset_name(std::uint8_t cause)
+{
+    return short_name<msg::ResetCause>(cause);
+}
+
 void header(TextScreen& screen, std::string_view title, Page page)
 {
     screen.put(0, 0, title);
@@ -141,6 +150,7 @@ void render_status(const Inputs& inputs, TextScreen& screen)
     screen.put(2, 0, Line().add("ESTOP ").add(s.emergency_stop ? "ON" : "OFF").view());
     screen.put(2, 10, Line().add("BOARD ").add(s.board_verified ? "OK" : "FAIL").view());
     screen.put(3, 0, Line().add("POWER ").add(power_name(s.actuator_power)).view());
+    screen.put(3, reset_column, Line().add("RST ").add(reset_name(s.reset_cause)).view());
     Line skipped;
     skipped.add("SKIP ");
     if (s.skipped_checks == 0) {

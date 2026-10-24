@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# What caused the last reset, as the platform read it at boot (ADR-0005).
+# A watchdog or fault reset refuses arming until the next deliberate reset.
+# Short names fit the local display's status page (ADR-0022).
+@type uint8
+UNKNOWN = 0                @short ?           # the platform cannot tell
+POWER_ON = 1               @short POWER       # power-on or brownout
+PIN = 2                                       # the reset pin: a reset button, a debugger or a download circuit
+SOFTWARE = 3               @short SOFT        # a reboot the firmware was asked for
+WATCHDOG = 4               @short WDOG        # the hardware watchdog, after the scheduler stalled
+FAULT = 5                                     # the fault stop, after a fault, a failed assertion or a stack overflow
+LOW_POWER = 6              @short LOWPWR      # the low-power reset of the MCU

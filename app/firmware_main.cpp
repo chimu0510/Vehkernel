@@ -29,7 +29,9 @@
 #endif
 
 #ifdef CONFIG_ACTUATOR_CONTROL
+#include <FreeRTOS.h>
 #include <vk/actuators/actuator_task.hpp>
+#include <vk/msg/actuator_outputs.hpp>
 #include <vk/hal/actuator.hpp>
 #include <vk/platform/motor_output.hpp>
 #endif
@@ -50,6 +52,7 @@
 #include <vk/local_display/local_menu_task.hpp>
 #endif
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <string_view>
@@ -129,7 +132,7 @@ const std::array<vk::hal::MotorChannel, 4> motor_channels{{
 }};
 vk::core::StaticInstance<vk::actuators::ActuatorTask> actuator_control;
 
-// Called from the output watchdog's interrupt.
+// Called from the output watchdog's interrupt and from the fault stop (ADR-0005).
 void stop_motor_outputs()
 {
     decltype(output1)::stop();
@@ -159,11 +162,67 @@ void start_actuators()
 }
 #endif
 
+#if defined(CONFIG_FAULT_TEST_ASSERT) || defined(CONFIG_FAULT_TEST_USAGE_FAULT) || defined(CONFIG_FAULT_TEST_STALL)
+// The fault test of the hardware check (Kconfig FAULT_TEST, ADR-0005): once
+// an output has been driven for 0.5 s, wq:ctrl faults or stalls.
+class FaultTest final : public vk::core::WorkItem {
+public:
+    static constexpr std::uint64_t driven_us = 500'000;
+
+    explicit FaultTest(vk::core::WorkQueue& queue) : WorkItem("fault_test", queue) {}
+
+    void start() { schedule_periodic(100'000); }
+
+protected:
+    void run() override
+    {
+        vk::msg::ActuatorOutputs outputs{};
+        bool driven = false;
+        while (outputs_.copy(outputs)) {
+            driven = std::ranges::any_of(outputs.output, [](float duty) { return duty != 0.0F; });
+        }
+        const std::uint64_t now = queue().now_us();
+        if (!driven) {
+            since_us_ = 0;
+            return;
+        }
+        if (since_us_ == 0) {
+            since_us_ = now;
+        }
+        if (now - since_us_ < driven_us) {
+            return;
+        }
+#if defined(CONFIG_FAULT_TEST_ASSERT)
+        configASSERT(false);
+#elif defined(CONFIG_FAULT_TEST_USAGE_FAULT)
+        __asm__ volatile("udf #0");
+#else
+        for (;;) {
+            __asm__ volatile("nop");
+        }
+#endif
+    }
+
+private:
+    vk::core::Subscription<vk::msg::ActuatorOutputs> outputs_{0};
+    std::uint64_t since_us_ = 0;
+};
+
+vk::core::StaticInstance<FaultTest> fault_test;
+
+void start_fault_test()
+{
+    fault_test.emplace(vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    fault_test->start();
+}
+#endif
+
 void start_commander()
 {
     vk::commander::CommanderTask::Config config{.interval_us = control_interval_us,
                                                 .revision_ok = revision_matches(),
-                                                .reset = &vk::platform::reset};
+                                                .reset = &vk::platform::reset,
+                                                .reset_report = vk::platform::reset_report()};
 #ifdef CONFIG_ACTUATOR_CONTROL
     config.actuators_started = true;
     config.output_watchdog_trips = &vk::platform::output_watchdog_trips;
@@ -329,6 +388,9 @@ int main()
 #ifdef CONFIG_ACTUATOR_CONTROL
     start_actuators();
 #endif
+#if defined(CONFIG_FAULT_TEST_ASSERT) || defined(CONFIG_FAULT_TEST_USAGE_FAULT) || defined(CONFIG_FAULT_TEST_STALL)
+    start_fault_test();
+#endif
 #ifdef CONFIG_ESTIMATOR_MAHONY
     start_estimator();
 #endif
@@ -338,5 +400,7 @@ int main()
 #ifdef CONFIG_LINK_SERIAL
     start_links();
 #endif
+    // From here a scheduler that never gets idle resets the board (ADR-0005).
+    vk::platform::start_hardware_watchdog();
     vk::core::start_scheduler();  // Never returns.
 }

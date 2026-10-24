@@ -16,11 +16,13 @@ from .enums import (
     BringupStart,
     BringupState,
     DisarmReason,
+    Fault,
     Mode,
     ModeResult,
     ParamResult,
     RebootAction,
     RebootResult,
+    ResetCause,
 )
 from .frame import PROTOCOL_VERSION, Frame, FrameType, FrameWriter
 
@@ -53,6 +55,9 @@ REBOOT_ACTIONS = {value.name.lower(): value.value for value in RebootAction}
 REBOOT_REJECT_REASONS = reason_texts(RebootResult)
 DISARM_REASONS = value_texts(DisarmReason)
 ACTUATOR_POWER_STATES = value_texts(ActuatorPower)
+# What caused the last reset, and the fault the fault stop recorded (ADR-0005).
+RESET_CAUSES = value_texts(ResetCause)
+FAULTS = value_texts(Fault)
 # Bits of COM_ARM_CHECK.
 ARM_CHECK_BITS = {0: "ACT_POWER"}
 

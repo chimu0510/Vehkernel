@@ -19,6 +19,7 @@ void Commander::update(std::uint64_t now_us, const Inputs& inputs, const Setting
     settings_ = settings;
     state_.board_verified = inputs.board_verified;
     state_.output_watchdog_trips = inputs.output_watchdog_trips;
+    state_.reset_report = inputs.reset_report;
     state_.skipped_checks = ~settings.arm_check & core::arm_checks::all;
     track_power(now_us, inputs.actuator_power);
     if (!state_.armed) {
@@ -167,6 +168,9 @@ core::ArmingResult Commander::arming_check(std::uint64_t now_us, core::ControlSo
     }
     if (inputs_.local_menu_open) {
         return core::ArmingResult::LocalMenuOpen;
+    }
+    if (core::unexpected(state_.reset_report)) {
+        return core::ArmingResult::UnexpectedReset;
     }
     return core::ArmingResult::Ok;
 }

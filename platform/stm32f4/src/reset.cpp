@@ -7,6 +7,8 @@
 // The register survives the reset; the bootloader clears it.
 #include <vk/platform/platform.hpp>
 
+#include "internal.hpp"
+
 #include <board.hpp>
 
 #include <stm32f4xx.h>
@@ -31,9 +33,11 @@ std::uint32_t boot_value(hal::BootTarget target)
     }
 }
 
+}  // namespace
+
 // As ArduPilot's set_rtc_backup: the backup domain is write-protected after
 // reset, and the RTC is clocked from the LSI if nothing clocks it yet.
-void write_backup_register(std::uint32_t value)
+void detail::unlock_backup_registers()
 {
     RCC->APB1ENR |= RCC_APB1ENR_PWREN;
     PWR->CR |= PWR_CR_DBP;
@@ -41,15 +45,13 @@ void write_backup_register(std::uint32_t value)
         RCC->BDCR |= RCC_BDCR_RTCSEL_1;  // LSI
         RCC->BDCR |= RCC_BDCR_RTCEN;
     }
-    RTC->BKP0R = value;
 }
-
-}  // namespace
 
 void reset(hal::BootTarget target)
 {
     __disable_irq();
-    write_backup_register(boot_value(target));
+    detail::unlock_backup_registers();
+    RTC->BKP0R = boot_value(target);
     NVIC_SystemReset();
 }
 

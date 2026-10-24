@@ -2,6 +2,7 @@
 // Platform start-up for SITL (ADR-0009, ADR-0018).
 #pragma once
 
+#include <vk/core/fault.hpp>
 #include <vk/core/work_queue.hpp>
 #include <vk/hal/actuator.hpp>
 #include <vk/hal/reset.hpp>
@@ -58,6 +59,24 @@ sim::Motor& motor(std::size_t output);
 // `period_us`, as a task above the work queues on the simulated clock.
 void start_output_watchdog(std::uint32_t period_us);
 std::uint32_t output_watchdog_trips();
+
+// What caused the last reset (ADR-0005). SITL has no reset to read: each run
+// starts as if powered on, unless whoever restarts it after a fault or a
+// reboot says otherwise (--reset-cause).
+core::ResetReport reset_report();
+void set_reset_report(const core::ResetReport& report);
+
+// The fault stop (ADR-0005) in SITL turns every simulated output off, prints
+// "fault kind=<fault> address=<hex> duty=<d1>,<d2>,<d3>,<d4>" with the duty
+// each motor is left with, and ends the run at once with this exit status.
+inline constexpr int fault_exit_status = 12;
+
+// A fault for tests (--fault): once any output has been driven with a duty
+// other than zero for fault_after_driven_us, the output watchdog's task fails
+// a configASSERT (ASSERT) or calls fail() (FAIL). Other faults have no SITL
+// equivalent.
+inline constexpr std::uint64_t fault_after_driven_us = 500'000;
+void raise_fault_when_driven(core::Fault fault);
 
 // Stops the scheduler after the given run time, so a SITL run ends on its own.
 void stop_after(std::uint64_t duration_us);

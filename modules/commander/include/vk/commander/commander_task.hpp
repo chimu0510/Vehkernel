@@ -15,10 +15,12 @@
 // queue; requests and cycles take turns in short critical sections. A reboot
 // accepted while disarmed (ADR-0023) happens reboot_delay_us later, from a
 // cycle, so the Link's reply leaves first; arming is refused meanwhile.
+// vehicle_status also carries the reset cause the platform read at boot.
 #pragma once
 
 #include <vk/commander/commander.hpp>
 #include <vk/core/bus.hpp>
+#include <vk/core/fault.hpp>
 #include <vk/core/vehicle_control.hpp>
 #include <vk/core/work_queue.hpp>
 #include <vk/hal/reset.hpp>
@@ -48,6 +50,7 @@ public:
         bool bringup = false;                // the motor bring-up case is built in
         std::uint32_t (*output_watchdog_trips)() = nullptr;  // the platform's count; nullptr without one
         hal::Reset reset = nullptr;          // the platform's reset; nullptr if it cannot
+        core::ResetReport reset_report{};    // what caused the last reset (ADR-0005)
     };
 
     CommanderTask(const Config& config, core::WorkQueue& queue);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/platform/platform.hpp>
 
+#include <vk/core/fault.hpp>
 #include <vk/core/scheduler.hpp>
 #include <vk/hal/clock.hpp>
 
@@ -12,17 +13,20 @@
 #include <vk/core/bus.hpp>
 #include <vk/hal/output_watchdog.hpp>
 #include <vk/core/static_instance.hpp>
+#include <vk/msg/enums.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_attitude_groundtruth.hpp>
 
 #include <FreeRTOS.h>
 #include <task.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <string_view>
 
 namespace vk::platform {
 namespace {
@@ -37,6 +41,10 @@ std::atomic<bool> simulated_user_key{false};
 core::StaticInstance<hal::OutputWatchdog> watchdog;
 StaticTask_t watchdog_tcb;
 std::array<StackType_t, configMINIMAL_STACK_SIZE> watchdog_stack;
+
+core::ResetReport last_reset{.cause = core::ResetCause::PowerOn};
+core::Fault test_fault = core::Fault::None;  // --fault
+std::uint64_t driven_since_us = 0;           // 0 while no output is driven
 
 // One actuator output over a simulated motor: the duty and direction lines as
 // an H-bridge applies them, and the encoder counter. Every duty refreshes the
@@ -57,7 +65,14 @@ public:
     }
 
     // The watchdog's stop: the motor coasts until the next duty.
-    void stop() { motor_->drive(0.0F); }
+    void stop()
+    {
+        if (motor_ != nullptr) {
+            motor_->drive(0.0F);
+        }
+    }
+
+    [[nodiscard]] float duty() const { return motor_ == nullptr ? 0.0F : motor_->duty(); }
 
     void set(bool in1, bool in2) override
     {
@@ -130,6 +145,29 @@ void stop_task(void* /*unused*/)
     core::stop_scheduler();
 }
 
+// Raises the --fault once an output has been driven for fault_after_driven_us.
+void check_test_fault(std::uint64_t now_us)
+{
+    if (test_fault == core::Fault::None) {
+        return;
+    }
+    const bool driven = std::ranges::any_of(motor_outputs, [](const MotorOutput& output) { return output.duty() != 0.0F; });
+    if (!driven) {
+        driven_since_us = 0;
+        return;
+    }
+    if (driven_since_us == 0) {
+        driven_since_us = now_us;
+    }
+    if (now_us - driven_since_us < fault_after_driven_us) {
+        return;
+    }
+    if (test_fault == core::Fault::Assert) {
+        configASSERT(false);
+    }
+    core::fail("SITL --fault");
+}
+
 }  // namespace
 
 void init(sim::MotionProfile profile)
@@ -193,6 +231,21 @@ void reset(hal::BootTarget target)
     std::_Exit(bootloader ? reset_bootloader_exit_status : reset_firmware_exit_status);
 }
 
+core::ResetReport reset_report()
+{
+    return last_reset;
+}
+
+void set_reset_report(const core::ResetReport& report)
+{
+    last_reset = report;
+}
+
+void raise_fault_when_driven(core::Fault fault)
+{
+    test_fault = fault;
+}
+
 bool actuator_power()
 {
     return simulated_actuator_power.load();
@@ -215,11 +268,13 @@ void start_output_watchdog(std::uint32_t period_us)
         [](void* /*unused*/) {
             // Above the work queues, so it runs when they stall.
             for (;;) {
-                if (watchdog->expired(hal::SystemClock::now_us())) {
+                const std::uint64_t now = hal::SystemClock::now_us();
+                if (watchdog->expired(now)) {
                     for (auto& output : motor_outputs) {
                         output.stop();
                     }
                 }
+                check_test_fault(now);
                 vTaskDelay(1);
             }
         },
@@ -242,3 +297,32 @@ sim::Motor& motor(std::size_t output)
 }
 
 }  // namespace vk::platform
+
+namespace vk::core {
+
+void fault_stop(Fault fault, std::uint32_t address)
+{
+    // Only the running FreeRTOS task runs on the POSIX port, so nothing drives
+    // the outputs again before the run ends.
+    for (auto& output : platform::motor_outputs) {
+        output.stop();
+    }
+    const std::string_view name = msg::enum_name(fault);
+    std::printf("fault kind=%.*s address=0x%08x duty=", static_cast<int>(name.size()), name.data(),
+                static_cast<unsigned>(address));
+    for (std::size_t i = 0; i < platform::motor_outputs.size(); ++i) {
+        std::printf(i == 0 ? "%.3f" : ",%.3f", static_cast<double>(platform::motor_outputs.at(i).duty()));
+    }
+    std::printf("\n");
+    std::fflush(stdout);
+    // At once, from whichever task faulted: FreeRTOS threads must not run exit handlers.
+    std::_Exit(platform::fault_exit_status);
+}
+
+}  // namespace vk::core
+
+extern "C" void vk_assert_failed()
+{
+    vk::core::fault_stop(vk::core::Fault::Assert,
+                         static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(__builtin_return_address(0))));
+}

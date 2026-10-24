@@ -35,6 +35,7 @@ class ArmingResult(enum.IntEnum):
     ACTUATORS_NOT_STARTED = 8
     LOCAL_MENU_OPEN = 9  # ADR-0022
     REBOOTING = 10  # a reboot was accepted and is about to happen
+    UNEXPECTED_RESET = 11  # the last reset was a watchdog or fault reset (ADR-0005)
 
 
 class BringupCase(enum.IntEnum):
@@ -86,6 +87,20 @@ class DisarmReason(enum.IntEnum):
     SETPOINT_TIMEOUT = 4
     IDLE = 5
     BRINGUP_ABORT = 6
+
+
+class Fault(enum.IntEnum):
+    """Why the fault stop ran (ADR-0005), recorded across the reset that follows it."""
+
+    NONE = 0
+    HARD_FAULT = 1
+    MEM_MANAGE = 2
+    BUS_FAULT = 3
+    USAGE_FAULT = 4
+    ASSERT = 5  # a configASSERT failed
+    FAIL = 6  # vk::core::fail() was called
+    STACK_OVERFLOW = 7  # FreeRTOS found a task's stack overflowed
+    UNEXPECTED_INTERRUPT = 8  # an exception or interrupt with no handler, NMI included
 
 
 class HandshakeState(enum.IntEnum):
@@ -145,3 +160,18 @@ class RebootResult(enum.IntEnum):
     ARMED = 1  # a reboot happens only while disarmed (ADR-0005)
     UNKNOWN_ACTION = 2
     NOT_AVAILABLE = 3  # the platform cannot reset
+
+
+class ResetCause(enum.IntEnum):
+    """What caused the last reset, as the platform read it at boot (ADR-0005). A watchdog or
+    fault reset refuses arming until the next deliberate reset. Short names fit the local
+    display's status page (ADR-0022).
+    """
+
+    UNKNOWN = 0  # the platform cannot tell
+    POWER_ON = 1  # power-on or brownout
+    PIN = 2  # the reset pin: a reset button, a debugger or a download circuit
+    SOFTWARE = 3  # a reboot the firmware was asked for
+    WATCHDOG = 4  # the hardware watchdog, after the scheduler stalled
+    FAULT = 5  # the fault stop, after a fault, a failed assertion or a stack overflow
+    LOW_POWER = 6  # the low-power reset of the MCU

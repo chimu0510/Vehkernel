@@ -36,3 +36,4 @@ Each milestone ends with a hardware check on the board, recorded on its spec's l
 | Attitude follows the board | [Link monitor](link-monitor.md#attitude) |
 | Parameters survive a power cycle | [Link monitor](link-monitor.md#parameters) |
 | Motor and encoder mapping | [Driving the wheels](driving.md#motor-bring-up) |
+| Fault stop and hardware watchdog | [Driving the wheels](driving.md#fault-stop-check) |

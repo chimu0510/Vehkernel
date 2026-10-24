@@ -19,16 +19,24 @@ The emergency stop follows ArduPilot's `MOTOR_ESTOP` and PX4's kill switch. It i
 
 Any connected Link may engage or release it, as PX4 accepts kill and unkill from any source. The remote control will be one more source when it exists.
 
-**Output watchdog**
+**Output watchdog, fault stop and hardware watchdog**
 
-The firmware also guards against itself stalling: the platform layer turns every actuator output off when actuator control has not refreshed it within a few control periods, so a stalled `wq:ctrl` cannot leave a motor running on its last duty, and the emergency stop, which acts in actuator control, still takes effect.
+The firmware also guards against itself stalling or faulting, at three levels, as Betaflight stops its motors in its fault handlers and ArduPilot enables the hardware watchdog:
+
+- **Output watchdog.** The platform layer turns every actuator output off when actuator control has not refreshed it within a few control periods, so a stalled `wq:ctrl` cannot leave a motor running on its last duty, and the emergency stop, which acts in actuator control, still takes effect. It runs from a timer interrupt above every interrupt that may call FreeRTOS (TIM6 on the STM32F4).
+- **Fault stop.** A fault (HardFault, MemManage, BusFault, UsageFault, or an exception or interrupt without a handler), a failed `configASSERT`, `fail()` and the FreeRTOS stack overflow hook run above that interrupt or with it masked, so the output watchdog never fires for them. Each ends in the fault stop, which first turns every actuator output off by writing registers only, as Betaflight's `systemFaultAction()` calls `stopMotors()` before anything else. It uses neither FreeRTOS nor the bus, so it works from any context. It then records the fault and where it happened, so it survives the reset, and stops: at a breakpoint when a debugger is attached, otherwise waiting for the hardware watchdog to reset the board. In SITL it ends the run.
+- **Hardware watchdog.** The MCU's independent watchdog (the IWDG on the STM32) starts just before the scheduler and is refreshed from the FreeRTOS idle hook, the lowest priority there is, so a scheduler that never gets idle, a task or an interrupt that never returns, or a stopped CPU resets the board. Its timeout is about 2 s, as ArduPilot's: longer than any wait the firmware allows itself, such as erasing a parameter sector, and short enough that a wedged board restarts on its own. It is frozen while a debugger halts the core, so SWD debugging keeps working, and a reset stops it, so the bootloader runs without it. Before the scheduler starts it is not running, and nothing drives an output then: actuator control runs only on `wq:ctrl`. The fault stop starts it if it is not running yet, so every fault ends in a reset unless a debugger holds the core.
+
+**Reset cause**
+
+At boot the platform reads what caused the last reset: power-on, the reset pin, a software reset (a reboot request, ADR-0023), the hardware watchdog, or the fault stop, with the fault and its address. The commander publishes it on `vehicle_status`, the local display shows it, and the Link tools print it. After a watchdog or fault reset arming is refused as an unexpected reset until the next deliberate reset: a reboot request, the reset pin or a power cycle. ArduPilot likewise reports a watchdog reset as an internal error, and an internal error fails its arming checks until the board reboots. A vehicle that stopped itself is not driven again before someone has seen why.
 
 **Arming checks**
 
 Arming checks are of two kinds:
 
 - **Checks of hardware state**, which can be skipped. Each has a bit in the bitmask parameter `COM_ARM_CHECK`, all set by default, as in ArduPilot's `ARMING_CHECK`. Clearing a bit skips that check: it neither refuses arming nor disarms, but its state is still published. Skipping is for bench testing and for boards whose input is unwired or unreliable. `COM_ARM_CHECK` is locked while armed, the vehicle status reports which checks are skipped, and tools warn on arming while any is. A check whose input a board lacks is not available and passes.
-- **Checks that cannot be skipped**: the board verified at boot (ADR-0010), the emergency stop released, the mode, the source in control, setpoints cleared, no bring-up case running, actuators started, the local menu closed (ADR-0022), and no accepted reboot pending (ADR-0023).
+- **Checks that cannot be skipped**: the board verified at boot (ADR-0010), the emergency stop released, the mode, the source in control, setpoints cleared, no bring-up case running, actuators started, the local menu closed (ADR-0022), no accepted reboot pending (ADR-0023), and no watchdog or fault reset since the last deliberate reset.
 
 **Board-specific: actuator power sense**
 
@@ -55,4 +63,14 @@ When the remote control exists these conditions stay; it adds a takeover path, i
 - **An emergency stop that disarms at once**: not adopted, to keep ArduPilot's and PX4's semantics, which ground stations and operators already know: engaging stops the outputs at once, and a release within a few seconds resumes without a new arming sequence. The 5 s auto-disarm bounds how long a stopped vehicle stays armed.
 - **A safety button in addition to arming** (PX4's `COM_SAFETY_MODE`, ArduPilot's `BRD_SAFETYENABLE`): not adopted. A push button held for about a second turns "safety" off before arming is allowed, and options decide whether disarming turns it back on. It protects propellers while a drone is handled on the bench. Here arming already needs a deliberate request from the source in control, and a vehicle model that needs a button later can add it as one more arming check.
 - **Board-specific checks that cannot be skipped**: rejected. Boards differ, and on the bench a sense line may be unwired or the drivers fed from a supply that bypasses it; a check nobody can skip gets patched out of the firmware instead.
+- **Resuming armed after a watchdog reset** (ArduPilot restores the armed state when a watchdog reset happens in flight, so a copter keeps flying): rejected. A ground, surface or underwater vehicle is safe stopped, so after a watchdog or fault reset it boots disarmed and refuses arming.
+- **Acknowledging an unexpected reset with its own request over a Link**: not adopted for now. A reboot request is already a deliberate act every Link tool can send, and the next boot reads a software reset; an acknowledgement would need a new control message for the same effect.
+- **Resetting at once from the fault stop**: not adopted. Waiting for the hardware watchdog keeps the core where a debugger finds the fault, keeps one path to the reset, and stops a fault at boot from becoming a fast reset loop; the outputs are already off by then.
+- **Refreshing the hardware watchdog from a high-priority task or the output watchdog's interrupt**: rejected. Either keeps refreshing while the work queues starve, which is what the hardware watchdog must catch. ArduPilot likewise refreshes it from its main loop, not from a timer.
 - **PX4's circuit breakers** (`CBRK_*` parameters that disable a check only when set to a magic number): not adopted. The magic number guards against setting one by accident; here `COM_ARM_CHECK` is locked while armed, and skipped checks are reported and warned about at every arming.
+
+## Consequences
+
+- Any code that holds the CPU for longer than the hardware watchdog's timeout without letting the idle task run resets the board, armed or not. A long blocking wait, such as erasing a large Flash sector, must stay well inside it.
+- A bootloader that runs before the firmware must leave the reset flags and the fault record alone, or the firmware reports a later cause; on the C50C this is recorded in ADR-0024.
+- SITL has no hardware watchdog and no real faults. Its tests raise a failed assertion or `fail()` on request and are given the reset cause at start, as whoever restarts SITL after a reset would.

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Why the fault stop ran (ADR-0005), recorded across the reset that follows it.
+@type uint8
+NONE = 0
+HARD_FAULT = 1
+MEM_MANAGE = 2
+BUS_FAULT = 3
+USAGE_FAULT = 4
+ASSERT = 5                                    # a configASSERT failed
+FAIL = 6                                      # vk::core::fail() was called
+STACK_OVERFLOW = 7                            # FreeRTOS found a task's stack overflowed
+UNEXPECTED_INTERRUPT = 8                      # an exception or interrupt with no handler, NMI included

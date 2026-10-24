@@ -33,8 +33,10 @@ from .session import (
     ACTUATOR_POWER_STATES,
     ARMING_REJECT_REASONS,
     DISARM_REASONS,
+    FAULTS,
     MODES,
     REJECT_REASONS,
+    RESET_CAUSES,
     BringupReply,
     ControlReply,
     HostSession,
@@ -171,7 +173,10 @@ def vehicle_status_line(status) -> str:
             f"skipped_checks={skipped} "
             f"arming_refusal={ARMING_REJECT_REASONS.get(status.arming_refusal, 'none').replace(' ', '_')} "
             f"disarm_reason={DISARM_REASONS.get(status.disarm_reason, status.disarm_reason).replace(' ', '_')} "
-            f"output_watchdog_trips={status.output_watchdog_trips}")
+            f"output_watchdog_trips={status.output_watchdog_trips} "
+            f"reset_cause={RESET_CAUSES.get(status.reset_cause, status.reset_cause).replace(' ', '_')} "
+            f"fault={FAULTS.get(status.fault, status.fault).replace(' ', '_')} "
+            f"fault_address=0x{status.fault_address:08X}")
 
 
 # The local menu's states (local_menu.state) and what its last Save returned.

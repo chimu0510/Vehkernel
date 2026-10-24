@@ -6,9 +6,15 @@
 // work queues do; when actuator control has not refreshed the outputs for
 // three control periods it stops every output through the callback given at
 // start. The interrupt writes registers only.
+//
+// The fault stop (fault.cpp) runs above this interrupt, or with it masked, so
+// it turns the outputs off itself, through the same callback.
 #include <vk/hal/clock.hpp>
 #include <vk/hal/output_watchdog.hpp>
 #include <vk/platform/platform.hpp>
+#include <vk/platform/pwm_timing.hpp>
+
+#include "internal.hpp"
 
 #include <board.hpp>
 
@@ -27,6 +33,17 @@ constexpr std::uint32_t check_irq_priority = 2;
 
 std::optional<vk::hal::OutputWatchdog> watchdog;
 void (*stop_outputs)() = nullptr;
+
+extern "C" std::uint32_t __vk_flash_firmware_start[];  // NOLINT: linker symbols
+extern "C" std::uint32_t __vk_flash_firmware_end[];    // NOLINT
+
+// Whether `stop` points into the firmware image: after a fault RAM may be corrupt.
+bool in_firmware(void (*stop)())
+{
+    const auto address = reinterpret_cast<std::uintptr_t>(stop);
+    return address >= reinterpret_cast<std::uintptr_t>(__vk_flash_firmware_start) &&
+           address < reinterpret_cast<std::uintptr_t>(__vk_flash_firmware_end);
+}
 
 }  // namespace
 
@@ -70,6 +87,20 @@ void start_output_watchdog(std::uint32_t period_us, void (*stop)())
 std::uint32_t output_watchdog_trips()
 {
     return watchdog ? watchdog->trips() : 0;
+}
+
+void detail::force_outputs_off()
+{
+    // MOE cleared: with OSSI set and the idle levels low, every channel of the
+    // timer drives low at once (ADR-0005). Writes to a timer whose clock is
+    // off are ignored, so this holds before set_frequency() too.
+    TIM1->BDTR &= ~advanced_timer_moe;
+    TIM8->BDTR &= ~advanced_timer_moe;
+    // No duty and the direction lines low.
+    void (*const stop)() = stop_outputs;
+    if (stop != nullptr && in_firmware(stop)) {
+        stop();
+    }
 }
 
 }  // namespace vk::platform

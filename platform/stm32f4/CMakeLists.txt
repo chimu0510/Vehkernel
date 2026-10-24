@@ -6,6 +6,7 @@ vk_add_library(vk_platform LAYER platform OBJECT
   boot_stub.c
   src/app_descriptor.cpp
   src/clock_tree.cpp
+  src/fault.cpp
   src/freertos_hooks.cpp
   src/internal_flash.cpp
   src/microsecond_clock.cpp
