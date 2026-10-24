@@ -6,14 +6,14 @@ On a single-bank MCU such as the STM32F407, every instruction or constant fetch 
 
 | Sector | Size | Use |
 |---|---|---|
-| S0 | 16 KB | Bootloader (ADR-0023); until it exists, a stub that jumps to the firmware |
+| S0 | 16 KB | The Vehkernel bootloader (ADR-0023), which replaced the boot stub that only jumped to the firmware |
 | S1–S2 | 16 KB × 2 | Parameter storage, two alternating sectors (ADR-0012) |
 | S3 | 16 KB | Event log (ADR-0019) |
 | S4–S7 | 64 KB + 128 KB × 3 | Firmware, 448 KB contiguous; VTOR points the vector table at S4 |
 
 - The board TOML declares the layout, and the sector table comes from the MCU database (ADR-0011). The generator derives the linker script memory regions from it and uses the firmware region size as the Flash budget of ADR-0017.
 - The table is the C50C's. Every board declares its own layout. A board that keeps an ArduPilot or PX4 bootloader declares the layout that bootloader expects, for example a 128 KB bootloader region on STM32H743 boards (ADR-0023).
-- The bootloader erases only the firmware region, so the parameter and event log sectors survive firmware updates. Until the bootloader exists, SWD and the STM32 system bootloader write the firmware region only, and a new board's whole chip is erased once.
+- The bootloader erases only the firmware region, so the parameter and event log sectors survive firmware updates. The bootloader and the firmware are separate images, each linked into its own region; the firmware image no longer carries the boot stub that held S0 before the bootloader existed. A new board's whole chip is erased once, when the STM32 system bootloader or SWD installs the bootloader and the firmware; SWD writes only the bootloader and firmware regions after that.
 
 **Write policy**
 

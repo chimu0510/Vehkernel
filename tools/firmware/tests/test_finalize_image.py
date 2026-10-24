@@ -56,11 +56,11 @@ def make_files(tmp_path: Path, board_id_in_image: int = BOARD_ID, with_descripto
     (tmp_path / "board.json").write_text(json.dumps(board))
 
 
-def run(tmp_path: Path, version: str = "0.1"):
+def run(tmp_path: Path, version: str = "0.1", *extra: str):
     return subprocess.run(
         [sys.executable, str(TOOL), "--elf", str(tmp_path / "vehkernel.elf"), "--bin", str(tmp_path / "vehkernel.bin"),
          "--board-json", str(tmp_path / "board.json"), "--apj", str(tmp_path / "vehkernel.apj"),
-         "--version", version, "--source-dir", str(tmp_path)],
+         "--version", version, "--source-dir", str(tmp_path), *extra],
         capture_output=True, text=True, check=False, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
 
 
@@ -141,3 +141,51 @@ def test_an_image_without_a_descriptor_is_refused(tmp_path):
     result = run(tmp_path)
     assert result.returncode == 1
     assert "no app descriptor in the firmware image" in result.stderr
+
+
+def read_intel_hex(text: str) -> dict[int, int]:
+    """Address to byte, checking every record's checksum."""
+    memory, upper = {}, 0
+    for line in text.splitlines():
+        assert line.startswith(":")
+        record = bytes.fromhex(line[1:])
+        assert sum(record) & 0xFF == 0, line
+        count, address, kind, data = record[0], record[1] << 8 | record[2], record[3], record[4:-1]
+        assert len(data) == count
+        if kind == 0:
+            for i, byte in enumerate(data):
+                memory[(upper << 16) + address + i] = byte
+        elif kind == 4:
+            upper = data[0] << 8 | data[1]
+        elif kind == 1:
+            break
+    return memory
+
+
+def with_bl(tmp_path: Path, bootloader: bytes):
+    (tmp_path / "bootloader.bin").write_bytes(bootloader)
+    return run(tmp_path, "0.1", "--bootloader", str(tmp_path / "bootloader.bin"),
+               "--with-bl-hex", str(tmp_path / "vehkernel_with_bl.hex"))
+
+
+def test_the_with_bl_hex_holds_both_images_at_their_regions(tmp_path):
+    make_files(tmp_path)
+    bootloader = bytes((i * 13) & 0xFF for i in range(9000))
+    result = with_bl(tmp_path, bootloader)
+    assert result.returncode == 0, result.stderr
+    memory = read_intel_hex((tmp_path / "vehkernel_with_bl.hex").read_text())
+    firmware = (tmp_path / "vehkernel.bin").read_bytes()  # finalized, with its descriptor filled
+    assert bytes(memory[0x08000000 + i] for i in range(len(bootloader))) == bootloader
+    assert bytes(memory[0x08010000 + i] for i in range(len(firmware))) == firmware
+    assert len(memory) == len(bootloader) + len(firmware)  # nothing in the parameter and event log sectors
+    assert ap_check(bytes(memory[0x08010000 + i] for i in range(len(firmware))), BOARD_ID) == "CHECK_FW_OK"
+
+
+def test_a_bootloader_larger_than_its_region_is_refused_and_nothing_is_written(tmp_path):
+    make_files(tmp_path)
+    before = (tmp_path / "vehkernel.bin").read_bytes()
+    result = with_bl(tmp_path, bytes(16385))
+    assert result.returncode == 1
+    assert "the BOOT region holds 16384" in result.stderr
+    assert (tmp_path / "vehkernel.bin").read_bytes() == before
+    assert not (tmp_path / "vehkernel_with_bl.hex").exists()

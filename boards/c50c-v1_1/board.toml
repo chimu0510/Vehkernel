@@ -157,7 +157,7 @@ actuator_power = { pin = "ACT_POWER_SENSE", powered = "HIGH" }
 # ADR-0022: S3 operates the local display and the local menu.
 user_key = { pin = "USER_KEY", pressed = "LOW" }
 
-# ADR-0020: S0 boot stub, S1-S2 parameters, S3 event log, S4-S7 firmware.
+# ADR-0020: S0 bootloader, S1-S2 parameters, S3 event log, S4-S7 firmware.
 flash = [
   { region = "BOOT",     start = 0x08000000, size = "16K" },
   { region = "PARAMS",   start = 0x08004000, size = "32K" },

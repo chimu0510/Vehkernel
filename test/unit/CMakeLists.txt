@@ -26,6 +26,15 @@ target_include_directories(vk_board_defaults_tests PRIVATE
 target_link_libraries(vk_board_defaults_tests PRIVATE GTest::gtest_main vk_hal vk_warnings)
 gtest_discover_tests(vk_board_defaults_tests)
 
+# The STM32F4 bootloader's FIRMWARE region writes, on the C50C V1.1 golden
+# board header's Flash layout.
+add_executable(vk_firmware_flash_tests firmware_flash_test.cpp)
+target_include_directories(vk_firmware_flash_tests PRIVATE
+  ${CMAKE_SOURCE_DIR}/tools/generators/tests/boards/c50c-v1_1/expected
+  ${CMAKE_SOURCE_DIR}/platform/stm32f4/include)
+target_link_libraries(vk_firmware_flash_tests PRIVATE GTest::gtest_main vk_hal vk_warnings)
+gtest_discover_tests(vk_firmware_flash_tests)
+
 # Every golden board.hpp of the board generator tests must compile: one
 # translation unit per header, each checking its pins are distinct.
 file(GLOB golden_headers

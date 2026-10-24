@@ -38,13 +38,13 @@
 | `schema/enum/` | Enums whose values cross the wire (`.enum`) | 0006 |
 | `cmake/` | Toolchain, Kconfig integration, generator invocation and the layering rules | 0009, 0017 |
 | `hal/` | Interface layer: HAL interfaces (C++20 concepts and runtime interfaces) | 0009 |
-| `platform/stm32f4/` | Platform layer: STM32F4 implementation (ST LL), startup, linker script, boot stub and the serial port parameters | 0009, 0020 |
+| `platform/stm32f4/` | Platform layer: STM32F4 implementation (ST LL), startup, linker script, the internal Flash code the bootloader shares, and the serial port parameters | 0009, 0020 |
 | `platform/sitl/` | Platform layer for SITL and tests: FreeRTOS POSIX port, UDP and pty transports | 0009, 0018 |
 | `drivers/` | Driver layer: device drivers (ICM20948, SSD1306) and the shared IMU parameters | 0009, 0014 |
 | `core/` | Bus, work queues, parameter runtime and storage, timing monitor, app descriptor, and the mode, arming and reboot types shared by modules and Links | 0008, 0012, 0015, 0023 |
 | `modules/` | Module layer: `commander/` (modes, arming, emergency stop), `actuators/` (actuator control, motor bring-up), `estimation/` (attitude estimator), `link/` (custom protocol, topic map), `local_display/` (display, local menu, user key). The control chain, vehicle models and logging come later | 0002, 0005, 0013, 0014, 0022 |
 | `lib/estimation/` | Estimation math components: `models/`, `filters/`, `math/` | 0014 |
-| `bootloader/` | The Vehkernel bootloader: a port of ArduPilot's `AP_Bootloader` structure, and its SITL build | 0023 |
+| `bootloader/` | The Vehkernel bootloader: a port of ArduPilot's `AP_Bootloader` structure, its STM32F4 build in the BOOT region and its SITL build | 0023 |
 | `tools/mcudb/` | Offline converter that regenerates an MCU database from the stm32-data source committed under `mcu/<mcu>/source/` | 0011, 0016 |
 | `tools/kconfig/` | Layered Kconfig solve and `menuconfig` with overlay saving | 0017 |
 | `tools/generators/` | Schema, board and parameter generators; the ULog format definitions and log profile generators come with logging | 0006, 0011, 0012, 0019 |

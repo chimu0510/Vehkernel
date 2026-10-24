@@ -18,7 +18,7 @@ The bootloader (spec 0008) is in progress; the hardware check of the first wheel
 - Parameters defined in TOML, set over the Link or the local menu, and stored in internal Flash.
 - Modes, arming checks and an emergency stop gating four motor outputs with wheel speed loops; checked in SITL, with the board's hardware check still to come.
 - The local display and local menu on the board's OLED and user key.
-- ArduPilot's app descriptor and `.apj` file, reboot into the bootloader over the Link, and the Vehkernel bootloader in SITL against ArduPilot's `uploader.py`. On the board, S0 still holds a boot stub until the Vehkernel bootloader is ported to it.
+- ArduPilot's app descriptor and `.apj` file, reboot into the bootloader over the Link, and the Vehkernel bootloader in S0 of the board, flashed by ArduPilot's `uploader.py` and checked against it in SITL; its hardware check is still to come.
 
 Decided but not built yet: the ROS2 Bridge (`bridge/` is a placeholder), the vehicle models and the control chain above the wheel speed loops, the remote control, logging, the replay (L2) and ROS2 (L5) test layers (`test/replay/` and `test/ros2/` are placeholders), and boards other than the C50C V1.1.
 

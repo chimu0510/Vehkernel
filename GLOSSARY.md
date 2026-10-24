@@ -147,7 +147,7 @@ The short wait at power-on and reset during which the bootloader accepts a flash
 _Avoid_: bootloader timeout
 
 **Boot Stub**:
-The minimal program in the bootloader region that only jumps to the firmware, used on a board until its bootloader is installed.
+The minimal program that held the bootloader region and only jumped to the firmware, until the Vehkernel bootloader replaced it (ADR-0020).
 _Avoid_: mini bootloader
 
 ### Operation

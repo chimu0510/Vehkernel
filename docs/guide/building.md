@@ -10,6 +10,7 @@ Tools that need the development host's USB devices run on the host, outside the 
 |---|---|---|
 | OpenOCD | 0.12.0 | Flashing over SWD ([Flashing](flashing.md)) |
 | [`stm32flash`](https://sourceforge.net/projects/stm32flash/) | 0.7 (`sudo apt install stm32flash`) | Flashing through the STM32 system bootloader ([Flashing](flashing.md)) |
+| [pyserial](https://pypi.org/project/pyserial/) | 3.5, as `pyproject.toml` pins it | ArduPilot's `uploader.py`, which updates the firmware through the bootloader ([Flashing](flashing.md)) |
 
 ## Presets
 
@@ -17,7 +18,7 @@ There is one CMake preset per build target:
 
 | Preset | Output |
 |---|---|
-| `c50c-v1_1` | C50C V1.1 firmware: `vehkernel.elf`, `vehkernel.hex` (boot stub and firmware), `vehkernel-boot.bin` (S0), `vehkernel.bin` (firmware only, from S4) and `vehkernel.apj` (ArduPilot's firmware file, ADR-0023). Every image carries ArduPilot's app descriptor, filled after linking with its CRCs, size, git hash, version and board ID |
+| `c50c-v1_1` | C50C V1.1 firmware and bootloader. In `app/`: `vehkernel.elf`, `vehkernel.hex` and `vehkernel.bin` (the firmware alone, from S4), `vehkernel.apj` (ArduPilot's firmware file, ADR-0023) and `vehkernel_with_bl.hex` (the bootloader and the firmware, for a new board). In `bootloader/`: `vehkernel-bootloader.elf` and `.bin` (S0). Every firmware image carries ArduPilot's app descriptor, filled after linking with its CRCs, size, git hash, version and board ID |
 | `c50c-v1_1-bringup` | The C50C V1.1 bring-up image ([Testing](testing.md#bring-up-image)) |
 | `sitl` | SITL executable for the development host ([SITL](sitl.md)) |
 | `test` | Host tests, run with `ctest --preset test` ([Testing](testing.md)) |
@@ -27,7 +28,7 @@ cmake --preset c50c-v1_1
 cmake --build --preset c50c-v1_1
 ```
 
-Every firmware build prints the usage of each memory region; outgrowing a region fails the link (ADR-0017, ADR-0020).
+Every firmware and bootloader build prints the usage of each memory region; outgrowing a region fails the link (ADR-0017, ADR-0020). The bootloader's budget is the BOOT region, 16 KB on the C50C.
 
 The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 
