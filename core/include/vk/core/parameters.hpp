@@ -12,6 +12,7 @@
 #include <vk/core/bus.hpp>
 #include <vk/hal/clock.hpp>
 #include <vk/msg/arming_state.hpp>
+#include <vk/msg/enums.hpp>
 #include <vk/msg/parameter_update.hpp>
 
 #include <bit>
@@ -88,14 +89,9 @@ struct MenuParam {
     std::span<const std::string_view> value_names;  // an enum's, in the order of ParamInfo::enum_values
 };
 
-// Why a change was refused; also what a Link reports back.
-enum class ParamResult : std::uint8_t {
-    Ok = 0,
-    UnknownName = 1,
-    WrongType = 2,
-    OutOfRange = 3,
-    LockedWhileArmed = 4,
-};
+// Why a change was refused; also what a Link reports back. Declared in
+// schema/enum/param_result.enum (ADR-0006).
+using ParamResult = msg::ParamResult;
 
 class Parameters {
 public:

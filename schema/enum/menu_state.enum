@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The local menu's state (ADR-0022).
+@type uint8
+CLOSED = 0
+LIST = 1                          # choosing an item
+EDIT = 2                          # changing an item's value

@@ -27,6 +27,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Callable, Protocol
 
+from .enums import HandshakeState, MenuState
 from .frame import Frame, FrameReader, FrameType
 from .session import (
     ACTUATOR_POWER_STATES,
@@ -42,6 +43,7 @@ from .session import (
     ParamValue,
     TimeSyncResult,
     check_names,
+    value_texts,
 )
 
 
@@ -173,7 +175,7 @@ def vehicle_status_line(status) -> str:
 
 
 # The local menu's states (local_menu.state) and what its last Save returned.
-MENU_STATES = {0: "closed", 1: "list", 2: "edit"}
+MENU_STATES = value_texts(MenuState)
 NO_MENU_ITEM = 0xFFFF
 NO_MENU_RESULT = 0xFF
 
@@ -300,7 +302,7 @@ class TopicStats:
         return (self.messages - 1) * 1e6 / (self.last_timestamp_us - self.first_timestamp_us)
 
 
-HANDSHAKE_STATES = {0: "waiting", 1: "connected", 2: "peer_silent"}
+HANDSHAKE_STATES = value_texts(HandshakeState)
 
 
 def euler_degrees(q) -> tuple[float, float, float]:
@@ -717,7 +719,7 @@ class LinkMonitor:
                 f"mcu_link instance={instance} frames_sent={status.frames_sent} bytes_sent={status.bytes_sent} "
                 f"frames_received={status.frames_received} bytes_received={status.bytes_received} "
                 f"drops={status.drops} crc_errors={status.crc_errors} malformed={status.malformed} "
-                f"lost={status.lost} handshake_state={HANDSHAKE_STATES.get(status.handshake_state, '?')} "
+                f"lost={status.lost} handshake_state={HANDSHAKE_STATES.get(status.handshake_state, '?').replace(' ', '_')} "
                 f"rate_scale={getattr(status, 'rate_scale', 100)}"
             )
         for _, status in self.latest("parameter_status"):

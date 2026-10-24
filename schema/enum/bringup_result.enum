@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The result of one output in the motors bring-up case (ADR-0018).
+@type uint8
+PASS = 0
+NO_ENCODER_MOVED = 1
+REVERSED = 2                      # its own encoder moved the wrong way
+ANOTHER_ENCODER_MOVED = 3         # another encoder moved most

@@ -43,6 +43,15 @@ class BringupCase(enum.IntEnum):
     MOTORS = 1  # motor-to-encoder mapping and direction
 
 
+class BringupResult(enum.IntEnum):
+    """The result of one output in the motors bring-up case (ADR-0018)."""
+
+    PASS = 0
+    NO_ENCODER_MOVED = 1
+    REVERSED = 2  # its own encoder moved the wrong way
+    ANOTHER_ENCODER_MOVED = 3  # another encoder moved most
+
+
 class BringupStart(enum.IntEnum):
     """Why a bring-up request was refused, in the order the checks run."""
 
@@ -54,6 +63,15 @@ class BringupStart(enum.IntEnum):
     NOT_IN_CONTROL = 5
     EMERGENCY_STOP = 6
     ALREADY_RUNNING = 7  # a case is already running
+
+
+class BringupState(enum.IntEnum):
+    """The state of the bring-up case actuator control runs (ADR-0018)."""
+
+    IDLE = 0
+    RUNNING = 1
+    DONE = 2
+    ABORTED = 3
 
 
 class DisarmReason(enum.IntEnum):
@@ -70,6 +88,22 @@ class DisarmReason(enum.IntEnum):
     BRINGUP_ABORT = 6
 
 
+class HandshakeState(enum.IntEnum):
+    """The handshake state of one Link (ADR-0002)."""
+
+    WAITING = 0  # no handshake yet
+    CONNECTED = 1  # handshake done, peer heard within the timeout
+    PEER_SILENT = 2  # handshake done, peer not heard within the timeout
+
+
+class MenuState(enum.IntEnum):
+    """The local menu's state (ADR-0022)."""
+
+    CLOSED = 0
+    LIST = 1  # choosing an item
+    EDIT = 2  # changing an item's value
+
+
 class Mode(enum.IntEnum):
     """The vehicle mode (ADR-0005): it decides which source is in control."""
 
@@ -83,6 +117,16 @@ class ModeResult(enum.IntEnum):
     OK = 0
     ARMED = 1  # the mode changes only while disarmed
     UNKNOWN_MODE = 2
+
+
+class ParamResult(enum.IntEnum):
+    """Why a parameter change was refused (ADR-0012); also what a Link reports back."""
+
+    OK = 0
+    UNKNOWN_NAME = 1
+    WRONG_TYPE = 2
+    OUT_OF_RANGE = 3
+    LOCKED_WHILE_ARMED = 4
 
 
 class RebootAction(enum.IntEnum):

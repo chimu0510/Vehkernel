@@ -22,6 +22,7 @@
 #include <vk/core/parameters.hpp>
 #include <vk/local_display/pages.hpp>
 #include <vk/local_display/user_key.hpp>
+#include <vk/msg/enums.hpp>
 
 #include <array>
 #include <cstddef>
@@ -32,11 +33,8 @@
 
 namespace vk::local_display {
 
-enum class MenuState : std::uint8_t {
-    Closed = 0,
-    List = 1,
-    Edit = 2,
-};
+// Declared in schema/enum/menu_state.enum (ADR-0006).
+using MenuState = msg::MenuState;
 
 enum class MenuAction : std::uint8_t {
     Increase,

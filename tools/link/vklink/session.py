@@ -12,10 +12,13 @@ from .enums import (
     ActuatorPower,
     ArmingResult,
     BringupCase,
+    BringupResult,
     BringupStart,
+    BringupState,
     DisarmReason,
     Mode,
     ModeResult,
+    ParamResult,
     RebootAction,
     RebootResult,
 )
@@ -29,15 +32,6 @@ class ParamType(enum.IntEnum):
     FLOAT = 2
 
 
-# Why the MCU refused a parameter request; vk::core::ParamResult.
-REJECT_REASONS = {
-    1: "unknown name",
-    2: "wrong type",
-    3: "out of range",
-    4: "locked while armed",
-}
-
-
 def value_texts(values: type[enum.IntEnum]) -> dict[int, str]:
     """Readable names of an enum's values: EMERGENCY_STOP -> 'emergency stop'."""
     return {value.value: value.name.lower().replace("_", " ") for value in values}
@@ -48,8 +42,9 @@ def reason_texts(results: type[enum.IntEnum]) -> dict[int, str]:
     return {number: text for number, text in value_texts(results).items() if number != 0}
 
 
-# Modes and the reasons of mode, arming, reboot and bring-up replies, from the
-# schema's enums (schema/enum/, ADR-0006).
+# Modes and the reasons of parameter, mode, arming, reboot and bring-up
+# replies, from the schema's enums (schema/enum/, ADR-0006).
+REJECT_REASONS = reason_texts(ParamResult)
 MODES = {value.value: value.name for value in Mode}
 MODE_REJECT_REASONS = reason_texts(ModeResult)
 ARMING_REJECT_REASONS = reason_texts(ArmingResult)
@@ -65,7 +60,7 @@ ARM_CHECK_BITS = {0: "ACT_POWER"}
 # The bring-up cases, why a bringup_run was refused, and each output's result; vk::actuators.
 BRINGUP_CASES = {value.name.lower(): value.value for value in BringupCase}
 BRINGUP_REJECT_REASONS = reason_texts(BringupStart)
-BRINGUP_RESULTS = {0: "pass", 1: "no encoder moved", 2: "reversed", 3: "another encoder moved"}
+BRINGUP_RESULTS = value_texts(BringupResult)
 
 
 @dataclass(frozen=True)
@@ -76,7 +71,7 @@ class BringupOutput:
 
     @property
     def passed(self) -> bool:
-        return self.result == 0
+        return self.result == BringupResult.PASS
 
 
 @dataclass(frozen=True)
@@ -102,7 +97,7 @@ class BringupReply:
             return None
         outputs = tuple(BringupOutput(body[3 + 3 * i], body[4 + 3 * i], struct.unpack("<b", body[5 + 3 * i:6 + 3 * i])[0])
                         for i in range(body[2]))
-        return cls(rejected=False, bringup_case=body[0], aborted=body[1] == 3, outputs=outputs)
+        return cls(rejected=False, bringup_case=body[0], aborted=body[1] == BringupState.ABORTED, outputs=outputs)
 
 
 def check_names(mask: int) -> list[str]:

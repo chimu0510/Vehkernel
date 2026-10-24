@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The handshake state of one Link (ADR-0002).
+@type uint8
+WAITING = 0                       # no handshake yet
+CONNECTED = 1                     # handshake done, peer heard within the timeout
+PEER_SILENT = 2                   # handshake done, peer not heard within the timeout
