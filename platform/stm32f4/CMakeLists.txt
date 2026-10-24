@@ -3,7 +3,6 @@
 # and the FreeRTOS hooks are always linked in.
 vk_add_library(vk_platform LAYER platform OBJECT
   startup_stm32f407.c
-  boot_stub.c
   src/app_descriptor.cpp
   src/clock_tree.cpp
   src/fault.cpp

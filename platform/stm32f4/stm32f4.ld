@@ -2,7 +2,9 @@
 /*
  * Linker script for STM32F4 firmware. The board generator emits memory.ld
  * with the board's Flash layout and the MCU's RAM (ADR-0020); every region
- * size there is a budget, so outgrowing one fails the link.
+ * size there is a budget, so outgrowing one fails the link. The firmware
+ * fills the FIRMWARE region only; BOOT holds the bootloader, linked on its
+ * own (bootloader/stm32f4/bootloader.ld).
  */
 INCLUDE memory.ld
 
@@ -18,12 +20,6 @@ __vk_ccm_end = ORIGIN(CCM) + LENGTH(CCM);
 
 SECTIONS
 {
-    .boot_stub :
-    {
-        KEEP(*(.boot_vectors))
-        KEEP(*(.boot_text))
-    } > BOOT
-
     .isr_vector :
     {
         . = ALIGN(4);

@@ -84,7 +84,7 @@ void Reset_Handler(void)
     volatile uint32_t *const dbgmcu_cr = (volatile uint32_t *)0xE0042004u;
     *dbgmcu_cr |= 0x7u;
 
-    /* Point VTOR at this table even when started without the boot stub, e.g. by a debugger. */
+    /* Point VTOR at this table even when started without the bootloader, e.g. by a debugger. */
     volatile uint32_t *const vtor = (volatile uint32_t *)0xE000ED08u;
     *vtor = (uint32_t)(uintptr_t)vk_vector_table;
 
