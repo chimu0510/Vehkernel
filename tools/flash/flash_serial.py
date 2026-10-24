@@ -1,24 +1,34 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Serial flasher: flash a board through the STM32 system bootloader over
-its one-key download port (ADR-0020, ADR-0023).
+"""Serial flasher: install the Vehkernel bootloader and firmware on a board
+over its one-key download port, and update the firmware through that
+bootloader (ADR-0020, ADR-0023).
 
 The board definition names the port with a download circuit and its kind.
 On the C50C V1.1 that port is SERIAL2, USART1 to its own CH9102F, and the
 circuit is DTR_RTS: the adapter's RTS drives BOOT0 (asserted: BOOT0 high) and
 its DTR, with RTS, drives NRST (DTR released and RTS asserted: in reset), so
-the bootloader is entered and left without touching the board. stm32flash
-does the bootloader protocol; this tool picks what to write, where and with
-which DTR/RTS sequence from the build's board definition, so stored
-parameters survive an update and a new board loses nothing it had before it
-was backed up.
+the STM32 system bootloader is entered and left without touching the board.
 
-    tools/flash/flash_serial.py update                   # firmware only, parameters kept
+- new-board backs up the whole chip, erases it and writes
+  vehkernel_with_bl.hex, the Vehkernel bootloader and the firmware, through
+  the system bootloader with stm32flash.
+- update asks the firmware over its Link to reboot into the Vehkernel
+  bootloader (link_monitor.py reboot --bootloader). When no Link answers, it
+  restarts the board through the download circuit instead, once uploader.py
+  is waiting, so the bootloader's boot window catches it. Either way the
+  pinned ArduPilot uploader.py then writes vehkernel.apj, which the
+  bootloader checks and writes to the FIRMWARE region only: stored
+  parameters survive.
+- backup reads the whole chip, and reset restarts the board.
+
     tools/flash/flash_serial.py new-board                # back up, erase the whole chip, write all
+    tools/flash/flash_serial.py update                   # firmware only, parameters kept
     tools/flash/flash_serial.py backup vendor.bin        # read the whole chip
-    tools/flash/flash_serial.py reset                    # restart the firmware
+    tools/flash/flash_serial.py reset                    # restart the board
 
-Exits 0 on success, 1 when stm32flash failed, 2 on a usage or tool error.
+Exits 0 on success, 1 when stm32flash or uploader.py failed, 2 on a usage or
+tool error.
 """
 
 from __future__ import annotations
@@ -27,13 +37,29 @@ import argparse
 import fcntl
 import json
 import os
+import queue
 import struct
 import subprocess
 import sys
 import termios
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+UPLOADER = REPO / "tools" / "bootloader" / "third_party" / "uploader.py"
+LINK_MONITOR = REPO / "tools" / "link" / "link_monitor.py"
+
+# How long the Link monitor may take to ask for the bootloader, and uploader.py to update.
+LINK_TIMEOUT_S = 20.0
+UPLOAD_TIMEOUT_S = 180.0
+# What link_monitor.py prints when the firmware refuses the request.
+REBOOT_REFUSED = "reboot refused"
+# uploader.py prints this once it has loaded the .apj and starts looking for the bootloader.
+UPLOADER_WAITING = "waiting for the bootloader"
+# uploader.py does not exit when the bootloader's board ID is not the image's: it waits for another board.
+UPLOADER_REFUSED = "Firmware not suitable for this board"
 
 # stm32flash -i sequences by download circuit. DTR_RTS: enter the bootloader
 # with NRST held low and BOOT0 high, then release NRST, then BOOT0; leave it
@@ -48,7 +74,7 @@ class FlashError(Exception):
 
 
 class TransferError(Exception):
-    """stm32flash ran and failed."""
+    """stm32flash or uploader.py ran and failed."""
 
 
 class Build:
@@ -83,16 +109,16 @@ class Build:
         return path
 
     @property
-    def firmware_bin(self) -> Path:
-        return self.image("vehkernel.bin")
+    def with_bl_hex(self) -> Path:
+        return self.image("vehkernel_with_bl.hex")
 
     @property
-    def hex(self) -> Path:
-        return self.image("vehkernel.hex")
+    def apj(self) -> Path:
+        return self.image("vehkernel.apj")
 
     @property
-    def firmware(self) -> dict:
-        return self.regions["FIRMWARE"]
+    def msg_dir(self) -> Path:
+        return self.directory / "generated" / "schema" / "python"
 
 
 class Stm32Flash:
@@ -124,7 +150,7 @@ class Stm32Flash:
 
 
 def reset(port: str, circuit: str) -> None:
-    """Restarts the firmware: NRST held low with BOOT0 high, then both released."""
+    """Restarts the board: NRST held low with BOOT0 high, then both released."""
     assert circuit == "DTR_RTS", circuit
     try:
         fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
@@ -147,13 +173,79 @@ def default_backup_name(board: str) -> Path:
     return Path(f"{board}_flash_{datetime.now():%Y%m%d_%H%M%S}.bin")
 
 
-def cmd_update(build: Build, flasher: Stm32Flash) -> None:
-    size = build.firmware_bin.stat().st_size
-    region = build.firmware
-    if size > region["size"]:
-        raise FlashError(f"{build.firmware_bin} is {size} bytes, the FIRMWARE region holds {region['size']}")
-    print(f"Writing {build.firmware_bin} ({size} bytes) to 0x{region['start']:08X}; parameters are kept")
-    flasher.write(build.firmware_bin, region["start"])
+def ask_link(args: argparse.Namespace, build: Build) -> bool:
+    """Asks the firmware over its Link to reboot into the bootloader; whether
+    it accepted. A refusal, as while armed, stops the update: the board is
+    then never restarted another way."""
+    command = [sys.executable, str(args.link_monitor), "--serial", args.port, "--baud", str(args.link_baud),
+               "--msg-dir", str(build.msg_dir), "reboot", "--bootloader"]
+    print(f"Asking the firmware over the Link on {args.port} to reboot into the bootloader", flush=True)
+    try:
+        result = subprocess.run(command, check=False, timeout=LINK_TIMEOUT_S, capture_output=True, text=True)
+    except subprocess.TimeoutExpired:
+        return False
+    print(result.stdout + result.stderr, end="", flush=True)
+    if REBOOT_REFUSED in result.stderr:
+        raise TransferError("the firmware refused to reboot into the bootloader; disarm it first")
+    return result.returncode == 0
+
+
+def run_uploader(args: argparse.Namespace, build: Build, restart: bool) -> None:
+    """Runs uploader.py with the .apj until it exits; with `restart`, restarts
+    the board through the download circuit once uploader.py waits for it."""
+    command = [sys.executable, "-u", str(args.uploader), "--port", args.port, "--no-extf", str(build.apj)]
+    print("$ " + " ".join(command[1:]), flush=True)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    lines: queue.Queue[str | None] = queue.Queue()
+
+    def read() -> None:
+        assert process.stdout is not None
+        for line in process.stdout:
+            lines.put(line)
+        lines.put(None)
+
+    threading.Thread(target=read, daemon=True).start()
+    deadline = time.monotonic() + UPLOAD_TIMEOUT_S
+    refused = timed_out = False
+    try:
+        while True:
+            try:
+                line = lines.get(timeout=max(0.0, deadline - time.monotonic()))
+            except queue.Empty:
+                timed_out = True
+                break
+            if line is None:
+                break
+            print(line, end="", flush=True)
+            if restart and UPLOADER_WAITING in line:
+                restart = False
+                print(f"Restarting the board through the {build.circuit} circuit", flush=True)
+                reset(args.port, build.circuit)
+            if UPLOADER_REFUSED in line:
+                refused = True
+                break
+    finally:
+        if process.poll() is None:
+            process.kill()
+        returncode = process.wait()
+    if refused:
+        raise TransferError(f"the bootloader refused {build.apj}: it is for another board")
+    if timed_out:
+        raise TransferError(f"uploader.py did not finish within {UPLOAD_TIMEOUT_S:.0f} s; if no bootloader "
+                            "answered, power-cycle the board while update waits for it")
+    if returncode != 0:
+        raise TransferError(f"uploader.py failed with exit code {returncode}")
+
+
+def cmd_update(args: argparse.Namespace, build: Build) -> None:
+    apj = build.apj
+    if not args.uploader.is_file():
+        raise FlashError(f"{args.uploader} is missing")
+    asked = ask_link(args, build)
+    if not asked:
+        print("No Link answered; the board is restarted into its bootloader's boot window instead", flush=True)
+    print(f"Writing {apj} through the bootloader; parameters are kept", flush=True)
+    run_uploader(args, build, restart=not asked)
 
 
 def cmd_new_board(args: argparse.Namespace, build: Build, flasher: Stm32Flash) -> None:
@@ -169,8 +261,8 @@ def cmd_new_board(args: argparse.Namespace, build: Build, flasher: Stm32Flash) -
             raise TransferError(f"the backup {backup} is incomplete; nothing was erased")
     print("Erasing the whole chip")
     flasher.erase_all()
-    print(f"Writing {build.hex}: the boot stub and the firmware; parameters start empty")
-    flasher.write(build.hex)
+    print(f"Writing {build.with_bl_hex}: the bootloader and the firmware; parameters start empty")
+    flasher.write(build.with_bl_hex)
 
 
 def cmd_backup(args: argparse.Namespace, build: Build, flasher: Stm32Flash) -> None:
@@ -181,23 +273,28 @@ def cmd_backup(args: argparse.Namespace, build: Build, flasher: Stm32Flash) -> N
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Flash a board through the STM32 system bootloader over its "
-                                                 "one-key download port.")
+    parser = argparse.ArgumentParser(description="Install the Vehkernel bootloader and firmware over a board's "
+                                                 "one-key download port, and update the firmware through it.")
     parser.add_argument("--port", default="/dev/ttyACM0",
                         help="the host device of the board's download port (default /dev/ttyACM0)")
-    parser.add_argument("--baud", type=int, default=115200, help="bootloader baud rate (default 115200)")
+    parser.add_argument("--baud", type=int, default=115200,
+                        help="the STM32 system bootloader's baud rate (default 115200)")
+    parser.add_argument("--link-baud", type=int, default=921600,
+                        help="the Link's baud rate on the port, for update (default 921600)")
     parser.add_argument("--build", type=Path, default=Path("build/c50c-v1_1"),
                         help="firmware build directory (default build/c50c-v1_1)")
     parser.add_argument("--stm32flash", default="stm32flash", help="stm32flash executable")
+    parser.add_argument("--uploader", type=Path, default=UPLOADER, help="uploader.py (default: the pinned copy)")
+    parser.add_argument("--link-monitor", type=Path, default=LINK_MONITOR, help="link_monitor.py (default: the repository's)")
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("update", help="write the firmware from the FIRMWARE region on; parameters are kept")
-    new_board = commands.add_parser("new-board", help="back up the whole chip, erase it and write the boot stub "
+    commands.add_parser("update", help="write vehkernel.apj through the Vehkernel bootloader; parameters are kept")
+    new_board = commands.add_parser("new-board", help="back up the whole chip, erase it and write the bootloader "
                                                       "and the firmware; parameters start empty")
     new_board.add_argument("--backup", type=Path, help="backup file (default <board>_flash_<time>.bin)")
     new_board.add_argument("--no-backup", action="store_true", help="erase without a backup")
     backup = commands.add_parser("backup", help="read the whole chip into a file")
     backup.add_argument("file", type=Path)
-    commands.add_parser("reset", help="restart the firmware")
+    commands.add_parser("reset", help="restart the board")
     args = parser.parse_args(argv)
 
     try:
@@ -205,7 +302,7 @@ def main(argv: list[str] | None = None) -> int:
         flasher = Stm32Flash(args.stm32flash, args.port, args.baud, build.circuit)
         print(f"{build.board}: download port {build.download_port}, {build.circuit} circuit, on {args.port}")
         if args.command == "update":
-            cmd_update(build, flasher)
+            cmd_update(args, build)
         elif args.command == "new-board":
             cmd_new_board(args, build, flasher)
         elif args.command == "backup":
