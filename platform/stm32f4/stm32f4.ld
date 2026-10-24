@@ -11,6 +11,10 @@ ENTRY(Reset_Handler)
 /* Main stack, reserved in RAM so the RAM budget accounts for it. */
 __vk_main_stack_size = 4K;
 _estack = ORIGIN(RAM) + LENGTH(RAM);
+/* RAM bounds, for the fault stop to check an exception frame before reading it. */
+__vk_ram_start = ORIGIN(RAM);
+__vk_ccm_start = ORIGIN(CCM);
+__vk_ccm_end = ORIGIN(CCM) + LENGTH(CCM);
 
 SECTIONS
 {

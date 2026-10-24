@@ -202,6 +202,18 @@ _Avoid_: self-test, boot check
 The platform-level guard that turns every actuator output off when actuator control stops refreshing it.
 _Avoid_: motor timeout
 
+**Fault Stop**:
+The platform's path for a fault, a failed assertion or a stack overflow: it turns every actuator output off by writing registers only, records the fault and stops until the hardware watchdog resets the board.
+_Avoid_: panic, crash handler
+
+**Hardware Watchdog**:
+The MCU's independent watchdog, refreshed only when the scheduler gets idle, which resets the board when it does not.
+_Avoid_: IWDG (except for the STM32 peripheral itself), dog
+
+**Reset Cause**:
+What caused the last reset, read by the platform at boot and published on `vehicle_status`; a watchdog or fault reset is an unexpected reset, after which arming is refused until the next deliberate reset.
+_Avoid_: boot reason
+
 ### Local interface
 
 **Local Display**:

@@ -49,6 +49,7 @@ Inputs sample_inputs()
     status.arming_refusal = 2;
     status.disarm_reason = 3;
     status.output_watchdog_trips = 7;
+    status.reset_cause = 4;
     inputs.status = status;
 
     // Roll 10, pitch -20.5 and yaw 135 degrees, ZYX.
@@ -92,7 +93,7 @@ TEST(LocalDisplayPages, StatusShowsTheVehicleStatus)
               "STATUS            1/3\n"
               "TEST DISARMED\n"
               "ESTOP ON  BOARD OK\n"
-              "POWER WAIT\n"
+              "POWER WAIT RST WDOG\n"
               "SKIP ACT_POWER\n"
               "REFUSED ESTOP\n"
               "DISARM  POWER_LOST\n"

@@ -236,6 +236,35 @@ config BRINGUP_TESTS
 	  the results to a RAM block for the bring-up runner to read over SWD,
 	  then idles (ADR-0018). It never configures actuator outputs.
 
+choice FAULT_TEST
+	prompt "Fault test (hardware check only)"
+	default FAULT_TEST_NONE
+	help
+	  For the hardware check of the fault stop and the hardware watchdog
+	  (ADR-0005), set in a local debug overlay and never committed: once
+	  an actuator output has been driven for 0.5 s, wq:ctrl faults or
+	  stalls. SITL raises its faults with --fault instead.
+
+config FAULT_TEST_NONE
+	bool "None"
+
+config FAULT_TEST_ASSERT
+	bool "A failed configASSERT"
+	depends on PLATFORM_STM32F4 && ACTUATOR_CONTROL
+
+config FAULT_TEST_USAGE_FAULT
+	bool "A UsageFault (an undefined instruction)"
+	depends on PLATFORM_STM32F4 && ACTUATOR_CONTROL
+
+config FAULT_TEST_STALL
+	bool "wq:ctrl stalls with interrupts enabled"
+	depends on PLATFORM_STM32F4 && ACTUATOR_CONTROL
+	help
+	  The output watchdog turns the outputs off, then the hardware
+	  watchdog resets the board.
+
+endchoice
+
 endmenu
 
 # Helper libraries. Only these may be pulled in with select.

@@ -13,3 +13,4 @@ ACTUATOR_POWER_OFF = 7     @short ACT_POWER   # unpowered or still settling, and
 ACTUATORS_NOT_STARTED = 8  @short ACTUATORS
 LOCAL_MENU_OPEN = 9        @short MENU_OPEN   # ADR-0022
 REBOOTING = 10                                # a reboot was accepted and is about to happen
+UNEXPECTED_RESET = 11      @short RESET       # the last reset was a watchdog or fault reset (ADR-0005)

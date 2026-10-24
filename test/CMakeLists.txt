@@ -83,6 +83,15 @@ if(CONFIG_ACTUATOR_CONTROL AND CONFIG_LINK_UDP)
       $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
 endif()
 
+# L3 SITL fault test (ADR-0005): a failed assertion and fail() while driving
+# end SITL with every output stopped, and a watchdog or fault reset refuses
+# arming.
+if(CONFIG_ACTUATOR_CONTROL AND CONFIG_LINK_UDP)
+  add_test(NAME sitl_fault
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_fault.py
+      $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
+endif()
+
 # L3 SITL bring-up test (spec 0006): the motor-to-encoder case finds a
 # reversed motor, and passes once MOTn_REV is set.
 if(CONFIG_BRINGUP_MOTORS AND CONFIG_LINK_UDP)

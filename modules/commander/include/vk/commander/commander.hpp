@@ -13,6 +13,9 @@
 // or within COM_SP_TIMEOUT when disarmed, so one left from before a disarm
 // neither blocks arming for long nor drives anything after it.
 //
+// After a watchdog or fault reset (ADR-0005) arming is refused until the
+// next deliberate reset: a reboot request, the reset pin or a power cycle.
+//
 // A bring-up case is aborted, by disarming, when the emergency stop is
 // engaged or its source falls silent while it runs.
 //
@@ -26,6 +29,7 @@
 // idle for COM_DISARM_IDLE. Nothing ever re-arms on its own.
 #pragma once
 
+#include <vk/core/fault.hpp>
 #include <vk/core/vehicle_control.hpp>
 #include <vk/msg/enums.hpp>
 
@@ -52,6 +56,7 @@ struct Inputs {
     bool local_menu_open = false;               // the local menu is open (ADR-0022)
     std::uint64_t last_setpoint_us = 0;         // when the last setpoint was accepted, 0 for never
     std::uint32_t output_watchdog_trips = 0;    // times the platform's output watchdog turned the outputs off
+    core::ResetReport reset_report{};           // what caused the last reset, read at boot
 };
 
 // The sensed actuator power state, declared in schema/enum/actuator_power.enum.
@@ -69,6 +74,7 @@ struct State {
     core::ArmingResult arming_refusal = core::ArmingResult::Ok;
     core::DisarmReason disarm_reason = core::DisarmReason::None;
     std::uint32_t output_watchdog_trips = 0;
+    core::ResetReport reset_report{};
 
     friend bool operator==(const State&, const State&) = default;
 };

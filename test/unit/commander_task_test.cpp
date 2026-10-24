@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The commander work item's reboot service on a fake clock (ADR-0023): a
 // reboot is refused while armed, happens reboot_delay_us after it is
-// accepted so the reply leaves first, and arming is refused meanwhile.
+// accepted so the reply leaves first, and arming is refused meanwhile. And
+// the reset cause it publishes on vehicle_status (ADR-0005).
 #include <vk/commander/commander_task.hpp>
 #include <vk/core/bus.hpp>
+#include <vk/core/fault.hpp>
 #include <vk/core/vehicle_control.hpp>
 #include <vk/core/work_queue.hpp>
 #include <vk/hal/reset.hpp>
 #include <vk/msg/imu_sample.hpp>
+#include <vk/msg/vehicle_status.hpp>
 
 #include <gtest/gtest.h>
 
@@ -121,6 +124,31 @@ TEST(CommanderTaskWithoutReset, ARebootIsNotAvailable)
     vk::core::WorkQueue queue{"wq:test", 1, &fake_clock};
     CommanderTask task{{.interval_us = interval_us}, queue};
     EXPECT_EQ(task.request_reboot(RebootAction::Reboot), RebootResult::NotAvailable);
+}
+
+TEST(CommanderTaskAfterAFault, PublishesTheResetCauseAndRefusesArming)
+{
+    fake_now = 1'000'000;
+    vk::core::WorkQueue queue{"wq:test", 1, &fake_clock};
+    vk::core::Publication<vk::msg::ImuSample> imu{0};
+    vk::core::Subscription<vk::msg::VehicleStatus> status{0};
+    CommanderTask task{{.interval_us = interval_us,
+                        .actuators_started = true,
+                        .reset_report = {.cause = vk::core::ResetCause::Fault,
+                                         .fault = vk::core::Fault::Assert,
+                                         .fault_address = 0x0801ABCD}},
+                       queue};
+    task.start();
+    imu.publish(vk::msg::ImuSample{.timestamp = fake_now});
+    fake_now += interval_us;
+    queue.process();
+    vk::msg::VehicleStatus published{};
+    ASSERT_TRUE(status.copy(published));
+    EXPECT_EQ(published.reset_cause, static_cast<std::uint8_t>(vk::core::ResetCause::Fault));
+    EXPECT_EQ(published.fault, static_cast<std::uint8_t>(vk::core::Fault::Assert));
+    EXPECT_EQ(published.fault_address, 0x0801ABCDU);
+    ASSERT_EQ(task.request_mode(link0, vk::core::Mode::Test), vk::core::ModeResult::Ok);
+    EXPECT_EQ(task.request_arming(link0, true), ArmingResult::UnexpectedReset);
 }
 
 }  // namespace

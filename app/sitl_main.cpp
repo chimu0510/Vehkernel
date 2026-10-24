@@ -4,7 +4,8 @@
 // Usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]
 //                       [--motion still|tilt|rotate|shake] [--param-file <path>]
 //                       [--actuator-power-off] [--reversed-motor <output>]
-//                       [--display <path>]
+//                       [--display <path>] [--reset-cause <cause>[:<fault>]]
+//                       [--fault assert|fail]
 //
 // The run stops by itself after the duration (default 1 s; 0 runs until
 // interrupted) and prints a report: one line per topic instance and per work
@@ -25,7 +26,11 @@
 // released by the Link's sim_user_key frame.
 // A reboot request over the Link ends the run at once, without the report,
 // with exit status 10 to start the firmware again or 11 for the bootloader
-// (ADR-0023).
+// (ADR-0023). The fault stop ends it with exit status 12 (ADR-0005); --fault
+// raises one once an output has been driven for 0.5 s. A run starts as if
+// powered on; whoever starts it again after a reset gives the reset cause
+// with --reset-cause, such as watchdog or fault:assert, as the board would
+// read it at boot.
 #include <vk/config.h>
 
 #ifdef CONFIG_ACTUATOR_CONTROL
@@ -33,6 +38,7 @@
 #endif
 #include <vk/commander/commander_task.hpp>
 #include <vk/core/bus.hpp>
+#include <vk/core/fault.hpp>
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
@@ -49,6 +55,7 @@
 #ifdef CONFIG_LOCAL_MENU
 #include <vk/local_display/local_menu_task.hpp>
 #endif
+#include <vk/msg/enums.hpp>
 #include <vk/msg/registry.hpp>
 #include <vk/params/params.hpp>
 #ifdef CONFIG_PARAM_STORAGE_FLASH
@@ -70,11 +77,14 @@
 #include <vk/platform/pty_transport.hpp>
 #endif
 
+#include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <iterator>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -113,7 +123,43 @@ struct Options {
     bool actuator_power = true;
     std::array<bool, vk::platform::actuator_count> reversed_motors{};
     const char* display_file = nullptr;  // nullptr: the display's image stays in memory
+    vk::core::ResetReport reset{.cause = vk::core::ResetCause::PowerOn};
+    vk::core::Fault fault = vk::core::Fault::None;  // --fault
 };
+
+// The value of `Enum` whose schema name is `text` in lower case.
+template <class Enum>
+std::optional<Enum> enum_from_name(std::string_view text)
+{
+    for (const auto& entry : vk::msg::EnumValues<Enum>::values) {
+        if (entry.name.size() == text.size() &&
+            std::equal(text.begin(), text.end(), entry.name.begin(),
+                       [](char a, char b) { return std::toupper(static_cast<unsigned char>(a)) == b; })) {
+            return entry.value;
+        }
+    }
+    return std::nullopt;
+}
+
+// <cause>[:<fault>], as power_on or fault:assert; a fault only with FAULT.
+bool parse_reset_cause(std::string_view text, Options& options)
+{
+    const auto colon = text.find(':');
+    const auto cause = enum_from_name<vk::core::ResetCause>(text.substr(0, colon));
+    if (!cause) {
+        return false;
+    }
+    options.reset = {.cause = *cause};
+    if (colon == std::string_view::npos) {
+        return true;
+    }
+    const auto fault = enum_from_name<vk::core::Fault>(text.substr(colon + 1));
+    if (*cause != vk::core::ResetCause::Fault || !fault) {
+        return false;
+    }
+    options.reset.fault = *fault;
+    return true;
+}
 
 bool parse_address(const char* argument, Options& options)
 {
@@ -175,6 +221,16 @@ bool parse_options(std::span<char*> args, Options& options)
             options.param_file = value;
         } else if (arg == "--display") {
             options.display_file = value;
+        } else if (arg == "--reset-cause") {
+            if (!parse_reset_cause(value, options)) {
+                return false;
+            }
+        } else if (arg == "--fault") {
+            const auto fault = enum_from_name<vk::core::Fault>(value);
+            if (!fault || (*fault != vk::core::Fault::Assert && *fault != vk::core::Fault::Fail)) {
+                return false;
+            }
+            options.fault = *fault;
         } else if (arg == "--reversed-motor") {
             char* end = nullptr;
             const unsigned long output = std::strtoul(value, &end, 10);
@@ -212,7 +268,8 @@ void start_commander()
                                                            .actuators_started = actuators,
                                                            .bringup = bringup,
                                                            .output_watchdog_trips = &vk::platform::output_watchdog_trips,
-                                                           .reset = &vk::platform::reset},
+                                                           .reset = &vk::platform::reset,
+                                                           .reset_report = vk::platform::reset_report()},
                       vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     commander->start();
 }
@@ -389,11 +446,14 @@ int main(int argc, char** argv)
         std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]\n"
                    "                      [--motion still|tilt|rotate|shake] [--param-file <path>]\n"
                    "                      [--actuator-power-off] [--reversed-motor <output>]\n"
-                   "                      [--display <path>]\n",
+                   "                      [--display <path>] [--reset-cause <cause>[:<fault>]]\n"
+                   "                      [--fault assert|fail]\n",
                    stderr);
         return 2;
     }
     vk::platform::init(options.motion);
+    vk::platform::set_reset_report(options.reset);
+    vk::platform::raise_fault_when_driven(options.fault);
     vk::platform::set_actuator_power(options.actuator_power);
     for (std::size_t output = 1; output <= vk::platform::actuator_count; ++output) {
         vk::platform::motor(output).set_reversed(options.reversed_motors.at(output - 1));

@@ -38,7 +38,7 @@
 #define configUSE_CO_ROUTINES         0
 #define configQUEUE_REGISTRY_SIZE     0
 
-/* Hooks. The idle hook puts the CPU to sleep with WFI. */
+/* Hooks. The idle hook refreshes the hardware watchdog and puts the CPU to sleep with WFI. */
 #define configUSE_IDLE_HOOK            1
 #define configUSE_TICK_HOOK            0
 #define configUSE_MALLOC_FAILED_HOOK   0
@@ -63,12 +63,21 @@
 #define configKERNEL_INTERRUPT_PRIORITY      (configLIBRARY_LOWEST_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY (configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
 
-/* A failed assertion stops the CPU where a debugger can see it. */
-#define configASSERT(x)              \
-    if ((x) == 0) {                  \
-        __asm volatile("cpsid i");   \
-        for (;;) {                   \
-        }                            \
+/*
+ * A failed assertion goes to the fault stop (fault.cpp, ADR-0005): every
+ * actuator output off, the fault recorded, then a breakpoint for a debugger
+ * or a reset by the hardware watchdog.
+ */
+#ifdef __cplusplus
+extern "C" {
+#endif
+void vk_assert_failed(void) __attribute__((noreturn));
+#ifdef __cplusplus
+}
+#endif
+#define configASSERT(x)        \
+    if ((x) == 0) {            \
+        vk_assert_failed();    \
     }
 
 /* The vector table names the port's handlers directly. */

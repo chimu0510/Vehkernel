@@ -36,7 +36,7 @@ topic name=link_status instance=0 messages=5 rate_hz=1.00
 topic name=vehicle_attitude instance=0 messages=250 rate_hz=49.95
 topic name=work_item_status instance=0 messages=5 rate_hz=1.00
 mcu_link instance=0 frames_sent=1666 bytes_sent=87998 frames_received=9 bytes_received=138 drops=0 crc_errors=0 malformed=0 lost=0 handshake_state=connected rate_scale=100
-vehicle_status mode=STANDBY armed=0 source=none board_verified=1 emergency_stop=0 actuator_power=powered skipped_checks=none arming_refusal=none disarm_reason=none output_watchdog_trips=0
+vehicle_status mode=STANDBY armed=0 source=none board_verified=1 emergency_stop=0 actuator_power=powered skipped_checks=none arming_refusal=none disarm_reason=none output_watchdog_trips=0 reset_cause=power_on fault=none fault_address=0x00000000
 work_item name=icm20948 runs=1000 overruns=0 run_time_last_us=14 run_time_max_us=40 run_time_mean_us=16 jitter_max_us=2885
 work_item name=link0 runs=1000 overruns=0 run_time_last_us=65 run_time_max_us=407 run_time_mean_us=60 jitter_max_us=2876
 ```

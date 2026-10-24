@@ -50,6 +50,7 @@ void CommanderTask::run()
         .local_menu_open = local_menu_open_,
         .last_setpoint_us = last_setpoint_.timestamp,
         .output_watchdog_trips = config_.output_watchdog_trips == nullptr ? 0 : config_.output_watchdog_trips(),
+        .reset_report = config_.reset_report,
     };
     const Settings settings{.arm_check = static_cast<std::uint32_t>(params::com.arm_check),
                             .setpoint_timeout_s = params::com.sp_timeout,
@@ -92,6 +93,9 @@ void CommanderTask::publish(std::uint64_t now_us, const State& state)
         .arming_refusal = static_cast<std::uint8_t>(state.arming_refusal),
         .disarm_reason = static_cast<std::uint8_t>(state.disarm_reason),
         .output_watchdog_trips = state.output_watchdog_trips,
+        .reset_cause = static_cast<std::uint8_t>(state.reset_report.cause),
+        .fault = static_cast<std::uint8_t>(state.reset_report.fault),
+        .fault_address = state.reset_report.fault_address,
     });
 }
 

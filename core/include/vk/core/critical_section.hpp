@@ -19,7 +19,7 @@ public:
     CriticalSection& operator=(CriticalSection&&) = delete;
 };
 
-// Stops the firmware on a broken invariant: halts on hardware, aborts in SITL.
+// Stops the firmware on a broken invariant through the fault stop (fault.hpp).
 [[noreturn]] void fail(const char* what);
 
 }  // namespace vk::core

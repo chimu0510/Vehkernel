@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Unit tests for the commander's state machine (ADR-0005, spec 0006): modes,
-// arming checks, actuator power sense, the emergency stop and the timers.
+// arming checks, actuator power sense, the emergency stop, the timers and
+// the reset cause.
 #include <vk/commander/commander.hpp>
 
 #include <gtest/gtest.h>
@@ -131,6 +132,31 @@ TEST_F(CommanderTest, TheLocalMenuOpenRefusesArmingEvenWithEveryCheckSkipped)
     inputs.local_menu_open = false;
     step();
     EXPECT_EQ(commander.request_arming(now, link0, true), ArmingResult::Ok);
+}
+
+// ADR-0005: after a watchdog or fault reset arming is refused, a check
+// COM_ARM_CHECK cannot skip; any other reset cause arms.
+TEST_F(CommanderTest, AWatchdogOrFaultResetRefusesArmingEvenWithEveryCheckSkipped)
+{
+    using vk::core::ResetCause;
+    settings.arm_check = 0;
+    for (const ResetCause cause : {ResetCause::Watchdog, ResetCause::Fault}) {
+        Commander fresh;
+        commander = fresh;
+        inputs.reset_report = {.cause = cause, .fault = vk::core::Fault::HardFault, .fault_address = 0x08012345};
+        ready();
+        EXPECT_EQ(commander.request_arming(now, link0, true), ArmingResult::UnexpectedReset);
+        EXPECT_FALSE(commander.state().armed);
+        EXPECT_EQ(commander.state().reset_report, inputs.reset_report);
+    }
+    for (const ResetCause cause :
+         {ResetCause::Unknown, ResetCause::PowerOn, ResetCause::Pin, ResetCause::Software, ResetCause::LowPower}) {
+        Commander fresh;
+        commander = fresh;
+        inputs.reset_report = {.cause = cause};
+        ready();
+        EXPECT_EQ(commander.request_arming(now, link0, true), ArmingResult::Ok) << static_cast<int>(cause);
+    }
 }
 
 TEST_F(CommanderTest, ModeChangesOnlyWhileDisarmed)

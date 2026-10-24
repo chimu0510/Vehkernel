@@ -19,6 +19,8 @@ build/sitl/app/vehkernel-sitl --duration 5
 | `--param-file <path>` | Keeps the simulated parameter Flash in a file ([Parameters](link-monitor.md#parameters)) |
 | `--display <path>` | Writes the simulated display to a PBM image ([Local display](local-display.md)) |
 | `--actuator-power-off`, `--reversed-motor <output>` | Simulated actuator faults ([Driving the wheels](driving.md)) |
+| `--fault assert\|fail` | Fails a `configASSERT` or calls `fail()` once an output has been driven for 0.5 s ([Faults and reset cause](#faults-and-reset-cause)) |
+| `--reset-cause <cause>[:<fault>]` | The reset cause the run reports, `power_on` by default ([Faults and reset cause](#faults-and-reset-cause)) |
 
 ## Report
 
@@ -40,6 +42,16 @@ work_item name=timing_monitor queue=wq:slow runs=5 overruns=0 run_time_last_us=3
 ```
 
 `rate_hz` is the average since the topic's first publication. `test/sitl/check_report.py` runs SITL and checks the report; CI runs it through `ctest` (the `sitl_smoke` test), failing when `imu_sample` is not published at 200 Hz within 5 %, or any work item overruns or never runs. With the UDP Link, overruns count over a check window after start-up, and an interval in which most work items overran at once is a host stall of the whole SITL process, not counted. SITL tests run serially under `ctest -j`, since they judge timing on the shared host.
+
+## Faults and reset cause
+
+SITL has no hardware watchdog and no real faults, but runs the fault stop of ADR-0005 for a failed `configASSERT` and for `fail()`: it turns every simulated output off, prints one line and ends the run at once with exit status 12:
+
+```text
+fault kind=ASSERT address=0xc2a4e1f3 duty=0.000,0.000,0.000,0.000
+```
+
+`--fault assert` or `--fault fail` raises one on purpose once an output has been driven for 0.5 s. A run starts as if powered on; whoever starts SITL again after a reset or a fault gives the reset cause the board would read at boot, with `--reset-cause watchdog` or `--reset-cause fault:assert`, for example. `vehicle_status` then reports it, and after a watchdog or fault reset arming is refused as an unexpected reset; `--reset-cause software` stands for the deliberate reboot that clears it. CI checks both with `test/sitl/check_fault.py` (the `sitl_fault` test).
 
 ## Motion profiles
 

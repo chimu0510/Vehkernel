@@ -2,9 +2,10 @@
 /*
  * Minimal Cortex-M4F startup for STM32F407: vector table, memory init, FPU
  * enable, then main(). Exceptions and interrupts without a handler go to
- * Default_Handler; the named handlers below are weak, so the platform layer
- * and FreeRTOS override them by defining a function of the same name. Written
- * in C so the vector table is a constant initializer that stays in Flash.
+ * Default_Handler, which enters the fault stop (fault.cpp, ADR-0005); the
+ * named handlers below are weak, so the platform layer and FreeRTOS override
+ * them by defining a function of the same name. Written in C so the vector
+ * table is a constant initializer that stays in Flash.
  */
 #include <stdint.h>
 
@@ -22,6 +23,10 @@ void Reset_Handler(void);
 void Default_Handler(void);
 
 #define VK_WEAK_HANDLER(name) void name(void) __attribute__((weak, alias("Default_Handler")))
+VK_WEAK_HANDLER(HardFault_Handler);  /* fault stop */
+VK_WEAK_HANDLER(MemManage_Handler);  /* fault stop */
+VK_WEAK_HANDLER(BusFault_Handler);   /* fault stop */
+VK_WEAK_HANDLER(UsageFault_Handler); /* fault stop */
 VK_WEAK_HANDLER(SVC_Handler);     /* FreeRTOS */
 VK_WEAK_HANDLER(PendSV_Handler);  /* FreeRTOS */
 VK_WEAK_HANDLER(SysTick_Handler); /* FreeRTOS tick */
@@ -29,6 +34,10 @@ VK_WEAK_HANDLER(TIM6_DAC_IRQHandler); /* output watchdog */
 VK_WEAK_HANDLER(TIM7_IRQHandler); /* microsecond clock overflow */
 
 /* Vector numbers: system exceptions first, then IRQn + VK_SYSTEM_VECTORS. */
+#define VK_HARDFAULT_VECTOR  3
+#define VK_MEMMANAGE_VECTOR  4
+#define VK_BUSFAULT_VECTOR   5
+#define VK_USAGEFAULT_VECTOR 6
 #define VK_SVCALL_VECTOR  11
 #define VK_PENDSV_VECTOR  14
 #define VK_SYSTICK_VECTOR 15
@@ -42,7 +51,12 @@ __attribute__((section(".isr_vector"), used))
 const vk_vector_t vk_vector_table[VK_SYSTEM_VECTORS + VK_STM32F407_IRQS] = {
     [0] = (vk_vector_t)_estack,
     [1] = Reset_Handler,
-    [2 ... VK_SVCALL_VECTOR - 1] = Default_Handler,
+    [2] = Default_Handler, /* NMI */
+    [VK_HARDFAULT_VECTOR] = HardFault_Handler,
+    [VK_MEMMANAGE_VECTOR] = MemManage_Handler,
+    [VK_BUSFAULT_VECTOR] = BusFault_Handler,
+    [VK_USAGEFAULT_VECTOR] = UsageFault_Handler,
+    [VK_USAGEFAULT_VECTOR + 1 ... VK_SVCALL_VECTOR - 1] = Default_Handler,
     [VK_SVCALL_VECTOR] = SVC_Handler,
     [VK_SVCALL_VECTOR + 1 ... VK_PENDSV_VECTOR - 1] = Default_Handler,
     [VK_PENDSV_VECTOR] = PendSV_Handler,
@@ -53,10 +67,10 @@ const vk_vector_t vk_vector_table[VK_SYSTEM_VECTORS + VK_STM32F407_IRQS] = {
     [VK_TIM7_VECTOR + 1 ... VK_LAST_VECTOR] = Default_Handler,
 };
 
-void Default_Handler(void)
+/* The fault stop as an unexpected interrupt (fault.enum: UNEXPECTED_INTERRUPT = 8). */
+__attribute__((naked)) void Default_Handler(void)
 {
-    for (;;) {
-    }
+    __asm__ volatile("movs r0, #8\n\tb vk_fault_trampoline");
 }
 
 void Reset_Handler(void)

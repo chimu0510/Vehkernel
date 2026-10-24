@@ -8,7 +8,7 @@ The local display shows three pages of 21 columns by 8 lines, whose values chang
 
 | Page | Shows |
 |---|---|
-| Status | Mode, arming, the emergency stop, board verification, actuator power, skipped arming checks, the last arming refusal and disarm reason, output watchdog trips |
+| Status | Mode, arming, the emergency stop, board verification, actuator power and the last reset cause (`RST`), skipped arming checks, the last arming refusal and disarm reason, output watchdog trips |
 | Attitude | Roll, pitch and yaw in degrees, and how many samples the accelerometer correction skipped |
 | Link | Each Link's handshake, rate scale, drops and lost frames |
 
