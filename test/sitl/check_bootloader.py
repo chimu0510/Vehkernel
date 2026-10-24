@@ -34,6 +34,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 UPLOADER = REPO / "tools" / "bootloader" / "third_party" / "uploader.py"
+# uploader.py runs through the flasher's launcher, as tools/flash/flash_serial.py runs it (#92).
+RUN_UPLOADER = REPO / "tools" / "flash" / "run_uploader.py"
 sys.path.insert(0, str(REPO / "tools" / "firmware"))
 
 import finalize_image  # noqa: E402
@@ -120,7 +122,7 @@ class Bootloader:
 
 def start_upload(pty: str, apj: Path) -> subprocess.Popen:
     # Unbuffered, so its lines can be watched as they come.
-    return subprocess.Popen([sys.executable, "-u", str(UPLOADER), "--port", pty, "--no-extf", str(apj)],
+    return subprocess.Popen([sys.executable, "-u", str(RUN_UPLOADER), str(UPLOADER), "--port", pty, "--no-extf", str(apj)],
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
 

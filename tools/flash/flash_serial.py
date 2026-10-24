@@ -50,6 +50,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 UPLOADER = REPO / "tools" / "bootloader" / "third_party" / "uploader.py"
 LINK_MONITOR = REPO / "tools" / "link" / "link_monitor.py"
+# Runs uploader.py with the port's DTR and RTS released, so BOOT0 stays low (#92).
+RUN_UPLOADER = Path(__file__).resolve().parent / "run_uploader.py"
 
 # How long the Link monitor may take to ask for the bootloader, and uploader.py to update.
 LINK_TIMEOUT_S = 20.0
@@ -193,8 +195,9 @@ def ask_link(args: argparse.Namespace, build: Build) -> bool:
 def run_uploader(args: argparse.Namespace, build: Build, restart: bool) -> None:
     """Runs uploader.py with the .apj until it exits; with `restart`, restarts
     the board through the download circuit once uploader.py waits for it."""
-    command = [sys.executable, "-u", str(args.uploader), "--port", args.port, "--no-extf", str(build.apj)]
-    print("$ " + " ".join(command[1:]), flush=True)
+    command = [sys.executable, "-u", str(RUN_UPLOADER), str(args.uploader), "--port", args.port, "--no-extf",
+               str(build.apj)]
+    print("$ " + " ".join(command[3:]), flush=True)
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     lines: queue.Queue[str | None] = queue.Queue()
 
@@ -300,7 +303,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         build = Build(args.build)
         flasher = Stm32Flash(args.stm32flash, args.port, args.baud, build.circuit)
-        print(f"{build.board}: download port {build.download_port}, {build.circuit} circuit, on {args.port}")
+        print(f"{build.board}: using {args.port}; the board's download port is {build.download_port}, "
+              f"with a {build.circuit} circuit")
         if args.command == "update":
             cmd_update(args, build)
         elif args.command == "new-board":

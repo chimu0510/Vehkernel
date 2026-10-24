@@ -126,7 +126,7 @@ def test_a_board_without_a_download_circuit_is_refused(tmp_path):
 def test_new_board_takes_the_sequence_from_the_board_definition(tmp_path):
     result, calls = run(tmp_path, "new-board", "--no-backup")
     assert result.returncode == 0, result.stderr
-    assert "download port SERIAL2, DTR_RTS circuit" in result.stdout
+    assert "the board's download port is SERIAL2, with a DTR_RTS circuit" in result.stdout
     assert all(call.startswith(f"-b 115200 -i {SEQUENCE} ") for call in calls)
 
 
