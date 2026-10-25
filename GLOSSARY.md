@@ -100,9 +100,9 @@ _Avoid_: board rotation, AHRS orientation
 An alternative use of a pin under a particular frame, declared in the board definition.
 _Avoid_: AF, pin mux
 
-**MCU Database**:
-An MCU's pin, DMA and Flash sector data, against which the generator validates board definitions.
-_Avoid_: pinmap, chip table
+**SoC Database**:
+An SoC's pin, DMA and Flash sector data, kept as `soc/<vendor>/<family>/<soc>/soc.json`, against which the generator validates board definitions.
+_Avoid_: MCU database, pinmap, chip table
 
 **Peripheral Bus**:
 A hardware bus between the MCU and board devices, such as I2C or SPI.
@@ -369,7 +369,7 @@ Software in the loop: the complete firmware running on the development host on t
 _Avoid_: simulator build, emulator
 
 **Debug Overlay**:
-The last of the three Kconfig layers, after the MCU defaults and the board defaults, given as a config fragment at configure time, for example the one that selects the bring-up image.
+The last of the three Kconfig layers, after the SoC defaults and the board defaults, given as a config fragment at configure time, for example the one that selects the bring-up image.
 _Avoid_: product config, frame overlay
 
 **Test Mode**:

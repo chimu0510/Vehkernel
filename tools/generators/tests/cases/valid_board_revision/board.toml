@@ -1,6 +1,6 @@
 # Revision-ID pins and an actuator power sense input.
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 
 pins = [
   { pin = "PA0", role = "REV_ID0",         func = "GPIO_INPUT" },

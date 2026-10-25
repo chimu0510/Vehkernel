@@ -1,6 +1,6 @@
 # Board IDs 110 to 119 are reserved for a vendor in ArduPilot's list.
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 board_id = 115
 bootloader = { kind = "VEHKERNEL", ports = ["SERIAL1"] }
 

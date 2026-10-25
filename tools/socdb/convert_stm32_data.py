@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Convert an stm32-data chip description into a Vehkernel MCU database.
+"""Convert an stm32-data chip description into a Vehkernel SoC database.
 
 Runs offline on a chip JSON downloaded from embassy-rs/stm32-data-generated and
-committed under ``<mcu_dir>/source/`` with a manifest naming its upstream
+committed under ``<soc_dir>/source/`` with a manifest naming its upstream
 commit, so the build never needs the network and the result is reproducible
 (ADR-0011, ADR-0016). Usage::
 
-    tools/mcudb/convert_stm32_data.py mcu/stm32f407vet6          # write mcu.json
-    tools/mcudb/convert_stm32_data.py mcu/stm32f407vet6 --check  # verify it
+    tools/socdb/convert_stm32_data.py soc/st/stm32f4/stm32f407vet6          # write soc.json
+    tools/socdb/convert_stm32_data.py soc/st/stm32f4/stm32f407vet6 --check  # verify it
 
-The MCU database holds what the board generator validates against:
+The SoC database holds what the board generator validates against:
 
 - ``af``: alternate functions per pin, named ``<PERIPHERAL>_<SIGNAL>``.
 - ``analog``: additional (non-AF) analog functions per pin, such as ADC inputs.
@@ -130,7 +130,7 @@ def _peripherals(peripherals: list[dict]) -> dict:
     return table
 
 
-def convert(chip: dict, *, mcu: str, package_name: str, commit: str, source_path: str) -> dict:
+def convert(chip: dict, *, soc: str, package_name: str, commit: str, source_path: str) -> dict:
     package = _find_package(chip, package_name)
     gpios = _package_gpios(package)
     if len(chip["cores"]) != 1:
@@ -175,7 +175,7 @@ def convert(chip: dict, *, mcu: str, package_name: str, commit: str, source_path
     pins = sorted(gpios, key=pin_sort_key)
     return {
         "format": FORMAT_VERSION,
-        "mcu": mcu,
+        "soc": soc,
         "family": chip["family"],
         "package": package["package"],
         "source": {
@@ -199,25 +199,25 @@ def render(database: dict) -> str:
     return json.dumps(database, indent=2, sort_keys=False) + "\n"
 
 
-def regenerate(mcu_dir: Path) -> str:
-    """Convert the upstream data described by ``<mcu_dir>/source/manifest.json``."""
-    manifest = json.loads((mcu_dir / "source" / "manifest.json").read_text(encoding="utf-8"))
-    chip = json.loads((mcu_dir / "source" / manifest["file"]).read_text(encoding="utf-8"))
-    return render(convert(chip, mcu=manifest["mcu"], package_name=manifest["package"],
+def regenerate(soc_dir: Path) -> str:
+    """Convert the upstream data described by ``<soc_dir>/source/manifest.json``."""
+    manifest = json.loads((soc_dir / "source" / "manifest.json").read_text(encoding="utf-8"))
+    chip = json.loads((soc_dir / "source" / manifest["file"]).read_text(encoding="utf-8"))
+    return render(convert(chip, soc=manifest["soc"], package_name=manifest["package"],
                           commit=manifest["commit"], source_path=manifest["path"]))
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("mcu_dir", type=Path,
-                        help="MCU directory holding source/manifest.json, for example mcu/stm32f407vet6")
+    parser.add_argument("soc_dir", type=Path,
+                        help="SoC directory holding source/manifest.json, for example soc/st/stm32f4/stm32f407vet6")
     parser.add_argument("--check", action="store_true",
-                        help="fail if mcu.json differs from a fresh conversion instead of writing it")
+                        help="fail if soc.json differs from a fresh conversion instead of writing it")
     args = parser.parse_args(argv)
 
-    output = args.mcu_dir / "mcu.json"
+    output = args.soc_dir / "soc.json"
     try:
-        text = regenerate(args.mcu_dir)
+        text = regenerate(args.soc_dir)
     except (OSError, ValueError, KeyError, ConversionError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

@@ -1,5 +1,5 @@
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 board_id = 30004
 bootloader = { kind = "VEHKERNEL", ports = ["SERIAL1", "SERIAL9", "SERIAL1"], stay = { pin = "LED", active = "LOW" }, led = "LED" }
 

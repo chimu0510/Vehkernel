@@ -1,1 +1,0 @@
-board.toml: error: unknown MCU 'nosuchmcu': the MCU root has no nosuchmcu/mcu.json

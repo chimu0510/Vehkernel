@@ -1,6 +1,6 @@
 # Base board for valid_inheritance.
 name = "demo-base"
-mcu = "testmcu"
+soc = "testsoc"
 
 pins = [
   { pin = "PA9",  role = "SERIAL1_TX", func = "USART1_TX" },

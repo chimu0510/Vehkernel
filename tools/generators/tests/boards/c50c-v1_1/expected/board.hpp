@@ -13,7 +13,7 @@
 namespace vk::board {
 
 inline constexpr std::string_view name = "c50c-v1_1";
-inline constexpr std::string_view mcu = "stm32f407vet6";
+inline constexpr std::string_view soc = "stm32f407vet6";
 
 namespace pins {
 using REV_ID0 = vk::hal::GpioInput<vk::hal::Port::E, 2>;  // PE2 GPIO_INPUT

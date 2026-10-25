@@ -16,7 +16,7 @@ function(vk_generate_board board)
   set(generator ${CMAKE_SOURCE_DIR}/tools/generators/generate_board.py)
 
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} -I ${generator} ${board_file} --mcu-root mcu --output-dir ${out_dir}
+    COMMAND ${Python3_EXECUTABLE} -I ${generator} ${board_file} --soc-root soc --output-dir ${out_dir}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     RESULT_VARIABLE result
     ERROR_VARIABLE diagnostics)
@@ -25,16 +25,16 @@ function(vk_generate_board board)
   endif()
 
   file(READ ${out_dir}/board.json board_json)
-  string(JSON mcu GET "${board_json}" mcu)
+  string(JSON soc_dir GET "${board_json}" soc_dir)
   file(GLOB generator_sources ${CMAKE_SOURCE_DIR}/tools/generators/vkboard/*.py)
   set_property(DIRECTORY ${CMAKE_SOURCE_DIR} APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/${board_file}
-    ${CMAKE_SOURCE_DIR}/mcu/${mcu}/mcu.json
+    ${CMAKE_SOURCE_DIR}/soc/${soc_dir}/soc.json
     ${generator}
     ${generator_sources})
 
   set(VK_BOARD_GENERATED_DIR ${out_dir} PARENT_SCOPE)
-  set(VK_BOARD_MCU ${mcu} PARENT_SCOPE)
+  set(VK_BOARD_SOC_DIR ${soc_dir} PARENT_SCOPE)
   set(VK_BOARD_JSON "${board_json}" PARENT_SCOPE)
   vk_add_library(vk_board LAYER platform INTERFACE)
   target_include_directories(vk_board INTERFACE ${out_dir})

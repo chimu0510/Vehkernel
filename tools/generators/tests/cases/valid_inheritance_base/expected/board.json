@@ -1,6 +1,7 @@
 {
   "name": "demo-base",
-  "mcu": "testmcu",
+  "soc": "testsoc",
+  "soc_dir": "testsoc",
   "pins": [
     {
       "role": "SERIAL1_TX",

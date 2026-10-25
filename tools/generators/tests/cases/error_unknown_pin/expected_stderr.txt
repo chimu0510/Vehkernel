@@ -1,1 +1,1 @@
-board.toml:5: error: pin PF0 does not exist on TESTMCU (LQFP-TEST)
+board.toml:5: error: pin PF0 does not exist on TESTSOC (LQFP-TEST)

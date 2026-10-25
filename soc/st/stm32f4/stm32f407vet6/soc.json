@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "mcu": "STM32F407VET6",
+  "soc": "STM32F407VET6",
   "family": "STM32F4",
   "package": "LQFP100",
   "source": {

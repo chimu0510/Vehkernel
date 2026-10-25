@@ -33,7 +33,7 @@
 |---|---|---|
 | `docs/` | User guides (`guide/`), board pages (`boards/`), ADRs (`adr/`), milestone specs (`specs/`) and agent workflow docs (`agents/`); this index is [`docs/README.md`](README.md) | 0021 |
 | `boards/` | Board definitions (TOML) and board defconfigs | 0010, 0011, 0017 |
-| `mcu/` | One subdirectory per MCU: the MCU database (AF map, DMA request map, Flash sector table, as JSON) and the Kconfig MCU defaults (`defconfig`) | 0011, 0017, 0020 |
+| `soc/` | One directory per SoC, grouped by vendor and family (`soc/st/stm32f4/stm32f407vet6/`): the SoC database (AF map, DMA request map, Flash sector table, as `soc.json`), its stm32-data source and the Kconfig SoC defaults (`defconfig`) | 0011, 0017, 0020 |
 | `schema/msg/` | Topic schemas (`.msg`) | 0006 |
 | `schema/enum/` | Enums whose values cross the wire (`.enum`) | 0006 |
 | `cmake/` | Toolchain, Kconfig integration, generator invocation and the layering rules | 0009, 0017 |
@@ -45,7 +45,7 @@
 | `modules/` | Module layer: `commander/` (modes, arming, emergency stop), `actuators/` (actuator control, motor bring-up), `estimation/` (attitude estimator), `link/` (custom protocol, topic map), `local_display/` (display, local menu, user key). The control chain, vehicle models and logging come later | 0002, 0005, 0013, 0014, 0022 |
 | `lib/estimation/` | Estimation math components: `models/`, `filters/`, `math/` | 0014 |
 | `bootloader/` | The Vehkernel bootloader: a port of ArduPilot's `AP_Bootloader` structure, its STM32F4 build in the BOOT region and its SITL build | 0023 |
-| `tools/mcudb/` | Offline converter that regenerates an MCU database from the stm32-data source committed under `mcu/<mcu>/source/` | 0011, 0016 |
+| `tools/socdb/` | Offline converter that regenerates an SoC database from the stm32-data source committed under `soc/<vendor>/<family>/<soc>/source/` | 0011, 0016 |
 | `tools/kconfig/` | Layered Kconfig solve and `menuconfig` with overlay saving | 0017 |
 | `tools/generators/` | Schema, board and parameter generators; the ULog format definitions and log profile generators come with logging | 0006, 0011, 0012, 0019 |
 | `tools/link/` | Link monitor: live view, checks, parameters and vehicle commands | 0002, 0006 |

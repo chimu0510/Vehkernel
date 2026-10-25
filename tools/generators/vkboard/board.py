@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Load a board definition and validate it against the MCU database (ADR-0010, ADR-0011).
+"""Load a board definition and validate it against the SoC database (ADR-0010, ADR-0011).
 
 A board definition may ``extends`` another board in a sibling directory. The
 child's pin entries replace base entries for the same pin, ``remove`` drops
@@ -33,7 +33,7 @@ GPIO_FUNCTIONS = ("GPIO_INPUT", "GPIO_OUTPUT")
 PIN_KEYS = {"pin", "role", "func", "alt", "pull"}
 PULLS = ("UP", "DOWN")
 ALT_KEYS = {"config", "role", "func"}
-TOP_LEVEL_KEYS = {"name", "mcu", "extends", "remove", "pins", "dma", "flash",
+TOP_LEVEL_KEYS = {"name", "soc", "extends", "remove", "pins", "dma", "flash",
                   "serial", "devices", "storage", "clock", "timing", "defaults",
                   "revision", "actuator_power", "actuators", "user_key", "board_id", "bootloader"}
 ARRAY_SECTIONS = {"pins": "pin", "dma": "request", "flash": "region", "serial": "port",
@@ -78,7 +78,8 @@ class Pin:
 @dataclass(frozen=True)
 class Board:
     name: str
-    mcu: str
+    soc: str
+    soc_dir: str  # where the SoC database lives, relative to the SoC root
     source: str
     pins: tuple[Pin, ...]
     dma: tuple[DmaAssignment, ...] = ()
@@ -87,7 +88,7 @@ class Board:
     ram: tuple[RamRegion, ...] = ()
     hardware: Hardware = Hardware()
     clock: Clock | None = None
-    peripherals: tuple[tuple[str, dict], ...] = ()  # (instance, MCU database entry), sorted
+    peripherals: tuple[tuple[str, dict], ...] = ()  # (instance, SoC database entry), sorted
     board_id: int | None = None
     bootloader: Bootloader | None = None
 
@@ -101,7 +102,7 @@ class _Entry:
 @dataclass
 class _Resolved:
     name: object
-    mcu: object
+    soc: object
     arrays: dict[str, list[_Entry]]  # by section name, see ARRAY_SECTIONS
     tables: dict[str, _Entry]  # see TABLE_SECTIONS
     board_id: _Entry | None = None  # never inherited: each board has its own
@@ -126,8 +127,20 @@ def _entry_lines(text: str, key: str, count: int) -> list[int | None]:
     return lines if len(lines) == count else [None] * count
 
 
-def load_mcu_database(mcu_root: Path, mcu: str) -> dict:
-    return json.loads((mcu_root / mcu / "mcu.json").read_text(encoding="utf-8"))
+def find_soc(soc_root: Path, soc: str) -> Path:
+    """The directory of the SoC database named `soc` under `soc_root`, which
+    groups SoCs by vendor and family (soc/<vendor>/<family>/<soc>/soc.json).
+    Raises FileNotFoundError when there is none, ValueError when two match."""
+    found = sorted(path.parent for path in soc_root.rglob("soc.json") if path.parent.name == soc)
+    if not found:
+        raise FileNotFoundError(soc)
+    if len(found) > 1:
+        raise ValueError(", ".join(str(path.relative_to(soc_root)) for path in found))
+    return found[0]
+
+
+def load_soc_database(soc_dir: Path) -> dict:
+    return json.loads((soc_dir / "soc.json").read_text(encoding="utf-8"))
 
 
 def _read(path: Path, shown: str, diag: Diagnostics) -> tuple[dict, str] | None:
@@ -171,7 +184,7 @@ def _resolve(path: Path, shown: str, diag: Diagnostics,
     if base_name is None:
         if removed:
             diag.error("'remove' needs 'extends'", top)
-        return _Resolved(data.get("name"), data.get("mcu"), arrays, tables, board_id)
+        return _Resolved(data.get("name"), data.get("soc"), arrays, tables, board_id)
 
     if not isinstance(base_name, str) or not _BOARD_NAME_RE.match(base_name):
         diag.error("'extends' must name a board directory", top)
@@ -220,7 +233,7 @@ def _resolve(path: Path, shown: str, diag: Diagnostics,
             merged_tables[section] = _Entry({**base.tables["defaults"].data, **entry.data}, entry.loc)
         else:
             merged_tables[section] = entry
-    return _Resolved(data.get("name"), data.get("mcu", base.mcu), merged, merged_tables, board_id)
+    return _Resolved(data.get("name"), data.get("soc", base.soc), merged, merged_tables, board_id)
 
 
 def _key_line(text: str, key: str) -> int | None:
@@ -228,25 +241,29 @@ def _key_line(text: str, key: str) -> int | None:
     return next((n for n, line in enumerate(text.splitlines(), start=1) if pattern.match(line)), None)
 
 
-def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> Board:
+def load_board(path: Path, soc_root: Path, display_path: str | None = None) -> Board:
     """Parse and validate a board definition, raising BoardError with every problem found."""
     shown = display_path or str(path)
     diag = Diagnostics(shown)
     resolved = _resolve(path, shown, diag, ((path.resolve(), shown),))
     if resolved is None:
         raise BoardError(diag.errors)
-    name, mcu = resolved.name, resolved.mcu
+    name, soc = resolved.name, resolved.soc
     if not isinstance(name, str) or not name:
         diag.error("missing board 'name'")
-    if not isinstance(mcu, str) or not mcu:
-        diag.error("missing 'mcu'")
-    if not isinstance(name, str) or not isinstance(mcu, str) or not mcu:
+    if not isinstance(soc, str) or not soc:
+        diag.error("missing 'soc'")
+    if not isinstance(name, str) or not isinstance(soc, str) or not soc:
         raise BoardError(diag.errors)
 
     try:
-        database = load_mcu_database(mcu_root, mcu)
+        soc_dir = find_soc(soc_root, soc)
+        database = load_soc_database(soc_dir)
     except FileNotFoundError:
-        diag.error(f"unknown MCU '{mcu}': the MCU root has no {mcu}/mcu.json")
+        diag.error(f"unknown SoC '{soc}': the SoC root has no <vendor>/<family>/{soc}/soc.json")
+        raise BoardError(diag.errors) from None
+    except ValueError as error:
+        diag.error(f"SoC '{soc}' is ambiguous: {error}")
         raise BoardError(diag.errors) from None
 
     arrays, tables = resolved.arrays, resolved.tables
@@ -289,7 +306,7 @@ def load_board(path: Path, mcu_root: Path, display_path: str | None = None) -> B
     dma = assign(requests, diag)
     if diag:
         raise BoardError(diag.errors)
-    return Board(name=name, mcu=mcu, source=shown, pins=tuple(pins), dma=tuple(dma),
+    return Board(name=name, soc=soc, soc_dir=soc_dir.relative_to(soc_root).as_posix(), source=shown, pins=tuple(pins), dma=tuple(dma),
                  alt_configs=tuple(configs), flash=flash, ram=ram_regions(database),
                  hardware=hardware, clock=clock, peripherals=peripherals, board_id=board_id,
                  bootloader=bootloader)
@@ -368,7 +385,7 @@ def _check_pin(entry: object, loc: Loc, database: dict, diag: Diagnostics) -> Pi
     pin = entry["pin"]
     match = _PIN_RE.match(pin) if isinstance(pin, str) else None
     if match is None or pin not in database["pins"]:
-        diag.error(f"pin {pin} does not exist on {database['mcu']} ({database['package']})", loc)
+        diag.error(f"pin {pin} does not exist on {database['soc']} ({database['package']})", loc)
         return None
     default = _function(pin, entry["role"], entry["func"], loc, database, diag)
 

@@ -2,8 +2,8 @@
 """Internal Flash layout and memory regions (ADR-0020).
 
 A board's ``flash`` array splits internal Flash into named regions, each a
-whole number of sectors from the MCU database. The generator turns the layout
-and the MCU's RAM regions into the linker script's MEMORY block, whose region
+whole number of sectors from the SoC database. The generator turns the layout
+and the SoC's RAM regions into the linker script's MEMORY block, whose region
 sizes are the budgets the linker enforces (ADR-0017).
 """
 
@@ -119,5 +119,5 @@ def ram_regions(database: dict) -> tuple[RamRegion, ...]:
             merged.append(RamRegion(name, r["address"], r["size"]))
     names = [r.name for r in merged]
     if names.count("RAM") != 1 or names.count("CCM") > 1:
-        raise ValueError(f"unsupported RAM map for {database['mcu']}: {names}")
+        raise ValueError(f"unsupported RAM map for {database['soc']}: {names}")
     return tuple(merged)

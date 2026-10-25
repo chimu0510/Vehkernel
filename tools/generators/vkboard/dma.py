@@ -2,7 +2,7 @@
 """DMA stream and channel assignment for STM32F4-style DMA (ADR-0011).
 
 The F4 has no DMAMUX: each request can use only the few stream/channel pairs
-listed in the MCU database. Requests are placed in priority order (higher
+listed in the SoC database. Requests are placed in priority order (higher
 first, then by name) with backtracking, so the result is deterministic.
 
 Requests come from two places:
@@ -100,7 +100,7 @@ def collect_requests(raw: list, locs: list[Loc], funcs: list[str], dma_map: dict
             continue
         seen[name] = line
         if name not in dma_map:
-            diag.error(f"DMA request {name} does not exist on this MCU", line)
+            diag.error(f"DMA request {name} does not exist on this SoC", line)
             continue
         priority, enabled, share = entry.get("priority", 0), entry.get("dma", True), entry.get("share", False)
         if not isinstance(priority, int) or isinstance(priority, bool) or priority < 0:

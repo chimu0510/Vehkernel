@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Build-time configuration (ADR-0017): Kconfig decides what the firmware
 # contains; parameters decide what is enabled after boot. Layers are merged in
-# order: MCU (or SITL) defaults, board defaults, debug overlay.
+# order: SoC (or SITL) defaults, board defaults, debug overlay.
 mainmenu "Vehkernel configuration"
 
 # Hardware facts. The board generator emits a fragment that turns on the ones

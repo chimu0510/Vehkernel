@@ -1,5 +1,5 @@
 {
-  "mcu": "STM32F407VET6",
+  "soc": "STM32F407VET6",
   "package": "STM32F407VETx",
   "commit": "6c84298753f53fbf02054f2489357398b9cef1b3",
   "path": "data/chips/STM32F407VE.json",

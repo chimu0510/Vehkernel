@@ -37,7 +37,7 @@ The `sitl`, `test` and `fuzz` presets also run clang-tidy and treat every warnin
 
 ## Build configuration (Kconfig)
 
-Kconfig decides what each build contains (ADR-0017). The layers are the MCU defaults (`mcu/<mcu>/defconfig`, or `platform/sitl/defconfig` for SITL), the board defaults (`boards/<board>/defconfig`), and the debug overlays: the local `build/<preset>/debug.config`, which is never committed, then any fragments listed in the `VK_DEBUG_OVERLAY` cache variable. The `c50c-v1_1-bringup` preset uses the latter for the committed `test/hardware/bringup.config`. Edit the local overlay by hand or interactively; the next build reconfigures:
+Kconfig decides what each build contains (ADR-0017). The layers are the SoC defaults (`soc/<vendor>/<family>/<soc>/defconfig`, or `platform/sitl/defconfig` for SITL), the board defaults (`boards/<board>/defconfig`), and the debug overlays: the local `build/<preset>/debug.config`, which is never committed, then any fragments listed in the `VK_DEBUG_OVERLAY` cache variable. The `c50c-v1_1-bringup` preset uses the latter for the committed `test/hardware/bringup.config`. Edit the local overlay by hand or interactively; the next build reconfigures:
 
 ```bash
 cmake --build --preset c50c-v1_1 --target menuconfig

@@ -1,0 +1,1 @@
+board.toml: error: unknown SoC 'nosuchsoc': the SoC root has no <vendor>/<family>/nosuchsoc/soc.json

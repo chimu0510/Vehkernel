@@ -1,6 +1,7 @@
 {
   "name": "c50c-v1_1",
-  "mcu": "stm32f407vet6",
+  "soc": "stm32f407vet6",
+  "soc_dir": "st/stm32f4/stm32f407vet6",
   "pins": [
     {
       "role": "REV_ID0",

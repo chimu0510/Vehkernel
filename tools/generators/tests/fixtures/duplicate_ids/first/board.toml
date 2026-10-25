@@ -1,6 +1,6 @@
 # Two boards beside each other with one board ID.
 name = "first"
-mcu = "testmcu"
+soc = "testsoc"
 board_id = 9
 bootloader = { kind = "PX4" }
 
