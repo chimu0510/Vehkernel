@@ -353,7 +353,7 @@ TEST_F(CommanderTest, ABringupCaseNeedsToBeBuiltInAndNotRunning)
     step();
     EXPECT_EQ(commander.request_bringup(link0, motors_case), BringupStart::AlreadyRunning);
     // While it runs: no setpoints, no idle or setpoint timeout, no arming.
-    EXPECT_FALSE(commander.accepts_setpoint(link0));
+    EXPECT_FALSE(commander.accepts_setpoint(link0, vk::core::SetpointLevel::DirectActuator));
     step(static_cast<std::uint64_t>(settings.disarm_idle_s * 1e6F) + cycle_us);
     EXPECT_TRUE(commander.state().armed);
 }

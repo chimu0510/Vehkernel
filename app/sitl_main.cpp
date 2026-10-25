@@ -490,7 +490,7 @@ bool start_link(const Options& options)
                       vk::link::Link::Config{.parameters = {.parameters = &vk::params::parameters(),
                                                             .set_hash = vk::params::set_hash,
                                                             .storage = stored_parameters()},
-                                             .control = {.control = &*commander},
+                                             .control = {.enabled = true},
                                              .sim_frames = &sim_frames},
                       vk::core::work_queue(vk::core::WorkQueueTier::Io));
     host_link->start();

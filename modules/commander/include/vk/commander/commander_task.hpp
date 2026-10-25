@@ -1,23 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The commander as a work item on wq:ctrl (ADR-0005, ADR-0008).
 //
-// Each control cycle it samples the board's inputs, runs the commander's
-// state machine with the COM_* parameters, and publishes arming_state on
-// every change and vehicle_status on every change and five times a second.
-// The board counts as verified (ADR-0010) once the boot check of the
-// revision-ID pins has passed and the IMU has answered with its first sample.
-// It follows the setpoints that arbitration accepted, on actuator_setpoint and
-// body_velocity_setpoint: the one accepted last decides whether the targets
-// are idle, and either keeps the setpoint timeout from running out. It
-// starts bring-up cases on bringup_command and follows them on
+// Each control cycle it first takes the requests every source published on
+// vehicle_command since the last cycle, in order, and answers each on
+// vehicle_command_ack with its result and the state after it. Then it
+// samples the board's inputs, runs the commander's state machine with the
+// COM_* parameters, and publishes arming_state on every change and
+// vehicle_status on every change and five times a second. The board counts
+// as verified (ADR-0010) once the boot check of the revision-ID pins has
+// passed and the IMU has answered with its first sample.
+//
+// It follows the setpoints on actuator_setpoint and body_velocity_setpoint
+// that setpoint arbitration accepts (core::setpoint_accepted, while armed
+// and no bring-up case runs), and counts the others on vehicle_status: the
+// one accepted last decides whether the targets are idle, and either keeps
+// the setpoint timeout from running out. A bring-up request that passes its
+// checks goes out on bringup_command; the commander follows the case on
 // bringup_status. It refuses arming while local_menu shows the local menu
 // open (ADR-0022).
 //
-// It is also the vehicle control service the Links call from their own work
-// queue; requests and cycles take turns in short critical sections. A reboot
-// accepted while disarmed (ADR-0023) happens reboot_delay_us later, from a
-// cycle, so the Link's reply leaves first; arming is refused meanwhile.
-// vehicle_status also carries the reset cause the platform read at boot.
+// A reboot accepted while disarmed (ADR-0023) happens reboot_delay_us
+// later, from a cycle, so the source's reply leaves first; arming is refused
+// meanwhile. vehicle_status also carries the reset cause the platform read
+// at boot.
 #pragma once
 
 #include <vk/commander/commander.hpp>
@@ -33,6 +38,8 @@
 #include <vk/msg/bringup_status.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/local_menu.hpp>
+#include <vk/msg/vehicle_command.hpp>
+#include <vk/msg/vehicle_command_ack.hpp>
 #include <vk/msg/vehicle_status.hpp>
 
 #include <cstdint>
@@ -40,7 +47,7 @@
 
 namespace vk::commander {
 
-class CommanderTask final : public core::WorkItem, public core::VehicleControl {
+class CommanderTask final : public core::WorkItem {
 public:
     static constexpr std::uint32_t status_interval_us = 200'000;
     static constexpr std::uint64_t reboot_delay_us = 100'000;  // a constant
@@ -61,30 +68,30 @@ public:
     // Starts the periodic runs.
     void start();
 
-    core::ModeResult request_mode(core::ControlSource source, core::Mode mode) override;
-    core::ArmingResult request_arming(core::ControlSource source, bool arm) override;
-    bool request_emergency_stop(bool engage) override;
-    [[nodiscard]] core::Mode mode() const override;
-    [[nodiscard]] bool armed() const override;
-    [[nodiscard]] std::uint32_t skipped_checks() const override;
-    [[nodiscard]] bool accepts_setpoint(core::ControlSource source) const override;
-    core::BringupStart request_bringup(core::ControlSource source, std::uint8_t bringup_case) override;
-    void source_lost(core::ControlSource source) override;
-    core::RebootResult request_reboot(core::RebootAction action) override;
+    // From the commander's own work queue, or in tests.
+    [[nodiscard]] const State& state() const { return commander_.state(); }
+    [[nodiscard]] bool armed() const { return commander_.state().armed; }
+    [[nodiscard]] std::uint32_t setpoints_rejected() const { return setpoints_rejected_; }
 
 protected:
     void run() override;
 
 private:
+    void handle(std::uint64_t now_us, const msg::VehicleCommand& command);
+    [[nodiscard]] core::RebootResult request_reboot(std::uint64_t now_us, std::uint8_t action);
+    void follow_setpoints();
     void publish(std::uint64_t now_us, const State& state);
 
     Config config_;
     Commander commander_;
+    core::Subscription<msg::VehicleCommand> commands_{0};
+    core::Publication<msg::VehicleCommandAck> ack_publication_;
     core::Subscription<msg::ImuSample> imu_{0};
     core::Subscription<msg::ActuatorSetpoint> setpoint_{0};
     msg::ActuatorSetpoint last_setpoint_{};
     core::Subscription<msg::BodyVelocitySetpoint> body_setpoint_{0};
     msg::BodyVelocitySetpoint last_body_setpoint_{};
+    std::uint32_t setpoints_rejected_ = 0;
     core::Subscription<msg::BringupStatus> bringup_status_{0};
     core::Subscription<msg::LocalMenu> local_menu_{0};
     bool local_menu_open_ = false;
@@ -100,7 +107,7 @@ private:
         hal::BootTarget target;
         std::uint64_t at_us;
     };
-    std::optional<PendingReboot> reboot_;  // guarded by the critical section
+    std::optional<PendingReboot> reboot_;
 };
 
 }  // namespace vk::commander

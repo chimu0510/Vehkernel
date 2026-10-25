@@ -43,11 +43,21 @@ void ControlChainTask::run()
             setpoints_from_us_ = status.timestamp;
         }
         emergency_stop_ = status.emergency_stop;
+        mode_ = static_cast<core::Mode>(status.mode);
+        in_control_ = status.source;
     }
-    while (setpoint_.copy(setpoint_message_)) {
-        // Only the newest counts.
+    // The newest of each level that setpoint arbitration accepts counts.
+    msg::BodyVelocitySetpoint body{};
+    while (setpoint_.copy(body)) {
+        if (core::setpoint_accepted(mode_, in_control_, body.source, core::SetpointLevel::BodyVelocity)) {
+            setpoint_message_ = body;
+        }
     }
-    while (direct_.copy(direct_message_)) {
+    msg::ActuatorSetpoint direct{};
+    while (direct_.copy(direct)) {
+        if (core::setpoint_accepted(mode_, in_control_, direct.source, core::SetpointLevel::DirectActuator)) {
+            direct_message_ = direct;
+        }
     }
     while (attitude_.copy(attitude_message_)) {
     }

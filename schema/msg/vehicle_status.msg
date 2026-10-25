@@ -6,7 +6,7 @@
 uint64 timestamp
 uint8 mode            @enum mode
 bool armed
-uint8 source                             # Link instance in control, 255 for none
+uint8 source                             # the source in control, 255 for none
 bool board_verified                      # the IMU answered and the revision-ID pins matched (ADR-0010)
 bool emergency_stop                      # engaged
 uint8 actuator_power  @enum actuator_power
@@ -18,3 +18,4 @@ uint32 output_watchdog_trips             # times the output watchdog turned the 
 uint8 reset_cause     @enum reset_cause  # what caused the last reset, read at boot
 uint8 fault           @enum fault        # what the fault stop recorded before a FAULT reset, NONE otherwise
 uint32 fault_address                     # the faulting instruction, or the caller of the assertion or fail(); 0 if unknown
+uint32 setpoints_rejected                # setpoints dropped by setpoint arbitration since boot

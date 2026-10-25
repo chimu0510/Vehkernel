@@ -7,6 +7,10 @@
 #include <vk/link/sim_handler.hpp>
 #include <vk/msg/arming_state.hpp>
 #include <vk/msg/bringup_status.hpp>
+#include <vk/msg/vehicle_command.hpp>
+#include <vk/msg/vehicle_command_ack.hpp>
+#include <vk/core/bus.hpp>
+#include <vk/core/vehicle_control.hpp>
 
 #include <gtest/gtest.h>
 
@@ -868,46 +872,71 @@ namespace {
 
 using namespace vk::link;
 
-// Records the requests a session passes on and answers as told.
-class FakeControl final : public vk::core::VehicleControl {
+// Plays the commander on the bus: answers each request a session published
+// on vehicle_command as told, on vehicle_command_ack.
+class FakeControl final {
 public:
-    vk::core::ModeResult request_mode(vk::core::ControlSource source, vk::core::Mode mode) override
+    FakeControl()
     {
-        last_source = source;
-        if (mode_result == vk::core::ModeResult::Ok) {
-            current_mode = mode;
+        vk::msg::VehicleCommand stale{};
+        while (commands_.copy(stale)) {
         }
-        return mode_result;
     }
-    vk::core::ArmingResult request_arming(vk::core::ControlSource source, bool arm) override
+
+    void process()
     {
-        last_source = source;
-        if (!arm || arming_result == vk::core::ArmingResult::Ok) {
-            is_armed = arm;
+        using vk::core::Command;
+        vk::msg::VehicleCommand command{};
+        while (commands_.copy(command)) {
+            vk::msg::VehicleCommandAck ack{.source = command.source, .sequence = command.sequence,
+                                           .command = command.command};
+            switch (static_cast<Command>(command.command)) {
+            case Command::Mode:
+                if (command.argument > static_cast<std::uint8_t>(vk::core::Mode::Test)) {
+                    ack.result = static_cast<std::uint8_t>(vk::core::ModeResult::UnknownMode);
+                    break;
+                }
+                last_source = command.source;
+                ack.result = static_cast<std::uint8_t>(mode_result);
+                if (mode_result == vk::core::ModeResult::Ok) {
+                    current_mode = static_cast<vk::core::Mode>(command.argument);
+                }
+                break;
+            case Command::Arm:
+                last_source = command.source;
+                ack.result = static_cast<std::uint8_t>(command.argument != 0 ? arming_result
+                                                                               : vk::core::ArmingResult::Ok);
+                if (command.argument == 0 || arming_result == vk::core::ArmingResult::Ok) {
+                    is_armed = command.argument != 0;
+                }
+                break;
+            case Command::EmergencyStop:
+                engaged = command.argument != 0;
+                break;
+            case Command::Bringup:
+                last_source = command.source;
+                ack.result = static_cast<std::uint8_t>(bringup_result);
+                break;
+            case Command::Reboot: {
+                const bool known = command.argument == static_cast<std::uint8_t>(vk::core::RebootAction::Reboot) ||
+                                   command.argument == static_cast<std::uint8_t>(vk::core::RebootAction::Bootloader);
+                const vk::core::RebootResult result = known ? reboot_result : vk::core::RebootResult::UnknownAction;
+                ack.result = static_cast<std::uint8_t>(result);
+                if (result == vk::core::RebootResult::Ok) {
+                    reboot = static_cast<vk::core::RebootAction>(command.argument);
+                }
+                break;
+            }
+            case Command::SourceLost:
+                lost = command.source;
+                break;
+            }
+            ack.mode = static_cast<std::uint8_t>(current_mode);
+            ack.armed = is_armed;
+            ack.emergency_stop = engaged;
+            ack.skipped_checks = skipped;
+            acks_.publish(ack);
         }
-        return arm ? arming_result : vk::core::ArmingResult::Ok;
-    }
-    bool request_emergency_stop(bool engage) override
-    {
-        engaged = engage;
-        return engaged;
-    }
-    [[nodiscard]] vk::core::Mode mode() const override { return current_mode; }
-    [[nodiscard]] bool armed() const override { return is_armed; }
-    [[nodiscard]] std::uint32_t skipped_checks() const override { return skipped; }
-    [[nodiscard]] bool accepts_setpoint(vk::core::ControlSource /*source*/) const override { return is_armed; }
-    vk::core::BringupStart request_bringup(vk::core::ControlSource source, std::uint8_t /*bringup_case*/) override
-    {
-        last_source = source;
-        return bringup_result;
-    }
-    void source_lost(vk::core::ControlSource source) override { lost = source; }
-    vk::core::RebootResult request_reboot(vk::core::RebootAction action) override
-    {
-        if (reboot_result == vk::core::RebootResult::Ok) {
-            reboot = action;
-        }
-        return reboot_result;
     }
 
     vk::core::RebootResult reboot_result = vk::core::RebootResult::Ok;
@@ -922,6 +951,10 @@ public:
     bool is_armed = false;
     bool engaged = false;
     std::uint32_t skipped = 0;
+
+private:
+    vk::core::Subscription<vk::msg::VehicleCommand> commands_{0};
+    vk::core::Publication<vk::msg::VehicleCommandAck> acks_;
 };
 
 bool sim_power = true;
@@ -962,16 +995,19 @@ protected:
         sink.sent.clear();
     }
 
+    // Sends one frame, lets the commander answer, and sends the session's answers.
     void request(Session& s, FrameType type, std::uint8_t value)
     {
         const std::array<std::uint8_t, 1> body{value};
         s.handle({.version = protocol_version, .type = type, .sequence = 1, .body = body}, 2000, sink);
+        control.process();
+        s.send_answers(2000, sink);
     }
 
     FakeControl control;
     MockSink sink;
     SimHandler sim{{.set_actuator_power = &set_sim_power, .set_user_key = &set_sim_key}};
-    Session session{{}, Session::default_peer_timeout_us, {}, {.control = &control, .source = 2}, &sim};
+    Session session{{}, Session::default_peer_timeout_us, {}, {.enabled = true, .source = 2}, &sim};
 };
 
 TEST_F(SessionControl, ModeRequestIsAnsweredWithTheModeOrTheRefusal)
@@ -988,7 +1024,7 @@ TEST_F(SessionControl, ModeRequestIsAnsweredWithTheModeOrTheRefusal)
     EXPECT_EQ(control.last_source, 2);
 }
 
-TEST_F(SessionControl, AnUnknownModeIsRefusedWithoutAsking)
+TEST_F(SessionControl, AnUnknownModeIsRefused)
 {
     request(session, FrameType::ModeRequest, 9);
     const auto got = replies(sink.sent);
@@ -1056,7 +1092,7 @@ TEST_F(SessionControl, WithoutVehicleControlRequestsGoUnanswered)
 
 TEST_F(SessionControl, RequestsBeforeTheHandshakeAreIgnored)
 {
-    Session fresh{{}, Session::default_peer_timeout_us, {}, {.control = &control}};
+    Session fresh{{}, Session::default_peer_timeout_us, {}, {.enabled = true}};
     request(fresh, FrameType::EstopRequest, 1);
     EXPECT_FALSE(control.engaged);
     EXPECT_TRUE(sink.sent.empty());
@@ -1098,7 +1134,7 @@ TEST_F(SessionControl, RebootRequestIsAnsweredWithTheActionOrTheRefusal)
     EXPECT_EQ(got[1].body, (std::vector<std::uint8_t>{1}));
 }
 
-TEST_F(SessionControl, AnUnknownRebootActionIsRefusedWithoutAsking)
+TEST_F(SessionControl, AnUnknownRebootActionIsRefused)
 {
     request(session, FrameType::RebootRequest, 2);
     const auto got = replies(sink.sent);
@@ -1130,7 +1166,7 @@ TEST_F(SessionControl, EachFrameGoesToItsHandlerOnly)
     std::array<ParamInfo, 3> table = make_param_table();
     vk::core::Parameters parameters{table};
     RecordingHandler recorder;
-    Session all{{}, Session::default_peer_timeout_us, {.parameters = &parameters}, {.control = &control, .source = 2},
+    Session all{{}, Session::default_peer_timeout_us, {.parameters = &parameters}, {.enabled = true, .source = 2},
                 &recorder};
     handshake(all);
 
@@ -1173,7 +1209,7 @@ TEST_F(SessionControl, HandlersNumberAndCountTheirFramesWithTheSession)
 TEST_F(SessionControl, HandlersDoNotSeeFramesBeforeTheHandshake)
 {
     RecordingHandler recorder;
-    Session fresh{{}, Session::default_peer_timeout_us, {}, {.control = &control}, &recorder};
+    Session fresh{{}, Session::default_peer_timeout_us, {}, {.enabled = true}, &recorder};
     request(fresh, FrameType::SimUserKey, 1);
     request(fresh, FrameType::ModeRequest, 1);
     EXPECT_TRUE(recorder.types.empty());
@@ -1184,7 +1220,7 @@ TEST_F(SessionControl, HandlersDoNotSeeFramesBeforeTheHandshake)
 TEST_F(SessionControl, ABoardSessionDoesNotAcceptSimFrames)
 {
     // As the board firmware builds it: vehicle control, no SITL-only handler.
-    Session board{{}, Session::default_peer_timeout_us, {}, {.control = &control, .source = 2}};
+    Session board{{}, Session::default_peer_timeout_us, {}, {.enabled = true, .source = 2}};
     handshake(board);
     sim_power = true;
     sim_key = false;
@@ -1209,6 +1245,69 @@ TEST(SimHandler, IgnoresAFrameWithoutItsValue)
     sim.handle(FrameType::SimActuatorPower, BodyReader({}), out);
     EXPECT_TRUE(sim_power);
     EXPECT_TRUE(sink.sent.empty());
+}
+
+}  // namespace
+
+namespace {
+
+using namespace vk::link;
+
+TEST(ControlHandler, AnUnansweredRequestIsForgottenAfterTheTimeout)
+{
+    ControlHandler handler({.enabled = true, .source = 3});
+    vk::core::Subscription<vk::msg::VehicleCommand> commands{0};
+    vk::msg::VehicleCommand command{};
+    while (commands.copy(command)) {
+    }
+    const std::array<std::uint8_t, 1> body{1};
+    for (std::size_t i = 0; i < ControlHandler::max_pending + 1; ++i) {
+        handler.handle(FrameType::EstopRequest, BodyReader(body), 1000);
+    }
+    // Only max_pending go out: the next waits for room.
+    std::size_t published = 0;
+    while (commands.copy(command)) {
+        EXPECT_EQ(command.source, 3);
+        EXPECT_EQ(command.command, static_cast<std::uint8_t>(vk::core::Command::EmergencyStop));
+        ++published;
+    }
+    EXPECT_EQ(published, ControlHandler::max_pending);
+    // Nobody answers: after the timeout there is room again.
+    FrameWriter writer;
+    MockSink sink;
+    std::uint32_t frames = 0;
+    FrameSender out(writer, sink, frames);
+    handler.send_answers(1000 + ControlHandler::answer_timeout_us + 1, out);
+    handler.handle(FrameType::EstopRequest, BodyReader(body), 300'000);
+    EXPECT_TRUE(commands.copy(command));
+    EXPECT_TRUE(sink.sent.empty());
+}
+
+TEST(ControlHandler, AnswersOnlyItsOwnRequests)
+{
+    ControlHandler mine({.enabled = true, .source = 4});
+    vk::core::Publication<vk::msg::VehicleCommandAck> acks;
+    vk::core::Subscription<vk::msg::VehicleCommand> commands{0};
+    vk::msg::VehicleCommand command{};
+    while (commands.copy(command)) {
+    }
+    const std::array<std::uint8_t, 1> body{1};
+    mine.handle(FrameType::EstopRequest, BodyReader(body), 1000);
+    ASSERT_TRUE(commands.copy(command));
+    // Another source's answer with the same sequence, then this one's.
+    acks.publish({.source = 5, .sequence = command.sequence,
+                  .command = static_cast<std::uint8_t>(vk::core::Command::EmergencyStop), .emergency_stop = false});
+    acks.publish({.source = 4, .sequence = command.sequence,
+                  .command = static_cast<std::uint8_t>(vk::core::Command::EmergencyStop), .emergency_stop = true});
+    FrameWriter writer;
+    MockSink sink;
+    std::uint32_t frames = 0;
+    FrameSender out(writer, sink, frames);
+    mine.send_answers(2000, out);
+    const auto got = replies(sink.sent);
+    ASSERT_EQ(got.size(), 1U);
+    EXPECT_EQ(got[0].type, FrameType::EstopReply);
+    EXPECT_EQ(got[0].body, (std::vector<std::uint8_t>{1}));
 }
 
 }  // namespace

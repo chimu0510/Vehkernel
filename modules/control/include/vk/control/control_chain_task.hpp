@@ -2,8 +2,9 @@
 // The control chain as a work item on wq:ctrl at the base rate (ADR-0008,
 // ADR-0013), after the attitude estimator and before actuator control.
 //
-// Each run takes the newest body velocity setpoint, which only setpoint
-// arbitration publishes, through the control chain with the RATE_YAW_*
+// Each run takes the newest body velocity setpoint that setpoint arbitration
+// accepts (core::setpoint_accepted, judged on the newest vehicle_status)
+// through the control chain with the RATE_YAW_*
 // parameters, the yaw rate of vehicle_attitude and MOT_MAX_SPD, and
 // publishes the wheel speed targets on actuator_demand, stamped with the
 // time that setpoint was accepted (0 and every target NaN before the first
@@ -20,6 +21,7 @@
 
 #include <vk/control/control_chain.hpp>
 #include <vk/core/bus.hpp>
+#include <vk/core/vehicle_control.hpp>
 #include <vk/core/work_queue.hpp>
 #include <vk/msg/actuator_demand.hpp>
 #include <vk/msg/actuator_setpoint.hpp>
@@ -65,6 +67,8 @@ private:
     core::Publication<msg::AllocationStatus> allocation_publication_;
     bool armed_ = false;
     bool emergency_stop_ = false;
+    core::Mode mode_ = core::Mode::Standby;  // from vehicle_status, for setpoint arbitration
+    core::ControlSource in_control_ = core::no_source;
     std::uint64_t setpoints_from_us_ = 0;  // setpoints accepted before this do not count
     std::uint64_t last_run_us_ = 0;
 };

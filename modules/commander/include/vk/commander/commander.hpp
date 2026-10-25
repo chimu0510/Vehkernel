@@ -98,8 +98,9 @@ public:
     // A source fell silent; aborts a bring-up case it runs by disarming.
     void source_lost(core::ControlSource source);
 
-    // Setpoint arbitration: whether a setpoint from `source` is accepted now.
-    [[nodiscard]] bool accepts_setpoint(core::ControlSource source) const;
+    // Setpoint arbitration: whether a setpoint at `level` from `source` counts
+    // now: core::setpoint_accepted, while armed and no bring-up case runs.
+    [[nodiscard]] bool accepts_setpoint(core::ControlSource source, core::SetpointLevel level) const;
 
     [[nodiscard]] const State& state() const { return state_; }
 

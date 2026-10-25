@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/commander/commander_task.hpp>
 
-#include <vk/core/critical_section.hpp>
 #include <vk/params/params.hpp>
 
 #include <algorithm>
@@ -13,6 +12,10 @@ namespace vk::commander {
 CommanderTask::CommanderTask(const Config& config, core::WorkQueue& queue)
     : WorkItem("commander", queue), config_(config)
 {
+    // Requests already queued were sent to no commander that exists.
+    msg::VehicleCommand stale{};
+    while (commands_.copy(stale)) {
+    }
 }
 
 void CommanderTask::start()
@@ -26,11 +29,11 @@ void CommanderTask::run()
     if (imu_.updated()) {
         imu_answered_ = true;
     }
-    while (setpoint_.copy(last_setpoint_)) {
-        // Only the newest counts.
+    msg::VehicleCommand command{};
+    while (commands_.copy(command)) {
+        handle(now, command);
     }
-    while (body_setpoint_.copy(last_body_setpoint_)) {
-    }
+    follow_setpoints();
     msg::BringupStatus bringup{};
     while (bringup_status_.copy(bringup)) {
         bringup_running_ = bringup.state == 1;  // running
@@ -61,18 +64,110 @@ void CommanderTask::run()
     const Settings settings{.arm_check = static_cast<std::uint32_t>(params::com.arm_check),
                             .setpoint_timeout_s = params::com.sp_timeout,
                             .disarm_idle_s = params::com.disarm_idle};
-    State state;
-    std::optional<PendingReboot> reboot;
-    {
-        const core::CriticalSection lock;
-        commander_.update(now, inputs, settings);
-        state = commander_.state();
-        reboot = reboot_;
-    }
+    commander_.update(now, inputs, settings);
+    const State& state = commander_.state();
     publish(now, state);
-    if (reboot && now >= reboot->at_us && !state.armed) {
-        config_.reset(reboot->target);  // Does not return.
+    if (reboot_ && now >= reboot_->at_us && !state.armed) {
+        config_.reset(reboot_->target);  // Does not return.
     }
+}
+
+// Setpoint arbitration (ADR-0005): only the setpoints the commander accepts
+// keep the timeout from running out or count as idle; the others are counted.
+void CommanderTask::follow_setpoints()
+{
+    msg::ActuatorSetpoint direct{};
+    while (setpoint_.copy(direct)) {
+        if (commander_.accepts_setpoint(direct.source, core::SetpointLevel::DirectActuator)) {
+            last_setpoint_ = direct;
+        } else {
+            ++setpoints_rejected_;
+        }
+    }
+    msg::BodyVelocitySetpoint body{};
+    while (body_setpoint_.copy(body)) {
+        if (commander_.accepts_setpoint(body.source, core::SetpointLevel::BodyVelocity)) {
+            last_body_setpoint_ = body;
+        } else {
+            ++setpoints_rejected_;
+        }
+    }
+}
+
+void CommanderTask::handle(std::uint64_t now_us, const msg::VehicleCommand& command)
+{
+    msg::VehicleCommandAck ack{};
+    ack.source = command.source;
+    ack.sequence = command.sequence;
+    ack.command = command.command;
+    switch (static_cast<core::Command>(command.command)) {
+    case core::Command::Mode: {
+        const bool known = command.argument <= static_cast<std::uint8_t>(core::Mode::Test);
+        ack.result = static_cast<std::uint8_t>(
+            known ? commander_.request_mode(now_us, command.source, static_cast<core::Mode>(command.argument))
+                  : core::ModeResult::UnknownMode);
+        break;
+    }
+    case core::Command::Arm: {
+        const bool arm = command.argument != 0;
+        const core::ArmingResult result = arm && reboot_ ? core::ArmingResult::Rebooting
+                                                         : commander_.request_arming(now_us, command.source, arm);
+        ack.result = static_cast<std::uint8_t>(result);
+        break;
+    }
+    case core::Command::EmergencyStop:
+        static_cast<void>(commander_.request_emergency_stop(now_us, command.argument != 0));
+        break;
+    case core::Command::Bringup: {
+        const core::BringupStart result = commander_.request_bringup(command.source, command.argument);
+        if (result == core::BringupStart::Ok) {
+            bringup_publication_.publish(msg::BringupCommand{
+                .timestamp = now_us, .bringup_case = command.argument, .source = command.source});
+        }
+        ack.result = static_cast<std::uint8_t>(result);
+        break;
+    }
+    case core::Command::Reboot:
+        ack.result = static_cast<std::uint8_t>(request_reboot(now_us, command.argument));
+        break;
+    case core::Command::SourceLost:
+        commander_.source_lost(command.source);
+        break;
+    default:
+        return;  // Not a command this commander knows: no answer.
+    }
+    const State& state = commander_.state();
+    ack.timestamp = now_us;
+    ack.mode = static_cast<std::uint8_t>(state.mode);
+    ack.armed = state.armed;
+    ack.emergency_stop = state.emergency_stop;
+    ack.skipped_checks = state.skipped_checks;
+    ack_publication_.publish(ack);
+}
+
+core::RebootResult CommanderTask::request_reboot(std::uint64_t now_us, std::uint8_t action)
+{
+    const bool known = action == static_cast<std::uint8_t>(core::RebootAction::Reboot) ||
+                       action == static_cast<std::uint8_t>(core::RebootAction::Bootloader);
+    if (!known) {
+        return core::RebootResult::UnknownAction;
+    }
+    if (config_.reset == nullptr) {
+        return core::RebootResult::NotAvailable;
+    }
+    if (commander_.state().armed) {
+        return core::RebootResult::Armed;
+    }
+    const hal::BootTarget target = action == static_cast<std::uint8_t>(core::RebootAction::Bootloader)
+                                       ? hal::BootTarget::Bootloader
+                                       : hal::BootTarget::Firmware;
+    // A repeated request keeps the first deadline, so retries cannot postpone it.
+    if (!reboot_) {
+        reboot_ = PendingReboot{.target = target, .at_us = now_us + reboot_delay_us};
+    } else {
+        reboot_->target = target;
+    }
+    return core::RebootResult::Ok;
 }
 
 void CommanderTask::publish(std::uint64_t now_us, const State& state)
@@ -102,92 +197,8 @@ void CommanderTask::publish(std::uint64_t now_us, const State& state)
         .reset_cause = static_cast<std::uint8_t>(state.reset_report.cause),
         .fault = static_cast<std::uint8_t>(state.reset_report.fault),
         .fault_address = state.reset_report.fault_address,
+        .setpoints_rejected = setpoints_rejected_,
     });
-}
-
-core::ModeResult CommanderTask::request_mode(core::ControlSource source, core::Mode mode)
-{
-    const core::CriticalSection lock;
-    return commander_.request_mode(queue().now_us(), source, mode);
-}
-
-core::ArmingResult CommanderTask::request_arming(core::ControlSource source, bool arm)
-{
-    const core::CriticalSection lock;
-    if (arm && reboot_) {
-        return core::ArmingResult::Rebooting;
-    }
-    return commander_.request_arming(queue().now_us(), source, arm);
-}
-
-core::RebootResult CommanderTask::request_reboot(core::RebootAction action)
-{
-    if (config_.reset == nullptr) {
-        return core::RebootResult::NotAvailable;
-    }
-    const core::CriticalSection lock;
-    if (commander_.state().armed) {
-        return core::RebootResult::Armed;
-    }
-    const hal::BootTarget target =
-        action == core::RebootAction::Bootloader ? hal::BootTarget::Bootloader : hal::BootTarget::Firmware;
-    // A repeated request keeps the first deadline, so retries cannot postpone it.
-    if (!reboot_) {
-        reboot_ = PendingReboot{.target = target, .at_us = queue().now_us() + reboot_delay_us};
-    } else {
-        reboot_->target = target;
-    }
-    return core::RebootResult::Ok;
-}
-
-bool CommanderTask::request_emergency_stop(bool engage)
-{
-    const core::CriticalSection lock;
-    return commander_.request_emergency_stop(queue().now_us(), engage);
-}
-
-core::Mode CommanderTask::mode() const
-{
-    const core::CriticalSection lock;
-    return commander_.state().mode;
-}
-
-bool CommanderTask::armed() const
-{
-    const core::CriticalSection lock;
-    return commander_.state().armed;
-}
-
-core::BringupStart CommanderTask::request_bringup(core::ControlSource source, std::uint8_t bringup_case)
-{
-    core::BringupStart result{};
-    {
-        const core::CriticalSection lock;
-        result = commander_.request_bringup(source, bringup_case);
-    }
-    if (result == core::BringupStart::Ok) {
-        bringup_publication_.publish(
-            msg::BringupCommand{.timestamp = queue().now_us(), .bringup_case = bringup_case, .source = source});
-    }
-    return result;
-}
-
-void CommanderTask::source_lost(core::ControlSource source)
-{
-    const core::CriticalSection lock;
-    commander_.source_lost(source);
-}
-
-bool CommanderTask::accepts_setpoint(core::ControlSource source) const
-{
-    const core::CriticalSection lock;
-    return commander_.accepts_setpoint(source);
-}
-
-std::uint32_t CommanderTask::skipped_checks() const
-{
-    const core::CriticalSection lock;
-    return commander_.state().skipped_checks;
 }
 
 }  // namespace vk::commander
