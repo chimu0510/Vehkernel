@@ -67,9 +67,15 @@ void ActuatorTask::run()
             setpoints_from_us_ = status.timestamp;
         }
         emergency_stop_ = status.emergency_stop;
+        mode_ = static_cast<core::Mode>(status.mode);
+        in_control_ = status.source;
     }
-    while (setpoint_.copy(setpoint_message_)) {
-        // Only the newest counts.
+    msg::ActuatorSetpoint incoming{};
+    while (setpoint_.copy(incoming)) {
+        // The newest that setpoint arbitration accepts counts.
+        if (core::setpoint_accepted(mode_, in_control_, incoming.source, core::SetpointLevel::DirectActuator)) {
+            setpoint_message_ = incoming;
+        }
     }
     while (demand_.copy(demand_message_)) {
     }

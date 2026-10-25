@@ -64,11 +64,12 @@ public:
     virtual void limit_rate(float hz) = 0;
 
     // Inbound streams only: whether the topic is a setpoint, and publishing a
-    // message the peer sent, stamped with the time it arrived; false if it
-    // does not decode.
+    // message the peer sent, stamped with the time it arrived and, for a
+    // message with a source, tagged with `source`, whatever the peer wrote
+    // there; false if it does not decode.
     [[nodiscard]] virtual bool inbound() const = 0;
     [[nodiscard]] virtual bool setpoint() const = 0;
-    virtual bool receive(std::span<const std::uint8_t> message, std::uint64_t now_us) = 0;
+    virtual bool receive(std::span<const std::uint8_t> message, std::uint64_t now_us, std::uint8_t source) = 0;
 
     [[nodiscard]] std::uint16_t topic_id() const { return topic_id_; }
     [[nodiscard]] std::uint8_t instance() const { return instance_; }
@@ -108,13 +109,16 @@ public:
     [[nodiscard]] bool inbound() const override { return inbound_; }
     [[nodiscard]] bool setpoint() const override { return setpoint_; }
 
-    bool receive(std::span<const std::uint8_t> message, std::uint64_t now_us) override
+    bool receive(std::span<const std::uint8_t> message, std::uint64_t now_us, std::uint8_t source) override
     {
         T decoded{};
         if (!inbound_ || !T::decode(message, decoded)) {
             return false;
         }
         decoded.timestamp = now_us;
+        if constexpr (requires { decoded.source; }) {
+            decoded.source = source;
+        }
         publication_.publish(decoded);
         return true;
     }

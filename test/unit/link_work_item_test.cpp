@@ -589,39 +589,10 @@ TEST_F(LinkTest, ASerialLinkScaledToItsBaudRateDropsNoFrame)
 
 namespace {
 
-// Setpoint arbitration as the commander decides it: only from the source in control.
-class SourceInControl final : public vk::core::VehicleControl {
-public:
-    vk::core::ModeResult request_mode(vk::core::ControlSource /*source*/, vk::core::Mode /*mode*/) override
-    {
-        return vk::core::ModeResult::Ok;
-    }
-    vk::core::ArmingResult request_arming(vk::core::ControlSource /*source*/, bool /*arm*/) override
-    {
-        return vk::core::ArmingResult::Ok;
-    }
-    bool request_emergency_stop(bool /*engage*/) override { return false; }
-    [[nodiscard]] vk::core::Mode mode() const override { return vk::core::Mode::Test; }
-    [[nodiscard]] bool armed() const override { return true; }
-    [[nodiscard]] std::uint32_t skipped_checks() const override { return 0; }
-    [[nodiscard]] bool accepts_setpoint(vk::core::ControlSource source) const override { return source == in_control; }
-    vk::core::BringupStart request_bringup(vk::core::ControlSource /*source*/, std::uint8_t /*bringup_case*/) override
-    {
-        return vk::core::BringupStart::Ok;
-    }
-    void source_lost(vk::core::ControlSource /*source*/) override {}
-    vk::core::RebootResult request_reboot(vk::core::RebootAction /*action*/) override
-    {
-        return vk::core::RebootResult::Ok;
-    }
-
-    vk::core::ControlSource in_control = 0;
-};
-
-// The topic_data body of one body velocity setpoint.
-std::vector<std::uint8_t> body_setpoint(float vx)
+// The topic_data body of one body velocity setpoint, with `source` as the peer wrote it.
+std::vector<std::uint8_t> body_setpoint(float vx, std::uint8_t source)
 {
-    const vk::msg::BodyVelocitySetpoint message{.timestamp = 0, .vx = vx, .vy = 0.0F, .yaw_rate = 0.0F};
+    const vk::msg::BodyVelocitySetpoint message{.timestamp = 0, .source = source, .vx = vx, .vy = 0.0F, .yaw_rate = 0.0F};
     std::vector<std::uint8_t> body(3 + vk::msg::BodyVelocitySetpoint::encoded_size);
     body[0] = static_cast<std::uint8_t>(vk::msg::BodyVelocitySetpoint::topic_id & 0xFFU);
     body[1] = static_cast<std::uint8_t>(vk::msg::BodyVelocitySetpoint::topic_id >> 8U);
@@ -632,46 +603,49 @@ std::vector<std::uint8_t> body_setpoint(float vx)
 
 }  // namespace
 
-TEST_F(LinkTest, ABodyVelocitySetpointCountsOnlyFromTheSourceInControl)
+TEST_F(LinkTest, ASetpointIsTaggedWithItsLinkWhateverThePeerWrote)
 {
-    SourceInControl control;
     FakeTransport other_transport;
     Host other{other_transport};
     TopicStreamOf<vk::msg::BodyVelocitySetpoint> stream(vk::link::Inbound{.setpoint = true});
     TopicStreamOf<vk::msg::BodyVelocitySetpoint> other_stream(vk::link::Inbound{.setpoint = true});
     const std::array<TopicStream*, 1> map{&stream};
     const std::array<TopicStream*, 1> other_map{&other_stream};
-    Link link("link_test", transport, map, {.instance = 0, .control = {.control = &control}}, queue);
-    Link other_link("link_other", other_transport, other_map, {.instance = 1, .control = {.control = &control}},
-                    queue);
+    Link link("link_test", transport, map, {.instance = 0, .control = {.enabled = true}}, queue);
+    Link other_link("link_other", other_transport, other_map, {.instance = 1, .control = {.enabled = true}}, queue);
     link.start();
     other_link.start();
     other.send_hello();
     connect();
-    vk::core::Subscription<vk::msg::BodyVelocitySetpoint> accepted{0};
-    vk::msg::BodyVelocitySetpoint drained{};
-    while (accepted.copy(drained)) {
+    vk::core::Subscription<vk::msg::BodyVelocitySetpoint> published{0};
+    vk::msg::BodyVelocitySetpoint message{};
+    while (published.copy(message)) {
     }
 
-    // From link 1, not in control: refused and counted.
-    other.send(FrameType::TopicData, body_setpoint(0.7F));
+    // Each Link publishes what its peer sends, stamped on arrival and tagged
+    // with the Link; the consumers judge it (setpoint arbitration, ADR-0005).
+    other.send(FrameType::TopicData, body_setpoint(0.7F, 0));
     step();
-    EXPECT_FALSE(accepted.updated());
-    EXPECT_EQ(other_link.link_stats().setpoints_rejected, 1U);
-
-    // From link 0, in control: published, stamped when it was accepted.
-    host.send(FrameType::TopicData, body_setpoint(0.3F));
-    step();
-    vk::msg::BodyVelocitySetpoint message{};
-    ASSERT_TRUE(accepted.copy(message));
-    EXPECT_FLOAT_EQ(message.vx, 0.3F);
+    ASSERT_TRUE(published.copy(message));
+    EXPECT_FLOAT_EQ(message.vx, 0.7F);
+    EXPECT_EQ(message.source, 1) << "a peer cannot claim another Link's source";
     EXPECT_EQ(message.timestamp, fake_now);
-    EXPECT_EQ(link.link_stats().setpoints_rejected, 0U);
-
-    // Outside TEST nothing is in control: refused from either.
-    control.in_control = vk::core::no_source;
-    host.send(FrameType::TopicData, body_setpoint(0.3F));
+    host.send(FrameType::TopicData, body_setpoint(0.3F, 9));
     step();
-    EXPECT_FALSE(accepted.updated());
-    EXPECT_EQ(link.link_stats().setpoints_rejected, 1U);
+    ASSERT_TRUE(published.copy(message));
+    EXPECT_FLOAT_EQ(message.vx, 0.3F);
+    EXPECT_EQ(message.source, 0);
+}
+
+TEST(SetpointArbitration, OnlyTheSourceInControlAtALevelItsModeAccepts)
+{
+    using vk::core::Mode;
+    using vk::core::SetpointLevel;
+    using vk::core::setpoint_accepted;
+    EXPECT_TRUE(setpoint_accepted(Mode::Test, 0, 0, SetpointLevel::DirectActuator));
+    EXPECT_TRUE(setpoint_accepted(Mode::Test, 0, 0, SetpointLevel::BodyVelocity));
+    EXPECT_FALSE(setpoint_accepted(Mode::Test, 0, 1, SetpointLevel::BodyVelocity));
+    EXPECT_FALSE(setpoint_accepted(Mode::Standby, vk::core::no_source, vk::core::no_source,
+                                   SetpointLevel::BodyVelocity));
+    EXPECT_FALSE(setpoint_accepted(Mode::Standby, 0, 0, SetpointLevel::DirectActuator));
 }

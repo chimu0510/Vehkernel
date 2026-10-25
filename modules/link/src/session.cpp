@@ -35,7 +35,7 @@ void Session::handle(const Frame& frame, std::uint64_t now_us, FrameSink& sink)
     case FrameType::EstopRequest:
     case FrameType::BringupRun:
     case FrameType::RebootRequest:
-        control_.handle(frame.type, body, out);
+        control_.handle(frame.type, body, now_us);
         break;
     case FrameType::SimActuatorPower:
     case FrameType::SimUserKey:
@@ -104,6 +104,17 @@ void Session::on_time_sync(BodyReader body, std::uint64_t now_us, FrameSender& o
     writer.u64(now_us);  // received
     writer.u64(now_us);  // sent: the reply leaves within the same run
     out.send(FrameType::TimeSyncReply, writer.written());
+}
+
+void Session::send_answers(std::uint64_t now_us, FrameSink& sink)
+{
+    FrameSender out = sender(sink);
+    control_.send_answers(now_us, out);
+}
+
+void Session::source_lost(std::uint64_t now_us)
+{
+    control_.source_lost(now_us);
 }
 
 bool Session::send_bringup_result(const msg::BringupStatus& status, FrameSink& sink)

@@ -75,6 +75,17 @@ class BringupState(enum.IntEnum):
     ABORTED = 3
 
 
+class Command(enum.IntEnum):
+    """A request to the commander on vehicle_command (ADR-0005): what it asks."""
+
+    MODE = 0  # argument: the mode
+    ARM = 1  # argument: 1 to arm, 0 to disarm
+    EMERGENCY_STOP = 2  # argument: 1 to engage, 0 to release
+    BRINGUP = 3  # argument: the bring-up case
+    REBOOT = 4  # argument: the reboot action
+    SOURCE_LOST = 5  # the source fell silent; no argument
+
+
 class DisarmReason(enum.IntEnum):
     """Why the vehicle last disarmed. Short names fit the local display's status page
     (ADR-0022).

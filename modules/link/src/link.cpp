@@ -48,8 +48,7 @@ LinkStats Link::link_stats() const
             .lost = received.lost,
             .handshake_state = handshake_state_,
             .rate_scale = rate_scale_,
-            .inbound_undeclared = inbound_undeclared_,
-            .setpoints_rejected = setpoints_rejected_};
+            .inbound_undeclared = inbound_undeclared_};
 }
 
 void Link::run()
@@ -62,7 +61,8 @@ void Link::run()
     } else {
         handshake_state_ = session_.handshake_done() ? HandshakeState::PeerSilent : HandshakeState::Waiting;
     }
-    follow_control(previous);
+    follow_control(previous, now);
+    session_.send_answers(now, sink_);
     publish_status(now);
     session_.send_pending(now, sink_, paced_frames_per_run);
     send_topics(now);
@@ -88,7 +88,6 @@ void Link::publish_status(std::uint64_t now_us)
     status.handshake_state = static_cast<std::uint8_t>(current.handshake_state);
     status.rate_scale = current.rate_scale;
     status.inbound_undeclared = current.inbound_undeclared;
-    status.setpoints_rejected = current.setpoints_rejected;
     status_publication_.publish(status);
 }
 
@@ -113,14 +112,13 @@ void Link::receive(std::uint64_t now_us)
     }
 }
 
-void Link::follow_control(HandshakeState previous)
+void Link::follow_control(HandshakeState previous, std::uint64_t now_us)
 {
-    core::VehicleControl* control = config_.control.control;
-    if (control == nullptr) {
+    if (!config_.control.enabled) {
         return;
     }
     if (previous == HandshakeState::Connected && handshake_state_ == HandshakeState::PeerSilent) {
-        control->source_lost(config_.instance);
+        session_.source_lost(now_us);
     }
     msg::BringupStatus status{};
     while (bringup_status_.copy(status)) {
@@ -156,14 +154,9 @@ void Link::on_topic_data(BodyReader body, std::uint64_t now_us)
         ++inbound_undeclared_;
         return;
     }
-    // A setpoint counts only from the source in control (ADR-0005).
-    const ControlAccess& control = config_.control;
-    if ((*stream)->setpoint() &&
-        (control.control == nullptr || !control.control->accepts_setpoint(config_.instance))) {
-        ++setpoints_rejected_;
-        return;
-    }
-    (*stream)->receive(message, now_us);
+    // A setpoint is tagged with this Link as its source; its consumers judge
+    // whether it counts (setpoint arbitration, ADR-0005).
+    (*stream)->receive(message, now_us, config_.instance);
 }
 
 void Link::send_topics(std::uint64_t now_us)

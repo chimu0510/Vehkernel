@@ -7,7 +7,7 @@ WHL_RADIUS 0.05 m, WHL_TRACK 0.2 m) and its UDP Link on a free port, and
 drives it through the Link monitor library. In order:
 
 - In STANDBY, body velocity setpoints are refused by setpoint arbitration
-  (link_status counts them) and no output is driven.
+  (vehicle_status counts them) and no output is driven.
 - In TEST, armed, 0.3 m/s forward gives both wheels a 6 rad/s target and
   outputs 3 and 4 none (NaN), and the wheels' mean speed from 1 s on is
   within 5 % of it; 1 rad/s of yaw rate gives +2 rad/s left and -2 rad/s
@@ -100,11 +100,11 @@ def targets_are(output, expected) -> bool:
 
 
 def check_refused_in_standby(vehicle: BodyVehicle, failures: list[str]) -> None:
-    vehicle.monitor.run(1.0)
-    before = vehicle.links[-1].setpoints_rejected if vehicle.links else 0
+    vehicle.monitor.run(0.5)
+    before = vehicle.statuses[-1].setpoints_rejected if vehicle.statuses else 0
     first, _ = send_for(vehicle, lambda: vehicle.send_body(0.3, 0.0, 0.0), 0.5)
-    vehicle.monitor.run(1.2)  # link_status comes once a second
-    rejected = (vehicle.links[-1].setpoints_rejected if vehicle.links else 0) - before
+    vehicle.monitor.run(0.5)  # vehicle_status comes five times a second
+    rejected = (vehicle.statuses[-1].setpoints_rejected if vehicle.statuses else 0) - before
     if rejected < 5:
         failures.append(f"in STANDBY, only {rejected} body velocity setpoints were counted refused")
     if any(any(d != 0.0 for d in o.output) for o in vehicle.outputs if o.timestamp >= vehicle.mcu_us(first)):

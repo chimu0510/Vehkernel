@@ -7,116 +7,137 @@
 
 namespace vk::link {
 
-void ControlHandler::handle(FrameType type, BodyReader body, FrameSender& out)
+ControlHandler::ControlHandler(ControlAccess access) : access_(access)
 {
+    msg::VehicleCommandAck stale{};
+    while (acks_.copy(stale)) {
+    }
+}
+
+void ControlHandler::handle(FrameType type, BodyReader body, std::uint64_t now_us)
+{
+    const std::uint8_t argument = body.u8();
+    if (!body.ok() || !access_.enabled) {
+        return;
+    }
     switch (type) {
     case FrameType::ModeRequest:
-        on_mode_request(body, out);
+        request(core::Command::Mode, argument, now_us);
         break;
     case FrameType::ArmingRequest:
-        on_arming_request(body, out);
+        request(core::Command::Arm, argument != 0 ? 1 : 0, now_us);
         break;
     case FrameType::EstopRequest:
-        on_estop_request(body, out);
+        request(core::Command::EmergencyStop, argument != 0 ? 1 : 0, now_us);
         break;
     case FrameType::BringupRun:
-        on_bringup_run(body, out);
+        request(core::Command::Bringup, argument, now_us);
         break;
     case FrameType::RebootRequest:
-        on_reboot_request(body, out);
+        request(core::Command::Reboot, argument, now_us);
         break;
     default:
         break;
     }
 }
 
-void ControlHandler::on_mode_request(BodyReader body, FrameSender& out)
+void ControlHandler::request(core::Command command, std::uint8_t argument, std::uint64_t now_us)
 {
-    const std::uint8_t mode = body.u8();
-    if (!body.ok() || access_.control == nullptr) {
-        return;
+    Pending* slot = nullptr;
+    for (Pending& pending : pending_) {
+        if (!pending.used) {
+            slot = &pending;
+            break;
+        }
     }
-    const core::ModeResult result =
-        mode > static_cast<std::uint8_t>(core::Mode::Test)
-            ? core::ModeResult::UnknownMode
-            : access_.control->request_mode(access_.source, static_cast<core::Mode>(mode));
-    std::array<std::uint8_t, 2> reply{};
-    BodyWriter writer(reply);
-    if (result != core::ModeResult::Ok) {
-        writer.u8(static_cast<std::uint8_t>(result));
-        writer.u8(static_cast<std::uint8_t>(access_.control->mode()));
-        out.send(FrameType::ModeReject, writer.written());
-        return;
+    if (slot == nullptr) {
+        return;  // Too many awaiting an answer: the host repeats it.
     }
-    writer.u8(static_cast<std::uint8_t>(access_.control->mode()));
-    out.send(FrameType::ModeReply, writer.written());
+    ++sequence_;
+    *slot = {.sequence = sequence_, .argument = argument, .at_us = now_us, .used = true};
+    commands_.publish(msg::VehicleCommand{.timestamp = now_us,
+                                          .source = access_.source,
+                                          .sequence = sequence_,
+                                          .command = static_cast<std::uint8_t>(command),
+                                          .argument = argument});
 }
 
-void ControlHandler::on_arming_request(BodyReader body, FrameSender& out)
+void ControlHandler::source_lost(std::uint64_t now_us)
 {
-    const std::uint8_t arm = body.u8();
-    if (!body.ok() || access_.control == nullptr) {
+    if (!access_.enabled) {
         return;
     }
-    const core::ArmingResult result = access_.control->request_arming(access_.source, arm != 0);
-    std::array<std::uint8_t, 5> reply{};
-    BodyWriter writer(reply);
-    if (result != core::ArmingResult::Ok) {
-        writer.u8(static_cast<std::uint8_t>(result));
-        out.send(FrameType::ArmingReject, writer.written());
-        return;
-    }
-    writer.u8(access_.control->armed() ? 1 : 0);
-    writer.u32(access_.control->skipped_checks());
-    out.send(FrameType::ArmingReply, writer.written());
+    ++sequence_;
+    commands_.publish(msg::VehicleCommand{.timestamp = now_us,
+                                          .source = access_.source,
+                                          .sequence = sequence_,
+                                          .command = static_cast<std::uint8_t>(core::Command::SourceLost),
+                                          .argument = 0});
 }
 
-void ControlHandler::on_estop_request(BodyReader body, FrameSender& out)
+void ControlHandler::send_answers(std::uint64_t now_us, FrameSender& out)
 {
-    const std::uint8_t engage = body.u8();
-    if (!body.ok() || access_.control == nullptr) {
-        return;
+    msg::VehicleCommandAck ack{};
+    while (acks_.copy(ack)) {
+        if (ack.source != access_.source) {
+            continue;
+        }
+        for (Pending& pending : pending_) {
+            if (pending.used && pending.sequence == ack.sequence) {
+                reply(pending, ack, out);
+                pending.used = false;
+            }
+        }
     }
-    std::array<std::uint8_t, 1> reply{};
-    BodyWriter writer(reply);
-    writer.u8(access_.control->request_emergency_stop(engage != 0) ? 1 : 0);
-    out.send(FrameType::EstopReply, writer.written());
+    for (Pending& pending : pending_) {
+        if (pending.used && now_us - pending.at_us > answer_timeout_us) {
+            pending.used = false;
+        }
+    }
 }
 
-void ControlHandler::on_bringup_run(BodyReader body, FrameSender& out)
+void ControlHandler::reply(const Pending& pending, const msg::VehicleCommandAck& ack, FrameSender& out)
 {
-    const std::uint8_t bringup_case = body.u8();
-    if (!body.ok() || access_.control == nullptr) {
-        return;
+    std::array<std::uint8_t, 5> body{};
+    BodyWriter writer(body);
+    const bool ok = ack.result == 0;
+    switch (static_cast<core::Command>(ack.command)) {
+    case core::Command::Mode:
+        if (!ok) {
+            writer.u8(ack.result);
+        }
+        writer.u8(ack.mode);
+        out.send(ok ? FrameType::ModeReply : FrameType::ModeReject, writer.written());
+        break;
+    case core::Command::Arm:
+        if (!ok) {
+            writer.u8(ack.result);
+            out.send(FrameType::ArmingReject, writer.written());
+            break;
+        }
+        writer.u8(ack.armed ? 1 : 0);
+        writer.u32(ack.skipped_checks);
+        out.send(FrameType::ArmingReply, writer.written());
+        break;
+    case core::Command::EmergencyStop:
+        writer.u8(ack.emergency_stop ? 1 : 0);
+        out.send(FrameType::EstopReply, writer.written());
+        break;
+    case core::Command::Bringup:
+        if (!ok) {  // Accepted silently: the result follows when the case ends.
+            writer.u8(ack.result);
+            out.send(FrameType::BringupReject, writer.written());
+        }
+        break;
+    case core::Command::Reboot:
+        // The reply echoes the action; the reject gives the reason. The board
+        // resets after the reply.
+        writer.u8(ok ? pending.argument : ack.result);
+        out.send(ok ? FrameType::RebootReply : FrameType::RebootReject, writer.written());
+        break;
+    default:
+        break;
     }
-    const core::BringupStart result = access_.control->request_bringup(access_.source, bringup_case);
-    if (result == core::BringupStart::Ok) {
-        return;  // The result follows when the case ends.
-    }
-    std::array<std::uint8_t, 1> reply{static_cast<std::uint8_t>(result)};
-    out.send(FrameType::BringupReject, reply);
-}
-
-// reboot_request: the action (core::RebootAction). The reply echoes it; the
-// reject gives the reason (core::RebootResult). The board resets after the reply.
-void ControlHandler::on_reboot_request(BodyReader body, FrameSender& out)
-{
-    const std::uint8_t action = body.u8();
-    if (!body.ok() || access_.control == nullptr) {
-        return;
-    }
-    const bool known = action == static_cast<std::uint8_t>(core::RebootAction::Reboot) ||
-                       action == static_cast<std::uint8_t>(core::RebootAction::Bootloader);
-    const core::RebootResult result = known ? access_.control->request_reboot(static_cast<core::RebootAction>(action))
-                                            : core::RebootResult::UnknownAction;
-    std::array<std::uint8_t, 1> reply{};
-    if (result != core::RebootResult::Ok) {
-        reply[0] = static_cast<std::uint8_t>(result);
-        out.send(FrameType::RebootReject, reply);
-        return;
-    }
-    reply[0] = action;
-    out.send(FrameType::RebootReply, reply);
 }
 
 bool ControlHandler::send_bringup_result(const msg::BringupStatus& status, FrameSender& out)

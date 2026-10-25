@@ -132,9 +132,10 @@ void Commander::source_lost(core::ControlSource source)
     }
 }
 
-bool Commander::accepts_setpoint(core::ControlSource source) const
+bool Commander::accepts_setpoint(core::ControlSource source, core::SetpointLevel level) const
 {
-    return state_.armed && state_.mode == core::Mode::Test && source == state_.source && !inputs_.bringup_running;
+    return state_.armed && !inputs_.bringup_running &&
+           core::setpoint_accepted(state_.mode, state_.source, source, level);
 }
 
 core::ArmingResult Commander::arming_check(std::uint64_t now_us, core::ControlSource source) const

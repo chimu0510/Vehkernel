@@ -2,7 +2,7 @@
 // Fuzz target for the session's frame handling (ADR-0002, ADR-0018): frames
 // in any order and with any body reach Session::handle(), as the frame
 // reader passes them on (session_input.hpp). The session has the build's
-// parameter table and a fake vehicle control. Topic data is decoded with the
+// parameter table and a fake commander on the bus. Topic data is decoded with the
 // schema's decoder for its topic, as the Link does for an inbound topic.
 //
 // Checks, besides the sanitizers:
@@ -13,11 +13,14 @@
 //   done its handshake.
 #include "session_input.hpp"
 
+#include <vk/core/bus.hpp>
 #include <vk/core/parameters.hpp>
 #include <vk/core/vehicle_control.hpp>
 #include <vk/link/frame.hpp>
 #include <vk/link/session.hpp>
 #include <vk/msg/arming_state.hpp>
+#include <vk/msg/vehicle_command.hpp>
+#include <vk/msg/vehicle_command_ack.hpp>
 #include <vk/msg/bringup_status.hpp>
 #include <vk/msg/topics.hpp>
 #include <vk/params/params.hpp>
@@ -57,42 +60,61 @@ void publish_armed(bool armed)
     vk::core::Publication<vk::msg::ArmingState>{}.publish(state);
 }
 
-// Accepts or refuses each kind of request as the options byte says.
-class FakeControl final : public vk::core::VehicleControl {
+// Plays the commander on the bus: accepts or refuses each kind of request as
+// the options byte says, on vehicle_command_ack.
+class FakeControl final {
 public:
-    explicit FakeControl(std::uint8_t options) : options_(options) {}
+    explicit FakeControl(std::uint8_t options) : options_(options)
+    {
+        vk::msg::VehicleCommand stale{};
+        while (commands_.copy(stale)) {
+        }
+    }
 
-    vk::core::ModeResult request_mode(vk::core::ControlSource /*source*/, vk::core::Mode mode) override
+    void process()
     {
-        if (refuses(session_options::refuse_mode)) {
-            return vk::core::ModeResult::Armed;
+        using vk::core::Command;
+        vk::msg::VehicleCommand command{};
+        while (commands_.copy(command)) {
+            vk::msg::VehicleCommandAck ack{.source = command.source, .sequence = command.sequence,
+                                           .command = command.command};
+            switch (static_cast<Command>(command.command)) {
+            case Command::Mode:
+                if (refuses(session_options::refuse_mode)) {
+                    ack.result = static_cast<std::uint8_t>(vk::core::ModeResult::Armed);
+                } else if (command.argument <= static_cast<std::uint8_t>(vk::core::Mode::Test)) {
+                    mode_ = static_cast<vk::core::Mode>(command.argument);
+                } else {
+                    ack.result = static_cast<std::uint8_t>(vk::core::ModeResult::UnknownMode);
+                }
+                break;
+            case Command::Arm:
+                if (command.argument != 0 && refuses(session_options::refuse_arming)) {
+                    ack.result = static_cast<std::uint8_t>(vk::core::ArmingResult::WrongMode);
+                } else {
+                    armed_ = command.argument != 0;
+                    publish_armed(armed_);
+                }
+                break;
+            case Command::Bringup:
+                if (refuses(session_options::refuse_bringup)) {
+                    ack.result = static_cast<std::uint8_t>(vk::core::BringupStart::NotArmed);
+                }
+                break;
+            case Command::Reboot:
+                if (refuses(session_options::refuse_reboot)) {
+                    ack.result = static_cast<std::uint8_t>(vk::core::RebootResult::Armed);
+                }
+                break;
+            default:
+                break;
+            }
+            ack.mode = static_cast<std::uint8_t>(mode_);
+            ack.armed = armed_;
+            ack.emergency_stop = command.command == static_cast<std::uint8_t>(Command::EmergencyStop) &&
+                                 command.argument != 0;
+            acks_.publish(ack);
         }
-        mode_ = mode;
-        return vk::core::ModeResult::Ok;
-    }
-    vk::core::ArmingResult request_arming(vk::core::ControlSource /*source*/, bool arm) override
-    {
-        if (arm && refuses(session_options::refuse_arming)) {
-            return vk::core::ArmingResult::WrongMode;
-        }
-        armed_ = arm;
-        publish_armed(arm);
-        return vk::core::ArmingResult::Ok;
-    }
-    bool request_emergency_stop(bool engage) override { return engage; }
-    [[nodiscard]] vk::core::Mode mode() const override { return mode_; }
-    [[nodiscard]] bool armed() const override { return armed_; }
-    [[nodiscard]] std::uint32_t skipped_checks() const override { return 0; }
-    [[nodiscard]] bool accepts_setpoint(vk::core::ControlSource /*source*/) const override { return armed_; }
-    vk::core::BringupStart request_bringup(vk::core::ControlSource /*source*/, std::uint8_t /*bringup_case*/) override
-    {
-        return refuses(session_options::refuse_bringup) ? vk::core::BringupStart::NotArmed
-                                                        : vk::core::BringupStart::Ok;
-    }
-    void source_lost(vk::core::ControlSource /*source*/) override {}
-    vk::core::RebootResult request_reboot(vk::core::RebootAction /*action*/) override
-    {
-        return refuses(session_options::refuse_reboot) ? vk::core::RebootResult::Armed : vk::core::RebootResult::Ok;
     }
 
 private:
@@ -101,6 +123,8 @@ private:
     std::uint8_t options_;
     vk::core::Mode mode_ = vk::core::Mode::Standby;
     bool armed_ = false;
+    vk::core::Subscription<vk::msg::VehicleCommand> commands_{0};
+    vk::core::Publication<vk::msg::VehicleCommandAck> acks_;
 };
 
 // Reads back every frame the session sends, and drops some if told to.
@@ -193,8 +217,8 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     const vk::link::ParameterAccess parameter_access{
         .parameters = (options & session_options::no_parameters) != 0 ? nullptr : &parameters,
         .set_hash = vk::params::set_hash};
-    const vk::link::ControlAccess control_access{
-        .control = (options & session_options::no_control) != 0 ? nullptr : &control, .source = 0};
+    const vk::link::ControlAccess control_access{.enabled = (options & session_options::no_control) == 0,
+                                                 .source = 0};
     vk::link::Session session(vk::link::schema_topics, vk::link::Session::default_peer_timeout_us, parameter_access,
                               control_access);
 
@@ -214,6 +238,8 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         }
         session.handle({.version = vk::link::protocol_version, .type = *type, .sequence = sequence++, .body = body},
                        fake_now, sink);
+        control.process();
+        session.send_answers(fake_now, sink);
         if (*type == FrameType::TopicData && session.handshake_done()) {
             decode_topic_data(vk::msg::AllTopics{}, body);
         }

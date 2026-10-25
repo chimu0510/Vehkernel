@@ -345,7 +345,7 @@ struct SerialLink {
                                                            .storage = &*param_storage,
 #endif
                                                            },
-                                            .control = {.control = &*commander}},
+                                            .control = {.enabled = true}},
                      vk::core::work_queue(vk::core::WorkQueueTier::Io));
         link->start();
     }

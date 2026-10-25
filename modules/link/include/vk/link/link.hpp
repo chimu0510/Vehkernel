@@ -8,13 +8,14 @@
 // topic_info frames or of a parameter list in progress, and every topic map
 // entry that is due once the session is connected and every topic has been
 // described. Topic data from the peer is published on an inbound topic of the
-// map, a setpoint only once setpoint arbitration accepts it, and counted
-// otherwise. A frame the transport cannot take is dropped and counted; the
+// map, a setpoint tagged with the Link as its source for its consumers to
+// judge (setpoint arbitration, ADR-0005). A frame the transport cannot take is dropped and counted; the
 // Link never blocks its work queue. Once a second it publishes its statistics
 // on link_status. On a transport with a baud rate, start() scales the topic
-// map down to fit it (ADR-0002). When a bring-up case this Link started
-// ends, it sends the result; when its peer falls silent, it tells the
-// vehicle control, which aborts such a case.
+// map down to fit it (ADR-0002). Requests to the commander leave on
+// vehicle_command and their replies follow its acknowledgements (ADR-0005).
+// When a bring-up case this Link started ends, it sends the result; when its
+// peer falls silent, it tells the commander, which aborts such a case.
 #pragma once
 
 #include <vk/core/work_queue.hpp>
@@ -49,7 +50,6 @@ struct LinkStats {
     HandshakeState handshake_state;
     std::uint8_t rate_scale;        // percent of the topic map's rates, scaled to fit the baud rate
     std::uint32_t inbound_undeclared;  // topic data for a topic the map does not declare inbound
-    std::uint32_t setpoints_rejected;  // setpoints refused by setpoint arbitration
 };
 
 class Link final : public core::WorkItem {
@@ -62,7 +62,7 @@ public:
         std::uint32_t interval_us = default_interval_us;  // how often the Link runs
         std::uint64_t peer_timeout_us = Session::default_peer_timeout_us;
         ParameterAccess parameters{};                     // what the peer may read and change
-        ControlAccess control{};                          // modes, arming and the emergency stop; the source is the instance
+        ControlAccess control{};                          // requests to the commander; the source is the instance
         FrameHandler* sim_frames = nullptr;               // SITL only: the SITL-only frames
     };
 
@@ -101,7 +101,7 @@ private:
 
     void receive(std::uint64_t now_us);
     void on_topic_data(BodyReader body, std::uint64_t now_us);
-    void follow_control(HandshakeState previous);
+    void follow_control(HandshakeState previous, std::uint64_t now_us);
     void send_topics(std::uint64_t now_us);
     void publish_status(std::uint64_t now_us);
 
@@ -117,7 +117,6 @@ private:
     std::uint64_t next_status_us_ = 0;
     std::uint8_t rate_scale_ = 100;
     std::uint32_t inbound_undeclared_ = 0;
-    std::uint32_t setpoints_rejected_ = 0;
     core::Subscription<msg::BringupStatus> bringup_status_{0};
     bool bringup_started_ = false;     // a case this Link started is running
     bool bringup_result_due_ = false;  // its result is to be sent

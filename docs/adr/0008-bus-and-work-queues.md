@@ -4,7 +4,7 @@ The bus follows PX4's uORB, but everything is allocated statically at compile ti
 
 - **Semantics**: by default a topic keeps only its latest value. Subscribers check `updated()` against a generation counter and read with `copy()`. A schema annotation `@queue N` turns a topic into a queue where needed.
 - **Allocation**: the generator creates all topics and buffers statically at compile time, including multiple instances (for example several IMUs). Nothing calls `malloc` at runtime.
-- **Concurrency**: publish and read are protected by short critical sections. ISRs never publish; they notify the corresponding driver work item, which publishes.
+- **Concurrency**: publish and read are protected by short critical sections. ISRs never publish; they notify the corresponding driver work item, which publishes. Work items on different queues talk only through the bus, never by calling each other: requests to the commander travel on `vehicle_command` and `vehicle_command_ack` (ADR-0005), so no work item locks another's state.
 - **Timestamps**: every message carries a 64-bit monotonic microsecond `timestamp`, always as its first field (ADR-0006).
 - **Observability**: the bus can list every topic with its publish rate and last update time, and expose them over a Link.
 

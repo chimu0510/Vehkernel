@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The vehicle control service (ADR-0005): mode, arming, emergency stop and
-// reboot (ADR-0023) requests. Like the parameter runtime (ADR-0012) it is protocol
-// independent, so the custom protocol now and MAVLink and the Bridge later
-// reach the commander through the same interface.
+// Vehicle control (ADR-0005): the vocabulary of requests to the commander and
+// of setpoint arbitration, shared by every source and every consumer.
 //
-// A source is whoever sends a request: a Link instance today, the remote
-// control and the Bridge later. Requests are idempotent, so a tool may repeat
-// one it got no reply to.
+// A source is whoever sends a request or a setpoint: a Link instance today,
+// the remote control and the Bridge later. Requests travel on the bus, on
+// vehicle_command, and the commander answers each on vehicle_command_ack;
+// they are idempotent, so a source may repeat one it got no answer to.
+// Setpoints are tagged with their source, and every consumer drops those the
+// mode does not accept from it, by the rule below, judged on the newest
+// vehicle_status. The commander applies the same rule and counts the drops.
 #pragma once
 
 #include <vk/msg/enums.hpp>
@@ -25,6 +27,7 @@ using RebootResult = msg::RebootResult;  // why a reboot request was refused
 using DisarmReason = msg::DisarmReason;  // why the vehicle last disarmed
 using BringupCase = msg::BringupCase;    // bring-up cases run in test mode (ADR-0018)
 using BringupStart = msg::BringupStart;  // why a bring-up request was refused
+using Command = msg::Command;            // what a vehicle_command asks
 
 // A Link instance, or later the remote control or the Bridge.
 using ControlSource = std::uint8_t;
@@ -36,44 +39,30 @@ inline constexpr std::uint32_t actuator_power = 1U << 0U;
 inline constexpr std::uint32_t all = actuator_power;
 }  // namespace arm_checks
 
-class VehicleControl {
-public:
-    VehicleControl() = default;
-    virtual ~VehicleControl() = default;
-    VehicleControl(const VehicleControl&) = delete;
-    VehicleControl& operator=(const VehicleControl&) = delete;
-    VehicleControl(VehicleControl&&) = delete;
-    VehicleControl& operator=(VehicleControl&&) = delete;
-
-    // Changes the mode; entering TEST makes `source` the source in control.
-    virtual ModeResult request_mode(ControlSource source, Mode mode) = 0;
-
-    // Arms if every arming check passes; disarming is accepted from any source.
-    virtual ArmingResult request_arming(ControlSource source, bool arm) = 0;
-
-    // Engages or releases the emergency stop, from any source; returns whether it is engaged.
-    virtual bool request_emergency_stop(bool engage) = 0;
-
-    [[nodiscard]] virtual Mode mode() const = 0;
-    [[nodiscard]] virtual bool armed() const = 0;
-
-    // Bits of arm_checks currently skipped.
-    [[nodiscard]] virtual std::uint32_t skipped_checks() const = 0;
-
-    // Setpoint arbitration (ADR-0005): whether a direct-actuator or body
-    // velocity setpoint from `source` is accepted now: from the source in
-    // control, in TEST, while armed and no bring-up case runs.
-    [[nodiscard]] virtual bool accepts_setpoint(ControlSource source) const = 0;
-
-    // Starts a bring-up case, from the source in control, in TEST, while armed.
-    virtual BringupStart request_bringup(ControlSource source, std::uint8_t bringup_case) = 0;
-
-    // `source` fell silent: a bring-up case it runs is aborted and the vehicle disarmed.
-    virtual void source_lost(ControlSource source) = 0;
-
-    // Reboots the board, or reboots it into the bootloader, from any source,
-    // while disarmed. The reply goes out before the board resets.
-    virtual RebootResult request_reboot(RebootAction action) = 0;
+// The setpoint levels of ADR-0003 built so far.
+enum class SetpointLevel : std::uint8_t {
+    DirectActuator,
+    BodyVelocity,
 };
+
+// Whether `mode` accepts setpoints at `level`.
+constexpr bool mode_accepts(Mode mode, SetpointLevel level)
+{
+    switch (mode) {
+    case Mode::Test:
+        return level == SetpointLevel::DirectActuator || level == SetpointLevel::BodyVelocity;
+    case Mode::Standby:
+        break;
+    }
+    return false;
+}
+
+// Setpoint arbitration (ADR-0005): whether a setpoint at `level` from
+// `source` counts, in `mode`, with `in_control` the source in control.
+// Whether it then drives anything is up to arming and the emergency stop.
+constexpr bool setpoint_accepted(Mode mode, ControlSource in_control, ControlSource source, SetpointLevel level)
+{
+    return source != no_source && source == in_control && mode_accepts(mode, level);
+}
 
 }  // namespace vk::core

@@ -93,6 +93,13 @@ public:
     // again on the next call.
     void send_pending(std::uint64_t now_us, FrameSink& sink, std::size_t max_frames);
 
+    // Sends the replies to the vehicle control requests the commander has
+    // answered since the last call (ControlHandler).
+    void send_answers(std::uint64_t now_us, FrameSink& sink);
+
+    // Tells the commander the peer fell silent.
+    void source_lost(std::uint64_t now_us);
+
     // Sends the result of a bring-up case this session started.
     bool send_bringup_result(const msg::BringupStatus& status, FrameSink& sink);
 

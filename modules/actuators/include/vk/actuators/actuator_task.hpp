@@ -6,9 +6,10 @@
 // parameters, drives each output's PWM and direction lines through the
 // output stage's slew limit (MOT_SLEWRATE), and publishes
 // wheel_encoders and actuator_outputs. Targets come from one of two setpoint
-// levels (ADR-0005): actuator_setpoint, the direct-actuator setpoints only
-// setpoint arbitration publishes, or actuator_demand, the control chain's
-// allocation of the body velocity setpoints arbitration accepted. The level
+// levels (ADR-0005): actuator_setpoint, the direct-actuator setpoints, of
+// which only those setpoint arbitration accepts count (core::setpoint_accepted,
+// judged on the newest vehicle_status), or actuator_demand, the control
+// chain's allocation of the body velocity setpoints it accepted. The level
 // whose setpoint was accepted last drives, never both. A setpoint counts
 // only when accepted since the vehicle last armed and since the emergency
 // stop was last released, so one left from before a disarm or an emergency
@@ -26,6 +27,7 @@
 #include <vk/actuators/actuator_control.hpp>
 #include <vk/actuators/bringup_case.hpp>
 #include <vk/core/bus.hpp>
+#include <vk/core/vehicle_control.hpp>
 #include <vk/core/work_queue.hpp>
 #include <vk/hal/actuator.hpp>
 #include <vk/msg/actuator_demand.hpp>
@@ -83,6 +85,8 @@ private:
     bool armed_ = false;
     std::uint64_t setpoints_from_us_ = 0;  // setpoints accepted before this do not count
     bool emergency_stop_ = false;
+    core::Mode mode_ = core::Mode::Standby;           // from vehicle_status, for setpoint arbitration
+    core::ControlSource in_control_ = core::no_source;
     std::uint64_t last_run_us_ = 0;
     std::array<float, max_outputs> applied_{};  // each output's duty last cycle, for the slew limit
 };
