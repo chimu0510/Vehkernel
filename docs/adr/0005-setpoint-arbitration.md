@@ -50,7 +50,7 @@ Some boards let the MCU read whether the actuators' power circuit is closed; on 
 
 Until the remote control is implemented, actuators may move only in test mode, under these conditions, which stand in for the RC takeover rule:
 
-- Only direct-actuator setpoints are accepted, as test mode always requires (ADR-0018).
+- Only direct-actuator and body velocity setpoints are accepted (ADR-0018). The two levels never drive at once: the newer one replaces the other until it times out. Body velocity goes through the control chain and the vehicle model (ADR-0013), and every condition below holds for it as for direct-actuator setpoints.
 - The emergency stop can be engaged from any connected Link.
 - Actuator output is capped by a parameter, low by default.
 - If the source in control times out, the failsafe action is stop and disarm; if no setpoint arrives within a set time after arming, or all targets stay zero for that time, the vehicle disarms as well.

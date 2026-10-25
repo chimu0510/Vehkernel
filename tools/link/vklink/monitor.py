@@ -658,6 +658,20 @@ class LinkMonitor:
         reported it armed; returns that vehicle_status, or None.
         """
         setpoint = self.messages.BY_NAME["actuator_setpoint"]
+        return self._send_setpoints("actuator_setpoint", setpoint(wheel_speed=tuple(wheel_speed)),
+                                    setpoint(wheel_speed=(math.nan,) * len(wheel_speed)), duration_s, rate_hz)
+
+    def drive_body(self, twist: tuple[float, float, float], duration_s: float,
+                   rate_hz: float = SETPOINT_RATE_HZ) -> object | None:
+        """Sends body_velocity_setpoint (vx, vy, yaw_rate) at `rate_hz` for
+        `duration_s`, then one with every field NaN; as drive()."""
+        setpoint = self.messages.BY_NAME["body_velocity_setpoint"]
+        vx, vy, yaw_rate = twist
+        return self._send_setpoints("body_velocity_setpoint", setpoint(vx=vx, vy=vy, yaw_rate=yaw_rate),
+                                    setpoint(vx=math.nan, vy=math.nan, yaw_rate=math.nan), duration_s, rate_hz)
+
+    def _send_setpoints(self, name: str, message: object, stop: object, duration_s: float,
+                        rate_hz: float) -> object | None:
         armed_seen = False
         disarmed = None
 
@@ -676,12 +690,12 @@ class LinkMonitor:
             next_send = 0.0
             while disarmed is None and (now := self.clock()) < end:
                 if now >= next_send:
-                    self.send_topic("actuator_setpoint", setpoint(wheel_speed=tuple(wheel_speed)))
+                    self.send_topic(name, message)
                     next_send = now + 1.0 / rate_hz
                 self.poll(min(next_send, end) - now)
         finally:
             self.listeners.remove(watch)
-        self.send_topic("actuator_setpoint", setpoint(wheel_speed=(math.nan,) * len(wheel_speed)))
+        self.send_topic(name, stop)
         return disarmed
 
     def latest(self, name: str) -> list[tuple[int, object]]:

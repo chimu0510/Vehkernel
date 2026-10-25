@@ -104,6 +104,15 @@ config ACTUATOR_CONTROL
 	  its defconfig once its platform implements the PWM output and
 	  quadrature encoder contracts.
 
+config CONTROL_CHAIN
+	bool "Control chain"
+	depends on ACTUATOR_CONTROL
+	default y
+	help
+	  The control chain above actuator control (ADR-0013): body velocity
+	  setpoints over a Link, allocated by the vehicle model selected at
+	  boot to a wheel speed target per output (spec 0009).
+
 config BRINGUP_MOTORS
 	bool "Motor-to-encoder bring-up case"
 	depends on ACTUATOR_CONTROL

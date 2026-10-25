@@ -32,6 +32,7 @@ ActuatorTask::ActuatorTask(const Config& config, core::WorkQueue& queue)
     : WorkItem("actuators", queue), config_(config), control_(config.channels.size())
 {
     setpoint_message_.wheel_speed.fill(std::numeric_limits<float>::quiet_NaN());
+    demand_message_.wheel_speed.fill(std::numeric_limits<float>::quiet_NaN());
 }
 
 void ActuatorTask::start()
@@ -70,11 +71,21 @@ void ActuatorTask::run()
     while (setpoint_.copy(setpoint_message_)) {
         // Only the newest counts.
     }
+    while (demand_.copy(demand_message_)) {
+    }
 
     std::array<float, max_outputs> targets{};
     targets.fill(std::numeric_limits<float>::quiet_NaN());
-    if (armed_ && setpoint_message_.timestamp >= setpoints_from_us_) {
-        targets = setpoint_message_.wheel_speed;
+    if (armed_) {
+        const bool direct = setpoint_message_.timestamp >= setpoints_from_us_;
+        const std::uint64_t body_at = demand_message_.timestamp_setpoint;
+        const bool body = body_at != 0 && body_at >= setpoints_from_us_;
+        // The level accepted last drives.
+        if (body && (!direct || body_at > setpoint_message_.timestamp)) {
+            targets = demand_message_.wheel_speed;
+        } else if (direct) {
+            targets = setpoint_message_.wheel_speed;
+        }
     }
     std::array<std::uint16_t, max_outputs> counts{};
     for (std::size_t i = 0; i < control_.size(); ++i) {

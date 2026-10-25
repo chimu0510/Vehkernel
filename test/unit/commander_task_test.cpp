@@ -2,18 +2,23 @@
 // The commander work item's reboot service on a fake clock (ADR-0023): a
 // reboot is refused while armed, happens reboot_delay_us after it is
 // accepted so the reply leaves first, and arming is refused meanwhile. And
-// the reset cause it publishes on vehicle_status (ADR-0005).
+// the reset cause it publishes on vehicle_status (ADR-0005). And both
+// setpoint levels, direct-actuator and body velocity, keeping the setpoint
+// timeout and the idle disarm (ADR-0005).
 #include <vk/commander/commander_task.hpp>
 #include <vk/core/bus.hpp>
 #include <vk/core/fault.hpp>
 #include <vk/core/vehicle_control.hpp>
 #include <vk/core/work_queue.hpp>
 #include <vk/hal/reset.hpp>
+#include <vk/msg/actuator_setpoint.hpp>
+#include <vk/msg/body_velocity_setpoint.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_status.hpp>
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -50,6 +55,9 @@ protected:
         fake_now = 1'000'000;
         resets.clear();
         task.start();
+        // The bus outlives each test: replace what earlier tests left on the setpoints.
+        body.publish(vk::msg::BodyVelocitySetpoint{.timestamp = 0, .vx = NAN, .vy = NAN, .yaw_rate = NAN});
+        direct.publish(vk::msg::ActuatorSetpoint{.timestamp = 0, .wheel_speed = {NAN, NAN, NAN, NAN}});
         imu.publish(vk::msg::ImuSample{.timestamp = fake_now});  // the IMU answered: the board verifies
         step(interval_us);
     }
@@ -70,7 +78,19 @@ protected:
     }
 
     vk::core::WorkQueue queue{"wq:test", 1, &fake_clock};
+    // Sends a body velocity setpoint every control cycle for `duration_us`, as
+    // setpoint arbitration publishes them, stamped when accepted.
+    void send_body(float vx, float yaw_rate, std::uint64_t duration_us)
+    {
+        for (const std::uint64_t end = fake_now + duration_us; fake_now < end;) {
+            body.publish(vk::msg::BodyVelocitySetpoint{.timestamp = fake_now, .vx = vx, .vy = 0.0F, .yaw_rate = yaw_rate});
+            step(interval_us);
+        }
+    }
+
     vk::core::Publication<vk::msg::ImuSample> imu{0};
+    vk::core::Publication<vk::msg::BodyVelocitySetpoint> body{0};
+    vk::core::Publication<vk::msg::ActuatorSetpoint> direct{0};
     CommanderTask task{{.interval_us = interval_us, .actuators_started = true, .reset = &fake_reset}, queue};
 };
 
@@ -152,3 +172,39 @@ TEST(CommanderTaskAfterAFault, PublishesTheResetCauseAndRefusesArming)
 }
 
 }  // namespace
+
+TEST_F(CommanderTaskTest, BodyVelocitySetpointsKeepTheVehicleArmedAndTimeOut)
+{
+    arm();
+    send_body(0.5F, 0.0F, 1'000'000);
+    EXPECT_TRUE(task.armed());
+    // They stop: after COM_SP_TIMEOUT (0.5 s) the vehicle disarms for it.
+    step(400'000);
+    EXPECT_TRUE(task.armed());
+    step(200'000);
+    EXPECT_FALSE(task.armed());
+    vk::msg::VehicleStatus status{};
+    vk::core::Subscription<vk::msg::VehicleStatus> statuses{0};
+    ASSERT_TRUE(statuses.copy(status));
+    EXPECT_EQ(status.disarm_reason, static_cast<std::uint8_t>(vk::core::DisarmReason::SetpointTimeout));
+}
+
+TEST_F(CommanderTaskTest, TheLevelAcceptedLastDecidesWhetherTheTargetsAreIdle)
+{
+    arm();
+    // A zero body velocity after a moving direct-actuator setpoint is idle:
+    // the vehicle disarms after COM_DISARM_IDLE (10 s) of it.
+    direct.publish(vk::msg::ActuatorSetpoint{.timestamp = fake_now, .wheel_speed = {5.0F, 5.0F, NAN, NAN}});
+    step(interval_us);
+    send_body(0.0F, 0.0F, 9'000'000);
+    EXPECT_TRUE(task.armed());
+    send_body(0.0F, 0.0F, 1'100'000);
+    EXPECT_FALSE(task.armed());
+}
+
+TEST_F(CommanderTaskTest, ATurnInPlaceIsNotIdle)
+{
+    arm();
+    send_body(0.0F, 1.0F, 10'500'000);
+    EXPECT_TRUE(task.armed());
+}

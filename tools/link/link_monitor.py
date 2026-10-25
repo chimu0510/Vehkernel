@@ -35,7 +35,10 @@ unless every output passes.
 drive requests TEST and arming if needed, sends one wheel speed per actuator
 output (rad/s, nan leaves an output uncontrolled) at 20 Hz for the duration,
 then all NaN, and disarms; it prints the wheel speeds reached and exits
-non-zero when the vehicle disarms on the way.
+non-zero when the vehicle disarms on the way. drive-body does the same with a
+body velocity (spec 0009): forward and right speed in m/s and yaw rate in
+rad/s, positive turning right, which the control chain allocates to the
+wheels.
 
     link_monitor.py --udp 127.0.0.1:15600 param list
     link_monitor.py --udp 127.0.0.1:15600 param set ATT_KP 2.5
@@ -46,11 +49,13 @@ non-zero when the vehicle disarms on the way.
     link_monitor.py --serial /dev/ttyACM0 reboot --bootloader
     link_monitor.py --udp 127.0.0.1:15600 drive 10,10,10,10 --duration 3
     link_monitor.py --udp 127.0.0.1:15600 drive --duration 2 -- -5,nan,nan,nan
+    link_monitor.py --udp 127.0.0.1:15600 drive-body 0.3,0,0.5 --duration 3
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import shutil
 import sys
@@ -129,6 +134,16 @@ def parse_speeds(text: str) -> tuple[float, ...]:
     if len(speeds) != 4:
         raise argparse.ArgumentTypeError(f"expected four wheel speeds <w1>,<w2>,<w3>,<w4> in rad/s, got '{text}'")
     return speeds
+
+
+def parse_twist(text: str) -> tuple[float, float, float]:
+    try:
+        twist = tuple(float(value) for value in text.split(","))
+    except ValueError:
+        twist = ()
+    if len(twist) != 3 or not all(math.isfinite(value) for value in twist):
+        raise argparse.ArgumentTypeError(f"expected a body velocity <vx>,<vy>,<yaw_rate> in m/s and rad/s, got '{text}'")
+    return twist
 
 
 def parse_duration(text: str) -> float:
@@ -278,10 +293,11 @@ def run_control(monitor: LinkMonitor, args: argparse.Namespace) -> int:
 
 
 def run_drive(monitor: LinkMonitor, args: argparse.Namespace) -> int:
-    """The drive command, once the handshake is done."""
+    """The drive and drive-body commands, once the handshake is done."""
     test = next(number for number, name in MODES.items() if name == "TEST")
-    if "actuator_setpoint" not in monitor.session.peer_topics_by_name:
-        print("FAIL: the MCU does not offer actuator_setpoint", file=sys.stderr)
+    topic = "body_velocity_setpoint" if args.command == "drive-body" else "actuator_setpoint"
+    if topic not in monitor.session.peer_topics_by_name:
+        print(f"FAIL: the MCU does not offer {topic}", file=sys.stderr)
         return 1
     for command, request in (("mode", lambda: monitor.request_mode(test, PARAM_TIMEOUT_S)),
                              ("arm", lambda: monitor.request_arming(True, PARAM_TIMEOUT_S))):
@@ -297,7 +313,10 @@ def run_drive(monitor: LinkMonitor, args: argparse.Namespace) -> int:
         print(f"warning: arming checks skipped: {', '.join(skipped)}", file=sys.stderr)
 
     try:
-        disarmed = monitor.drive(args.speeds, args.drive_duration)
+        if args.command == "drive-body":
+            disarmed = monitor.drive_body(args.twist, args.drive_duration)
+        else:
+            disarmed = monitor.drive(args.speeds, args.drive_duration)
         encoders = monitor.latest("wheel_encoders")
     finally:
         # Disarm whatever happened, an interrupt included.
@@ -360,6 +379,13 @@ def main() -> int:
                        help="wheel speeds in rad/s by output number, nan for none; put -- before a negative first one")
     drive.add_argument("--duration", dest="drive_duration", type=parse_duration, required=True, metavar="SECONDS",
                        help="seconds to send the setpoints")
+    drive_body = commands.add_parser("drive-body", help="arm and drive the vehicle by body velocity for a while, "
+                                                      "then disarm")
+    drive_body.add_argument("twist", type=parse_twist, metavar="VX,VY,YAW_RATE",
+                            help="forward and right speed in m/s and yaw rate in rad/s, positive turning right; "
+                                 "put -- before a negative first one")
+    drive_body.add_argument("--duration", dest="drive_duration", type=parse_duration, required=True,
+                            metavar="SECONDS", help="seconds to send the setpoints")
     args = parser.parse_args()
 
     metadata = None
@@ -394,7 +420,7 @@ def main() -> int:
             return 1
         if args.command == "param":
             return run_param(monitor, args, metadata)
-        if args.command == "drive":
+        if args.command in ("drive", "drive-body"):
             return run_drive(monitor, args)
         if args.command == "bringup":
             return run_bringup(monitor, args)

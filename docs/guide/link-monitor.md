@@ -105,6 +105,6 @@ The hardware check of the parameters (L4): set `ATT_KP` and `SENS_BOARD_ROT`, po
 | Command | Guide |
 |---|---|
 | `param list`, `param get <name>`, `param set <name> <value>` | [Parameters](#parameters) |
-| `mode`, `arm`, `disarm`, `estop`, `drive`, `bringup motors`, `sim-power` | [Driving the wheels](driving.md) |
+| `mode`, `arm`, `disarm`, `estop`, `drive`, `drive-body`, `bringup motors`, `sim-power` | [Driving the wheels](driving.md) |
 | `key short\|long\|hold <seconds>` | [Local display](local-display.md) |
 | `reboot`, `reboot --bootloader` | [Flashing](flashing.md#rebooting-into-the-bootloader) |
