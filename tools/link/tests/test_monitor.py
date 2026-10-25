@@ -227,13 +227,16 @@ def test_only_losses_and_drops_after_the_handshake_count():
 
 
 
-def work_item_reports(*reports):
-    """WorkItemOverruns fed one report a second, each a {name: overruns} map."""
+def work_item_reports(*reports, rates=None):
+    """WorkItemOverruns fed one report a second, each a {name: overruns} map;
+    `rates` gives each work item's runs a second (none: every one 200)."""
     tracker = WorkItemOverruns()
     for second, report in enumerate(reports):
         for index, (name, overruns) in enumerate(report.items()):
+            runs = second * (rates or {}).get(name, 200)
             tracker.record(types.SimpleNamespace(timestamp=second * 1_000_000, work_item=index,
-                                                 name=tuple(name.encode().ljust(16, b"\0")), overruns=overruns))
+                                                 name=tuple(name.encode().ljust(16, b"\0")), overruns=overruns,
+                                                 runs=runs))
     return tracker
 
 
@@ -244,6 +247,23 @@ def test_work_item_overruns_set_aside_a_stall_of_the_whole_process():
                                 {"imu": 8, "ctrl": 8, "act": 9, "link": 9, "est": 0, "timing": 0},
                                 {"imu": 8, "ctrl": 8, "act": 9, "link": 9, "est": 0, "timing": 0})
     assert tracker.judge() == ({"imu": 0, "ctrl": 0, "act": 0, "link": 0, "est": 0, "timing": 0}, 1)
+
+
+def test_work_item_overruns_judge_a_stall_among_the_work_items_at_the_base_rate():
+    # Four periodic items at 200 Hz overran together; four slow ones (10 and
+    # 1 Hz) could not have. Among all ten that is fewer than half, but among
+    # the six at the base rate, two of them triggered, it is most: a stall.
+    slow = {"menu": 0, "display": 0, "storage": 0, "timing": 0}
+    rates = {"menu": 100, "display": 20, "storage": 20, "timing": 1}
+    tracker = work_item_reports({"imu": 0, "ctrl": 0, "act": 0, "link": 0, "est": 0, "odom": 0, **slow},
+                                {"imu": 1, "ctrl": 1, "act": 1, "link": 1, "est": 0, "odom": 0, **slow},
+                                rates=rates)
+    assert tracker.judge() == (dict.fromkeys(["imu", "ctrl", "act", "link", "est", "odom", *slow], 0), 1)
+    # One base-rate item alone still counts.
+    tracker = work_item_reports({"imu": 0, "ctrl": 0, "act": 0, "link": 0, "est": 0, "odom": 0, **slow},
+                                {"imu": 0, "ctrl": 1, "act": 0, "link": 0, "est": 0, "odom": 0, **slow},
+                                rates=rates)
+    assert tracker.judge()[0]["ctrl"] == 1
 
 
 def test_work_item_overruns_count_a_few_work_items_overrunning_alone():
