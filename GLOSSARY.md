@@ -373,7 +373,11 @@ The last of the three Kconfig layers, after the SoC defaults and the board defau
 _Avoid_: product config, frame overlay
 
 **Test Mode**:
-A mode in which the test runner on the development host is in control, accepting only direct-actuator setpoints, used for bring-up cases and actuator tests.
+A mode in which the test runner on the development host is in control, accepting direct-actuator and body velocity setpoints, used for bring-up cases and actuator tests; it is entered only while disarmed.
+
+**Manual Mode**:
+A mode in which the remote control is in control and drives the vehicle by body velocity; the remote control can enter it at any time, armed or not, which is how it takes over.
+_Avoid_: RC mode, joystick mode
 
 ### Software layers
 

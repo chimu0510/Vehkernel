@@ -102,7 +102,7 @@ void CommanderTask::handle(std::uint64_t now_us, const msg::VehicleCommand& comm
     ack.command = command.command;
     switch (static_cast<core::Command>(command.command)) {
     case core::Command::Mode: {
-        const bool known = command.argument <= static_cast<std::uint8_t>(core::Mode::Test);
+        const bool known = core::known_mode(command.argument);
         ack.result = static_cast<std::uint8_t>(
             known ? commander_.request_mode(now_us, command.source, static_cast<core::Mode>(command.argument))
                   : core::ModeResult::UnknownMode);

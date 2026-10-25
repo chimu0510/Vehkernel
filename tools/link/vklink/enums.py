@@ -27,7 +27,7 @@ class ArmingResult(enum.IntEnum):
     OK = 0
     BOARD_NOT_VERIFIED = 1  # ADR-0010
     EMERGENCY_STOP = 2  # engaged
-    WRONG_MODE = 3  # only TEST can be armed for now
+    WRONG_MODE = 3  # this mode cannot be armed
     NOT_IN_CONTROL = 4  # the request did not come from the source in control
     SETPOINTS_ACTIVE = 5  # a setpoint is neither NaN nor zero
     BRINGUP_RUNNING = 6
@@ -36,6 +36,8 @@ class ArmingResult(enum.IntEnum):
     LOCAL_MENU_OPEN = 9  # ADR-0022
     REBOOTING = 10  # a reboot was accepted and is about to happen
     UNEXPECTED_RESET = 11  # the last reset was a watchdog or fault reset (ADR-0005)
+    RC_NOT_CONNECTED = 12  # MANUAL: the remote control is not connected
+    STICKS_NOT_CENTRED = 13  # MANUAL: a stick is off centre
 
 
 class BringupCase(enum.IntEnum):
@@ -152,14 +154,16 @@ class Mode(enum.IntEnum):
 
     STANDBY = 0  # no source in control; nothing can be armed
     TEST = 1  # the development host in control, direct-actuator and body velocity setpoints (ADR-0018)
+    MANUAL = 2  # the remote control in control, body velocity setpoints from it only
 
 
 class ModeResult(enum.IntEnum):
     """Why a mode request was refused."""
 
     OK = 0
-    ARMED = 1  # the mode changes only while disarmed
+    ARMED = 1  # this mode can be entered only while disarmed
     UNKNOWN_MODE = 2
+    WRONG_SOURCE = 3  # this mode cannot be requested by this source
 
 
 class ParamResult(enum.IntEnum):

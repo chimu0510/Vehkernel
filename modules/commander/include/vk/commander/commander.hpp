@@ -3,8 +3,13 @@
 // stop, as a state machine with no bus, no FreeRTOS and no hardware, so it
 // runs on the development host in tests. CommanderTask runs it as a work item.
 //
-// The vehicle boots in STANDBY. A mode changes only while disarmed; entering
-// TEST makes the requesting source the source in control. An arm request
+// The vehicle boots in STANDBY. Each mode's rules (core::mode_rules) say
+// which sources may request it, whether it can be entered while armed and
+// whether it can be armed: TEST only while disarmed and from a Link, MANUAL
+// at any time and from the remote control only, which then takes over at
+// once, armed or not. Entering a mode other than STANDBY makes the
+// requesting source the source in control. Arming in MANUAL also needs the
+// remote control connected with its sticks centred. An arm request
 // passes the arming checks in the order of ArmingResult; the checks of
 // hardware state (only actuator power so far) are skipped by clearing their
 // bit in COM_ARM_CHECK.
@@ -54,6 +59,8 @@ struct Inputs {
     bool bringup_running = false;
     bool bringup_available = false;             // the bring-up case is built in
     bool local_menu_open = false;               // the local menu is open (ADR-0022)
+    bool remote_control_connected = false;      // a remote control reports
+    bool sticks_centred = false;                // its sticks are inside the deadband
     std::uint64_t last_setpoint_us = 0;         // when the last setpoint was accepted, 0 for never
     std::uint32_t output_watchdog_trips = 0;    // times the platform's output watchdog turned the outputs off
     core::ResetReport reset_report{};           // what caused the last reset, read at boot

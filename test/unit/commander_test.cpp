@@ -391,3 +391,97 @@ TEST_F(CommanderTest, ReportsTheOutputWatchdogTrips)
 }
 
 }  // namespace
+
+// --- Per-mode rules and MANUAL (spec 0010, #82) ---
+
+namespace {
+
+using vk::core::remote_control;
+
+TEST_F(CommanderTest, EachModeTakesRequestsOnlyFromItsSources)
+{
+    step(Commander::power_settle_us + cycle_us);
+    EXPECT_EQ(commander.request_mode(now, link0, Mode::Manual), ModeResult::WrongSource);
+    EXPECT_EQ(commander.request_mode(now, remote_control, Mode::Test), ModeResult::WrongSource);
+    EXPECT_EQ(commander.state().mode, Mode::Standby);
+    EXPECT_EQ(commander.request_mode(now, remote_control, Mode::Manual), ModeResult::Ok);
+    EXPECT_EQ(commander.state().source, remote_control);
+    EXPECT_EQ(commander.request_mode(now, link0, Mode::Standby), ModeResult::Ok);
+    EXPECT_EQ(commander.state().source, vk::core::no_source);
+}
+
+TEST_F(CommanderTest, TestIsEnteredOnlyWhileDisarmed)
+{
+    arm();
+    EXPECT_EQ(commander.request_mode(now, link1, Mode::Test), ModeResult::Armed);
+    EXPECT_EQ(commander.request_mode(now, link0, Mode::Standby), ModeResult::Armed);
+    EXPECT_EQ(commander.request_mode(now, link0, Mode::Test), ModeResult::Ok) << "unchanged: not refused";
+    EXPECT_EQ(commander.state().source, link0);
+}
+
+TEST_F(CommanderTest, TheRemoteControlTakesOverWhileArmed)
+{
+    arm();
+    EXPECT_EQ(commander.request_mode(now, remote_control, Mode::Manual), ModeResult::Ok);
+    EXPECT_TRUE(commander.state().armed) << "taking over does not disarm";
+    EXPECT_EQ(commander.state().mode, Mode::Manual);
+    EXPECT_EQ(commander.state().source, remote_control);
+    // The Link's setpoints no longer count; the remote control's body velocity does.
+    EXPECT_FALSE(commander.accepts_setpoint(link0, vk::core::SetpointLevel::DirectActuator));
+    EXPECT_FALSE(commander.accepts_setpoint(link0, vk::core::SetpointLevel::BodyVelocity));
+    EXPECT_FALSE(commander.accepts_setpoint(remote_control, vk::core::SetpointLevel::DirectActuator));
+    EXPECT_TRUE(commander.accepts_setpoint(remote_control, vk::core::SetpointLevel::BodyVelocity));
+    // Back to TEST only once disarmed.
+    EXPECT_EQ(commander.request_mode(now, link0, Mode::Test), ModeResult::Armed);
+}
+
+TEST_F(CommanderTest, TakingOverRestartsTheSetpointTimeoutForTheNewSource)
+{
+    arm();
+    inputs.last_setpoint_us = now;
+    inputs.setpoints_idle = false;
+    step(400'000);
+    ASSERT_EQ(commander.request_mode(now, remote_control, Mode::Manual), ModeResult::Ok);
+    // 0.4 s of the old source's silence do not count against the new one.
+    step(300'000);
+    EXPECT_TRUE(commander.state().armed);
+    step(300'000);
+    EXPECT_FALSE(commander.state().armed);
+    EXPECT_EQ(commander.state().disarm_reason, DisarmReason::SetpointTimeout);
+}
+
+TEST_F(CommanderTest, TakingOverEndsABringupCaseWithADisarm)
+{
+    arm();
+    inputs.bringup_running = true;
+    step();
+    EXPECT_EQ(commander.request_mode(now, remote_control, Mode::Manual), ModeResult::Ok);
+    EXPECT_FALSE(commander.state().armed);
+    EXPECT_EQ(commander.state().disarm_reason, DisarmReason::BringupAbort);
+    EXPECT_EQ(commander.state().mode, Mode::Manual);
+}
+
+TEST_F(CommanderTest, ArmingInManualNeedsTheRemoteControlReadyAndInControl)
+{
+    step(Commander::power_settle_us + cycle_us);
+    ASSERT_EQ(commander.request_mode(now, remote_control, Mode::Manual), ModeResult::Ok);
+    EXPECT_EQ(commander.request_arming(now, link0, true), ArmingResult::NotInControl);
+    EXPECT_EQ(commander.request_arming(now, remote_control, true), ArmingResult::RcNotConnected);
+    inputs.remote_control_connected = true;
+    step();
+    EXPECT_EQ(commander.request_arming(now, remote_control, true), ArmingResult::SticksNotCentred);
+    inputs.sticks_centred = true;
+    step();
+    EXPECT_EQ(commander.request_arming(now, remote_control, true), ArmingResult::Ok);
+    // Disarming is accepted from any source.
+    EXPECT_EQ(commander.request_arming(now, link0, false), ArmingResult::Ok);
+    EXPECT_FALSE(commander.state().armed);
+}
+
+TEST_F(CommanderTest, TestNeedsNoRemoteControl)
+{
+    arm();  // inputs.remote_control_connected is false
+    EXPECT_TRUE(commander.state().armed);
+}
+
+}  // namespace
