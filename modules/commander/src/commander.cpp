@@ -55,16 +55,32 @@ void Commander::update(std::uint64_t now_us, const Inputs& inputs, const Setting
     }
 }
 
-core::ModeResult Commander::request_mode(std::uint64_t /*now_us*/, core::ControlSource source, core::Mode mode)
+core::ModeResult Commander::request_mode(std::uint64_t now_us, core::ControlSource source, core::Mode mode)
 {
-    if (mode != core::Mode::Standby && mode != core::Mode::Test) {
+    if (!core::known_mode(static_cast<std::uint8_t>(mode))) {
         return core::ModeResult::UnknownMode;
     }
-    const core::ControlSource in_control = mode == core::Mode::Test ? source : core::no_source;
+    if (!core::may_request(mode, source)) {
+        return core::ModeResult::WrongSource;
+    }
+    const core::ControlSource in_control = mode == core::Mode::Standby ? core::no_source : source;
     if (state_.armed) {
         // A repeated request changes nothing, so it is not refused.
         const bool unchanged = mode == state_.mode && in_control == state_.source;
-        return unchanged ? core::ModeResult::Ok : core::ModeResult::Armed;
+        if (unchanged) {
+            return core::ModeResult::Ok;
+        }
+        if (!core::mode_rules(mode).enter_while_armed) {
+            return core::ModeResult::Armed;
+        }
+        // Taking over while armed (ADR-0005): the new source is in control at
+        // once, and its setpoints, not the old source's, keep the timeout.
+        // A bring-up case drives the outputs open loop, so it ends with a
+        // disarm rather than run on under the new source.
+        timeout_from_us_ = now_us;
+        if (inputs_.bringup_running) {
+            disarm(core::DisarmReason::BringupAbort);
+        }
     }
     state_.mode = mode;
     state_.source = in_control;
@@ -146,11 +162,18 @@ core::ArmingResult Commander::arming_check(std::uint64_t now_us, core::ControlSo
     if (state_.emergency_stop) {
         return core::ArmingResult::EmergencyStop;
     }
-    if (state_.mode != core::Mode::Test) {
+    const core::ModeRules rules = core::mode_rules(state_.mode);
+    if (!rules.armable) {
         return core::ArmingResult::WrongMode;
     }
     if (source != state_.source) {
         return core::ArmingResult::NotInControl;
+    }
+    if (rules.needs_remote_control && !inputs_.remote_control_connected) {
+        return core::ArmingResult::RcNotConnected;
+    }
+    if (rules.needs_remote_control && !inputs_.sticks_centred) {
+        return core::ArmingResult::SticksNotCentred;
     }
     const bool current = inputs_.last_setpoint_us != 0 &&
                          now_us - inputs_.last_setpoint_us <= to_us(settings_.setpoint_timeout_s);

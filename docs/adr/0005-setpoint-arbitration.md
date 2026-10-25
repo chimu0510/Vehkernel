@@ -2,7 +2,7 @@
 
 Several sources may send setpoints at the same time: the companion computer, the remote control, a ground station, and in test mode the test runner on the development host (ADR-0018). Instead of a fixed source priority, the current mode decides which source is in control, as with PX4's offboard mode. A mode decides two things: which source is in control, and which setpoint levels that source may use (ADR-0003). In companion mode, for example, only setpoints from the Bridge are accepted, at any of the three levels; the RC manual mode accepts only body velocity. Direct actuator is a setpoint level, not a mode.
 
-At boot the vehicle is in `STANDBY`, where no source is in control and nothing can be armed. For now the mode can change only while disarmed; see **Modes while armed** below for what changes when the remote control and companion mode arrive. The source in control is the Link (or, later, the remote control or the Bridge) that requested the mode; setpoints from any other source are dropped and counted (see **Requests and setpoint arbitration on the bus**).
+At boot the vehicle is in `STANDBY`, where no source is in control and nothing can be armed. Whether a mode can be entered while armed is the mode's own rule; see **Modes while armed** below. The source in control is the Link (or, later, the remote control or the Bridge) that requested the mode; setpoints from any other source are dropped and counted (see **Requests and setpoint arbitration on the bus**).
 
 Two rules apply regardless of mode:
 
@@ -57,13 +57,19 @@ Until the remote control is implemented, actuators may move only in test mode, u
 
 When the remote control exists these conditions stay; it adds a takeover path, it does not replace them.
 
-**Modes while armed (decided, built with the remote control or companion mode)**
+**Modes while armed**
 
-The rule that the mode changes only while disarmed holds while `STANDBY` and `TEST` are the only modes. Once the remote control and companion mode exist, taking over means switching modes while armed, and a failsafe action is usually a mode too, so the rule becomes per mode, as in ArduPilot (`Rover::set_mode()` asks each mode's `enter()`) and PX4 (per-mode `can_run` checks):
+A global rule that the mode changes only while disarmed would contradict the remote control's takeover, and a failsafe action is usually a mode too, so the rule is per mode, as in ArduPilot (`Rover::set_mode()` asks each mode's `enter()`) and PX4 (per-mode `can_run` checks). Each mode declares, in one table every consumer shares (`core::mode_rules`), whether it can be armed, whether it may be entered while armed, which sources may request it and so be in control in it, the setpoint levels it accepts, and its extra arming checks:
 
-- Each mode declares whether it may be entered while armed, and what it needs: the source in control, the setpoint levels it accepts and the estimator health it requires.
-- `TEST` is still entered only while disarmed.
-- The remote control can always switch to its manual mode or engage the emergency stop, and a failsafe can always switch to its action, whatever the current mode allows.
+| Mode | Armable | Entered while armed | Requested by | Setpoint levels | Extra arming checks |
+|---|---|---|---|---|---|
+| `STANDBY` | no | no | any source | none | |
+| `TEST` | yes | no | a Link | direct actuator, body velocity | |
+| `MANUAL` | yes | yes | the remote control | body velocity | the remote control connected, its sticks centred |
+
+- Entering a mode other than `STANDBY` makes the requesting source the source in control. Entering `MANUAL` while armed takes over at once without disarming; the setpoint timeout then counts from the takeover, so the old source's silence is not held against the new one. A bring-up case running at that moment ends with a disarm, since it drives the outputs open loop.
+- The remote control can always switch to `MANUAL` or engage the emergency stop, whatever the current mode allows; a failsafe action that is a mode will be allowed the same way when one exists.
+- A mode needing estimator health declares it here when one does.
 
 **Requests and setpoint arbitration on the bus**
 

@@ -5,7 +5,7 @@
 OK = 0                     @short -
 BOARD_NOT_VERIFIED = 1     @short BOARD       # ADR-0010
 EMERGENCY_STOP = 2         @short ESTOP       # engaged
-WRONG_MODE = 3                                # only TEST can be armed for now
+WRONG_MODE = 3                                # this mode cannot be armed
 NOT_IN_CONTROL = 4         @short NO_CONTROL  # the request did not come from the source in control
 SETPOINTS_ACTIVE = 5       @short SETPOINTS   # a setpoint is neither NaN nor zero
 BRINGUP_RUNNING = 6        @short BRINGUP
@@ -14,3 +14,5 @@ ACTUATORS_NOT_STARTED = 8  @short ACTUATORS
 LOCAL_MENU_OPEN = 9        @short MENU_OPEN   # ADR-0022
 REBOOTING = 10                                # a reboot was accepted and is about to happen
 UNEXPECTED_RESET = 11      @short RESET       # the last reset was a watchdog or fault reset (ADR-0005)
+RC_NOT_CONNECTED = 12      @short RC          # MANUAL: the remote control is not connected
+STICKS_NOT_CENTRED = 13    @short STICKS      # MANUAL: a stick is off centre

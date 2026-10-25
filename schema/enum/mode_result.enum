@@ -2,5 +2,6 @@
 # Why a mode request was refused.
 @type uint8
 OK = 0
-ARMED = 1                         # the mode changes only while disarmed
+ARMED = 1                         # this mode can be entered only while disarmed
 UNKNOWN_MODE = 2
+WRONG_SOURCE = 3                  # this mode cannot be requested by this source
