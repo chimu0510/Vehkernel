@@ -54,7 +54,7 @@
 | `tools/bootloader/` | ArduPilot's `uploader.py`, pinned, and the script listing upstream bootloader changes | 0023 |
 | `tools/bringup/` | Bring-up runner for the hardware cases over SWD | 0018 |
 | `app/` | Entry points: firmware image and SITL executable | 0017 |
-| `third_party/` | Pinned submodules: FreeRTOS kernel, CMSIS core, STM32F4 device headers and LL drivers | 0004, 0016 |
+| `external/` | External code, pinned as git submodules: FreeRTOS kernel, CMSIS core, STM32F4 device headers and LL drivers. A tool's own pinned external files sit beside it, as `tools/bootloader/external/` | 0004, 0016 |
 | `bridge/` | ROS2 Bridge for the companion computer; a placeholder, nothing is built yet | 0002, 0003 |
 | `sim/` | SITL's simulated devices (ICM20948 with motion profiles, SSD1306, NOR Flash, motors and encoders); the built-in vehicle simulator and the external simulator interface come later | 0018 |
 | `test/` | `unit/` (L1), `sitl/` (L3), `hardware/` (the L4 bring-up image), `cmake/` (build system checks); `replay/` (L2) and `ros2/` (L5) are placeholders. L0 static checks run from root config files and CI | 0018 |

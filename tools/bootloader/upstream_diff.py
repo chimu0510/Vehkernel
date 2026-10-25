@@ -4,7 +4,7 @@
 
 The bootloader ports the structure of ArduPilot's Tools/AP_Bootloader and
 libraries/AP_CheckFirmware at the commit in bootloader/UPSTREAM, and
-tools/bootloader/third_party/uploader.py is ArduPilot's Tools/scripts/uploader.py
+tools/bootloader/external/uploader.py is ArduPilot's Tools/scripts/uploader.py
 at the same commit. Given an ArduPilot checkout, this lists every commit since
 then that touches those paths, with the files each changed, so the port can
 adopt those that change the protocol, the boot decision or the descriptor.

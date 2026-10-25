@@ -4,7 +4,7 @@
 
 The SITL bootloader serves the bootloader protocol on a pty, over a file
 standing for the FIRMWARE region. The pinned uploader.py
-(tools/bootloader/third_party) flashes .apj files built the way the firmware
+(tools/bootloader/external) flashes .apj files built the way the firmware
 build builds them (tools/firmware/finalize_image.py):
 
 1. An image for the board flashes, verifies and starts.
@@ -33,7 +33,7 @@ import tty
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-UPLOADER = REPO / "tools" / "bootloader" / "third_party" / "uploader.py"
+UPLOADER = REPO / "tools" / "bootloader" / "external" / "uploader.py"
 # uploader.py runs through the flasher's launcher, as tools/flash/flash_serial.py runs it (#92).
 RUN_UPLOADER = REPO / "tools" / "flash" / "run_uploader.py"
 sys.path.insert(0, str(REPO / "tools" / "firmware"))

@@ -2,7 +2,7 @@
 
 ## Development environment
 
-The development environment is [`.devcontainer/`](../../.devcontainer/); every tool that affects build output is pinned ([ADR-0016](../adr/0016-dependency-policy.md)). Third-party C code (FreeRTOS, CMSIS, ST LL) is pinned as git submodules under `third_party/`, so clone with `git clone --recurse-submodules`, or run `git submodule update --init` in an existing clone. Open the repo with VS Code Dev Containers or the `devcontainer` CLI.
+The development environment is [`.devcontainer/`](../../.devcontainer/); every tool that affects build output is pinned ([ADR-0016](../adr/0016-dependency-policy.md)). Third-party C code (FreeRTOS, CMSIS, ST LL) is pinned as git submodules under `external/`, so clone with `git clone --recurse-submodules`, or run `git submodule update --init` in an existing clone. Open the repo with VS Code Dev Containers or the `devcontainer` CLI.
 
 Tools that need the development host's USB devices run on the host, outside the devcontainer, at these versions:
 

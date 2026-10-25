@@ -48,7 +48,7 @@ from datetime import datetime
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-UPLOADER = REPO / "tools" / "bootloader" / "third_party" / "uploader.py"
+UPLOADER = REPO / "tools" / "bootloader" / "external" / "uploader.py"
 LINK_MONITOR = REPO / "tools" / "link" / "link_monitor.py"
 # Runs uploader.py with the port's DTR and RTS released, so BOOT0 stays low (#92).
 RUN_UPLOADER = Path(__file__).resolve().parent / "run_uploader.py"
