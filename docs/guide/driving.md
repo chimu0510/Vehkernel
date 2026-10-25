@@ -31,6 +31,21 @@ bringup output=1 result=pass encoder=1 sign=+1
 bringup output=2 result=reversed encoder=2 sign=-1  fix: set MOT2_REV=REVERSED if the wheel turned backwards, MOT2_ENC_REV=REVERSED if it turned forwards
 ```
 
+## Vehicle description
+
+The vehicle model turns a body motion demand into wheel speeds, and the wheel speeds back into the body velocity (ADR-0013). Parameters describe the vehicle; all are `reboot_required`, read once at boot, when the model is selected:
+
+| Parameter | Meaning |
+|---|---|
+| `VEHICLE_TYPE` | The environment: `GROUND` |
+| `FRAME_CLASS` | The allocation math, which selects the vehicle model: `WHEELED` |
+| `FRAME_TYPE` | The geometry: `DIFF_2WD` (a left and a right wheel) or `SKID_4WD` (a front and a rear pair, skid-steered) |
+| `WHL_RADIUS`, `WHL_TRACK` | The wheel radius and the track width, in metres |
+| `WHL_LEFT_OUT`, `WHL_RIGHT_OUT` | The output that drives the left and the right wheel; the front pair for `SKID_4WD` |
+| `WHL_REAR_L_OUT`, `WHL_REAR_R_OUT` | The output of each rear wheel, `SKID_4WD` only |
+
+Outputs the frame does not use stay uncontrolled. A description no compiled-in model can drive, such as two wheels on one output, selects no model. Only frame classes and types whose model is compiled in (Kconfig `VEHICLE_MODEL_*`) are offered. The body frame is x forward, y right and z down, so a positive yaw rate turns right: on `DIFF_2WD` the left wheel then runs faster than the right by `yaw rate × WHL_TRACK / WHL_RADIUS`.
+
 ## Driving
 
 `drive` requests `TEST` and arms if needed, sends one wheel speed in rad/s per output at 20 Hz for the given time (`nan` leaves an output uncontrolled; put `--` before a negative first speed), then stops and disarms:

@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The vehicle type (ADR-0013): the environment the vehicle operates in,
+# resolved first at boot. Values follow schema/enum/vehicle_type.enum.
+prefix = "VEHICLE"
+# The vehicle description never changes from the local menu (ADR-0022).
+menu = false
+
+[[param]]
+name = "VEHICLE_TYPE"
+type = "INT32"
+default = "GROUND"
+values = [{ name = "GROUND", value = 0 }]
+description = "Vehicle type: the environment the vehicle operates in."
+reboot_required = true

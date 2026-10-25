@@ -103,6 +103,23 @@ class Fault(enum.IntEnum):
     UNEXPECTED_INTERRUPT = 8  # an exception or interrupt with no handler, NMI included
 
 
+class FrameClass(enum.IntEnum):
+    """The frame class, classified by allocation math (ADR-0013): FRAME_CLASS. It selects the
+    vehicle model.
+    """
+
+    WHEELED = 0  # differential, skid-steer, mecanum and omni wheels
+    ACKERMANN = 1
+    THRUSTER = 2
+
+
+class FrameType(enum.IntEnum):
+    """The frame type, a named geometry within the frame class (ADR-0013): FRAME_TYPE."""
+
+    DIFF_2WD = 0  # WHEELED: two wheels on a common axle, left and right
+    SKID_4WD = 1  # WHEELED: four wheels, a front and a rear pair, skid-steered
+
+
 class HandshakeState(enum.IntEnum):
     """The handshake state of one Link (ADR-0002)."""
 
@@ -175,3 +192,13 @@ class ResetCause(enum.IntEnum):
     WATCHDOG = 4  # the hardware watchdog, after the scheduler stalled
     FAULT = 5  # the fault stop, after a fault, a failed assertion or a stack overflow
     LOW_POWER = 6  # the low-power reset of the MCU
+
+
+class VehicleType(enum.IntEnum):
+    """The environment the vehicle operates in, independent of its frame (ADR-0013):
+    VEHICLE_TYPE.
+    """
+
+    GROUND = 0
+    SURFACE = 1
+    UNDERWATER = 2

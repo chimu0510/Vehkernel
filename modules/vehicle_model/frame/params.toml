@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The frame (ADR-0013): the frame class selects the vehicle model at boot,
+# the frame type its geometry. A value whose vehicle model is not compiled in
+# (Kconfig VEHICLE_MODEL_*) is not offered (ADR-0017). Values follow
+# schema/enum/frame_class.enum and frame_type.enum.
+prefix = "FRAME"
+# The vehicle description never changes from the local menu (ADR-0022).
+menu = false
+
+[[param]]
+name = "FRAME_CLASS"
+type = "INT32"
+default = "WHEELED"
+values = [{ name = "WHEELED", value = 0, kconfig = "VEHICLE_MODEL_WHEELED" }]
+description = "Frame class: the allocation math, which selects the vehicle model."
+reboot_required = true
+
+[[param]]
+name = "FRAME_TYPE"
+type = "INT32"
+default = "DIFF_2WD"
+values = [
+  { name = "DIFF_2WD", value = 0, kconfig = "VEHICLE_MODEL_WHEELED" },
+  { name = "SKID_4WD", value = 1, kconfig = "VEHICLE_MODEL_WHEELED" },
+]
+description = "Frame type: the named geometry within the frame class."
+reboot_required = true
