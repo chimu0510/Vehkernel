@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Parameters of the control chain's angular rate control (ADR-0012,
+# ADR-0013): a PI loop on the gyro's yaw rate with feedforward of the
+# target, so the vehicle turns at the commanded rate even when its wheels
+# slip. The output is the yaw rate demand the vehicle model allocates.
+# Changes apply from the next control cycle. For a check with the wheels
+# lifted, set P and I to 0: a lifted vehicle cannot turn, and the loop would
+# wind up against it.
+prefix = "RATE"
+kconfig = "CONTROL_CHAIN"
+# Control tuning never changes from the local menu (ADR-0022).
+menu = false
+
+[[param]]
+name = "RATE_YAW_P"
+type = "FLOAT"
+default = 0.5
+min = 0.0
+max = 10.0
+description = "Yaw rate loop: proportional gain, yaw rate demand per rad/s of yaw rate error."
+
+[[param]]
+name = "RATE_YAW_I"
+type = "FLOAT"
+default = 1.0
+min = 0.0
+max = 50.0
+unit = "1/s"
+description = "Yaw rate loop: integral gain, yaw rate demand per rad of accumulated yaw rate error."
+
+[[param]]
+name = "RATE_YAW_FF"
+type = "FLOAT"
+default = 1.0
+min = 0.0
+max = 5.0
+description = "Yaw rate loop: feedforward, yaw rate demand per rad/s of target."

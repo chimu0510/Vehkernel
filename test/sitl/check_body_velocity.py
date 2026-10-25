@@ -21,7 +21,9 @@ drives it through the Link monitor library. In order:
   kinematics and disarms at the end.
 
 A source not in control cannot be shown here, as SITL has a single Link:
-the Link work item's unit tests check it with two.
+the Link work item's unit tests check it with two. The yaw rate loop's P
+and I are set to 0 first, so the targets are the kinematics' exactly;
+check_body_motion.py checks the loop.
 
     check_body_velocity.py build/test/app/vehkernel-sitl tools/link/link_monitor.py \\
         --msg-dir build/test/generated/schema/python
@@ -39,13 +41,19 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from check_actuators import (  # noqa: E402
-    REACT_US, REASON, REPLY_S, SETPOINT_INTERVAL_S, SETTLED_S, SP_TIMEOUT_S, TEST, Vehicle, arm, stopped_after)
+    REACT_US, REASON, REPLY_S, SETPOINT_INTERVAL_S, SETTLED_S, SP_TIMEOUT_S, TEST, Vehicle, arm, set_param,
+    stopped_after)
+from vklink.session import ParamType, ParamValue  # noqa: E402
 from check_attitude import free_udp_port  # noqa: E402
 
 RADIUS = 0.05
 TRACK = 0.2
 TOLERANCE = 0.05
 DIRECT = (5.0, 5.0, 5.0, 5.0)
+# The targets are judged from this long after a level's first setpoint left
+# the host: what they are matters here, not how fast they appear, which
+# check_actuators.py bounds for stops.
+APPLIED_US = 100_000
 
 
 def wheel_targets(vx: float, yaw_rate: float) -> tuple[float, float]:
@@ -108,7 +116,7 @@ def check_targets(vehicle: BodyVehicle, failures: list[str]) -> None:
         left, right = wheel_targets(vx, yaw_rate)
         start = len(vehicle.outputs)
         first, _ = send_for(vehicle, lambda vx=vx, yaw_rate=yaw_rate: vehicle.send_body(vx, 0.0, yaw_rate), 1.5)
-        late = [o for o in vehicle.outputs[start:] if o.timestamp >= vehicle.mcu_us(first) + REACT_US]
+        late = [o for o in vehicle.outputs[start:] if o.timestamp >= vehicle.mcu_us(first) + APPLIED_US]
         expected = (left, right, math.nan, math.nan)
         wrong = [o for o in late if not targets_are(o, expected)]
         if not late or wrong:
@@ -132,14 +140,14 @@ def check_levels(vehicle: BodyVehicle, failures: list[str]) -> None:
     switch_body, _ = send_for(vehicle, lambda: vehicle.send_body(0.1, 0.0, 0.0), 0.6)
     switch_direct, _ = send_for(vehicle, lambda: vehicle.send_setpoint(DIRECT), 0.6)
     vehicle.monitor.run(0.1)
-    samples = [o for o in vehicle.outputs[start:] if o.timestamp >= vehicle.mcu_us(first) + REACT_US]
+    samples = [o for o in vehicle.outputs[start:] if o.timestamp >= vehicle.mcu_us(first) + APPLIED_US]
     mixed = [o for o in samples if not targets_are(o, DIRECT) and not targets_are(o, body)]
     if mixed:
         failures.append("switching levels, an output sample mixed them: "
                         + ", ".join(f"{t:.2f}" for t in mixed[0].target))
 
     def level_between(begin: float, end: float):
-        window = [o for o in samples if vehicle.mcu_us(begin) + REACT_US <= o.timestamp <= vehicle.mcu_us(end)]
+        window = [o for o in samples if vehicle.mcu_us(begin) + APPLIED_US <= o.timestamp <= vehicle.mcu_us(end)]
         return window and all(targets_are(o, DIRECT) for o in window), \
             window and all(targets_are(o, body) for o in window)
 
@@ -198,6 +206,9 @@ def main() -> int:
         if not vehicle.connect():
             failures.append("no handshake with SITL")
         else:
+            for name in ("RATE_YAW_P", "RATE_YAW_I"):
+                if not isinstance(set_param(vehicle, name, ParamType.FLOAT, 0.0), ParamValue):
+                    failures.append(f"{name} could not be set to 0")
             check_refused_in_standby(vehicle, failures)
             mode = vehicle.monitor.request_mode(TEST, REPLY_S)
             if mode is None or mode.refused:
