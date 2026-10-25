@@ -15,7 +15,8 @@ build/sitl/app/vehkernel-sitl --duration 5
 | `--duration <seconds>` | Stops after the duration and prints a report; default 1 s, 0 runs until interrupted |
 | `--link udp\|pty` | The Link transport, UDP by default ([Transports](#transports)) |
 | `--udp <address>:<port>` | The UDP address, `127.0.0.1:15600` by default; port 0 picks a free one |
-| `--motion <profile>` | The scripted motion of the simulated IMU ([Motion profiles](#motion-profiles)) |
+| `--motion <profile>` | What moves the simulated IMU: `vehicle`, the default ([Ground vehicle](#ground-vehicle)), or a scripted profile ([Motion profiles](#motion-profiles)) |
+| `--slip <fraction>` | The fraction of its wheels' motion the ground vehicle loses, 0 by default ([Ground vehicle](#ground-vehicle)) |
 | `--param-file <path>` | Keeps the simulated parameter Flash in a file ([Parameters](link-monitor.md#parameters)) |
 | `--display <path>` | Writes the simulated display to a PBM image ([Local display](local-display.md)) |
 | `--actuator-power-off`, `--reversed-motor <output>` | Simulated actuator faults ([Driving the wheels](driving.md)) |
@@ -53,13 +54,23 @@ fault kind=ASSERT address=0xc2a4e1f3 duty=0.000,0.000,0.000,0.000
 
 `--fault assert` or `--fault fail` raises one on purpose once an output has been driven for 0.5 s. A run starts as if powered on; whoever starts SITL again after a reset or a fault gives the reset cause the board would read at boot, with `--reset-cause watchdog` or `--reset-cause fault:assert`, for example. `vehicle_status` then reports it, and after a watchdog or fault reset arming is refused as an unexpected reset; `--reset-cause software` stands for the deliberate reboot that clears it. CI checks both with `test/sitl/check_fault.py` (the `sitl_fault` test).
 
+## Ground vehicle
+
+By default the simulated board sits in a ground vehicle that its motors move (ADR-0018). The vehicle is the one the firmware's vehicle description gives, read at boot from the same parameters: the frame type, `WHL_RADIUS`, `WHL_TRACK` and the output of each wheel ([Vehicle description](driving.md#vehicle-description)). The wheels' true speeds move it through the frame's wheel kinematics; the IMU's gyro feels its turns and its accelerometer its accelerations. A description no model can drive leaves the board at rest.
+
+`--slip 0.25` makes the vehicle move and turn only 75 % as far as its wheels say, as when its tyres skid; the wheel encoders still read the wheels.
+
+SITL publishes the vehicle's true pose and velocity on `vehicle_local_odometry_groundtruth`: position in the local level frame (north-east-down, origin and heading zero at boot), attitude, and velocity and yaw rate in the body frame. Its true attitude also goes out on `vehicle_attitude_groundtruth`. The Link carries both at 50 Hz.
+
+CI drives the vehicle with direct-actuator setpoints in `test/sitl/check_vehicle.py` (`sitl_vehicle`): driving forward, the true distance must match the wheels' turn times `WHL_RADIUS` within 2 %; turning in place, the true heading change must match `WHL_RADIUS × (left - right) / WHL_TRACK` within 2 %, and the attitude estimator's yaw must follow the true heading within 3°; with `--slip 0.25`, the distance must be 75 % of the wheels' within 2 %.
+
 ## Motion profiles
 
-SITL's simulated IMU follows a scripted motion chosen with `--motion`, and SITL publishes its true attitude on `vehicle_attitude_groundtruth`, which the Link also carries, so the [Link monitor](link-monitor.md) shows the estimate and the truth side by side. Each profile starts moving 3 s after boot, once the estimator has aligned, and ends by 10 s:
+With `--motion` and a profile, SITL's simulated IMU follows a scripted motion instead, the vehicle is not simulated, and SITL publishes its true attitude on `vehicle_attitude_groundtruth`, which the Link also carries, so the [Link monitor](link-monitor.md) shows the estimate and the truth side by side. Each profile starts moving 3 s after boot, once the estimator has aligned, and ends by 10 s:
 
 | Profile | Motion |
 |---|---|
-| `still` | Level and at rest (the default) |
+| `still` | Level and at rest |
 | `tilt` | 20° of roll, then 20° of pitch, at 20°/s |
 | `rotate` | 90° turns about x, y and z in turn, at 45°/s |
 | `shake` | Level, with 0.5 s bursts of 6 m/s² forward acceleration every 1.5 s |

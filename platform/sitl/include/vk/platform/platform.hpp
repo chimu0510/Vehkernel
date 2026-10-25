@@ -6,11 +6,13 @@
 #include <vk/core/work_queue.hpp>
 #include <vk/hal/actuator.hpp>
 #include <vk/hal/reset.hpp>
+#include <vk/estimation/models/wheel_kinematics.hpp>
 #include <vk/sim/motor.hpp>
 #include <vk/sim/i2c_bus.hpp>
 #include <vk/sim/motion.hpp>
 #include <vk/sim/ssd1306.hpp>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -37,8 +39,17 @@ void set_user_key(bool pressed);
 // following `motion`. Call once from the entry point, before anything else runs.
 void init(sim::MotionProfile motion = sim::MotionProfile::Still);
 
+// Simulates a ground vehicle (ADR-0018) whose wheels, by `kinematics`, are
+// the motors on `outputs` (indexes, 0 for output 1), losing the fraction
+// `slip` of their motion. From then on it drives the IMU instead of the
+// scripted motion. Call after init(), before the IMU starts.
+void start_vehicle(const estimation::WheelKinematics& kinematics,
+                   const std::array<std::size_t, estimation::max_wheels>& outputs, float slip);
+
 // Publishes the simulated IMU's true attitude on vehicle_attitude_groundtruth
-// for every imu_sample, from a work item on `queue`.
+// for every imu_sample, from a work item on `queue`; with a ground vehicle,
+// its attitude, and its pose and velocity on
+// vehicle_local_odometry_groundtruth.
 void start_ground_truth(core::WorkQueue& queue);
 
 // SITL's board senses actuator power (ADR-0005). The simulated power is on

@@ -3,6 +3,7 @@
 # shared by SITL and the unit tests (ADR-0018). Part of the platform layer:
 # drivers never see it, only the I2C contract.
 vk_add_library(vk_sim LAYER platform STATIC
+  src/ground_vehicle.cpp
   src/i2c_bus.cpp
   src/icm20948.cpp
   src/motion.cpp
