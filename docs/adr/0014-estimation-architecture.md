@@ -6,7 +6,7 @@ Estimation has two levels: replaceable estimator modules that can run side by si
 - Attitude estimation.
 - Local odometry: dead reckoning from body velocity measurements and the heading from attitude estimation. The heading comes from attitude estimation (gyro integration, fused with the magnetometer when enabled), never from the left/right wheel speed difference.
 
-Outputs include both the calibrated raw data and the fused results, all with covariances. The ICM20948's DMP is not used: it is closed on-chip firmware with opaque timing and filtering, and provides no covariance. Magnetometer use is a parameter whose default depends on the vehicle type and can be overridden by the frame preset (ADR-0013).
+Outputs include both the calibrated raw data and the fused results; the fused results carry covariances. The per-sample IMU topic carries no noise figures: as ArduPilot (`EK3_GYRO_P_NSE`) and PX4 (`EKF2_GYR_NOISE`) do, sensor noise is a parameter of the estimator that uses it, which keeps `imu_sample` small at high rates, and the Bridge fills the covariances of ROS2's `sensor_msgs/Imu` from parameters (ADR-0003). The ICM20948's DMP is not used: it is closed on-chip firmware with opaque timing and filtering, and provides no covariance. Magnetometer use is a parameter whose default depends on the vehicle type and can be overridden by the frame preset (ADR-0013).
 
 **Measurement sources and odometry state are separate**
 

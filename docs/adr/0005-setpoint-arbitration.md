@@ -2,7 +2,7 @@
 
 Several sources may send setpoints at the same time: the companion computer, the remote control, a ground station, and in test mode the test runner on the development host (ADR-0018). Instead of a fixed source priority, the current mode decides which source is in control, as with PX4's offboard mode. A mode decides two things: which source is in control, and which setpoint levels that source may use (ADR-0003). In companion mode, for example, only setpoints from the Bridge are accepted, at any of the three levels; the RC manual mode accepts only body velocity. Direct actuator is a setpoint level, not a mode.
 
-At boot the vehicle is in `STANDBY`, where no source is in control and nothing can be armed. The mode can change only while disarmed. The source in control is the Link (or, later, the remote control or the Bridge) that requested the mode; setpoints from any other source are rejected and counted.
+At boot the vehicle is in `STANDBY`, where no source is in control and nothing can be armed. For now the mode can change only while disarmed; see **Modes while armed** below for what changes when the remote control and companion mode arrive. The source in control is the Link (or, later, the remote control or the Bridge) that requested the mode; setpoints from any other source are rejected and counted.
 
 Two rules apply regardless of mode:
 
@@ -56,6 +56,16 @@ Until the remote control is implemented, actuators may move only in test mode, u
 - If the source in control times out, the failsafe action is stop and disarm; if no setpoint arrives within a set time after arming, or all targets stay zero for that time, the vehicle disarms as well.
 
 When the remote control exists these conditions stay; it adds a takeover path, it does not replace them.
+
+**Modes while armed (decided, built with the remote control or companion mode)**
+
+The rule that the mode changes only while disarmed holds while `STANDBY` and `TEST` are the only modes. Once the remote control and companion mode exist, taking over means switching modes while armed, and a failsafe action is usually a mode too, so the rule becomes per mode, as in ArduPilot (`Rover::set_mode()` asks each mode's `enter()`) and PX4 (per-mode `can_run` checks):
+
+- Each mode declares whether it may be entered while armed, and what it needs: the source in control, the setpoint levels it accepts and the estimator health it requires.
+- `TEST` is still entered only while disarmed.
+- The remote control can always switch to its manual mode or engage the emergency stop, and a failsafe can always switch to its action, whatever the current mode allows.
+
+Requests then travel on the bus, as PX4's `vehicle_command` and `vehicle_command_ack` do and as `bringup_command` and `bringup_status` already do here: a queued command topic carrying the source, a sequence number and the request, and an acknowledgement topic matched by source and sequence. The commander takes requests on its own cycle, every source (each Link, the remote control, the Bridge) publishes to the same topic, and requests and their results are logged with the other topics (ADR-0019). Setpoint arbitration moves to the consumer: setpoints are tagged with their source, and those from a source not in control are dropped. Replies then arrive one control cycle later instead of at once. Until a second kind of source exists, Links keep calling the vehicle control service directly.
 
 ## Considered Options
 

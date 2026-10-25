@@ -18,5 +18,7 @@ At boot the firmware estimates the CPU budget from driver capabilities and perip
 
 ## Consequences
 
+- Only part of this is built so far: the `TIMER` trigger, the base rate, per-sample reads and the timing monitor. `IMU_EVENT`, the dividers and the boot-time feasibility check are accepted by the board generator but not yet implemented (#85).
+
 - C50C V1.1 is just one combination. Its IMU sits on PB9 = SCL and PB8 = SDA, as the vendor firmware says and the schematic confirms (the RS0102 level shifter U19 connects PB9 to SCL and PB8 to SDA). F407 hardware I2C1 uses those pins the other way round, PB8 = SCL and PB9 = SDA, so the IMU runs on software I2C: one read of accelerometer, gyroscope and temperature busy-waits the CPU for 0.50 ms (measured by the bring-up test), so about 2 kHz is reachable, and the board default of 200 Hz costs about 10 % of the CPU. The final values live in the board TOML; this ADR only gives an example. A board with the IMU on hardware I2C or SPI changes only its board defaults, not the architecture.
 - A bring-up test still confirms the wiring on real hardware by reading the ICM20948's WHO_AM_I over software I2C, which must be `0xEA`, and measures the achievable rate.
