@@ -9,7 +9,7 @@ Tests are split into six layers, from static checks to ROS2 integration. SITL ru
   - Parameter storage is tested against a fake Flash that simulates power loss at any point during a write.
 - **L2 replay**: re-run estimators on recorded data and compare against reference results. The data is ULog, recorded with the estimator replay log profile (ADR-0019).
 - **L3 SITL scenarios**: the complete firmware runs on the development host, driven by scenario scripts (modelled on ArduPilot's `rover.py`), for example driving a square to check odometry error, cutting a Link to check the failsafe action, and RC takeover.
-- **L4 hardware tests**: the firmware offers a test mode that runs bring-up cases and reports results over a Link, while a runner on the development host flashes the board and collects results. Test mode is a mode (ADR-0005): the runner is in control and only direct-actuator setpoints are accepted. The first cases:
+- **L4 hardware tests**: the firmware offers a test mode that runs bring-up cases and reports results over a Link, while a runner on the development host flashes the board and collects results. Test mode is a mode (ADR-0005): the runner is in control and only direct-actuator and body velocity setpoints are accepted; bring-up cases drive the outputs open loop, and body velocity lets the runner drive the vehicle as a whole through the control chain (spec 0009). The first cases:
   - IMU wiring, by reading WHO_AM_I.
   - Revision-ID pins.
   - Motor-to-encoder mapping and direction.

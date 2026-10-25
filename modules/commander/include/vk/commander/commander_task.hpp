@@ -6,7 +6,9 @@
 // every change and vehicle_status on every change and five times a second.
 // The board counts as verified (ADR-0010) once the boot check of the
 // revision-ID pins has passed and the IMU has answered with its first sample.
-// It follows the setpoints that arbitration accepted on actuator_setpoint,
+// It follows the setpoints that arbitration accepted, on actuator_setpoint and
+// body_velocity_setpoint: the one accepted last decides whether the targets
+// are idle, and either keeps the setpoint timeout from running out. It
 // starts bring-up cases on bringup_command and follows them on
 // bringup_status. It refuses arming while local_menu shows the local menu
 // open (ADR-0022).
@@ -26,6 +28,7 @@
 #include <vk/hal/reset.hpp>
 #include <vk/msg/actuator_setpoint.hpp>
 #include <vk/msg/arming_state.hpp>
+#include <vk/msg/body_velocity_setpoint.hpp>
 #include <vk/msg/bringup_command.hpp>
 #include <vk/msg/bringup_status.hpp>
 #include <vk/msg/imu_sample.hpp>
@@ -80,6 +83,8 @@ private:
     core::Subscription<msg::ImuSample> imu_{0};
     core::Subscription<msg::ActuatorSetpoint> setpoint_{0};
     msg::ActuatorSetpoint last_setpoint_{};
+    core::Subscription<msg::BodyVelocitySetpoint> body_setpoint_{0};
+    msg::BodyVelocitySetpoint last_body_setpoint_{};
     core::Subscription<msg::BringupStatus> bringup_status_{0};
     core::Subscription<msg::LocalMenu> local_menu_{0};
     bool local_menu_open_ = false;

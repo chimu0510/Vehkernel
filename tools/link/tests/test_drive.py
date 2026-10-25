@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Direct-actuator setpoints (spec 0006): inbound topic data, the monitor's drive and the drive command."""
+"""Direct-actuator setpoints (spec 0006) and body velocity setpoints (spec 0009): inbound topic data, the
+monitor's drive and drive_body, and the drive and drive-body commands."""
 
 import math
 import struct
@@ -18,7 +19,9 @@ from vklink.view import render
 
 SETPOINT_ID = 7
 STATUS_ID = 8
+BODY_ID = 9
 SETPOINT = TopicDescription(SETPOINT_ID, 1, 0xB87642E9C9631930, "actuator_setpoint")
+BODY = TopicDescription(BODY_ID, 1, 0x2E9C96319B876430, "body_velocity_setpoint")
 STATUS = TopicDescription(STATUS_ID, 1, 0x5555, "vehicle_status")
 
 
@@ -39,6 +42,24 @@ class ActuatorSetpoint:
     def decode(cls, data: bytes) -> "ActuatorSetpoint":
         values = cls._STRUCT.unpack(data)
         return cls(values[0], tuple(values[1:]))
+
+
+class BodyVelocitySetpoint:
+    NAME = "body_velocity_setpoint"
+    TOPIC_ID = BODY_ID
+    SCHEMA_HASH = BODY.schema_hash
+    ENCODED_SIZE = 20
+    _STRUCT = struct.Struct("<Q3f")
+
+    def __init__(self, timestamp=0, vx=0.0, vy=0.0, yaw_rate=0.0):
+        self.timestamp, self.vx, self.vy, self.yaw_rate = timestamp, vx, vy, yaw_rate
+
+    def encode(self) -> bytes:
+        return self._STRUCT.pack(self.timestamp, self.vx, self.vy, self.yaw_rate)
+
+    @classmethod
+    def decode(cls, data: bytes) -> "BodyVelocitySetpoint":
+        return cls(*cls._STRUCT.unpack(data))
 
 
 class VehicleStatus:
@@ -62,7 +83,7 @@ class VehicleStatus:
 
 
 def messages():
-    classes = (Sample, ActuatorSetpoint, VehicleStatus)
+    classes = (Sample, ActuatorSetpoint, BodyVelocitySetpoint, VehicleStatus)
     return types.SimpleNamespace(TOPICS={c.TOPIC_ID: c for c in classes}, BY_NAME={c.NAME: c for c in classes})
 
 
@@ -100,6 +121,27 @@ def test_drive_sends_setpoints_at_20_hz_then_all_nan():
     assert 9 <= len(sent) <= 12
     assert sent[0][:2] == (10.0, -10.0) and math.isnan(sent[0][2]) and sent[0][3] == 0.0
     assert all(math.isnan(speed) for speed in sent[-1])
+
+
+def body_setpoints(mcu: McuSession) -> list[tuple[float, float, float]]:
+    return [(b.vx, b.vy, b.yaw_rate) for b in (BodyVelocitySetpoint.decode(message)
+                                               for topic_id, _, message in mcu.topic_data if topic_id == BODY_ID)]
+
+
+def test_drive_body_sends_body_velocity_at_20_hz_then_nan():
+    with FakeMcu(topics=[BODY]) as mcu:
+        connection = UdpConnection("127.0.0.1", mcu.port)
+        monitor = LinkMonitor(connection, messages())
+        try:
+            assert monitor.handshake(2.0)
+            assert monitor.drive_body((0.3, 0.0, -0.5), 0.5) is None
+            monitor.run(0.1)
+        finally:
+            connection.close()
+    sent = body_setpoints(mcu.session)
+    assert 9 <= len(sent) <= 12
+    assert sent[0] == pytest.approx((0.3, 0.0, -0.5))
+    assert all(math.isnan(value) for value in sent[-1])
 
 
 class ScriptedLink:
@@ -184,16 +226,29 @@ class ActuatorSetpoint:
     def encode(self):
         return struct.pack("<Q4f", self.timestamp, *self.wheel_speed)
 
-TOPICS = {0: Sample, 7: ActuatorSetpoint}
-BY_NAME = {"sample": Sample, "actuator_setpoint": ActuatorSetpoint}
+class BodyVelocitySetpoint:
+    NAME = "body_velocity_setpoint"
+    TOPIC_ID = 9
+    SCHEMA_HASH = 0x2E9C96319B876430
+    ENCODED_SIZE = 20
+    FIELDS = ("timestamp", "vx", "vy", "yaw_rate")
+
+    def __init__(self, timestamp=0, vx=0, vy=0, yaw_rate=0):
+        self.timestamp, self.vx, self.vy, self.yaw_rate = timestamp, vx, vy, yaw_rate
+
+    def encode(self):
+        return struct.pack("<Q3f", self.timestamp, self.vx, self.vy, self.yaw_rate)
+
+TOPICS = {0: Sample, 7: ActuatorSetpoint, 9: BodyVelocitySetpoint}
+BY_NAME = {"sample": Sample, "actuator_setpoint": ActuatorSetpoint, "body_velocity_setpoint": BodyVelocitySetpoint}
 '''
 
 
-def run_drive(port: int, tmp_path: Path, *arguments: str) -> subprocess.CompletedProcess:
+def run_drive(port: int, tmp_path: Path, *arguments: str, command: str = "drive") -> subprocess.CompletedProcess:
     (tmp_path / "vkmsg.py").write_text(VKMSG, encoding="utf-8")
     return subprocess.run(
         [sys.executable, str(MONITOR), "--udp", f"127.0.0.1:{port}", "--msg-dir", str(tmp_path),
-         "--handshake-timeout", "2", "drive", *arguments],
+         "--handshake-timeout", "2", command, *arguments],
         capture_output=True, text=True, timeout=30, check=False)
 
 
@@ -229,3 +284,26 @@ def test_cli_drive_needs_four_speeds_and_a_duration(tmp_path: Path):
     assert no_duration.returncode == 2 and "--duration" in no_duration.stderr
     assert zero.returncode == 2 and "expected a positive number of seconds" in zero.stderr
 
+
+
+def test_cli_drive_body_takes_test_arms_drives_and_disarms(tmp_path: Path):
+    control = McuControl()
+    with FakeMcu(control=control, topics=[BODY]) as mcu:
+        result = run_drive(mcu.port, tmp_path, "--duration", "0.3", "--", "-0.2,0,1.5", command="drive-body")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "wheel_speed=none armed=0\n"
+    assert control.mode == 1 and not control.armed
+    sent = body_setpoints(mcu.session)
+    assert len(sent) >= 5
+    assert sent[0] == pytest.approx((-0.2, 0.0, 1.5))
+    assert all(math.isnan(value) for value in sent[-1])
+
+
+def test_cli_drive_body_needs_the_topic_and_three_finite_values(tmp_path: Path):
+    with FakeMcu(topics=[SETPOINT]) as mcu:
+        missing = run_drive(mcu.port, tmp_path, "0.2,0,0", "--duration", "0.3", command="drive-body")
+        two = run_drive(mcu.port, tmp_path, "0.2,0", "--duration", "1", command="drive-body")
+        nan = run_drive(mcu.port, tmp_path, "nan,0,0", "--duration", "1", command="drive-body")
+    assert missing.returncode == 1 and "FAIL: the MCU does not offer body_velocity_setpoint" in missing.stderr
+    assert two.returncode == 2 and "expected a body velocity" in two.stderr
+    assert nan.returncode == 2 and "expected a body velocity" in nan.stderr

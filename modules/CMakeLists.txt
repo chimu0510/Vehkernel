@@ -40,6 +40,18 @@ if(CONFIG_ACTUATOR_CONTROL)
   vk_target_link_libraries(vk_modules INTERFACE vk_actuators)
 endif()
 
+if(CONFIG_CONTROL_CHAIN)
+  # The control chain (ADR-0013): it uses neither the bus nor FreeRTOS and is
+  # tested on the development host; the work item wraps it.
+  vk_add_library(vk_control LAYER module STATIC
+    control/src/control_chain.cpp
+    control/src/control_chain_task.cpp)
+  target_include_directories(vk_control PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/control/include)
+  vk_target_link_libraries(vk_control PUBLIC vk_msg_headers vk_core vk_params vk_vehicle_model)
+  target_link_libraries(vk_control PRIVATE vk_warnings vk_cxx_subset)
+  vk_target_link_libraries(vk_modules INTERFACE vk_control)
+endif()
+
 if(CONFIG_LINK)
   # The custom protocol and the Link work item (ADR-0002). The protocol code
   # uses neither a transport nor FreeRTOS, so it is tested on the development

@@ -1,6 +1,6 @@
 # Driving the wheels
 
-Actuators move only in test mode, armed, and only on direct-actuator setpoints: one wheel speed in rad/s per motor output (ADR-0005, ADR-0018). The commands below use the [Link monitor](link-monitor.md) against SITL; on a board, use `--serial /dev/ttyACM0` instead of `--udp`, with the firmware build's `--msg-dir` and `--param-meta` ([Connecting](link-monitor.md#connecting)).
+Actuators move only in test mode, armed, on one of two setpoint levels (ADR-0005, ADR-0018): direct-actuator setpoints, one wheel speed in rad/s per motor output, or body velocity setpoints, the motion of the vehicle as a whole, which the control chain allocates to the wheels through the vehicle model (ADR-0013). The commands below use the [Link monitor](link-monitor.md) against SITL; on a board, use `--serial /dev/ttyACM0` instead of `--udp`, with the firmware build's `--msg-dir` and `--param-meta` ([Connecting](link-monitor.md#connecting)).
 
 ## Safety conditions
 
@@ -53,6 +53,14 @@ Outputs the frame does not use stay uncontrolled. A description no compiled-in m
 ```bash
 tools/link/link_monitor.py --udp 127.0.0.1:15600 drive 5,5,5,5 --duration 3
 ```
+
+`drive-body` does the same with a body velocity: the forward and right speed in m/s and the yaw rate in rad/s, positive turning right. `vy` is ignored by frames that cannot move sideways. The vehicle model turns it into a wheel speed target per output, scaled down uniformly when a wheel would exceed `MOT_MAX_SPD`, so the path keeps its curvature:
+
+```bash
+tools/link/link_monitor.py --udp 127.0.0.1:15600 drive-body 0.3,0,0.5 --duration 3
+```
+
+The two levels never drive at once: the one whose setpoint arrived last drives, until it times out. Every safety condition above holds for body velocity setpoints as for direct-actuator ones.
 
 The live view shows `vehicle_status`, `wheel_encoders` and `actuator_outputs`.
 

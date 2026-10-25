@@ -92,6 +92,15 @@ if(CONFIG_ACTUATOR_CONTROL AND CONFIG_VEHICLE_MODEL_WHEELED AND CONFIG_LINK_UDP)
       $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
 endif()
 
+# L3 SITL body velocity test (spec 0009): body velocity setpoints in TEST
+# mode, allocated by the vehicle model, beside direct-actuator setpoints, and
+# the Link monitor's drive-body.
+if(CONFIG_CONTROL_CHAIN AND CONFIG_VEHICLE_MODEL_WHEELED AND CONFIG_LINK_UDP)
+  add_test(NAME sitl_body_velocity
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_body_velocity.py
+      $<TARGET_FILE:vehkernel-sitl> ${CMAKE_SOURCE_DIR}/tools/link/link_monitor.py --msg-dir ${VK_MSG_PYTHON_DIR})
+endif()
+
 # L3 SITL fault test (ADR-0005): a failed assertion and fail() while driving
 # end SITL with every output stopped, and a watchdog or fault reset refuses
 # arming.

@@ -73,6 +73,10 @@
 #include <vk/platform/platform.hpp>
 #include <vk/vehicle_model/vehicle_description.hpp>
 
+#ifdef CONFIG_CONTROL_CHAIN
+#include <vk/control/control_chain_task.hpp>
+#endif
+
 #ifdef CONFIG_LINK
 #include <vk/hal/transport.hpp>
 #include <vk/link/link.hpp>
@@ -320,6 +324,22 @@ void start_commander()
 #ifdef CONFIG_ACTUATOR_CONTROL
 vk::core::StaticInstance<vk::actuators::ActuatorTask> actuator_control;
 
+#ifdef CONFIG_CONTROL_CHAIN
+vk::vehicle_model::VehicleModels vehicle_models;
+vk::core::StaticInstance<vk::control::ControlChainTask> control_chain;
+
+// The control chain on wq:ctrl before actuator control, over the vehicle
+// model the parameters select at boot (ADR-0013).
+void start_control_chain()
+{
+    const vk::vehicle_model::VehicleModel* model =
+        vehicle_models.select(vk::vehicle_model::description_from_parameters());
+    control_chain.emplace(vk::control::ControlChainTask::Config{.interval_us = control_interval_us, .model = model},
+                          vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    control_chain->start();
+}
+#endif
+
 // Actuator control on wq:ctrl after the commander, over the simulated motors (spec 0006).
 void start_actuators()
 {
@@ -519,6 +539,9 @@ int main(int argc, char** argv)
 #endif
     start_commander();
 #ifdef CONFIG_ACTUATOR_CONTROL
+#ifdef CONFIG_CONTROL_CHAIN
+    start_control_chain();
+#endif
     start_actuators();
 #endif
 #ifdef CONFIG_LOCAL_DISPLAY

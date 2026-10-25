@@ -62,6 +62,8 @@ By default the simulated board sits in a ground vehicle that its motors move (AD
 
 SITL publishes the vehicle's true pose and velocity on `vehicle_local_odometry_groundtruth`: position in the local level frame (north-east-down, origin and heading zero at boot), attitude, and velocity and yaw rate in the body frame. Its true attitude also goes out on `vehicle_attitude_groundtruth`. The Link carries both at 50 Hz.
 
+`test/sitl/check_body_velocity.py` (`sitl_body_velocity`) drives it by body velocity setpoints: refused in `STANDBY`, the wheel speed targets of the kinematics in `TEST`, never both setpoint levels at once, the setpoint timeout, and the Link monitor's `drive-body`.
+
 CI drives the vehicle with direct-actuator setpoints in `test/sitl/check_vehicle.py` (`sitl_vehicle`): driving forward, the true distance must match the wheels' turn times `WHL_RADIUS` within 2 %; turning in place, the true heading change must match `WHL_RADIUS × (left - right) / WHL_TRACK` within 2 %, and the attitude estimator's yaw must follow the true heading within 3°; with `--slip 0.25`, the distance must be 75 % of the wheels' within 2 %.
 
 ## Motion profiles

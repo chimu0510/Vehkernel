@@ -140,7 +140,7 @@ class Mode(enum.IntEnum):
     """The vehicle mode (ADR-0005): it decides which source is in control."""
 
     STANDBY = 0  # no source in control; nothing can be armed
-    TEST = 1  # the development host in control, direct-actuator setpoints only (ADR-0018)
+    TEST = 1  # the development host in control, direct-actuator and body velocity setpoints (ADR-0018)
 
 
 class ModeResult(enum.IntEnum):
