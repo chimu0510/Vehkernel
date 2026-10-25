@@ -4,6 +4,7 @@
 #include <vk/link/crc16.hpp>
 #include <vk/link/frame.hpp>
 #include <vk/link/session.hpp>
+#include <vk/link/sim_handler.hpp>
 #include <vk/msg/arming_state.hpp>
 #include <vk/msg/bringup_status.hpp>
 
@@ -967,9 +968,8 @@ protected:
 
     FakeControl control;
     MockSink sink;
-    Session session{{}, Session::default_peer_timeout_us, {}, {.control = &control, .source = 2,
-                                                              .set_sim_actuator_power = &set_sim_power,
-                                                              .set_sim_user_key = &set_sim_key}};
+    SimHandler sim{{.set_actuator_power = &set_sim_power, .set_user_key = &set_sim_key}};
+    Session session{{}, Session::default_peer_timeout_us, {}, {.control = &control, .source = 2}, &sim};
 };
 
 TEST_F(SessionControl, ModeRequestIsAnsweredWithTheModeOrTheRefusal)
@@ -1104,6 +1104,109 @@ TEST_F(SessionControl, AnUnknownRebootActionIsRefusedWithoutAsking)
     EXPECT_EQ(got[0].type, FrameType::RebootReject);
     EXPECT_EQ(got[0].body, (std::vector<std::uint8_t>{2}));  // unknown action
     EXPECT_FALSE(control.reboot.has_value());
+}
+
+// --- Dispatch to the frame handlers (issue #75) ---
+
+// Records the frames a session hands it.
+class RecordingHandler final : public FrameHandler {
+public:
+    void handle(FrameType type, BodyReader /*body*/, FrameSender& /*out*/) override { types.push_back(type); }
+
+    std::vector<FrameType> types;
+};
+
+// ControlAccess describes only vehicle control: the board firmware builds it
+// without any SITL hook.
+template <class Access>
+concept HasSimHooks = requires(Access access) { access.set_sim_actuator_power; } ||
+                      requires(Access access) { access.set_sim_user_key; };
+static_assert(!HasSimHooks<ControlAccess>);
+
+TEST_F(SessionControl, EachFrameGoesToItsHandlerOnly)
+{
+    std::array<ParamInfo, 3> table = make_param_table();
+    vk::core::Parameters parameters{table};
+    RecordingHandler recorder;
+    Session all{{}, Session::default_peer_timeout_us, {.parameters = &parameters}, {.control = &control, .source = 2},
+                &recorder};
+    handshake(all);
+
+    const std::array<std::uint8_t, 2> unknown_name{1, 'X'};
+    all.handle({.version = protocol_version, .type = FrameType::ParamGet, .sequence = 1, .body = unknown_name}, 2000,
+               sink);
+    EXPECT_EQ(control.last_source, vk::core::no_source);
+    EXPECT_TRUE(recorder.types.empty());
+
+    request(all, FrameType::ModeRequest, 1);
+    EXPECT_EQ(control.last_source, 2);
+    EXPECT_TRUE(recorder.types.empty());
+
+    request(all, FrameType::SimActuatorPower, 0);
+    request(all, FrameType::SimUserKey, 1);
+    request(all, FrameType::TimeSyncRequest, 0);  // too short: answered by nobody
+    request(all, FrameType::ParamValue, 0);       // only the MCU sends it
+    EXPECT_EQ(recorder.types, (std::vector<FrameType>{FrameType::SimActuatorPower, FrameType::SimUserKey}));
+
+    const auto got = replies(sink.sent);
+    ASSERT_EQ(got.size(), 2U);
+    EXPECT_EQ(got[0].type, FrameType::ParamReject);
+    EXPECT_EQ(got[1].type, FrameType::ModeReply);
+}
+
+TEST_F(SessionControl, HandlersNumberAndCountTheirFramesWithTheSession)
+{
+    request(session, FrameType::ModeRequest, 1);
+    request(session, FrameType::EstopRequest, 1);
+    std::vector<std::uint16_t> sequences;
+    FrameReader reader;
+    for (const auto& wire : sink.sent) {
+        reader.feed(wire, [&](const Frame& f) { sequences.push_back(f.sequence); });
+    }
+    // hello_reply was frame 0.
+    EXPECT_EQ(sequences, (std::vector<std::uint16_t>{1, 2}));
+    EXPECT_EQ(session.frames_sent(), 3U);
+}
+
+TEST_F(SessionControl, HandlersDoNotSeeFramesBeforeTheHandshake)
+{
+    RecordingHandler recorder;
+    Session fresh{{}, Session::default_peer_timeout_us, {}, {.control = &control}, &recorder};
+    request(fresh, FrameType::SimUserKey, 1);
+    request(fresh, FrameType::ModeRequest, 1);
+    EXPECT_TRUE(recorder.types.empty());
+    EXPECT_EQ(control.last_source, vk::core::no_source);
+    EXPECT_TRUE(sink.sent.empty());
+}
+
+TEST_F(SessionControl, ABoardSessionDoesNotAcceptSimFrames)
+{
+    // As the board firmware builds it: vehicle control, no SITL-only handler.
+    Session board{{}, Session::default_peer_timeout_us, {}, {.control = &control, .source = 2}};
+    handshake(board);
+    sim_power = true;
+    sim_key = false;
+    request(board, FrameType::SimActuatorPower, 0);
+    request(board, FrameType::SimUserKey, 1);
+    EXPECT_TRUE(sim_power);
+    EXPECT_FALSE(sim_key);
+    EXPECT_EQ(control.last_source, vk::core::no_source);
+    EXPECT_FALSE(control.engaged);
+    EXPECT_TRUE(sink.sent.empty());
+    EXPECT_EQ(board.frames_sent(), 1U);  // hello_reply only
+}
+
+TEST(SimHandler, IgnoresAFrameWithoutItsValue)
+{
+    sim_power = true;
+    SimHandler sim{{.set_actuator_power = &set_sim_power, .set_user_key = &set_sim_key}};
+    FrameWriter writer;
+    MockSink sink;
+    std::uint32_t frames_sent = 0;
+    FrameSender out(writer, sink, frames_sent);
+    sim.handle(FrameType::SimActuatorPower, BodyReader({}), out);
+    EXPECT_TRUE(sim_power);
+    EXPECT_TRUE(sink.sent.empty());
 }
 
 }  // namespace

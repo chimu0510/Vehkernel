@@ -33,12 +33,19 @@ if(CONFIG_LINK)
   # host; the Link is tested there over a fake transport.
   vk_add_library(vk_link LAYER module STATIC
     link/src/cobs.cpp
+    link/src/control_handler.cpp
     link/src/crc16.cpp
     link/src/default_topic_map.cpp
     link/src/frame.cpp
+    link/src/frame_handler.cpp
     link/src/link.cpp
+    link/src/parameter_handler.cpp
     link/src/session.cpp
     link/src/topic_map.cpp)
+  if(CONFIG_PLATFORM_SITL)
+    # The SITL-only frames; the board firmware never builds them (ADR-0018).
+    target_sources(vk_link PRIVATE link/src/sim_handler.cpp)
+  endif()
   target_include_directories(vk_link PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/link/include)
   vk_target_link_libraries(vk_link PUBLIC vk_msg_headers vk_core vk_hal)
   target_link_libraries(vk_link PRIVATE vk_warnings vk_cxx_subset)

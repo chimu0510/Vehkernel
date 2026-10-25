@@ -68,6 +68,7 @@
 #ifdef CONFIG_LINK
 #include <vk/hal/transport.hpp>
 #include <vk/link/link.hpp>
+#include <vk/link/sim_handler.hpp>
 #include <vk/link/topic_map.hpp>
 #endif
 #ifdef CONFIG_LINK_UDP
@@ -323,6 +324,9 @@ void start_local_display(const Options& options)
 
 #ifdef CONFIG_LINK
 vk::core::StaticInstance<vk::link::Link> host_link;
+// The Link's sim_actuator_power and sim_user_key frames act on the simulator.
+vk::link::SimHandler sim_frames({.set_actuator_power = &vk::platform::set_actuator_power,
+                                 .set_user_key = &vk::platform::set_user_key});
 #endif
 #ifdef CONFIG_LINK_UDP
 vk::platform::UdpTransport udp;
@@ -395,9 +399,8 @@ bool start_link(const Options& options)
                       vk::link::Link::Config{.parameters = {.parameters = &vk::params::parameters(),
                                                             .set_hash = vk::params::set_hash,
                                                             .storage = stored_parameters()},
-                                             .control = {.control = &*commander,
-                                                         .set_sim_actuator_power = &vk::platform::set_actuator_power,
-                                                         .set_sim_user_key = &vk::platform::set_user_key}},
+                                             .control = {.control = &*commander},
+                                             .sim_frames = &sim_frames},
                       vk::core::work_queue(vk::core::WorkQueueTier::Io));
     host_link->start();
     return true;
