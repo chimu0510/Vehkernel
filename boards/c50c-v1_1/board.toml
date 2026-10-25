@@ -150,8 +150,10 @@ defaults = { MOT_PWM_FREQ = 10000 }
 # ADR-0010: the revision-ID pins read 0 on V1.1 (schematic sheet 2, firmware sys.h).
 revision = { pins = ["REV_ID0", "REV_ID1", "REV_ID2"], value = 0 }
 
-# ADR-0005: PE4 reads the drive power circuit. Its powered level is not in the
-# schematic notes or the vendor firmware; it is measured at bring-up (#50).
+# ADR-0005: PE4 reads the drive power circuit. Its powered level is in neither
+# the schematic notes nor the vendor firmware; measured at bring-up (#50,
+# 2026-10-25): PE4 reads high while the drive supply on CN6 is connected and
+# low when it is disconnected.
 actuator_power = { pin = "ACT_POWER_SENSE", powered = "HIGH" }
 
 # ADR-0022: S3 operates the local display and the local menu.

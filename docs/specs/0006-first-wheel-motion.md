@@ -1,8 +1,8 @@
 # Spec 0006: first wheel motion
 
-**Status**: deferred. Issue: [#43](https://github.com/chimu0510/Vehkernel/issues/43); tickets #44 to #50. Every ticket but the hardware check in #50 is done; the maintainer deferred #50 on 2026-10-22 while specs 0007 and 0008 went ahead, and the `PE4` powered level, `MOTn_CPR` and the speed loop defaults are still to be measured there.
+**Status**: done. Issue: [#43](https://github.com/chimu0510/Vehkernel/issues/43); tickets #44 to #50. The hardware check in #50 confirmed it on the C50C V1.1 on 2026-10-25, on a two-motor vehicle (outputs 1 and 2), after the fault stop of #81; its oscilloscope readings of the PWM frequency and slew rate moved to #101.
 
-Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
+This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 
 ## Problem Statement
 
