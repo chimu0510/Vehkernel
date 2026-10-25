@@ -2,7 +2,8 @@
 // SITL entry point: the firmware on the FreeRTOS POSIX port (ADR-0018).
 //
 // Usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]
-//                       [--motion still|tilt|rotate|shake] [--param-file <path>]
+//                       [--motion vehicle|still|tilt|rotate|shake] [--slip <fraction>]
+//                       [--param-file <path>]
 //                       [--actuator-power-off] [--reversed-motor <output>]
 //                       [--display <path>] [--reset-cause <cause>[:<fault>]]
 //                       [--fault assert|fail]
@@ -13,8 +14,14 @@
 // streams topics to the development host, over UDP by default
 // (127.0.0.1:15600, port 0 for any free port) or over a pty with --link pty.
 // Its line, with the port bound or the pty's path, is printed when it starts.
-// The simulated IMU follows a scripted motion (level and still by default),
-// and its true attitude is published on vehicle_attitude_groundtruth.
+// By default the simulated board sits in a ground vehicle (ADR-0018) that its
+// motors move, described by the same parameters as the firmware's vehicle
+// model, read at boot; --slip makes it lose that fraction of its wheels'
+// motion. The IMU feels the vehicle's turns and accelerations, and its true
+// pose goes out on vehicle_local_odometry_groundtruth. With --motion and a
+// scripted profile, the IMU follows that instead and the vehicle is not
+// simulated. Either way the true attitude is published on
+// vehicle_attitude_groundtruth.
 // Parameters are stored in a simulated NOR Flash: blank at every start, so
 // runs are reproducible, or kept in the file given with --param-file.
 // The simulated board senses actuator power, on unless --actuator-power-off
@@ -64,6 +71,7 @@
 #include <vk/sim/nor_flash.hpp>
 #endif
 #include <vk/platform/platform.hpp>
+#include <vk/vehicle_model/vehicle_description.hpp>
 
 #ifdef CONFIG_LINK
 #include <vk/hal/transport.hpp>
@@ -119,7 +127,8 @@ struct Options {
     std::string_view link = "udp";
     std::array<char, 64> udp_address{"127.0.0.1"};  // NUL-terminated
     std::uint16_t udp_port = 15600;
-    vk::sim::MotionProfile motion = vk::sim::MotionProfile::Still;
+    std::optional<vk::sim::MotionProfile> motion;  // none: the ground vehicle
+    float slip = 0.0F;
     const char* param_file = nullptr;  // nullptr: blank Flash in memory
     bool actuator_power = true;
     std::array<bool, vk::platform::actuator_count> reversed_motors{};
@@ -209,11 +218,21 @@ bool parse_options(std::span<char*> args, Options& options)
             }
             options.link = value;
         } else if (arg == "--motion") {
+            if (std::string_view(value) == "vehicle") {
+                options.motion.reset();
+                continue;
+            }
             const auto profile = vk::sim::motion_profile(value);
             if (!profile) {
                 return false;
             }
-            options.motion = *profile;
+            options.motion = profile;
+        } else if (arg == "--slip") {
+            char* end = nullptr;
+            options.slip = std::strtof(value, &end);
+            if (*end != '\0' || !(options.slip >= 0.0F && options.slip < 1.0F)) {
+                return false;
+            }
         } else if (arg == "--udp") {
             if (!parse_address(value, options)) {
                 return false;
@@ -244,6 +263,29 @@ bool parse_options(std::span<char*> args, Options& options)
         }
     }
     return true;
+}
+
+// The ground vehicle, from the vehicle description the firmware reads: the
+// same frame, geometry and output mapping. A description no model can drive
+// leaves the board still, as the scripted still motion.
+void start_vehicle(const Options& options)
+{
+#ifdef CONFIG_VEHICLE_MODEL_WHEELED
+    const vk::vehicle_model::VehicleDescription description = vk::vehicle_model::description_from_parameters();
+    static vk::vehicle_model::WheeledModel model;
+    model.set(description.wheeled);
+    if (description.vehicle_type != vk::msg::VehicleType::Ground ||
+        description.frame_class != vk::msg::FrameClass::Wheeled || !model.valid()) {
+        return;
+    }
+    std::array<std::size_t, vk::estimation::max_wheels> outputs{};
+    for (std::size_t i = 0; i < model.kinematics().size(); ++i) {
+        outputs.at(i) = model.output(i);
+    }
+    vk::platform::start_vehicle(model.kinematics(), outputs, options.slip);
+#else
+    static_cast<void>(options);
+#endif
 }
 
 vk::core::StaticInstance<vk::commander::CommanderTask> commander;
@@ -447,14 +489,15 @@ int main(int argc, char** argv)
     Options options;
     if (!parse_options(std::span(argv, static_cast<std::size_t>(argc)), options)) {
         std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]\n"
-                   "                      [--motion still|tilt|rotate|shake] [--param-file <path>]\n"
+                   "                      [--motion vehicle|still|tilt|rotate|shake] [--slip <fraction>]\n"
+                   "                      [--param-file <path>]\n"
                    "                      [--actuator-power-off] [--reversed-motor <output>]\n"
                    "                      [--display <path>] [--reset-cause <cause>[:<fault>]]\n"
                    "                      [--fault assert|fail]\n",
                    stderr);
         return 2;
     }
-    vk::platform::init(options.motion);
+    vk::platform::init(options.motion.value_or(vk::sim::MotionProfile::Still));
     vk::platform::set_reset_report(options.reset);
     vk::platform::raise_fault_when_driven(options.fault);
     vk::platform::set_actuator_power(options.actuator_power);
@@ -466,6 +509,9 @@ int main(int argc, char** argv)
         return 1;
     }
 #endif
+    if (!options.motion) {
+        start_vehicle(options);
+    }
     start_imu();
     vk::platform::start_ground_truth(vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
 #ifdef CONFIG_ESTIMATOR_MAHONY

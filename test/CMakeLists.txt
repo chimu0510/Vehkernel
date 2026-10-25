@@ -83,6 +83,15 @@ if(CONFIG_ACTUATOR_CONTROL AND CONFIG_LINK_UDP)
       $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
 endif()
 
+# L3 SITL ground vehicle test (spec 0009): the simulated motors move the
+# vehicle as its wheel kinematics say, the gyro feels its turns, and slip
+# takes its share.
+if(CONFIG_ACTUATOR_CONTROL AND CONFIG_VEHICLE_MODEL_WHEELED AND CONFIG_LINK_UDP)
+  add_test(NAME sitl_vehicle
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_vehicle.py
+      $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
+endif()
+
 # L3 SITL fault test (ADR-0005): a failed assertion and fail() while driving
 # end SITL with every output stopped, and a watchdog or fault reset refuses
 # arming.

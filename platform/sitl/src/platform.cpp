@@ -5,6 +5,7 @@
 #include <vk/core/scheduler.hpp>
 #include <vk/hal/clock.hpp>
 
+#include <vk/sim/ground_vehicle.hpp>
 #include <vk/sim/i2c_bus.hpp>
 #include <vk/sim/icm20948.hpp>
 #include <vk/sim/motion.hpp>
@@ -16,6 +17,7 @@
 #include <vk/msg/enums.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_attitude_groundtruth.hpp>
+#include <vk/msg/vehicle_local_odometry_groundtruth.hpp>
 
 #include <FreeRTOS.h>
 #include <task.h>
@@ -104,7 +106,16 @@ sim::I2cBus bus;
 sim::Icm20948 imu;
 sim::Ssd1306 oled;
 // A small gyroscope bias in the body frame.
+constexpr estimation::Vector3 gyro_bias{0.002F, 0.001F, -0.0005F};
 core::StaticInstance<sim::MotionImu> motion;
+// The ground vehicle, once started; it then drives the IMU instead of motion.
+core::StaticInstance<sim::GroundVehicle> vehicle;
+core::StaticInstance<sim::VehicleImu> vehicle_imu;
+
+float wheel_speed(std::size_t index)
+{
+    return motors.at(index)->speed();
+}
 
 // Publishes the truth of each IMU sample at the sample's own time.
 class GroundTruth final : public core::WorkItem {
@@ -118,6 +129,10 @@ protected:
     {
         msg::ImuSample sample{};
         while (imu_.copy(sample)) {
+            if (vehicle.has_value()) {
+                publish_vehicle(sample.timestamp);
+                continue;
+            }
             const sim::MotionState truth = sim::motion_at(motion->profile(), sample.timestamp);
             msg::VehicleAttitudeGroundtruth out{};
             out.timestamp = sample.timestamp;
@@ -128,8 +143,29 @@ protected:
     }
 
 private:
+    // The vehicle's state now, a moment after the sample, stamped with it.
+    void publish_vehicle(std::uint64_t timestamp)
+    {
+        const sim::GroundVehicle::State& truth = vehicle->state();
+        const auto q = truth.attitude().array();
+        const estimation::Vector3 rate{0.0F, 0.0F, truth.twist.yaw_rate};
+        msg::VehicleAttitudeGroundtruth attitude{};
+        attitude.timestamp = timestamp;
+        attitude.q = q;
+        attitude.angular_velocity = rate.array();
+        publication_.publish(attitude);
+        msg::VehicleLocalOdometryGroundtruth odometry{};
+        odometry.timestamp = timestamp;
+        odometry.position = {static_cast<float>(truth.north), static_cast<float>(truth.east), 0.0F};
+        odometry.q = q;
+        odometry.velocity = {truth.twist.vx, truth.twist.vy, 0.0F};
+        odometry.angular_velocity = rate.array();
+        odometry_publication_.publish(odometry);
+    }
+
     core::Subscription<msg::ImuSample> imu_{0};
     core::Publication<msg::VehicleAttitudeGroundtruth> publication_;
+    core::Publication<msg::VehicleLocalOdometryGroundtruth> odometry_publication_;
 };
 
 core::StaticInstance<GroundTruth> ground_truth;
@@ -182,7 +218,7 @@ void init(sim::MotionProfile profile)
     }
 
     // The scripted motion, with sensor noise and a small gyroscope bias.
-    motion.emplace(profile, estimation::Vector3{0.002F, 0.001F, -0.0005F}, &hal::SystemClock::now_us);
+    motion.emplace(profile, gyro_bias, &hal::SystemClock::now_us);
     imu.set_output_source(&*motion);
     imu.set_temperature(30.0F);
     imu.set_noise(0.05F, 0.005F);
@@ -207,6 +243,15 @@ bool user_key_pressed()
 void set_user_key(bool pressed)
 {
     simulated_user_key.store(pressed);
+}
+
+void start_vehicle(const estimation::WheelKinematics& kinematics,
+                   const std::array<std::size_t, estimation::max_wheels>& outputs, float slip)
+{
+    vehicle.emplace(sim::GroundVehicle::Config{.kinematics = kinematics, .outputs = outputs, .slip = slip},
+                    &hal::SystemClock::now_us, &wheel_speed);
+    vehicle_imu.emplace(*vehicle, gyro_bias);
+    imu.set_output_source(&*vehicle_imu);
 }
 
 void start_ground_truth(core::WorkQueue& queue)

@@ -11,6 +11,7 @@
 #include <vk/msg/parameter_status.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
 #include <vk/msg/vehicle_attitude_groundtruth.hpp>
+#include <vk/msg/vehicle_local_odometry_groundtruth.hpp>
 #include <vk/msg/vehicle_status.hpp>
 #include <vk/msg/wheel_encoders.hpp>
 #include <vk/msg/work_item_status.hpp>
@@ -54,6 +55,7 @@ struct DefaultStreams {
     TopicStreamOf<msg::ImuSample> imu;
     TopicStreamOf<msg::VehicleAttitude> attitude{MaxRate{50.0F}, 0};
     TopicStreamOf<msg::VehicleAttitudeGroundtruth> truth{MaxRate{50.0F}, 0};  // SITL only
+    TopicStreamOf<msg::VehicleLocalOdometryGroundtruth> odometry_truth{MaxRate{50.0F}, 0};  // SITL only
     TopicStreamOf<msg::ParameterStatus> parameters{status_rate, 0};           // with parameter storage
     TopicStreamOf<msg::VehicleStatus> vehicle{MaxRate{5.0F}, 0};
     TopicStreamOf<msg::WheelEncoders> wheels{MaxRate{50.0F}, 0};
@@ -63,9 +65,10 @@ struct DefaultStreams {
     std::array<TopicStreamOf<msg::WorkItemStatus>, msg::WorkItemStatus::instances> work_items =
         make_status_streams<msg::WorkItemStatus>();
     std::array<TopicStreamOf<msg::LinkStatus>, msg::LinkStatus::instances> links = make_status_streams<msg::LinkStatus>();
-    std::array<TopicStream*, 9> first{&imu, &attitude, &truth, &parameters, &vehicle, &wheels, &outputs, &setpoint, &menu};
-    std::array<TopicStream*, 9 + msg::WorkItemStatus::instances + msg::LinkStatus::instances> map =
-        make_map(first, std::make_index_sequence<9>{}, work_items,
+    std::array<TopicStream*, 10> first{&imu,     &attitude, &truth,    &odometry_truth, &parameters,
+                                       &vehicle, &wheels,   &outputs, &setpoint,       &menu};
+    std::array<TopicStream*, 10 + msg::WorkItemStatus::instances + msg::LinkStatus::instances> map =
+        make_map(first, std::make_index_sequence<10>{}, work_items,
                  std::make_index_sequence<msg::WorkItemStatus::instances>{}, links,
                  std::make_index_sequence<msg::LinkStatus::instances>{});
 };

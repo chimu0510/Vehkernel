@@ -558,7 +558,9 @@ private:
 TEST(Session, HandshakeOverASmallBufferDropsNothingAndDescribesTopicsBeforeTheirData)
 {
     // Room for about four topic_info frames, and topic data due every run.
-    BufferedSink sink(256, 128);
+    // A topic_info frame is about 25 bytes plus the topic's name, and the
+    // longest names are over 30 characters.
+    BufferedSink sink(320, 160);
     Session session;
     const std::array<std::uint8_t, 2> hello = {1, protocol_version};
     const std::array<std::uint8_t, 32> sample{};
