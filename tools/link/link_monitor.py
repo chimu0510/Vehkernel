@@ -422,6 +422,11 @@ def main() -> int:
                 print("\n".join(monitor.summary()), flush=True)
     except KeyboardInterrupt:
         return 0
+    except OSError as error:
+        # The port went away, as when its USB cable is pulled: the MCU's own
+        # timeouts stop the vehicle; the tool reports it instead of a traceback.
+        print(f"FAIL: the Link's {target} failed: {error.strerror or error}", file=sys.stderr)
+        return 1
     finally:
         connection.close()
 

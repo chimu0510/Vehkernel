@@ -111,6 +111,9 @@ unit = "counts"
 description = "Output 4: encoder counts per wheel turn, after the gearbox and quadrature decoding."
 locked_when_armed = true
 
+# The speed loop defaults were checked on the C50C's stock motors (500-line
+# encoders, 1:18 gearboxes) at the hardware check of spec 0006 (#50): each
+# wheel held +5 and -5 rad/s within 10 %, so they stay as first chosen.
 [[param]]
 name = "MOT_SPD_P"
 type = "FLOAT"
