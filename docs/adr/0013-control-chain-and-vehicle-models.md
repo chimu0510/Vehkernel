@@ -37,6 +37,10 @@ All vehicle models implement one virtual interface and are selected at boot by f
   - For control, `wheel speeds = J·twist`.
   - For body velocity measurements, the pseudo-inverse of the same matrix, `twist = J⁺·wheel speeds`; the least-squares residual goes into the covariance as a slip indicator.
   - On saturation the whole twist is scaled down uniformly, keeping the path curvature.
+
+**Saturation feedback**
+
+Each allocation reports the factor it scaled the demand by and which axes that limited: every axis with a demand, when any wheel would exceed its largest speed. The controllers above stop integrating on a limited axis, so their integrators do not wind up while the vehicle cannot follow, as ArduPilot's `AP_MotorsUGV` limit flags do for its steering and speed controllers and PX4's control allocator does for its rate controllers. The angular rate loop also takes its error against the target scaled by the last allocation's factor: a saturated vehicle turns at the rate its scaled-down speed allows, keeping the commanded curvature, rather than the loop bending its path to chase the full rate. The allocation status is published for tests and tools. A priority between steering and speed (ArduPilot's `MOT_STR_THR_MIX`) is left until a frame needs it.
 - **`ACKERMANN`**: nonlinear, a separate model using the bicycle model.
 - **`THRUSTER`**: allocates at the force and torque level, `thrust = B⁺·wrench` (like PX4's control allocator). Only the interface is defined for now.
 

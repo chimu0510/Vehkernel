@@ -101,6 +101,14 @@ if(CONFIG_CONTROL_CHAIN AND CONFIG_VEHICLE_MODEL_WHEELED AND CONFIG_LINK_UDP)
       $<TARGET_FILE:vehkernel-sitl> ${CMAKE_SOURCE_DIR}/tools/link/link_monitor.py --msg-dir ${VK_MSG_PYTHON_DIR})
 endif()
 
+# L3 SITL body motion test (spec 0009): the control chain against the true
+# motion, a circle with and without slip and a twist beyond the wheels' reach.
+if(CONFIG_CONTROL_CHAIN AND CONFIG_VEHICLE_MODEL_WHEELED AND CONFIG_LINK_UDP)
+  add_test(NAME sitl_body_motion
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_body_motion.py
+      $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
+endif()
+
 # L3 SITL fault test (ADR-0005): a failed assertion and fail() while driving
 # end SITL with every output stopped, and a watchdog or fault reset refuses
 # arming.

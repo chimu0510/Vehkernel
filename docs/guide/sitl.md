@@ -64,6 +64,8 @@ SITL publishes the vehicle's true pose and velocity on `vehicle_local_odometry_g
 
 `test/sitl/check_body_velocity.py` (`sitl_body_velocity`) drives it by body velocity setpoints: refused in `STANDBY`, the wheel speed targets of the kinematics in `TEST`, never both setpoint levels at once, the setpoint timeout, and the Link monitor's `drive-body`.
 
+`test/sitl/check_body_motion.py` (`sitl_body_motion`) checks the control chain against the true motion: on a circle at 0.3 m/s and 0.5 rad/s, with and without `--slip 0.25`, the true yaw rate's mean from 4 s on must be within 3 % of the commanded rate (the wheels alone would be 25 % short with slip, so only the gyro loop passes it), and a twist beyond the wheels' reach must keep its curvature within 5 % while `allocation_status` reports the limited axes.
+
 CI drives the vehicle with direct-actuator setpoints in `test/sitl/check_vehicle.py` (`sitl_vehicle`): driving forward, the true distance must match the wheels' turn times `WHL_RADIUS` within 2 %; turning in place, the true heading change must match `WHL_RADIUS × (left - right) / WHL_TRACK` within 2 %, and the attitude estimator's yaw must follow the true heading within 3°; with `--slip 0.25`, the distance must be 75 % of the wheels' within 2 %.
 
 ## Motion profiles

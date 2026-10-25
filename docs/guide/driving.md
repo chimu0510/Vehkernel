@@ -60,6 +60,8 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600 drive 5,5,5,5 --duration 3
 tools/link/link_monitor.py --udp 127.0.0.1:15600 drive-body 0.3,0,0.5 --duration 3
 ```
 
+The yaw rate is closed on the gyro, a PI loop with feedforward (`RATE_YAW_P`, `RATE_YAW_I`, `RATE_YAW_FF`), so the vehicle turns at the commanded rate even when its wheels slip. With the wheels lifted the vehicle cannot turn, so set `RATE_YAW_P` and `RATE_YAW_I` to 0 for a lifted check, or the loop winds up against it. `allocation_status` shows the demand, the scale factor and the limited axes.
+
 The two levels never drive at once: the one whose setpoint arrived last drives, until it times out. Every safety condition above holds for body velocity setpoints as for direct-actuator ones.
 
 The live view shows `vehicle_status`, `wheel_encoders` and `actuator_outputs`.
