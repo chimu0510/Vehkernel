@@ -62,13 +62,19 @@ By default the simulated board sits in a ground vehicle that its motors move (AD
 
 SITL publishes the vehicle's true pose and velocity on `vehicle_local_odometry_groundtruth`: position in the local level frame (north-east-down, origin and heading zero at boot), attitude, and velocity and yaw rate in the body frame. Its true attitude also goes out on `vehicle_attitude_groundtruth`. The Link carries both at 50 Hz.
 
-`test/sitl/check_body_velocity.py` (`sitl_body_velocity`) drives it by body velocity setpoints: refused in `STANDBY`, the wheel speed targets of the kinematics in `TEST`, never both setpoint levels at once, the setpoint timeout, and the Link monitor's `drive-body`.
+### Body velocity scenarios
 
-`test/sitl/check_body_motion.py` (`sitl_body_motion`) checks the control chain against the true motion: on a circle at 0.3 m/s and 0.5 rad/s, with and without `--slip 0.25`, the true yaw rate's mean from 4 s on must be within 3 % of the commanded rate (the wheels alone would be 25 % short with slip, so only the gyro loop passes it), and a twist beyond the wheels' reach must keep its curvature within 5 % while `allocation_status` reports the limited axes.
+CI checks spec 0009 against the ground vehicle's truth with these scenarios, each driven over the Link. Every tolerance is set where a correct firmware passes with margin and a sign error, a wrong geometry or a missing loop fails; each script gives the same reasons in its header.
 
-`test/sitl/check_odometry.py` (`sitl_odometry`) checks the odometry against the truth: after 0.6 m forward, a 90° turn in place and 0.6 m more, its position must be within 3 % of the distance plus 2 cm and its heading within 3°, and the measured speed within 2 % of the true one; with `--slip 0.25`, turning in place, its heading must stay within 3° of the truth while the wheels' own heading runs a third ahead.
+| Test | Scenario | Tolerance, and why |
+|---|---|---|
+| `sitl_vehicle` (`check_vehicle.py`) | Direct-actuator setpoints: forward, a turn in place, and forward with `--slip 0.25` | Distance and heading change within 2 % of what the wheels turned, slip 75 % of it: room for encoder steps and interpolating the 50 Hz truth. The estimated yaw within 3° of the true heading, through the gyro alone |
+| `sitl_body_velocity` (`check_body_velocity.py`) | Body velocity refused in `STANDBY`; in `TEST`, the kinematics' wheel speed targets; direct-actuator and body velocity setpoints switched; the setpoint timeout; the `drive-body` command | Targets exact to 0.001 rad/s, with the yaw rate loop opened (P and I at 0); wheel speeds' mean within 5 %: about 32 encoder counts a cycle at 2 rad/s. No sample may mix the levels |
+| `sitl_body_motion` (`check_body_motion.py`) | A circle at 0.3 m/s and 0.5 rad/s, with and without `--slip 0.25`; 0.4 m/s at 2 rad/s with `MOT_MAX_SPD` 10 | Yaw rate mean within 3 % from 4 s on, once the loop's integral has settled: the wheels alone would be 25 % short with slip. Saturated: curvature within 5 %, vx and yaw rate reported limited, scale near 5/6 |
+| `sitl_odometry` (`check_odometry.py`) | 0.6 m, a 90° turn in place, 0.6 m; turning in place with `--slip 0.25` | Odometry within 3 % of the distance plus 2 cm and 3° of the truth, measured speed within 2 %. With slip, its heading within 3° while the wheels' heading runs a third ahead |
+| `sitl_routes` (`check_routes.py`) | Forward 1 m at 0.25 m/s; a square of 0.5 m sides and right turns in place | Forward: within 5 % of 1 m, feedforward with the wheels' 0.1 s lag at either end; odometry within 3 % of the truth; heading within 2°. Square: the odometry ends within 5 cm and 3° of the truth, and the truth turned a full circle within 15° |
 
-CI drives the vehicle with direct-actuator setpoints in `test/sitl/check_vehicle.py` (`sitl_vehicle`): driving forward, the true distance must match the wheels' turn times `WHL_RADIUS` within 2 %; turning in place, the true heading change must match `WHL_RADIUS × (left - right) / WHL_TRACK` within 2 %, and the attitude estimator's yaw must follow the true heading within 3°; with `--slip 0.25`, the distance must be 75 % of the wheels' within 2 %.
+A source not in control cannot send setpoints in these scenarios, since SITL has a single Link; the Link work item's unit tests check that refusal with two Links.
 
 ## Motion profiles
 
