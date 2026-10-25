@@ -63,6 +63,7 @@ public:
         std::uint64_t peer_timeout_us = Session::default_peer_timeout_us;
         ParameterAccess parameters{};                     // what the peer may read and change
         ControlAccess control{};                          // modes, arming and the emergency stop; the source is the instance
+        FrameHandler* sim_frames = nullptr;               // SITL only: the SITL-only frames
     };
 
     // topic_info and parameter list frames sent per run: at the default

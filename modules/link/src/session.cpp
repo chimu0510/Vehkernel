@@ -3,15 +3,15 @@
 
 #include <array>
 #include <limits>
-#include <optional>
-#include <string_view>
 
 namespace vk::link {
 
 void Session::handle(const Frame& frame, std::uint64_t now_us, FrameSink& sink)
 {
+    FrameSender out = sender(sink);
+    const BodyReader body(frame.body);
     if (frame.type == FrameType::Hello) {
-        on_hello(BodyReader(frame.body), sink);
+        on_hello(body, out);
         if (handshake_done_) {
             last_heard_us_ = now_us;
         }
@@ -23,37 +23,25 @@ void Session::handle(const Frame& frame, std::uint64_t now_us, FrameSink& sink)
     last_heard_us_ = now_us;
     switch (frame.type) {
     case FrameType::TimeSyncRequest:
-        on_time_sync(BodyReader(frame.body), now_us, sink);
+        on_time_sync(body, now_us, out);
         break;
     case FrameType::ParamListRequest:
-        on_param_list(BodyReader(frame.body));
-        break;
     case FrameType::ParamGet:
-        on_param_get(BodyReader(frame.body), sink);
-        break;
     case FrameType::ParamSet:
-        on_param_set(BodyReader(frame.body), sink);
+        parameters_.handle(frame.type, body, out);
         break;
     case FrameType::ModeRequest:
-        on_mode_request(BodyReader(frame.body), sink);
-        break;
     case FrameType::ArmingRequest:
-        on_arming_request(BodyReader(frame.body), sink);
-        break;
     case FrameType::EstopRequest:
-        on_estop_request(BodyReader(frame.body), sink);
-        break;
     case FrameType::BringupRun:
-        on_bringup_run(BodyReader(frame.body), sink);
-        break;
     case FrameType::RebootRequest:
-        on_reboot_request(BodyReader(frame.body), sink);
+        control_.handle(frame.type, body, out);
         break;
     case FrameType::SimActuatorPower:
-        on_sim_actuator_power(BodyReader(frame.body));
-        break;
     case FrameType::SimUserKey:
-        on_sim_user_key(BodyReader(frame.body));
+        if (sim_frames_ != nullptr) {
+            sim_frames_->handle(frame.type, body, out);
+        }
         break;
     default:
         break;  // Frames only the MCU sends, or not meant for a session.
@@ -65,7 +53,7 @@ bool Session::connected(std::uint64_t now_us) const
     return handshake_done_ && now_us - last_heard_us_ <= peer_timeout_us_;
 }
 
-void Session::on_hello(BodyReader body, FrameSink& sink)
+void Session::on_hello(BodyReader body, FrameSender& out)
 {
     const std::uint8_t count = body.u8();
     std::uint8_t chosen = 0;
@@ -79,7 +67,7 @@ void Session::on_hello(BodyReader body, FrameSink& sink)
     }
     version_ = chosen;
     handshake_done_ = chosen != 0;
-    list_next_ = std::numeric_limits<std::size_t>::max();  // A new peer starts afresh.
+    parameters_.stop_list();  // A new peer starts afresh.
     // send_pending() describes the topics; a burst here would overflow the transport.
     info_next_ = handshake_done_ ? 0 : std::numeric_limits<std::size_t>::max();
 
@@ -87,24 +75,24 @@ void Session::on_hello(BodyReader body, FrameSink& sink)
     BodyWriter writer(reply);
     writer.u8(chosen);
     writer.u16(static_cast<std::uint16_t>(handshake_done_ ? topics_.size() : 0));
-    writer.u64(handshake_done_ ? parameters_.set_hash : 0);
-    writer.u16(static_cast<std::uint16_t>(handshake_done_ ? parameter_count() : 0));
-    send(FrameType::HelloReply, writer.written(), sink);
+    writer.u64(handshake_done_ ? parameters_.set_hash() : 0);
+    writer.u16(static_cast<std::uint16_t>(handshake_done_ ? parameters_.count() : 0));
+    out.send(FrameType::HelloReply, writer.written());
 }
 
-bool Session::send_topic_info(const TopicDescription& topic, FrameSink& sink)
+bool Session::send_topic_info(const TopicDescription& topic, FrameSender& out)
 {
     std::array<std::uint8_t, max_body_size> info{};
-    BodyWriter out(info);
-    out.u16(topic.id);
-    out.u8(topic.instances);
-    out.u64(topic.schema_hash);
-    out.u8(static_cast<std::uint8_t>(topic.name.size()));
-    out.bytes({reinterpret_cast<const std::uint8_t*>(topic.name.data()), topic.name.size()});
-    return out.ok() && send(FrameType::TopicInfo, out.written(), sink);
+    BodyWriter writer(info);
+    writer.u16(topic.id);
+    writer.u8(topic.instances);
+    writer.u64(topic.schema_hash);
+    writer.u8(static_cast<std::uint8_t>(topic.name.size()));
+    writer.bytes({reinterpret_cast<const std::uint8_t*>(topic.name.data()), topic.name.size()});
+    return writer.ok() && out.send(FrameType::TopicInfo, writer.written());
 }
 
-void Session::on_time_sync(BodyReader body, std::uint64_t now_us, FrameSink& sink)
+void Session::on_time_sync(BodyReader body, std::uint64_t now_us, FrameSender& out)
 {
     const std::uint64_t host_send = body.u64();
     if (!body.ok()) {
@@ -115,230 +103,29 @@ void Session::on_time_sync(BodyReader body, std::uint64_t now_us, FrameSink& sin
     writer.u64(host_send);
     writer.u64(now_us);  // received
     writer.u64(now_us);  // sent: the reply leaves within the same run
-    send(FrameType::TimeSyncReply, writer.written(), sink);
-}
-
-namespace {
-
-// Reads a name: a length and that many characters.
-std::string_view read_name(BodyReader& body)
-{
-    const auto bytes = body.bytes(body.u8());
-    return {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
-}
-
-void write_name(BodyWriter& out, std::string_view name)
-{
-    out.u8(static_cast<std::uint8_t>(name.size()));
-    out.bytes({reinterpret_cast<const std::uint8_t*>(name.data()), name.size()});
-}
-
-}  // namespace
-
-void Session::on_param_list(BodyReader body)
-{
-    const std::uint16_t first = body.u16();
-    if (body.ok()) {
-        list_next_ = first;
-    }
-}
-
-void Session::on_param_get(BodyReader body, FrameSink& sink)
-{
-    const std::string_view name = read_name(body);
-    if (!body.ok()) {
-        return;
-    }
-    const auto index = parameter_count() == 0 ? std::nullopt : parameters_.parameters->find(name);
-    if (!index) {
-        send_param_reject(core::ParamResult::UnknownName, name, sink);
-        return;
-    }
-    send_param_value(*index, sink);
-}
-
-void Session::on_param_set(BodyReader body, FrameSink& sink)
-{
-    const std::string_view name = read_name(body);
-    const std::uint8_t type = body.u8();
-    const std::uint32_t bits = body.u32();
-    if (!body.ok()) {
-        return;
-    }
-    const auto index = parameter_count() == 0 ? std::nullopt : parameters_.parameters->find(name);
-    if (!index) {
-        send_param_reject(core::ParamResult::UnknownName, name, sink);
-        return;
-    }
-    const core::ParamValue value{.type = static_cast<core::ParamType>(type), .bits = bits};
-    const core::ParamResult result = parameters_.parameters->set(*index, value);
-    if (result != core::ParamResult::Ok) {
-        send_param_reject(result, name, sink);
-        return;
-    }
-    send_param_value(*index, sink);
-}
-
-bool Session::send_param_value(std::size_t index, FrameSink& sink)
-{
-    const core::ParamInfo& info = parameters_.parameters->info(index);
-    const core::ParamValue value = parameters_.parameters->get(index);
-    std::array<std::uint8_t, max_body_size> body{};
-    BodyWriter out(body);
-    out.u16(static_cast<std::uint16_t>(index));
-    out.u16(static_cast<std::uint16_t>(parameter_count()));
-    out.u8(static_cast<std::uint8_t>(value.type));
-    out.u32(value.bits);
-    out.u8(parameters_.storage == nullptr ? 0 : parameters_.storage->state(index));  // core::param_state
-    write_name(out, info.name);
-    return out.ok() && send(FrameType::ParamValue, out.written(), sink);
-}
-
-void Session::send_param_reject(core::ParamResult reason, std::string_view name, FrameSink& sink)
-{
-    std::array<std::uint8_t, max_body_size> body{};
-    BodyWriter out(body);
-    out.u8(static_cast<std::uint8_t>(reason));
-    write_name(out, name);
-    if (out.ok()) {
-        send(FrameType::ParamReject, out.written(), sink);
-    }
-}
-
-void Session::on_mode_request(BodyReader body, FrameSink& sink)
-{
-    const std::uint8_t mode = body.u8();
-    if (!body.ok() || control_.control == nullptr) {
-        return;
-    }
-    const core::ModeResult result =
-        mode > static_cast<std::uint8_t>(core::Mode::Test)
-            ? core::ModeResult::UnknownMode
-            : control_.control->request_mode(control_.source, static_cast<core::Mode>(mode));
-    std::array<std::uint8_t, 2> reply{};
-    BodyWriter out(reply);
-    if (result != core::ModeResult::Ok) {
-        out.u8(static_cast<std::uint8_t>(result));
-        out.u8(static_cast<std::uint8_t>(control_.control->mode()));
-        send(FrameType::ModeReject, out.written(), sink);
-        return;
-    }
-    out.u8(static_cast<std::uint8_t>(control_.control->mode()));
-    send(FrameType::ModeReply, out.written(), sink);
-}
-
-void Session::on_arming_request(BodyReader body, FrameSink& sink)
-{
-    const std::uint8_t arm = body.u8();
-    if (!body.ok() || control_.control == nullptr) {
-        return;
-    }
-    const core::ArmingResult result = control_.control->request_arming(control_.source, arm != 0);
-    std::array<std::uint8_t, 5> reply{};
-    BodyWriter out(reply);
-    if (result != core::ArmingResult::Ok) {
-        out.u8(static_cast<std::uint8_t>(result));
-        send(FrameType::ArmingReject, out.written(), sink);
-        return;
-    }
-    out.u8(control_.control->armed() ? 1 : 0);
-    out.u32(control_.control->skipped_checks());
-    send(FrameType::ArmingReply, out.written(), sink);
-}
-
-void Session::on_estop_request(BodyReader body, FrameSink& sink)
-{
-    const std::uint8_t engage = body.u8();
-    if (!body.ok() || control_.control == nullptr) {
-        return;
-    }
-    std::array<std::uint8_t, 1> reply{};
-    BodyWriter out(reply);
-    out.u8(control_.control->request_emergency_stop(engage != 0) ? 1 : 0);
-    send(FrameType::EstopReply, out.written(), sink);
-}
-
-void Session::on_bringup_run(BodyReader body, FrameSink& sink)
-{
-    const std::uint8_t bringup_case = body.u8();
-    if (!body.ok() || control_.control == nullptr) {
-        return;
-    }
-    const core::BringupStart result = control_.control->request_bringup(control_.source, bringup_case);
-    if (result == core::BringupStart::Ok) {
-        return;  // The result follows when the case ends.
-    }
-    std::array<std::uint8_t, 1> reply{static_cast<std::uint8_t>(result)};
-    send(FrameType::BringupReject, reply, sink);
-}
-
-// reboot_request: the action (core::RebootAction). The reply echoes it; the
-// reject gives the reason (core::RebootResult). The board resets after the reply.
-void Session::on_reboot_request(BodyReader body, FrameSink& sink)
-{
-    const std::uint8_t action = body.u8();
-    if (!body.ok() || control_.control == nullptr) {
-        return;
-    }
-    const bool known = action == static_cast<std::uint8_t>(core::RebootAction::Reboot) ||
-                       action == static_cast<std::uint8_t>(core::RebootAction::Bootloader);
-    const core::RebootResult result = known ? control_.control->request_reboot(static_cast<core::RebootAction>(action))
-                                            : core::RebootResult::UnknownAction;
-    std::array<std::uint8_t, 1> reply{};
-    if (result != core::RebootResult::Ok) {
-        reply[0] = static_cast<std::uint8_t>(result);
-        send(FrameType::RebootReject, reply, sink);
-        return;
-    }
-    reply[0] = action;
-    send(FrameType::RebootReply, reply, sink);
+    out.send(FrameType::TimeSyncReply, writer.written());
 }
 
 bool Session::send_bringup_result(const msg::BringupStatus& status, FrameSink& sink)
 {
-    std::array<std::uint8_t, 3 + 3 * 4> body{};
-    BodyWriter out(body);
-    out.u8(status.bringup_case);
-    out.u8(status.state);
-    out.u8(status.outputs);
-    for (std::size_t i = 0; i < status.outputs && i < status.result.size(); ++i) {
-        out.u8(status.result[i]);
-        out.u8(status.encoder[i]);
-        out.u8(static_cast<std::uint8_t>(status.sign[i]));
-    }
-    return out.ok() && send(FrameType::BringupResult, out.written(), sink);
-}
-
-void Session::on_sim_actuator_power(BodyReader body)
-{
-    const std::uint8_t powered = body.u8();
-    if (body.ok() && control_.set_sim_actuator_power != nullptr) {
-        control_.set_sim_actuator_power(powered != 0);
-    }
-}
-
-void Session::on_sim_user_key(BodyReader body)
-{
-    const std::uint8_t pressed = body.u8();
-    if (body.ok() && control_.set_sim_user_key != nullptr) {
-        control_.set_sim_user_key(pressed != 0);
-    }
+    FrameSender out = sender(sink);
+    return control_.send_bringup_result(status, out);
 }
 
 void Session::send_pending(std::uint64_t now_us, FrameSink& sink, std::size_t max_frames)
 {
+    FrameSender out = sender(sink);
     for (std::size_t sent = 0; sent < max_frames && (describing() || listing()) && connected(now_us); ++sent) {
         if (describing()) {
-            if (!send_topic_info(topics_[info_next_], sink)) {
+            if (!send_topic_info(topics_[info_next_], out)) {
                 return;  // Dropped: the same topic goes again next time.
             }
             ++info_next_;
             continue;
         }
-        if (!send_param_value(list_next_, sink)) {
+        if (!parameters_.send_next(out)) {
             return;  // Dropped: the same parameter goes again next time.
         }
-        ++list_next_;
     }
 }
 
@@ -353,22 +140,8 @@ bool Session::send_topic(std::uint16_t topic_id, std::uint8_t instance, std::spa
     writer.u16(topic_id);
     writer.u8(instance);
     writer.bytes(message);
-    return writer.ok() && send(FrameType::TopicData, writer.written(), sink);
-}
-
-bool Session::send(FrameType type, std::span<const std::uint8_t> body, FrameSink& sink)
-{
-    std::array<std::uint8_t, max_wire_size> wire{};
-    const std::size_t size = writer_.write(type, body, wire);
-    if (size == 0) {
-        return false;
-    }
-    if (!sink.send(std::span(wire).first(size))) {
-        writer_.retract();
-        return false;
-    }
-    ++frames_sent_;
-    return true;
+    FrameSender out = sender(sink);
+    return writer.ok() && out.send(FrameType::TopicData, writer.written());
 }
 
 }  // namespace vk::link

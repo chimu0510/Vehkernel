@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The MCU side of a Link session (ADR-0002): the handshake, the peer timeout
-// and time synchronization replies. Independent of the transport and of
-// FreeRTOS, so it runs on the development host in tests.
+// The MCU side of a Link session (ADR-0002): the handshake, the peer timeout,
+// time synchronization replies and topic data. Independent of the transport
+// and of FreeRTOS, so it runs on the development host in tests.
 //
 // The development host starts with hello. The MCU accepts it when it offers
 // the MCU's protocol version and answers with hello_reply, carrying the
@@ -15,24 +15,18 @@
 // data for a topic it has not been told about. The host keeps the session
 // alive with time sync requests.
 //
-// Parameters (ADR-0012) are read and changed through the parameter runtime:
-// param_get and param_set are answered at once with param_value or
-// param_reject, and param_list_request starts a stream of param_value frames
-// that send_pending() paces after the topic_info frames.
-//
-// Mode, arming and emergency stop requests (ADR-0005) go to the vehicle
-// control service, with this Link as their source, and are answered at once:
-// mode_request with mode_reply or mode_reject, arming_request with
-// arming_reply, which carries the arming checks skipped, or arming_reject,
-// and estop_request with estop_reply. bringup_run is refused at once with
-// bringup_reject, or accepted silently: its bringup_result follows when the
-// case ends. Without the service they go unanswered.
+// Once the handshake has succeeded, the session hands the other frames it
+// receives to a handler by frame type: parameter frames to its
+// ParameterHandler (ADR-0012), whose param_value list send_pending() paces
+// after the topic_info frames, vehicle control frames to its ControlHandler
+// (ADR-0005), and the SITL-only frames to the FrameHandler it is given, if
+// any (SimHandler, ADR-0018). Without one, a session ignores those frames.
 #pragma once
 
-#include <vk/core/parameter_storage.hpp>
-#include <vk/core/parameters.hpp>
-#include <vk/core/vehicle_control.hpp>
+#include <vk/link/control_handler.hpp>
 #include <vk/link/frame.hpp>
+#include <vk/link/frame_handler.hpp>
+#include <vk/link/parameter_handler.hpp>
 #include <vk/msg/bringup_status.hpp>
 #include <vk/msg/topics.hpp>
 
@@ -64,44 +58,16 @@ constexpr std::array<TopicDescription, sizeof...(Messages)> describe(msg::TopicL
 // Every topic of the schema, in topic ID order.
 inline constexpr auto schema_topics = detail::describe(msg::AllTopics{});
 
-// Where a session sends the frames it writes.
-class FrameSink {
-public:
-    FrameSink() = default;
-    virtual ~FrameSink() = default;
-    FrameSink(const FrameSink&) = delete;
-    FrameSink& operator=(const FrameSink&) = delete;
-    FrameSink(FrameSink&&) = delete;
-    FrameSink& operator=(FrameSink&&) = delete;
-
-    // Sends one frame, as encoded for the wire; false if it was dropped.
-    virtual bool send(std::span<const std::uint8_t> wire) = 0;
-};
-
-// The parameters a session offers; without a runtime it offers none.
-struct ParameterAccess {
-    core::Parameters* parameters = nullptr;
-    std::uint64_t set_hash = 0;                         // of the metadata the parameters come from
-    const core::ParameterStorage* storage = nullptr;    // for the flags of param_value, if parameters are stored
-};
-
-// The vehicle control a session offers; without it, mode, arming and
-// emergency stop requests go unanswered.
-struct ControlAccess {
-    core::VehicleControl* control = nullptr;
-    core::ControlSource source = 0;                     // this Link, as the source of its requests
-    void (*set_sim_actuator_power)(bool) = nullptr;     // SITL only: sim_actuator_power frames
-    void (*set_sim_user_key)(bool) = nullptr;           // SITL only: sim_user_key frames
-};
-
 class Session {
 public:
     static constexpr std::uint64_t default_peer_timeout_us = 3'000'000;
 
+    // `sim_frames` handles the SITL-only frames; only SITL gives one.
     explicit Session(std::span<const TopicDescription> topics = schema_topics,
                      std::uint64_t peer_timeout_us = default_peer_timeout_us, ParameterAccess parameters = {},
-                     ControlAccess control = {})
-        : topics_(topics), peer_timeout_us_(peer_timeout_us), parameters_(parameters), control_(control)
+                     ControlAccess control = {}, FrameHandler* sim_frames = nullptr)
+        : topics_(topics), peer_timeout_us_(peer_timeout_us), parameters_(parameters), control_(control),
+          sim_frames_(sim_frames)
     {
     }
 
@@ -134,40 +100,23 @@ public:
     [[nodiscard]] bool describing() const { return info_next_ < topics_.size(); }
 
     // Whether a parameter list is still being sent.
-    [[nodiscard]] bool listing() const { return list_next_ < parameter_count(); }
+    [[nodiscard]] bool listing() const { return parameters_.listing(); }
 
     [[nodiscard]] std::uint32_t frames_sent() const { return frames_sent_; }
 
 private:
-    void on_hello(BodyReader body, FrameSink& sink);
-    void on_time_sync(BodyReader body, std::uint64_t now_us, FrameSink& sink);
-    void on_param_list(BodyReader body);
-    bool send_topic_info(const TopicDescription& topic, FrameSink& sink);
-    void on_param_get(BodyReader body, FrameSink& sink);
-    void on_param_set(BodyReader body, FrameSink& sink);
-    bool send_param_value(std::size_t index, FrameSink& sink);
-    void send_param_reject(core::ParamResult reason, std::string_view name, FrameSink& sink);
-    void on_mode_request(BodyReader body, FrameSink& sink);
-    void on_arming_request(BodyReader body, FrameSink& sink);
-    void on_estop_request(BodyReader body, FrameSink& sink);
-    void on_bringup_run(BodyReader body, FrameSink& sink);
-    void on_reboot_request(BodyReader body, FrameSink& sink);
-    void on_sim_actuator_power(BodyReader body);
-    void on_sim_user_key(BodyReader body);
-    [[nodiscard]] std::size_t parameter_count() const
-    {
-        return parameters_.parameters == nullptr ? 0 : parameters_.parameters->count();
-    }
-    bool send(FrameType type, std::span<const std::uint8_t> body, FrameSink& sink);
+    void on_hello(BodyReader body, FrameSender& out);
+    void on_time_sync(BodyReader body, std::uint64_t now_us, FrameSender& out);
+    bool send_topic_info(const TopicDescription& topic, FrameSender& out);
+    FrameSender sender(FrameSink& sink) { return {writer_, sink, frames_sent_}; }
 
     std::span<const TopicDescription> topics_;
     std::uint64_t peer_timeout_us_;
-    ParameterAccess parameters_;
-    ControlAccess control_;
+    ParameterHandler parameters_;
+    ControlHandler control_;
+    FrameHandler* sim_frames_;  // SITL only
     // Next topic to describe with topic_info; none at or past the topic count.
     std::size_t info_next_ = std::numeric_limits<std::size_t>::max();
-    // Next parameter of the list being sent; none at or past the count.
-    std::size_t list_next_ = std::numeric_limits<std::size_t>::max();
     FrameWriter writer_;
     std::uint8_t version_ = 0;
     bool handshake_done_ = false;

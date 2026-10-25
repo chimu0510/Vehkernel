@@ -23,7 +23,8 @@ ControlAccess with_source(ControlAccess control, std::uint8_t instance)
 Link::Link(std::string_view name, hal::Transport& transport, TopicMap map, const Config& config,
            core::WorkQueue& queue)
     : WorkItem(name, queue), transport_(&transport), map_(map), config_(config),
-      session_(schema_topics, config.peer_timeout_us, config.parameters, with_source(config.control, config.instance)),
+      session_(schema_topics, config.peer_timeout_us, config.parameters, with_source(config.control, config.instance),
+               config.sim_frames),
       sink_(transport), status_publication_(config.instance)
 {
 }
