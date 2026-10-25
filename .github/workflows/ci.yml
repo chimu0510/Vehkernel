@@ -20,9 +20,22 @@ jobs:
       - name: Build presets, run L0 checks and host tests
         run: |
           docker run --rm -v "$PWD:/work" -w /work vehkernel-dev bash -euo pipefail -c '
-            for preset in c50c-v1_1 c50c-v1_1-bringup sitl test; do
+            for preset in c50c-v1_1 c50c-v1_1-bringup sitl test fuzz; do
               cmake --preset "$preset"
               cmake --build --preset "$preset"
             done
             ctest --preset test
           '
+
+      # Each Link fuzz target for 60 s, three at a time (docs/guide/testing.md).
+      - name: Fuzz the Link decoders
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work vehkernel-dev ctest --preset fuzz
+
+      - name: Keep fuzzer findings
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: build/fuzz/test/fuzz/artifacts/
+          if-no-files-found: ignore

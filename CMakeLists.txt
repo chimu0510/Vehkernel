@@ -8,6 +8,7 @@ set_property(CACHE VK_PLATFORM PROPERTY STRINGS stm32f4 sitl)
 set(VK_BOARD "" CACHE STRING "Board directory under boards/ (STM32 targets only)")
 option(VK_BUILD_TESTS "Build and register host tests" OFF)
 option(VK_CLANG_TIDY "Run clang-tidy on Vehkernel sources (L0, ADR-0018)" OFF)
+option(VK_BUILD_FUZZERS "Build and register the Link fuzz targets (L1, ADR-0018); Clang only" OFF)
 
 if(NOT VK_PLATFORM MATCHES "^(stm32f4|sitl)$")
   message(FATAL_ERROR "VK_PLATFORM must be stm32f4 or sitl; use a CMake preset")
@@ -37,6 +38,18 @@ add_library(vk_cxx_subset INTERFACE)
 if(VK_PLATFORM STREQUAL "stm32f4")
   target_compile_options(vk_cxx_subset INTERFACE
     $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions -fno-rtti -fno-threadsafe-statics>)
+endif()
+
+# The fuzz build instruments every source for libFuzzer's coverage and for
+# the sanitizers, and turns on libstdc++'s bounds checks, which catch an
+# overrun from one array member into the next that AddressSanitizer cannot
+# see. Any finding aborts.
+if(VK_BUILD_FUZZERS)
+  if(NOT VK_PLATFORM STREQUAL "sitl" OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    message(FATAL_ERROR "VK_BUILD_FUZZERS needs the sitl platform and Clang; use the fuzz preset")
+  endif()
+  add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-fsanitize=fuzzer-no-link,address,undefined;-fno-sanitize-recover=all;-fno-omit-frame-pointer;-D_GLIBCXX_ASSERTIONS>")
+  add_link_options(-fsanitize=address,undefined)
 endif()
 
 if(VK_CLANG_TIDY)
@@ -72,4 +85,8 @@ add_subdirectory(app)
 if(VK_BUILD_TESTS)
   enable_testing()
   add_subdirectory(test)
+endif()
+if(VK_BUILD_FUZZERS)
+  enable_testing()
+  add_subdirectory(test/fuzz)
 endif()

@@ -46,19 +46,39 @@
         "VK_BUILD_TESTS": "ON",
         "VK_CLANG_TIDY": "ON"
       }
+    },
+    {
+      "name": "fuzz",
+      "displayName": "Link fuzz targets (libFuzzer, Clang)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "clang-18",
+        "CMAKE_CXX_COMPILER": "clang++-18",
+        "VK_PLATFORM": "sitl",
+        "VK_BUILD_FUZZERS": "ON",
+        "VK_CLANG_TIDY": "ON"
+      }
     }
   ],
   "buildPresets": [
     { "name": "c50c-v1_1", "configurePreset": "c50c-v1_1" },
     { "name": "c50c-v1_1-bringup", "configurePreset": "c50c-v1_1-bringup" },
     { "name": "sitl", "configurePreset": "sitl" },
-    { "name": "test", "configurePreset": "test" }
+    { "name": "test", "configurePreset": "test" },
+    { "name": "fuzz", "configurePreset": "fuzz", "targets": ["vk_fuzzers"] }
   ],
   "testPresets": [
     {
       "name": "test",
       "configurePreset": "test",
       "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "fuzz",
+      "configurePreset": "fuzz",
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 3 }
     }
   ]
 }
