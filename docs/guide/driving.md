@@ -64,7 +64,11 @@ The yaw rate is closed on the gyro, a PI loop with feedforward (`RATE_YAW_P`, `R
 
 The two levels never drive at once: the one whose setpoint arrived last drives, until it times out. Every safety condition above holds for body velocity setpoints as for direct-actuator ones.
 
-The live view shows `vehicle_status`, `wheel_encoders` and `actuator_outputs`.
+The live view shows `vehicle_status`, `wheel_encoders` and `actuator_outputs`, and the odometry below.
+
+## Odometry
+
+The vehicle model measures the body velocity from the wheel speeds and publishes it on `body_velocity_measurement` (ADR-0014), with its variance: each wheel's encoder quantization and the residual, the rim speed the wheels disagree by, which grows with slip. Local odometry dead-reckons from it in the local level frame, north-east-down with its origin where the vehicle stood when the attitude estimator aligned, and publishes `vehicle_local_odometry`: position, attitude, body velocity, yaw rate and their variances. The heading is always the attitude estimator's, never the wheels' speed difference, so a skid does not turn the track. Both go to the Link at 50 Hz; the live view shows them on its `body velocity` and `odometry` lines, and `--check` prints them.
 
 ## Fault stop check
 

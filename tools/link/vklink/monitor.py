@@ -214,6 +214,23 @@ def actuator_outputs_line(outputs) -> str:
     return f"actuator_outputs output={speeds_text(outputs.output)} target={speeds_text(outputs.target)}"
 
 
+def body_velocity_measurement_line(measurement) -> str:
+    """body_velocity_measurement as a space-separated key=value line."""
+    std = ",".join(f"{math.sqrt(max(v, 0.0)):.4f}" for v in measurement.variance)
+    return (f"body_velocity_measurement vx={measurement.vx:.3f} vy={measurement.vy:.3f} "
+            f"yaw_rate={measurement.yaw_rate:.3f} residual={measurement.residual:.4f} std={std}")
+
+
+def vehicle_local_odometry_line(odometry) -> str:
+    """vehicle_local_odometry as a space-separated key=value line, the heading in degrees."""
+    north_std = math.sqrt(max(odometry.position_variance[0], 0.0))
+    east_std = math.sqrt(max(odometry.position_variance[2], 0.0))
+    return (f"vehicle_local_odometry north={odometry.position[0]:.3f} east={odometry.position[1]:.3f} "
+            f"heading_deg={euler_degrees(odometry.q)[2]:.1f} vx={odometry.velocity[0]:.3f} "
+            f"vy={odometry.velocity[1]:.3f} yaw_rate={odometry.yaw_rate:.3f} "
+            f"north_std={north_std:.4f} east_std={east_std:.4f}")
+
+
 def param_status_line(status) -> str:
     """parameter_status as a space-separated key=value line."""
     return (f"param_status count={status.parameter_count} sector={status.active_sector} "
@@ -758,6 +775,10 @@ class LinkMonitor:
             lines.append(wheel_encoders_line(encoders))
         for _, outputs in self.latest("actuator_outputs"):
             lines.append(actuator_outputs_line(outputs))
+        for _, measurement in self.latest("body_velocity_measurement"):
+            lines.append(body_velocity_measurement_line(measurement))
+        for _, odometry in self.latest("vehicle_local_odometry"):
+            lines.append(vehicle_local_odometry_line(odometry))
         for _, status in self.latest("work_item_status"):
             lines.append(
                 f"work_item name={work_item_name(status)} runs={status.runs} overruns={status.overruns} "

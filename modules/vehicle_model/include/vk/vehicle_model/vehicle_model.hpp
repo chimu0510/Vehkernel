@@ -48,9 +48,10 @@ public:
     [[nodiscard]] virtual WheelAllocation allocate(const Twist& demand, float max_speed,
                                                    OutputTargets targets) const = 0;
 
-    // The body velocity the outputs' wheel speeds [rad/s] show, when the
-    // model has wheel speed feedback.
-    [[nodiscard]] virtual std::optional<WheelMeasurement> measure(OutputSpeeds speeds) const = 0;
+    // The body velocity the outputs' wheel speeds [rad/s] show, with its
+    // variance from each output's speed noise [rad/s, standard deviation],
+    // when the model has wheel speed feedback.
+    [[nodiscard]] virtual std::optional<WheelMeasurement> measure(OutputSpeeds speeds, OutputSpeeds noise) const = 0;
 
 protected:
     ~VehicleModel() = default;

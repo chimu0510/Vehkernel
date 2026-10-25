@@ -42,7 +42,7 @@ public:
     [[nodiscard]] std::size_t output(std::size_t wheel) const { return outputs_.at(wheel); }
 
     [[nodiscard]] WheelAllocation allocate(const Twist& demand, float max_speed, OutputTargets targets) const override;
-    [[nodiscard]] std::optional<WheelMeasurement> measure(OutputSpeeds speeds) const override;
+    [[nodiscard]] std::optional<WheelMeasurement> measure(OutputSpeeds speeds, OutputSpeeds noise) const override;
 
 private:
     estimation::WheelKinematics kinematics_;

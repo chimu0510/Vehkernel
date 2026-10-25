@@ -79,7 +79,7 @@ TEST(WheeledModel, OutputMappingPlacesEachWheel)
     EXPECT_FLOAT_EQ(targets[3], 12.0F);  // left on output 4
     // The measurement reads each wheel from its output.
     const Targets speeds{0.0F, 8.0F, 0.0F, 12.0F};
-    const auto m = model.measure(speeds);
+    const auto m = model.measure(speeds, Targets{});
     ASSERT_TRUE(m.has_value());
     const auto twist = m.value_or(vk::estimation::WheelMeasurement{}).twist;
     EXPECT_NEAR(twist.vx, 0.5F, 1e-5F);
@@ -118,7 +118,7 @@ TEST(WheeledModel, NonFiniteDemandLeavesEveryOutputUncontrolled)
     for (const float target : targets) {
         EXPECT_TRUE(std::isnan(target));
     }
-    EXPECT_FALSE(model.measure(Targets{std::nanf(""), 0.0F, 0.0F, 0.0F}).has_value());
+    EXPECT_FALSE(model.measure(Targets{std::nanf(""), 0.0F, 0.0F, 0.0F}, Targets{}).has_value());
 }
 
 TEST(WheeledModel, InvalidFramesAreRefused)
@@ -136,7 +136,7 @@ TEST(WheeledModel, InvalidFramesAreRefused)
     Targets targets{};
     static_cast<void>(invalid.allocate({.vx = 1.0F}, 30.0F, targets));
     EXPECT_TRUE(std::isnan(targets[0]));
-    EXPECT_FALSE(invalid.measure(Targets{}).has_value());
+    EXPECT_FALSE(invalid.measure(Targets{}, Targets{}).has_value());
 }
 
 TEST_F(VehicleParameters, DefaultsDescribeADifferentialFrame)

@@ -38,7 +38,13 @@
 
 #ifdef CONFIG_CONTROL_CHAIN
 #include <vk/control/control_chain_task.hpp>
+#endif
+#ifdef CONFIG_ESTIMATOR_LOCAL_ODOMETRY
+#include <vk/estimation/local_odometry.hpp>
+#endif
+#ifdef CONFIG_ACTUATOR_CONTROL
 #include <vk/vehicle_model/vehicle_description.hpp>
+#include <vk/vehicle_model/velocity_measurement_task.hpp>
 #endif
 
 #ifdef CONFIG_DRIVER_ICM20948
@@ -146,19 +152,42 @@ void stop_motor_outputs()
     decltype(output4)::stop();
 }
 
-#ifdef CONFIG_CONTROL_CHAIN
 vk::vehicle_model::VehicleModels vehicle_models;
+const vk::vehicle_model::VehicleModel* vehicle_model = nullptr;
+vk::core::StaticInstance<vk::vehicle_model::VelocityMeasurementTask> velocity_measurement;
+
+// The vehicle model the parameters select at boot (ADR-0013), and its body
+// velocity measurement from the wheel encoders on wq:ctrl (ADR-0014).
+void start_vehicle_model()
+{
+    vehicle_model = vehicle_models.select(vk::vehicle_model::description_from_parameters());
+    velocity_measurement.emplace(vk::vehicle_model::VelocityMeasurementTask::Config{.model = vehicle_model},
+                                 vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    velocity_measurement->start();
+}
+
+#ifdef CONFIG_CONTROL_CHAIN
 vk::core::StaticInstance<vk::control::ControlChainTask> control_chain;
 
 // The control chain on wq:ctrl before actuator control, over the vehicle
-// model the parameters select at boot (ADR-0013).
+// model selected at boot (ADR-0013).
 void start_control_chain()
 {
-    const vk::vehicle_model::VehicleModel* model =
-        vehicle_models.select(vk::vehicle_model::description_from_parameters());
-    control_chain.emplace(vk::control::ControlChainTask::Config{.interval_us = control_interval_us, .model = model},
-                          vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    control_chain.emplace(
+        vk::control::ControlChainTask::Config{.interval_us = control_interval_us, .model = vehicle_model},
+        vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     control_chain->start();
+}
+#endif
+
+#ifdef CONFIG_ESTIMATOR_LOCAL_ODOMETRY
+vk::core::StaticInstance<vk::estimation::LocalOdometry> local_odometry;
+
+// Local odometry on wq:ctrl, from the wheels' body velocity measurement (ADR-0014).
+void start_local_odometry()
+{
+    local_odometry.emplace(vk::estimation::LocalOdometry::Config{}, vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    local_odometry->start();
 }
 #endif
 
@@ -407,8 +436,12 @@ int main()
 #endif
     start_commander();
 #ifdef CONFIG_ACTUATOR_CONTROL
+    start_vehicle_model();
 #ifdef CONFIG_CONTROL_CHAIN
     start_control_chain();
+#endif
+#ifdef CONFIG_ESTIMATOR_LOCAL_ODOMETRY
+    start_local_odometry();
 #endif
     start_actuators();
 #endif

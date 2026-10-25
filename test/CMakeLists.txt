@@ -109,6 +109,14 @@ if(CONFIG_CONTROL_CHAIN AND CONFIG_VEHICLE_MODEL_WHEELED AND CONFIG_LINK_UDP)
       $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
 endif()
 
+# L3 SITL odometry test (spec 0009): local odometry against the truth, and
+# its heading from the attitude estimator when the wheels slip.
+if(CONFIG_ESTIMATOR_LOCAL_ODOMETRY AND CONFIG_CONTROL_CHAIN AND CONFIG_VEHICLE_MODEL_WHEELED AND CONFIG_LINK_UDP)
+  add_test(NAME sitl_odometry
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_odometry.py
+      $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
+endif()
+
 # L3 SITL fault test (ADR-0005): a failed assertion and fail() while driving
 # end SITL with every output stopped, and a watchdog or fault reset refuses
 # arming.
