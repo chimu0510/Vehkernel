@@ -24,6 +24,7 @@ There is one CMake preset per build target:
 | `c50c-v1_1-bringup` | The C50C V1.1 bring-up image ([Testing](testing.md#bring-up-image)) |
 | `sitl` | SITL executable for the development host ([SITL](sitl.md)) |
 | `test` | Host tests, run with `ctest --preset test` ([Testing](testing.md)) |
+| `fuzz` | The Link fuzz targets, built with Clang, libFuzzer and the sanitizers, run with `ctest --preset fuzz` ([Testing](testing.md#fuzzing-the-link-decoders)) |
 
 ```bash
 cmake --preset c50c-v1_1
@@ -32,7 +33,7 @@ cmake --build --preset c50c-v1_1
 
 Every firmware and bootloader build prints the usage of each memory region; outgrowing a region fails the link (ADR-0017, ADR-0020). The bootloader's budget is the BOOT region, 16 KB on the C50C.
 
-The `sitl` and `test` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
+The `sitl`, `test` and `fuzz` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests inside the same devcontainer image.
 
 ## Build configuration (Kconfig)
 

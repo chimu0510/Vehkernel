@@ -43,3 +43,13 @@ RUN curl -fsSL -o /tmp/gtest.tar.gz \
     && cmake --build /tmp/gtest/build && cmake --install /tmp/gtest/build \
     && rm -rf /tmp/gtest /tmp/gtest.tar.gz
 ENV CMAKE_PREFIX_PATH=/opt/googletest
+
+# Clang with libFuzzer and the sanitizer runtimes, for the fuzz preset only
+# (ADR-0018); every other host build stays on GCC. llvm-18 brings
+# llvm-symbolizer, so sanitizer reports name source lines.
+ARG CLANG_VERSION=1:18.1.3-1ubuntu1
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        "clang-18=${CLANG_VERSION}" "libclang-rt-18-dev=${CLANG_VERSION}" "llvm-18=${CLANG_VERSION}" \
+    && rm -rf /var/lib/apt/lists/*
+ENV PATH=$PATH:/usr/lib/llvm-18/bin
