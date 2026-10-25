@@ -8,3 +8,9 @@ Build and development-host tools may use third-party packages, but versions must
 - External data that affects build output, such as the SoC database, is converted offline and committed, so builds need no network and stay reproducible.
 
 Unmaintained packages such as kconfiglib may be kept as a copy in the repo when necessary.
+
+**Where external code lives**: C and C++ code from elsewhere is pinned as git submodules under `external/`, the name Android's AOSP and many CMake projects use; a tool's own pinned external files sit beside it in an `external/` directory of its own, as `tools/bootloader/external/uploader.py` does. External code is never edited in place: it is updated by moving the pin, and REUSE and GitHub's language statistics treat it as vendored.
+
+## Considered Options
+
+- **`third_party/` as the directory name** (Chromium, TensorFlow): replaced by `external/`. `modules/` (ArduPilot, Zephyr) and `lib/` (Betaflight) were taken by the module layer and the math libraries, and `vendor/` names the ignored directory that holds vendor datasheets and firmware backups.

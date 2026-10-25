@@ -12,6 +12,6 @@
 *.pdf binary
 
 # Keep pinned third-party and lock files out of language statistics and diffs.
-third_party/** linguist-vendored
-tools/bootloader/third_party/** linguist-vendored
+external/** linguist-vendored
+tools/bootloader/external/** linguist-vendored
 uv.lock linguist-generated -diff

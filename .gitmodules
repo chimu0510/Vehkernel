@@ -1,16 +1,16 @@
-[submodule "third_party/freertos-kernel"]
-	path = third_party/freertos-kernel
+[submodule "external/freertos-kernel"]
+	path = external/freertos-kernel
 	url = https://github.com/FreeRTOS/FreeRTOS-Kernel
 	shallow = true
-[submodule "third_party/cmsis-core"]
-	path = third_party/cmsis-core
+[submodule "external/cmsis-core"]
+	path = external/cmsis-core
 	url = https://github.com/ARM-software/CMSIS_6
 	shallow = true
-[submodule "third_party/cmsis-device-f4"]
-	path = third_party/cmsis-device-f4
+[submodule "external/cmsis-device-f4"]
+	path = external/cmsis-device-f4
 	url = https://github.com/STMicroelectronics/cmsis-device-f4
 	shallow = true
-[submodule "third_party/stm32f4xx-hal-driver"]
-	path = third_party/stm32f4xx-hal-driver
+[submodule "external/stm32f4xx-hal-driver"]
+	path = external/stm32f4xx-hal-driver
 	url = https://github.com/STMicroelectronics/stm32f4xx-hal-driver
 	shallow = true

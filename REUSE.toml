@@ -4,7 +4,7 @@ version = 1
 # SPDX-License-Identifier line, in the REUSE format (https://reuse.software).
 # Every first-party source carries the line itself; `reuse lint` (an L0 check,
 # ADR-0018) fails on a new source that has neither the line nor an entry here.
-# The submodules under third_party/ keep their own notices and are not checked.
+# The submodules under external/ keep their own notices and are not checked.
 # Files stay without per-file copyright lines: the copyright of first-party
 # files is recorded here once.
 
@@ -57,7 +57,7 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 
 # PX4's firmware uploader keeps its own BSD-3-Clause notice.
 [[annotations]]
-path = "tools/bootloader/third_party/uploader.py"
+path = "tools/bootloader/external/uploader.py"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2012-2017 PX4 Development Team"
 SPDX-License-Identifier = "BSD-3-Clause"

@@ -37,7 +37,7 @@ tools/flash/flash_serial.py update
 1. It asks the firmware over its Link on the port to reboot into the bootloader, as `link_monitor.py --serial <port> reboot --bootloader` does (the Link at 921600 baud unless given `--link-baud`). A firmware that refuses, because it is armed, stops the update there.
 2. When no Link answers, for example because the firmware does not run, it starts `uploader.py` first and, once it waits for the bootloader, restarts the board through the download circuit, so the boot window catches it.
    `uploader.py` usually prints `Attempting reboot on <port> with baudrate=57600...` once before `Found board`: it looked for the bootloader before the board had finished resetting. That is expected.
-3. The pinned `uploader.py` (`tools/bootloader/third_party/`) writes `vehkernel.apj`, verifies it and starts the firmware. It runs through `tools/flash/run_uploader.py`, which releases DTR and RTS each time `uploader.py` opens the port: on a download port, RTS asserted holds BOOT0 high, and the reset after `reboot --bootloader` would then start the STM32 system bootloader instead of the board's.
+3. The pinned `uploader.py` (`tools/bootloader/external/`) writes `vehkernel.apj`, verifies it and starts the firmware. It runs through `tools/flash/run_uploader.py`, which releases DTR and RTS each time `uploader.py` opens the port: on a download port, RTS asserted holds BOOT0 high, and the reset after `reboot --bootloader` would then start the STM32 system bootloader instead of the board's.
 
 The tool fails with exit code 1 when `stm32flash` or `uploader.py` fails, the firmware refuses to reboot, the bootloader refuses an image built for another board, or no bootloader answers within 3 minutes, and with 2 when an image does not fit its region, the build, `stm32flash` or `uploader.py` is missing, or the backup file already exists. `uploader.py` needs pyserial on the host ([Building](building.md)).
 
@@ -45,7 +45,7 @@ The tool fails with exit code 1 when `stm32flash` or `uploader.py` fails, the fi
 
 ```bash
 tools/link/link_monitor.py --serial /dev/ttyACM0 reboot --bootloader
-python3 tools/bootloader/third_party/uploader.py --port /dev/ttyACM0 --no-extf build/c50c-v1_1/app/vehkernel.apj
+python3 tools/bootloader/external/uploader.py --port /dev/ttyACM0 --no-extf build/c50c-v1_1/app/vehkernel.apj
 ```
 
 ## Over SWD
