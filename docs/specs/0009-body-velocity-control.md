@@ -1,8 +1,8 @@
 # Spec 0009: body velocity control (the WHEELED vehicle model, local odometry and SITL vehicle physics)
 
-**Status**: in progress. Issue: [#103](https://github.com/chimu0510/Vehkernel/issues/103); tickets #104 to #110, with the hardware check in #110.
+**Status**: done. Issue: [#103](https://github.com/chimu0510/Vehkernel/issues/103); tickets #104 to #110. The hardware check in #110 confirmed it on the C50C V1.1 on 2026-10-26, wheels lifted, on WHEELTEC's four-wheel differential swing-arm vehicle (two motors, outputs 1 and 2; its preset is recorded on #110).
 
-Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
+This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 
 ## Problem Statement
 

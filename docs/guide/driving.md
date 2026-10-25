@@ -44,6 +44,8 @@ The vehicle model turns a body motion demand into wheel speeds, and the wheel sp
 | `WHL_LEFT_OUT`, `WHL_RIGHT_OUT` | The output that drives the left and the right wheel; the front pair for `SKID_4WD` |
 | `WHL_REAR_L_OUT`, `WHL_REAR_R_OUT` | The output of each rear wheel, `SKID_4WD` only |
 
+A positive wheel speed must roll the vehicle forward on every side. The motor bring-up case only makes each motor agree with its own encoder, so check the direction by eye with `drive-body` and the wheels lifted. On a side whose motor is mounted mirrored, which turns it the other way for forward, flip the output as a whole: both `MOTn_REV` and `MOTn_ENC_REV`. On the C50C's four-wheel differential swing-arm vehicle that is output 2, the right wheel.
+
 Outputs the frame does not use stay uncontrolled. A description no compiled-in model can drive, such as two wheels on one output, selects no model. Only frame classes and types whose model is compiled in (Kconfig `VEHICLE_MODEL_*`) are offered. The body frame is x forward, y right and z down, so a positive yaw rate turns right: on `DIFF_2WD` the left wheel then runs faster than the right by `yaw rate × WHL_TRACK / WHL_RADIUS`.
 
 ## Driving
