@@ -21,6 +21,10 @@ vk_add_library(vk_vehicle_model LAYER module STATIC vehicle_model/src/vehicle_de
 if(CONFIG_VEHICLE_MODEL_WHEELED)
   target_sources(vk_vehicle_model PRIVATE vehicle_model/src/wheeled_model.cpp)
 endif()
+if(CONFIG_ACTUATOR_CONTROL)
+  # The body velocity measurement reads the wheel encoders actuator control publishes.
+  target_sources(vk_vehicle_model PRIVATE vehicle_model/src/velocity_measurement_task.cpp)
+endif()
 target_include_directories(vk_vehicle_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vehicle_model/include)
 vk_target_link_libraries(vk_vehicle_model PUBLIC vk_msg_headers vk_core vk_params vk_lib_estimation)
 # Its header includes the compiled-in models, so the Kconfig header is public.
@@ -99,6 +103,9 @@ endif()
 if(CONFIG_ESTIMATOR_MAHONY)
   # Estimators (ADR-0014): work items over the math library in lib/estimation.
   vk_add_library(vk_estimation LAYER module STATIC estimation/src/attitude_estimator.cpp)
+  if(CONFIG_ESTIMATOR_LOCAL_ODOMETRY)
+    target_sources(vk_estimation PRIVATE estimation/src/local_odometry.cpp)
+  endif()
   target_include_directories(vk_estimation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/estimation/include)
   vk_target_link_libraries(vk_estimation PUBLIC vk_msg_headers vk_core vk_params vk_lib_estimation)
   target_link_libraries(vk_estimation PRIVATE vk_warnings vk_cxx_subset)

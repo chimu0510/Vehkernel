@@ -202,3 +202,11 @@ class VehicleType(enum.IntEnum):
     GROUND = 0
     SURFACE = 1
     UNDERWATER = 2
+
+
+class VelocitySource(enum.IntEnum):
+    """Where a body velocity measurement comes from (ADR-0014). Each source publishes on its
+    own instance of body_velocity_measurement.
+    """
+
+    WHEELS = 0  # the vehicle model, from the wheel encoders

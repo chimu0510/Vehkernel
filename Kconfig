@@ -89,6 +89,15 @@ config ESTIMATOR_MAHONY
 	  Attitude from the IMU with the Mahony complementary filter
 	  (ADR-0014), published on vehicle_attitude.
 
+config ESTIMATOR_LOCAL_ODOMETRY
+	bool "Local odometry"
+	depends on ESTIMATOR_MAHONY && ACTUATOR_CONTROL
+	default y
+	help
+	  Dead reckoning from the vehicle model's body velocity measurement
+	  with the attitude estimator's heading (ADR-0014), published on
+	  vehicle_local_odometry.
+
 endmenu
 
 menu "Actuators"

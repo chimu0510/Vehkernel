@@ -177,7 +177,7 @@ def test_drive_stops_when_the_vehicle_disarms_after_it_was_armed():
     assert all(math.isnan(speed) for speed in setpoints(link.mcu)[-1])
 
 
-def test_summary_and_live_view_show_wheels_and_outputs():
+def test_summary_and_live_view_show_wheels_outputs_and_odometry():
     connection = types.SimpleNamespace(send=lambda data: None, receive=lambda timeout: b"", close=lambda: None)
     monitor = LinkMonitor(connection, messages())
     encoders = types.SimpleNamespace(timestamp=1, angle=(1.0, 2.0, 3.0, 4.0), speed=(10.0, 9.5, -1.0, 0.0),
@@ -191,7 +191,21 @@ def test_summary_and_live_view_show_wheels_and_outputs():
     assert ("wheel_encoders speed=10.000,9.500,-1.000,0.000 angle=1.000,2.000,3.000,4.000 valid=0xF"
             in summary)
     assert "actuator_outputs output=0.200,0.190,0.000,0.000 target=10.000,10.000,nan,nan" in summary
+    measurement = types.SimpleNamespace(timestamp=1, vx=0.3, vy=0.0, yaw_rate=-0.5, residual=0.002,
+                                        variance=(1e-4, 0.0, 4e-4))
+    odometry = types.SimpleNamespace(timestamp=1, position=(1.5, -0.25, 0.0), q=(0.7071068, 0.0, 0.0, 0.7071068),
+                                     velocity=(0.3, 0.0, 0.0), yaw_rate=-0.5, position_variance=(1e-4, 0.0, 4e-4))
+    for name, message in (("body_velocity_measurement", measurement), ("vehicle_local_odometry", odometry)):
+        monitor.topics[(name, 0)] = TopicStats(name, 0)
+        monitor.topics[(name, 0)].add(message)
+    summary = monitor.summary()
+    assert ("body_velocity_measurement vx=0.300 vy=0.000 yaw_rate=-0.500 residual=0.0020 std=0.0100,0.0000,0.0200"
+            in summary)
+    assert ("vehicle_local_odometry north=1.500 east=-0.250 heading_deg=90.0 vx=0.300 vy=0.000 yaw_rate=-0.500 "
+            "north_std=0.0100 east_std=0.0200" in summary)
     view = render(monitor, "udp", width=200)
+    assert "body velocity  vx=0.300" in "\n".join(view)
+    assert "odometry       north=1.500 east=-0.250 heading_deg=90.0" in "\n".join(view)
     assert "wheels         speed=10.000,9.500,-1.000,0.000 angle=1.000,2.000,3.000,4.000 valid=0xF" in view
     assert "outputs        output=0.200,0.190,0.000,0.000 target=10.000,10.000,nan,nan" in view
 

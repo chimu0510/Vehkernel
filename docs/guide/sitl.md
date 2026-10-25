@@ -66,6 +66,8 @@ SITL publishes the vehicle's true pose and velocity on `vehicle_local_odometry_g
 
 `test/sitl/check_body_motion.py` (`sitl_body_motion`) checks the control chain against the true motion: on a circle at 0.3 m/s and 0.5 rad/s, with and without `--slip 0.25`, the true yaw rate's mean from 4 s on must be within 3 % of the commanded rate (the wheels alone would be 25 % short with slip, so only the gyro loop passes it), and a twist beyond the wheels' reach must keep its curvature within 5 % while `allocation_status` reports the limited axes.
 
+`test/sitl/check_odometry.py` (`sitl_odometry`) checks the odometry against the truth: after 0.6 m forward, a 90° turn in place and 0.6 m more, its position must be within 3 % of the distance plus 2 cm and its heading within 3°, and the measured speed within 2 % of the true one; with `--slip 0.25`, turning in place, its heading must stay within 3° of the truth while the wheels' own heading runs a third ahead.
+
 CI drives the vehicle with direct-actuator setpoints in `test/sitl/check_vehicle.py` (`sitl_vehicle`): driving forward, the true distance must match the wheels' turn times `WHL_RADIUS` within 2 %; turning in place, the true heading change must match `WHL_RADIUS × (left - right) / WHL_TRACK` within 2 %, and the attitude estimator's yaw must follow the true heading within 3°; with `--slip 0.25`, the distance must be 75 % of the wheels' within 2 %.
 
 ## Motion profiles

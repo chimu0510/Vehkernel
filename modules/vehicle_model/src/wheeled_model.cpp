@@ -59,19 +59,22 @@ WheelAllocation WheeledModel::allocate(const Twist& demand, float max_speed, Out
     return result;
 }
 
-std::optional<WheelMeasurement> WheeledModel::measure(OutputSpeeds speeds) const
+std::optional<WheelMeasurement> WheeledModel::measure(OutputSpeeds speeds, OutputSpeeds noise) const
 {
     if (!valid_) {
         return std::nullopt;
     }
     std::array<float, estimation::max_wheels> wheels{};
+    std::array<float, estimation::max_wheels> wheel_noise{};
     for (std::size_t i = 0; i < kinematics_.size(); ++i) {
         wheels[i] = speeds[outputs_[i]];
+        wheel_noise[i] = noise[outputs_[i]];
         if (!std::isfinite(wheels[i])) {
             return std::nullopt;
         }
     }
-    return kinematics_.measure(std::span(wheels).first(kinematics_.size()));
+    const std::size_t n = kinematics_.size();
+    return kinematics_.measure(std::span(wheels).first(n), std::span(wheel_noise).first(n));
 }
 
 }  // namespace vk::vehicle_model

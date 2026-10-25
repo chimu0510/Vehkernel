@@ -15,7 +15,9 @@
 // wheel can move, such as vy for plain wheels, is left out of J⁺ and reads
 // zero. The residual, the RMS of the wheels' rim speeds that the estimated
 // twist does not explain, is zero when the wheels agree with a rigid body
-// and grows with slip.
+// and grows with slip. The measurement's variance carries each wheel's
+// speed noise and the residual, as a speed error of every wheel, through J⁺:
+// var(axis) = Σ J⁺[axis][i]²·(noise_i² + (residual / r_i)²).
 //
 // On saturation the whole twist is scaled down by one factor, so the path
 // keeps its curvature, and every axis with a demand is reported limited.
@@ -62,6 +64,7 @@ struct WheelAllocation {
 struct WheelMeasurement {
     Twist twist{};
     float residual = 0.0F;  // [m/s] RMS rim speed the twist does not explain
+    std::array<float, 3> variance{};  // of vx [m²/s²], vy [m²/s²] and the yaw rate [rad²/s²]
 };
 
 class WheelKinematics {
@@ -141,8 +144,9 @@ public:
         return result;
     }
 
-    // twist = J⁺·wheel speeds, and the residual of the fit.
-    [[nodiscard]] WheelMeasurement measure(std::span<const float> speeds) const
+    // twist = J⁺·wheel speeds, the residual of the fit, and the variance
+    // from each wheel's speed noise [rad/s, standard deviation] (none: 0).
+    [[nodiscard]] WheelMeasurement measure(std::span<const float> speeds, std::span<const float> noise = {}) const
     {
         WheelMeasurement result{};
         if (!valid_ || speeds.size() < size_) {
@@ -163,6 +167,13 @@ public:
             sum += rim * rim;
         }
         result.residual = std::sqrt(sum / static_cast<float>(size_));
+        for (std::size_t a = 0; a < result.variance.size(); ++a) {
+            for (std::size_t i = 0; i < size_; ++i) {
+                const float n = i < noise.size() ? noise[i] : 0.0F;
+                const float slip = result.residual / radius_[i];
+                result.variance[a] += pinv_[a][i] * pinv_[a][i] * (n * n + slip * slip);
+            }
+        }
         return result;
     }
 

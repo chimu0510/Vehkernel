@@ -7,8 +7,10 @@ from .monitor import (
     HANDSHAKE_STATES,
     LinkMonitor,
     actuator_outputs_line,
+    body_velocity_measurement_line,
     euler_degrees,
     local_menu_line,
+    vehicle_local_odometry_line,
     vehicle_status_line,
     wheel_encoders_line,
     work_item_name,
@@ -16,7 +18,7 @@ from .monitor import (
 
 # Topics shown in their own lines or tables rather than by their raw values.
 STATUS_TOPICS = ("link_status", "work_item_status", "parameter_status", "vehicle_status", "wheel_encoders",
-                 "actuator_outputs", "local_menu")
+                 "actuator_outputs", "local_menu", "body_velocity_measurement", "vehicle_local_odometry")
 
 
 def format_value(value: object) -> str:
@@ -78,6 +80,11 @@ def render(monitor: LinkMonitor, target: str, width: int = 120) -> list[str]:
         lines.append("wheels         " + wheel_encoders_line(encoders).removeprefix("wheel_encoders "))
     for _, outputs in monitor.latest("actuator_outputs"):
         lines.append("outputs        " + actuator_outputs_line(outputs).removeprefix("actuator_outputs "))
+    for _, measurement in monitor.latest("body_velocity_measurement"):
+        lines.append("body velocity  " + body_velocity_measurement_line(measurement)
+                     .removeprefix("body_velocity_measurement "))
+    for _, odometry in monitor.latest("vehicle_local_odometry"):
+        lines.append("odometry       " + vehicle_local_odometry_line(odometry).removeprefix("vehicle_local_odometry "))
     for mismatch in monitor.mismatches:
         lines.append(f"MISMATCH       topic {mismatch.name}: schema hash differs from the local build")
 
