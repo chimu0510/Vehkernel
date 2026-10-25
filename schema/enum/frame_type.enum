@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The frame type, a named geometry within the frame class (ADR-0013):
+# FRAME_TYPE.
+@type uint8
+DIFF_2WD = 0                      # WHEELED: two wheels on a common axle, left and right
+SKID_4WD = 1                      # WHEELED: four wheels, a front and a rear pair, skid-steered

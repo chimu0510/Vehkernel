@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The frame class, classified by allocation math (ADR-0013): FRAME_CLASS. It
+# selects the vehicle model.
+@type uint8
+WHEELED = 0                       # differential, skid-steer, mecanum and omni wheels
+ACKERMANN = 1
+THRUSTER = 2

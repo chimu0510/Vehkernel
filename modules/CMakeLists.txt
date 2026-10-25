@@ -14,6 +14,19 @@ vk_target_link_libraries(vk_commander PUBLIC vk_msg_headers vk_core vk_params)
 target_link_libraries(vk_commander PRIVATE vk_warnings vk_cxx_subset)
 vk_target_link_libraries(vk_modules INTERFACE vk_commander)
 
+# The vehicle model (ADR-0013): the vehicle description, read at boot, and
+# the compiled-in models it selects from. No bus and no FreeRTOS, so it is
+# tested on the development host.
+vk_add_library(vk_vehicle_model LAYER module STATIC vehicle_model/src/vehicle_description.cpp)
+if(CONFIG_VEHICLE_MODEL_WHEELED)
+  target_sources(vk_vehicle_model PRIVATE vehicle_model/src/wheeled_model.cpp)
+endif()
+target_include_directories(vk_vehicle_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vehicle_model/include)
+vk_target_link_libraries(vk_vehicle_model PUBLIC vk_msg_headers vk_core vk_params vk_lib_estimation)
+# Its header includes the compiled-in models, so the Kconfig header is public.
+target_link_libraries(vk_vehicle_model PUBLIC vk_config PRIVATE vk_warnings vk_cxx_subset)
+vk_target_link_libraries(vk_modules INTERFACE vk_vehicle_model)
+
 if(CONFIG_ACTUATOR_CONTROL)
   # Actuator control (ADR-0013): the speed loops use neither the bus nor
   # FreeRTOS and are tested on the development host; the work item wraps them.

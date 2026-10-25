@@ -144,7 +144,8 @@ def test_the_c50c_board_sets_the_link_baud_rate(tmp_path: Path):
     definitions = sorted(str(p.relative_to(REPO)) for layer in ("core", "drivers", "modules", "platform")
                          for p in (REPO / layer).rglob("params.toml"))
     config = tmp_path / "config"
-    config.write_text("CONFIG_PLATFORM_STM32F4=y\nCONFIG_ESTIMATOR_MAHONY=y\n", encoding="utf-8")
+    config.write_text("CONFIG_PLATFORM_STM32F4=y\nCONFIG_ESTIMATOR_MAHONY=y\nCONFIG_VEHICLE_MODEL_WHEELED=y\n",
+                      encoding="utf-8")
     result = subprocess.run(
         [sys.executable, str(GENERATOR), *definitions, "--config", str(config), "--board-defaults", str(board_defaults),
          "--board", "boards/c50c-v1_1/board.toml", "--output-dir", str(tmp_path / "out")],
@@ -153,3 +154,30 @@ def test_the_c50c_board_sets_the_link_baud_rate(tmp_path: Path):
     params = {p["name"]: p for p in json.loads((tmp_path / "out" / "params.json").read_text())["parameters"]}
     assert params["SERIAL1_BAUD"]["default"] == 921600
     assert params["ATT_KP"]["default"] == 1.0
+
+
+def generate_frame(tmp_path: Path, config_text: str):
+    """The repository's vehicle description with a solved Kconfig."""
+    definitions = sorted(str(p.relative_to(REPO)) for p in (REPO / "modules" / "vehicle_model").rglob("params.toml"))
+    config = tmp_path / "config"
+    config.write_text(config_text, encoding="utf-8")
+    return subprocess.run(
+        [sys.executable, str(GENERATOR), *definitions, "--config", str(config), "--output-dir", str(tmp_path / "out")],
+        cwd=REPO, capture_output=True, text=True, check=False)
+
+
+def test_frame_types_follow_the_compiled_in_vehicle_models(tmp_path: Path):
+    """ADR-0013, ADR-0017: FRAME_CLASS and FRAME_TYPE offer only the compiled-in models' values."""
+    result = generate_frame(tmp_path, "CONFIG_VEHICLE_MODEL_WHEELED=y\n")
+    assert result.returncode == 0, result.stderr
+    params = {p["name"]: p for p in json.loads((tmp_path / "out" / "params.json").read_text())["parameters"]}
+    assert [v["name"] for v in params["FRAME_CLASS"]["values"]] == ["WHEELED"]
+    assert [v["name"] for v in params["FRAME_TYPE"]["values"]] == ["DIFF_2WD", "SKID_4WD"]
+    assert params["WHL_RADIUS"]["reboot_required"]
+
+    # Without the WHEELED model its frame types are not offered, and its
+    # geometry is not compiled in: the default frame type is refused.
+    result = generate_frame(tmp_path, "CONFIG_VEHICLE_MODEL_ACKERMANN=y\n")
+    assert result.returncode == 1
+    assert "FRAME_CLASS: default WHEELED is not compiled in" in result.stderr
+    assert "FRAME_TYPE: default DIFF_2WD is not compiled in" in result.stderr

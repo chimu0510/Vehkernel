@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The WHEELED vehicle model's geometry and output mapping (ADR-0013). The
+# frame type places each wheel from the radius and the track; the mapping
+# says which actuator output drives it. The defaults are no vehicle's: a
+# frame preset sets them, since the board does not know the vehicle it is in.
+prefix = "WHL"
+kconfig = "VEHICLE_MODEL_WHEELED"
+# The vehicle description never changes from the local menu (ADR-0022).
+menu = false
+
+[[param]]
+name = "WHL_RADIUS"
+type = "FLOAT"
+default = 0.05
+min = 0.005
+max = 1.0
+unit = "m"
+description = "Wheel radius."
+reboot_required = true
+
+[[param]]
+name = "WHL_TRACK"
+type = "FLOAT"
+default = 0.2
+min = 0.02
+max = 5.0
+unit = "m"
+description = "Track width: the distance between the left and right wheels' contact points."
+reboot_required = true
+
+[[param]]
+name = "WHL_LEFT_OUT"
+type = "INT32"
+default = 1
+min = 1
+max = 4
+description = "Actuator output that drives the left wheel (DIFF_2WD) or the front left wheel (SKID_4WD)."
+reboot_required = true
+
+[[param]]
+name = "WHL_RIGHT_OUT"
+type = "INT32"
+default = 2
+min = 1
+max = 4
+description = "Actuator output that drives the right wheel (DIFF_2WD) or the front right wheel (SKID_4WD)."
+reboot_required = true
+
+[[param]]
+name = "WHL_REAR_L_OUT"
+type = "INT32"
+default = 3
+min = 1
+max = 4
+description = "Actuator output that drives the rear left wheel (SKID_4WD only)."
+reboot_required = true
+
+[[param]]
+name = "WHL_REAR_R_OUT"
+type = "INT32"
+default = 4
+min = 1
+max = 4
+description = "Actuator output that drives the rear right wheel (SKID_4WD only)."
+reboot_required = true

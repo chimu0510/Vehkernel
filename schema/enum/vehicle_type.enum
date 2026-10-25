@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The environment the vehicle operates in, independent of its frame
+# (ADR-0013): VEHICLE_TYPE.
+@type uint8
+GROUND = 0
+SURFACE = 1
+UNDERWATER = 2
