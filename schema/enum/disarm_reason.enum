@@ -9,3 +9,4 @@ ACTUATOR_POWER_LOST = 3    @short POWER_LOST
 SETPOINT_TIMEOUT = 4       @short TIMEOUT
 IDLE = 5
 BRINGUP_ABORT = 6
+RC_LOST = 7                @short RC_LOST     # MANUAL: the remote control stopped reporting or went

@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The bit of each button in manual_control_input's buttons, in the Xbox 360
+# controller's layout, which every source maps into (spec 0010).
+@type uint8
+DPAD_UP = 0
+DPAD_DOWN = 1
+DPAD_LEFT = 2
+DPAD_RIGHT = 3
+START = 4
+BACK = 5
+LEFT_STICK = 6                    # the left stick pressed
+RIGHT_STICK = 7                   # the right stick pressed
+LEFT_SHOULDER = 8                 # LB
+RIGHT_SHOULDER = 9                # RB
+GUIDE = 10
+A = 12
+B = 13
+X = 14
+Y = 15

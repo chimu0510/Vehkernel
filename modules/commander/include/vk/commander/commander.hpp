@@ -31,7 +31,8 @@
 // It also disarms an armed vehicle when the emergency stop has been engaged
 // for 5 s, when the setpoints from the source in control stop for longer
 // than COM_SP_TIMEOUT after the first one, and when every target has been
-// idle for COM_DISARM_IDLE. Nothing ever re-arms on its own.
+// idle for COM_DISARM_IDLE, and, in a mode that needs the remote control,
+// when it is no longer connected (RC_LOST). Nothing ever re-arms on its own.
 #pragma once
 
 #include <vk/core/fault.hpp>

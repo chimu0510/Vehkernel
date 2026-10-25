@@ -72,6 +72,38 @@ The live view shows `vehicle_status`, `wheel_encoders` and `actuator_outputs`, a
 
 The vehicle model measures the body velocity from the wheel speeds and publishes it on `body_velocity_measurement` (ADR-0014), with its variance: each wheel's encoder quantization and the residual, the rim speed the wheels disagree by, which grows with slip. Local odometry dead-reckons from it in the local level frame, north-east-down with its origin where the vehicle stood when the attitude estimator aligned, and publishes `vehicle_local_odometry`: position, attitude, body velocity, yaw rate and their variances. The heading is always the attitude estimator's, never the wheels' speed difference, so a skid does not turn the track. Both go to the Link at 50 Hz; the live view shows them on its `body velocity` and `odometry` lines, and `--check` prints them.
 
+## Remote control
+
+A gamepad drives the vehicle in `MANUAL` (spec 0010). It publishes `manual_control_input` (its sticks, triggers and buttons, and whether it is connected), which the Link carries at 50 Hz and the live view shows on its `gamepad` line.
+
+| Button or stick | Does |
+|---|---|
+| `A` | Takes over in `MANUAL` from any mode, armed or not |
+| `START` held 1 s | Arms, with both sticks centred |
+| `BACK` held 1 s | Disarms |
+| `B` | Engages the emergency stop |
+| `Y` held 1 s | Releases the emergency stop |
+| Left stick forward and back | Forward speed, up to `MAN_VX_MAX` (0.5 m/s) |
+| Right stick left and right | Yaw rate, up to `MAN_YAW_MAX` (1 rad/s), right turning right |
+
+Stick travel inside `MAN_DEADZONE` (8 %) counts as centred. Arming in `MANUAL` is refused while the gamepad is not connected (`RC_NOT_CONNECTED`) or a stick is off centre (`STICKS_NOT_CENTRED`). Taking over while armed does not disarm: the gamepad's sticks drive from the next cycle, and setpoints from a Link are then dropped and counted on `vehicle_status`. A Link cannot request `MANUAL`, and `TEST` can be entered only while disarmed. If the gamepad stops reporting for `RC_TIMEOUT` (0.5 s) or is unplugged while armed in `MANUAL`, the vehicle stops and disarms with `RC_LOST`; it does not re-arm when the gamepad returns. The idle disarm (`COM_DISARM_IDLE`) applies in `MANUAL` too.
+
+In SITL the gamepad is simulated and set with `sim-gamepad`; for example, take over and arm, then drive forward at half speed for 2 s:
+
+```bash
+tools/link/link_monitor.py --udp 127.0.0.1:15600 sim-gamepad --buttons A --duration 0.3
+```
+
+```bash
+tools/link/link_monitor.py --udp 127.0.0.1:15600 sim-gamepad --buttons START --duration 1.2
+```
+
+```bash
+tools/link/link_monitor.py --udp 127.0.0.1:15600 sim-gamepad --left 0,0.54 --duration 2
+```
+
+`sim-gamepad --off` unplugs it. After `--duration` the gamepad stays connected, centred and released.
+
 ## Fault stop check
 
 The hardware check of ADR-0005: a fault while driving turns every output off within one interrupt, and the board resets and reports why. Lift the wheels off the ground and limit the motor supply. Build the firmware with a fault test in the local debug overlay, `build/c50c-v1_1/debug.config` ([Building](building.md)), one of:

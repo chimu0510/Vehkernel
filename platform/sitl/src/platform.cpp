@@ -13,9 +13,11 @@
 
 #include <vk/core/bus.hpp>
 #include <vk/hal/output_watchdog.hpp>
+#include <vk/core/critical_section.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/msg/enums.hpp>
 #include <vk/msg/imu_sample.hpp>
+#include <vk/msg/manual_control_input.hpp>
 #include <vk/msg/vehicle_attitude_groundtruth.hpp>
 #include <vk/msg/vehicle_local_odometry_groundtruth.hpp>
 
@@ -170,6 +172,55 @@ private:
 
 core::StaticInstance<GroundTruth> ground_truth;
 
+// The simulated gamepad, set from the Link's work queue.
+struct Gamepad {
+    bool connected = false;
+    std::array<float, 4> sticks{};
+    std::array<float, 2> triggers{};
+    std::uint16_t buttons = 0;
+};
+Gamepad simulated_gamepad;  // guarded by the critical section
+
+// Publishes the simulated gamepad as a gamepad driver would.
+class SimGamepad final : public core::WorkItem {
+public:
+    static constexpr std::uint32_t interval_us = 20'000;
+
+    explicit SimGamepad(core::WorkQueue& queue) : WorkItem("sim_gamepad", queue) {}
+
+    void start() { schedule_periodic(interval_us); }
+
+protected:
+    void run() override
+    {
+        Gamepad now{};
+        {
+            const core::CriticalSection lock;
+            now = simulated_gamepad;
+        }
+        if (!now.connected && !was_connected_) {
+            return;
+        }
+        was_connected_ = now.connected;
+        msg::ManualControlInput input{};
+        input.timestamp = queue().now_us();
+        input.source = static_cast<std::uint8_t>(msg::ManualControlSource::Simulated);
+        input.connected = now.connected;
+        if (now.connected) {
+            input.sticks = now.sticks;
+            input.triggers = now.triggers;
+            input.buttons = now.buttons;
+        }
+        publication_.publish(input);
+    }
+
+private:
+    core::Publication<msg::ManualControlInput> publication_;
+    bool was_connected_ = false;
+};
+
+core::StaticInstance<SimGamepad> sim_gamepad;
+
 void stop_task(void* /*unused*/)
 {
     // Highest priority, so the run ends on time whatever else is busy. Ticks
@@ -243,6 +294,19 @@ bool user_key_pressed()
 void set_user_key(bool pressed)
 {
     simulated_user_key.store(pressed);
+}
+
+void set_gamepad(bool connected, const std::array<float, 4>& sticks, const std::array<float, 2>& triggers,
+                 std::uint16_t buttons)
+{
+    const core::CriticalSection lock;
+    simulated_gamepad = {.connected = connected, .sticks = sticks, .triggers = triggers, .buttons = buttons};
+}
+
+void start_sim_gamepad(core::WorkQueue& queue)
+{
+    sim_gamepad.emplace(queue);
+    sim_gamepad->start();
 }
 
 void start_vehicle(const estimation::WheelKinematics& kinematics,

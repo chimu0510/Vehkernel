@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# What a manual_control_input comes from (spec 0010).
+@type uint8
+USB_GAMEPAD = 0                   # an XInput gamepad on the board's USB host port
+SIMULATED = 1                     # SITL's simulated gamepad, set over the Link

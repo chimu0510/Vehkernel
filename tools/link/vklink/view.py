@@ -9,6 +9,7 @@ from .monitor import (
     actuator_outputs_line,
     body_velocity_measurement_line,
     euler_degrees,
+    gamepad_line,
     local_menu_line,
     vehicle_local_odometry_line,
     vehicle_status_line,
@@ -18,7 +19,8 @@ from .monitor import (
 
 # Topics shown in their own lines or tables rather than by their raw values.
 STATUS_TOPICS = ("link_status", "work_item_status", "parameter_status", "vehicle_status", "wheel_encoders",
-                 "actuator_outputs", "local_menu", "body_velocity_measurement", "vehicle_local_odometry")
+                 "actuator_outputs", "local_menu", "body_velocity_measurement", "vehicle_local_odometry",
+                 "manual_control_input")
 
 
 def format_value(value: object) -> str:
@@ -85,6 +87,8 @@ def render(monitor: LinkMonitor, target: str, width: int = 120) -> list[str]:
                      .removeprefix("body_velocity_measurement "))
     for _, odometry in monitor.latest("vehicle_local_odometry"):
         lines.append("odometry       " + vehicle_local_odometry_line(odometry).removeprefix("vehicle_local_odometry "))
+    for _, gamepad in monitor.latest("manual_control_input"):
+        lines.append("gamepad        " + gamepad_line(gamepad).removeprefix("gamepad "))
     for mismatch in monitor.mismatches:
         lines.append(f"MISMATCH       topic {mismatch.name}: schema hash differs from the local build")
 

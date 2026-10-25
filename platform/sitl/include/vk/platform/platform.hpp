@@ -35,6 +35,14 @@ sim::Ssd1306& display();
 bool user_key_pressed();
 void set_user_key(bool pressed);
 
+// SITL's gamepad (spec 0010): disconnected at start, set by the Link's
+// sim_gamepad frame. start_sim_gamepad() publishes it on
+// manual_control_input from a work item on `queue`, 50 times a second while
+// connected and once when it disconnects, as a gamepad driver does.
+void set_gamepad(bool connected, const std::array<float, 4>& sticks, const std::array<float, 2>& triggers,
+                 std::uint16_t buttons);
+void start_sim_gamepad(core::WorkQueue& queue);
+
 // Starts the microsecond clock and attaches the simulated devices, the IMU
 // following `motion`. Call once from the entry point, before anything else runs.
 void init(sim::MotionProfile motion = sim::MotionProfile::Still);

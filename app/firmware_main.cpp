@@ -8,6 +8,7 @@
 #include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
 #include <vk/commander/commander_task.hpp>
+#include <vk/remote_control/remote_control_task.hpp>
 #include <vk/params/params.hpp>
 #include <vk/platform/gpio.hpp>
 #include <vk/platform/platform.hpp>
@@ -288,6 +289,17 @@ void start_commander()
     commander->start();
 }
 
+vk::core::StaticInstance<vk::remote_control::RemoteControlTask> remote_control;
+
+// The remote control on wq:ctrl after the commander (spec 0010).
+void start_remote_control()
+{
+    remote_control.emplace(vk::remote_control::RemoteControlTask::Config{.interval_us = control_interval_us},
+                           vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    remote_control->start();
+}
+
+
 #ifdef CONFIG_DRIVER_ICM20948
 using Imu = vk::board::devices::IMU0;
 static_assert(Imu::type == "ICM20948" && Imu::bus == "SOFT_I2C", "the C50C's IMU is an ICM20948 on software I2C");
@@ -435,6 +447,7 @@ int main()
     start_imu();
 #endif
     start_commander();
+    start_remote_control();
 #ifdef CONFIG_ACTUATOR_CONTROL
     start_vehicle_model();
 #ifdef CONFIG_CONTROL_CHAIN

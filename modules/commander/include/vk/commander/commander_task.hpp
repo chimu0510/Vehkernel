@@ -17,7 +17,9 @@
 // the setpoint timeout from running out. A bring-up request that passes its
 // checks goes out on bringup_command; the commander follows the case on
 // bringup_status. It refuses arming while local_menu shows the local menu
-// open (ADR-0022).
+// open (ADR-0022). From manual_control_input it judges whether the remote
+// control is connected (core::rc_connected, RC_TIMEOUT) with its sticks
+// centred (MAN_DEADZONE), for MANUAL's arming checks and failsafe.
 //
 // A reboot accepted while disarmed (ADR-0023) happens reboot_delay_us
 // later, from a cycle, so the source's reply leaves first; arming is refused
@@ -38,6 +40,7 @@
 #include <vk/msg/bringup_status.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/local_menu.hpp>
+#include <vk/msg/manual_control_input.hpp>
 #include <vk/msg/vehicle_command.hpp>
 #include <vk/msg/vehicle_command_ack.hpp>
 #include <vk/msg/vehicle_status.hpp>
@@ -94,6 +97,8 @@ private:
     std::uint32_t setpoints_rejected_ = 0;
     core::Subscription<msg::BringupStatus> bringup_status_{0};
     core::Subscription<msg::LocalMenu> local_menu_{0};
+    core::Subscription<msg::ManualControlInput> manual_input_{0};
+    msg::ManualControlInput manual_input_message_{};
     bool local_menu_open_ = false;
     core::Publication<msg::BringupCommand> bringup_publication_;
     bool bringup_running_ = false;

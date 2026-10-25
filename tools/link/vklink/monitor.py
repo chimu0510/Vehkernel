@@ -27,7 +27,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Callable, Protocol
 
-from .enums import HandshakeState, MenuState
+from .enums import GamepadButton, HandshakeState, MenuState
 from .frame import Frame, FrameReader, FrameType
 from .session import (
     ACTUATOR_POWER_STATES,
@@ -207,6 +207,13 @@ def wheel_encoders_line(encoders) -> str:
     """wheel_encoders as a space-separated key=value line."""
     return (f"wheel_encoders speed={speeds_text(encoders.speed)} angle={speeds_text(encoders.angle)} "
             f"valid=0x{encoders.valid:X}")
+
+
+def gamepad_line(gamepad) -> str:
+    """manual_control_input as a space-separated key=value line, the buttons by name."""
+    pressed = [b.name for b in GamepadButton if gamepad.buttons & (1 << b.value)]
+    return (f"gamepad connected={int(gamepad.connected)} sticks={speeds_text(gamepad.sticks)} "
+            f"triggers={speeds_text(gamepad.triggers)} buttons={','.join(pressed) or 'none'}")
 
 
 def actuator_outputs_line(outputs) -> str:
@@ -659,6 +666,11 @@ class LinkMonitor:
         """SITL only: cuts or restores the simulated actuator power. The MCU does not answer."""
         self.connection.send(self.session.make_sim_actuator_power(powered))
 
+    def sim_gamepad(self, connected: bool, sticks=(0.0, 0.0, 0.0, 0.0), triggers=(0.0, 0.0),
+                    buttons: int = 0) -> None:
+        """SITL only: sets the simulated gamepad, which stays so until set again. The MCU does not answer."""
+        self.connection.send(self.session.make_sim_gamepad(connected, sticks, triggers, buttons))
+
     def press_key(self, duration_s: float) -> None:
         """SITL only: holds the simulated user key down for the duration, keeping the Link alive."""
         self.connection.send(self.session.make_sim_user_key(True))
@@ -779,6 +791,8 @@ class LinkMonitor:
             lines.append(body_velocity_measurement_line(measurement))
         for _, odometry in self.latest("vehicle_local_odometry"):
             lines.append(vehicle_local_odometry_line(odometry))
+        for _, gamepad in self.latest("manual_control_input"):
+            lines.append(gamepad_line(gamepad))
         for _, status in self.latest("work_item_status"):
             lines.append(
                 f"work_item name={work_item_name(status)} runs={status.runs} overruns={status.overruns} "

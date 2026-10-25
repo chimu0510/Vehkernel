@@ -288,6 +288,14 @@ class HostSession:
     def make_sim_user_key(self, pressed: bool) -> bytes:
         return self.writer.write(FrameType.SIM_USER_KEY, struct.pack("<B", int(pressed)))
 
+    def make_sim_gamepad(self, connected: bool, sticks=(0.0, 0.0, 0.0, 0.0), triggers=(0.0, 0.0),
+                         buttons: int = 0) -> bytes:
+        """sticks -1 to 1 (left x, left y, right x, right y), triggers 0 to 1, buttons a gamepad_button bitmask."""
+        axes = [round(max(-1.0, min(1.0, s)) * 32767) for s in sticks]
+        pulls = [round(max(0.0, min(1.0, t)) * 255) for t in triggers]
+        body = struct.pack("<B4h2BH", int(connected), *axes, *pulls, buttons & 0xFFFF)
+        return self.writer.write(FrameType.SIM_GAMEPAD, body)
+
     def make_topic_data(self, name: str, message: bytes, instance: int = 0) -> bytes:
         """Encodes an inbound TopicData frame for a topic the MCU announced at the handshake.
 
@@ -375,6 +383,7 @@ class McuControl:
     arming_result: int = 0  # vk::core::ArmingResult
     sim_actuator_power: bool = True
     sim_user_key: bool = False
+    sim_gamepad: bytes = b""  # the body of the last sim_gamepad frame
     bringup_result: int = 0  # vk::core::BringupStart
     reboot_result: int = 0   # vk::core::RebootResult
     reboot_action: int = 0   # the last accepted reboot action, 0 for none
@@ -465,6 +474,8 @@ class McuSession:
             control.sim_actuator_power = bool(value)
         if frame.type == FrameType.SIM_USER_KEY:
             control.sim_user_key = bool(value)
+        if frame.type == FrameType.SIM_GAMEPAD:
+            control.sim_gamepad = bytes(frame.body)
         if frame.type == FrameType.BRINGUP_RUN:
             if control.bringup_result != 0:
                 return [self._send(FrameType.BRINGUP_REJECT, struct.pack("<B", control.bringup_result))]

@@ -37,6 +37,11 @@ void Commander::update(std::uint64_t now_us, const Inputs& inputs, const Setting
         disarm(core::DisarmReason::EmergencyStop);
         return;
     }
+    // The remote control lost in a mode that needs it (spec 0010).
+    if (core::mode_rules(state_.mode).needs_remote_control && !inputs.remote_control_connected) {
+        disarm(core::DisarmReason::RcLost);
+        return;
+    }
     const bool setpoint_since_arming = inputs.last_setpoint_us != 0 && inputs.last_setpoint_us >= armed_at_us_;
     if ((setpoint_since_arming && !inputs.setpoints_idle) || inputs.bringup_running) {
         active_at_us_ = now_us;

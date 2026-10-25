@@ -23,6 +23,8 @@ build/sitl/app/vehkernel-sitl --duration 5
 | `--fault assert\|fail` | Fails a `configASSERT` or calls `fail()` once an output has been driven for 0.5 s ([Faults and reset cause](#faults-and-reset-cause)) |
 | `--reset-cause <cause>[:<fault>]` | The reset cause the run reports, `power_on` by default ([Faults and reset cause](#faults-and-reset-cause)) |
 
+The simulated gamepad starts unplugged; the Link's `sim_gamepad` frame, sent by the Link monitor's `sim-gamepad`, plugs it in and sets its sticks and buttons, and SITL publishes it on `manual_control_input` 50 times a second while it is connected ([Remote control](driving.md#remote-control)).
+
 ## Report
 
 At the end of a run SITL prints one line per topic instance and per work item, as space-separated `key=value` pairs (topics never published are listed too, with `publications=0`). Shortened:

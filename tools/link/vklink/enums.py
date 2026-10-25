@@ -100,6 +100,7 @@ class DisarmReason(enum.IntEnum):
     SETPOINT_TIMEOUT = 4
     IDLE = 5
     BRINGUP_ABORT = 6
+    RC_LOST = 7  # MANUAL: the remote control stopped reporting or went
 
 
 class Fault(enum.IntEnum):
@@ -133,12 +134,41 @@ class FrameType(enum.IntEnum):
     SKID_4WD = 1  # WHEELED: four wheels, a front and a rear pair, skid-steered
 
 
+class GamepadButton(enum.IntEnum):
+    """The bit of each button in manual_control_input's buttons, in the Xbox 360 controller's
+    layout, which every source maps into (spec 0010).
+    """
+
+    DPAD_UP = 0
+    DPAD_DOWN = 1
+    DPAD_LEFT = 2
+    DPAD_RIGHT = 3
+    START = 4
+    BACK = 5
+    LEFT_STICK = 6  # the left stick pressed
+    RIGHT_STICK = 7  # the right stick pressed
+    LEFT_SHOULDER = 8  # LB
+    RIGHT_SHOULDER = 9  # RB
+    GUIDE = 10
+    A = 12
+    B = 13
+    X = 14
+    Y = 15
+
+
 class HandshakeState(enum.IntEnum):
     """The handshake state of one Link (ADR-0002)."""
 
     WAITING = 0  # no handshake yet
     CONNECTED = 1  # handshake done, peer heard within the timeout
     PEER_SILENT = 2  # handshake done, peer not heard within the timeout
+
+
+class ManualControlSource(enum.IntEnum):
+    """What a manual_control_input comes from (spec 0010)."""
+
+    USB_GAMEPAD = 0  # an XInput gamepad on the board's USB host port
+    SIMULATED = 1  # SITL's simulated gamepad, set over the Link
 
 
 class MenuState(enum.IntEnum):
