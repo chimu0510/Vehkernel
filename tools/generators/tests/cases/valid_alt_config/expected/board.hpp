@@ -13,7 +13,7 @@
 namespace vk::board {
 
 inline constexpr std::string_view name = "demo";
-inline constexpr std::string_view mcu = "testmcu";
+inline constexpr std::string_view soc = "testsoc";
 
 namespace pins {
 using ENC_B_B = vk::hal::AfPin<vk::hal::Port::B, 7, 2, "TIM4_CH2">;  // PB7 TIM4_CH2

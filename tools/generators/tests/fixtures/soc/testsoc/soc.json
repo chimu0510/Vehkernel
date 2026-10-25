@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "mcu": "TESTMCU",
+  "soc": "TESTSOC",
   "family": "STM32F4",
   "package": "LQFP-TEST",
   "source": {

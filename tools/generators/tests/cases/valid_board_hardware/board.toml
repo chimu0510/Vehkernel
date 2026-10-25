@@ -1,6 +1,6 @@
 # Ports, board devices on each bus type, storage, clock, timing and defaults.
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 
 pins = [
   { pin = "PA9",  role = "SERIAL1_TX", func = "USART1_TX" },

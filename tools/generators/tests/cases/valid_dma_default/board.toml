@@ -1,6 +1,6 @@
 # Serial pins imply their DMA requests; ADC and SPI requests are listed explicitly.
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 
 pins = [
   { pin = "PA9",  role = "SERIAL1_TX", func = "USART1_TX" },

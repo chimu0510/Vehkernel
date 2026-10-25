@@ -148,8 +148,8 @@ set_tests_properties(reuse_lint PROPERTIES ENVIRONMENT
   "GIT_CONFIG_COUNT=1;GIT_CONFIG_KEY_0=safe.directory;GIT_CONFIG_VALUE_0=*")
 
 # Host tool tests (pytest), through each tool's command line.
-add_test(NAME mcudb
-  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/mcudb/tests)
+add_test(NAME socdb
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/socdb/tests)
 add_test(NAME board_generator
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/generators/tests/test_board_generator.py)
 add_test(NAME bringup_runner

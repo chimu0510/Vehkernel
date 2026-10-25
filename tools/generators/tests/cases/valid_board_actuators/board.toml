@@ -1,6 +1,6 @@
 # Two actuator outputs, one with the encoder resolution of its stock motor.
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 
 pins = [
   { pin = "PA9",  role = "MOTOR_A_PWM", func = "TIM1_CH2" },

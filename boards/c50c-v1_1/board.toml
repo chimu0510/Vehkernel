@@ -13,7 +13,7 @@
 # - CR1-CR4 straps on the motor connectors (PC4, PB1, PA4, PA5) are
 #   unpopulated by default and left undeclared.
 name = "c50c-v1_1"
-mcu = "stm32f407vet6"
+soc = "stm32f407vet6"
 
 # ADR-0023: the C50C has no bootloader of its own, so it gets the Vehkernel
 # bootloader on both Link ports. Its board ID is in no entry of ArduPilot's

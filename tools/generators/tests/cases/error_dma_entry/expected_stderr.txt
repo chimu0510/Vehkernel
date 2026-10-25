@@ -1,4 +1,4 @@
-board.toml:7: error: DMA request DMA_DOES_NOT_EXIST does not exist on this MCU
+board.toml:7: error: DMA request DMA_DOES_NOT_EXIST does not exist on this SoC
 board.toml:8: error: 'priority' of DMA request TIM2_UP must be a non-negative integer
 board.toml:9: error: unknown key 'channel' in dma entry
 board.toml:11: error: DMA request ADC1_ADC1 is already listed (line 10)

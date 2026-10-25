@@ -1,5 +1,5 @@
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 board_id = 70000
 bootloader = { kind = "ARDUPILOT" }
 

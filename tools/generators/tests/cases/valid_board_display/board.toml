@@ -1,6 +1,6 @@
 # A display on a write-only software SPI bus, a user key and an input pull (ADR-0022).
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 
 pins = [
   { pin = "PA0", role = "OLED_SCL", func = "GPIO_OUTPUT" },

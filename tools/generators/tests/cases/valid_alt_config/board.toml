@@ -1,7 +1,7 @@
 # PB7 is encoder input normally; alt config 1 turns it into a servo output on
 # the same timer channel, and alt config 2 moves the serial TX to PB6.
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 
 pins = [
   { pin = "PB7", role = "ENC_B_B", func = "TIM4_CH2", alt = [{ config = 1, role = "SERVO_1", func = "TIM4_CH2" }] },

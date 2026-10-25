@@ -1,5 +1,5 @@
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 vendor = "acme"
 
 pins = [

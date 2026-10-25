@@ -43,7 +43,7 @@ def board_header(board: Board) -> str:
         "namespace vk::board {",
         "",
         f'inline constexpr std::string_view name = "{board.name}";',
-        f'inline constexpr std::string_view mcu = "{board.mcu}";',
+        f'inline constexpr std::string_view soc = "{board.soc}";',
         "",
         "namespace pins {",
     ]
@@ -409,7 +409,8 @@ def dma_report(board: Board) -> str:
 def board_json(board: Board) -> str:
     data = {
         "name": board.name,
-        "mcu": board.mcu,
+        "soc": board.soc,
+        "soc_dir": board.soc_dir,
         "pins": [
             {"role": p.role, "pin": p.pin, "port": p.port, "number": p.number,
              "func": p.func, "kind": p.kind, "af": p.af, "pull": p.pull,

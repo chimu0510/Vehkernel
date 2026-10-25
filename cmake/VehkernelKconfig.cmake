@@ -3,7 +3,7 @@
 #
 # Runs at configure time, after the board generator, because CMake itself
 # needs the CONFIG_* values to decide what to build. Layers, in merge order:
-#   1. MCU defaults (mcu/<mcu>/defconfig), or platform/sitl/defconfig for SITL
+#   1. SoC defaults (soc/<vendor>/<family>/<soc>/defconfig), or platform/sitl/defconfig for SITL
 #   2. Board defaults (boards/<board>/defconfig)
 #   3. Debug overlays: <build>/debug.config, written by the menuconfig target,
 #      and never committed, then the files listed in VK_DEBUG_OVERLAY, such
@@ -26,7 +26,7 @@ function(vk_configure_kconfig)
   else()
     set(board_kconfig ${VK_BOARD_GENERATED_DIR}/Kconfig.board)
     set(fragments
-      ${CMAKE_SOURCE_DIR}/mcu/${VK_BOARD_MCU}/defconfig
+      ${CMAKE_SOURCE_DIR}/soc/${VK_BOARD_SOC_DIR}/defconfig
       ${CMAKE_SOURCE_DIR}/boards/${VK_BOARD}/defconfig)
   endif()
   list(APPEND fragments ${local_overlay} ${VK_DEBUG_OVERLAY})

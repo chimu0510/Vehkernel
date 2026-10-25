@@ -13,7 +13,7 @@
 namespace vk::board {
 
 inline constexpr std::string_view name = "demo";
-inline constexpr std::string_view mcu = "testmcu";
+inline constexpr std::string_view soc = "testsoc";
 
 namespace pins {
 using MOTOR_A_PWM = vk::hal::AfPin<vk::hal::Port::A, 9, 1, "TIM1_CH2">;  // PA9 TIM1_CH2

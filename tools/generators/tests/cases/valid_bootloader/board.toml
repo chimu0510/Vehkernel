@@ -1,6 +1,6 @@
 # The Vehkernel bootloader on two ports, with a stay input and a download circuit.
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 board_id = 30001
 bootloader = { kind = "VEHKERNEL", ports = ["SERIAL2", "SERIAL1"], stay = { pin = "BOOT_HOLD", active = "LOW" } }
 

@@ -13,7 +13,7 @@
 namespace vk::board {
 
 inline constexpr std::string_view name = "demo-rev2";
-inline constexpr std::string_view mcu = "testmcu";
+inline constexpr std::string_view soc = "testsoc";
 
 namespace pins {
 using SERIAL1_TX = vk::hal::AfPin<vk::hal::Port::A, 9, 7, "USART1_TX">;  // PA9 USART1_TX

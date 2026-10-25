@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Tests for the MCU database and its offline converter, run through the command line."""
+"""Tests for the SoC database and its offline converter, run through the command line."""
 
 import json
 import shutil
@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[3]
-CONVERTER = REPO / "tools" / "mcudb" / "convert_stm32_data.py"
-F407 = REPO / "mcu" / "stm32f407vet6"
+CONVERTER = REPO / "tools" / "socdb" / "convert_stm32_data.py"
+F407 = REPO / "soc" / "st" / "stm32f4" / "stm32f407vet6"
 
 
 def run_converter(*args):
@@ -21,7 +21,7 @@ def run_converter(*args):
 
 @pytest.fixture(scope="module")
 def database():
-    return json.loads((F407 / "mcu.json").read_text(encoding="utf-8"))
+    return json.loads((F407 / "soc.json").read_text(encoding="utf-8"))
 
 
 def test_committed_database_matches_a_fresh_conversion():
@@ -32,7 +32,7 @@ def test_committed_database_matches_a_fresh_conversion():
 def test_check_fails_when_the_database_is_out_of_date(tmp_path):
     copy = tmp_path / "stm32f407vet6"
     shutil.copytree(F407, copy)
-    (copy / "mcu.json").write_text("{}\n", encoding="utf-8")
+    (copy / "soc.json").write_text("{}\n", encoding="utf-8")
     result = run_converter(copy, "--check")
     assert result.returncode == 1
     assert "out of date" in result.stderr
@@ -41,9 +41,9 @@ def test_check_fails_when_the_database_is_out_of_date(tmp_path):
 def test_conversion_writes_the_same_bytes_as_committed(tmp_path):
     copy = tmp_path / "stm32f407vet6"
     shutil.copytree(F407, copy)
-    (copy / "mcu.json").unlink()
+    (copy / "soc.json").unlink()
     assert run_converter(copy).returncode == 0
-    assert (copy / "mcu.json").read_bytes() == (F407 / "mcu.json").read_bytes()
+    assert (copy / "soc.json").read_bytes() == (F407 / "soc.json").read_bytes()
 
 
 def test_unknown_package_is_reported(tmp_path):
@@ -60,7 +60,7 @@ def test_unknown_package_is_reported(tmp_path):
 
 def test_records_identity_and_source(database):
     assert database["format"] == 1
-    assert database["mcu"] == "STM32F407VET6"
+    assert database["soc"] == "STM32F407VET6"
     assert database["family"] == "STM32F4"
     assert database["package"] == "LQFP100"
     source = database["source"]

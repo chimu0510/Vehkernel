@@ -1,6 +1,6 @@
-# ADR-0020-style layout on the test MCU: stub, parameters, event log, firmware.
+# ADR-0020-style layout on the test SoC: stub, parameters, event log, firmware.
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 board_id = 9
 bootloader = { kind = "ARDUPILOT" }
 

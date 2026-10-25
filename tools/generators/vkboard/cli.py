@@ -15,14 +15,15 @@ from .emit import outputs
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="generate_board.py",
-        description="Validate a board definition against its MCU database and emit board outputs.")
+        description="Validate a board definition against its SoC database and emit board outputs.")
     parser.add_argument("board", type=Path, help="board definition, for example boards/c50c-v1_1/board.toml")
-    parser.add_argument("--mcu-root", type=Path, required=True, help="directory holding <mcu>/mcu.json")
+    parser.add_argument("--soc-root", type=Path, required=True,
+                        help="directory holding <vendor>/<family>/<soc>/soc.json")
     parser.add_argument("--output-dir", type=Path, required=True, help="directory for generated files")
     args = parser.parse_args(argv)
 
     try:
-        board = load_board(args.board, args.mcu_root)
+        board = load_board(args.board, args.soc_root)
     except BoardError as error:
         for diagnostic in error.diagnostics:
             print(diagnostic, file=sys.stderr)

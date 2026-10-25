@@ -1,6 +1,6 @@
 # Board ID 51 belongs to the PX4 FMU v5X in ArduPilot's list.
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 board_id = 51
 bootloader = { kind = "VEHKERNEL", ports = ["SERIAL1"] }
 

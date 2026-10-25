@@ -1,6 +1,6 @@
 # TIM2_UP and TIM4_CH2 can only use DMA1 stream 3; both allow sharing.
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 
 pins = [
   { pin = "PB7", role = "PWM_1", func = "TIM4_CH2" },

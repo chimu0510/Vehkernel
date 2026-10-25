@@ -13,7 +13,7 @@
 namespace vk::board {
 
 inline constexpr std::string_view name = "demo";
-inline constexpr std::string_view mcu = "testmcu";
+inline constexpr std::string_view soc = "testsoc";
 
 namespace pins {
 using STATUS_LED = vk::hal::GpioOutput<vk::hal::Port::A, 1>;  // PA1 GPIO_OUTPUT

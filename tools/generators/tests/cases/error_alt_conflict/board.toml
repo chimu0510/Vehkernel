@@ -1,5 +1,5 @@
 name = "demo"
-mcu = "testmcu"
+soc = "testsoc"
 
 pins = [
   { pin = "PB7",  role = "ENC_B_B", func = "TIM4_CH2" },

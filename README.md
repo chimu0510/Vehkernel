@@ -48,7 +48,7 @@ The design as the ADRs decide it; [Status](#status) says which parts run today.
   - A local display shows the vehicle's status, and its local menu changes whitelisted parameters only while disarmed ([0022](docs/adr/0022-local-display-and-local-menu.md)).
 - **Runtime**: FreeRTOS, a C++20 subset, and rate-tiered work queues ([0004](docs/adr/0004-freertos.md), [0007](docs/adr/0007-cpp20-subset.md), [0008](docs/adr/0008-bus-and-work-queues.md)).
 - **Hardware support**:
-  - Board definitions are written in TOML; the generator validates pins against the MCU database and solves DMA assignments ([0011](docs/adr/0011-toml-board-definition-toolchain.md)).
+  - Board definitions are written in TOML; the generator validates pins against the SoC database and solves DMA assignments ([0011](docs/adr/0011-toml-board-definition-toolchain.md)).
   - The HAL picks its form of polymorphism by when each choice is made ([0009](docs/adr/0009-layered-hal.md)).
   - Firmware updates use the ArduPilot and PX4 bootloader protocol: boards that ship with that bootloader keep it, and boards without one get a compatible Vehkernel bootloader ([0023](docs/adr/0023-bootloader.md)).
 - **Configuration**:
