@@ -82,7 +82,7 @@ cmake --preset c50c-v1_1
 cmake --build --preset c50c-v1_1
 ```
 
-Every firmware and bootloader build prints the usage of each memory region; outgrowing a region fails the link (ADR-0017, ADR-0020). The bootloader's budget is the BOOT region, 16 KB on the C50C.
+Every firmware and bootloader build prints the usage of each memory region; outgrowing a region fails the link (ADR-0017, ADR-0020). The bootloader's budget is the BOOT region, 16 KB on the C50C. The link also prints two warnings from newlib's `nosys` stubs, `_getpid is not implemented and will always fail` and `_kill is not implemented and will always fail`. They are expected: the C library links in its signal handling, and the firmware has no processes or signals for these stubs to serve.
 
 The `sitl`, `test` and `fuzz` presets also run clang-tidy and treat every warning as an error. CI builds every preset and runs the tests in the same image.
 

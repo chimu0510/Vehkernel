@@ -14,6 +14,8 @@ ctest --preset test
 
 The SITL tests (`sitl_*`) start the SITL executable and check it from the development host with the scripts in `test/sitl/`; each guide names the tests that cover it ([SITL](sitl.md), [Link monitor](link-monitor.md), [Driving the wheels](driving.md), [Local display](local-display.md)). SITL tests run serially under `ctest -j`, since they judge timing on the shared host. CI builds every preset and runs the tests in the same image.
 
+The license check, `reuse_lint`, covers every file in the working tree that git does not ignore, untracked ones included. A stray file such as a log written to the repository root fails it with `The following files have no licensing information`: move it out of the tree, or under `build/`, which git ignores.
+
 ### Faster local runs
 
 A full run takes a few minutes, for two reasons. The `test` preset runs clang-tidy on every file, which takes about 95 % of the build time (66 s against 3 s on 24 cores). The SITL tests, about 6 minutes, always run one at a time: they judge timing, and running them together would make them fail. While iterating, turn clang-tidy off in the build tree and leave the SITL tests out:
