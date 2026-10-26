@@ -39,9 +39,10 @@ mcu_link instance=0 frames_sent=1666 bytes_sent=87998 frames_received=9 bytes_re
 vehicle_status mode=STANDBY armed=0 source=none board_verified=1 emergency_stop=0 actuator_power=powered skipped_checks=none arming_refusal=none disarm_reason=none output_watchdog_trips=0 reset_cause=power_on fault=none fault_address=0x00000000
 work_item name=icm20948 runs=1000 overruns=0 run_time_last_us=14 run_time_max_us=40 run_time_mean_us=16 jitter_max_us=2885
 work_item name=link0 runs=1000 overruns=0 run_time_last_us=65 run_time_max_us=407 run_time_mean_us=60 jitter_max_us=2876
+work_item_overruns judged=1 stalls=0 real=0
 ```
 
-`rate_hz` here follows the MCU's timestamps, so host scheduling does not skew it. The `link` line is the development host's side of the Link, with the parameter count and parameter set hash the MCU reported at the handshake; `mcu_link` is the MCU's side, with the rate scale it sends topics at: frames the transport could not take count as `drops`, frames missing from the peer's sequence as `lost`. The check also fails when the MCU dropped frames.
+`rate_hz` here follows the MCU's timestamps, so host scheduling does not skew it. The `link` line is the development host's side of the Link, with the parameter count and parameter set hash the MCU reported at the handshake; `mcu_link` is the MCU's side, with the rate scale it sends topics at: frames the transport could not take count as `drops`, frames missing from the peer's sequence as `lost`. The check also fails when the MCU dropped frames. The `work_item` lines count overruns since boot. The `work_item_overruns` line judges those during the check, one 1 s timing report to the next. An interval in which most work items at the base rate overran at once is a host `stall`: SITL runs the whole MCU in one process, and a host that pauses it delays every periodic work item together. Its overruns are set aside. The others are `real`, and `overran` names the work items they came from. `judged=0` means there were too few reports to judge. This line does not fail the check; the SITL tests judge it: `sitl_link` allows one stall and no real overruns.
 
 The hardware check of a serial Link runs the check for a minute; it passes when `imu_sample` arrives at 200 Hz with no CRC errors and no lost frames:
 

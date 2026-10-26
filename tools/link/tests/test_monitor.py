@@ -11,7 +11,7 @@ import pytest
 
 from vklink import PROTOCOL_VERSION, FrameReader, McuSession, TopicDescription
 from vklink.monitor import (LinkMonitor, RateExpectation, TopicStats, UdpConnection, WorkItemOverruns, check,
-                            euler_degrees)
+                            euler_degrees, work_item_overruns_line)
 from vklink.view import render
 
 SAMPLE_HASH = 0x1122334455667788
@@ -271,6 +271,13 @@ def test_work_item_overruns_count_a_few_work_items_overrunning_alone():
                                 {"imu": 0, "ctrl": 2, "act": 1, "link": 0, "est": 0, "timing": 0},
                                 {"imu": 0, "ctrl": 2, "act": 1, "link": 0, "est": 0, "timing": 0})
     assert tracker.judge() == ({"imu": 0, "ctrl": 2, "act": 1, "link": 0, "est": 0, "timing": 0}, 0)
+
+
+def test_work_item_overruns_line_gives_the_stalls_and_the_real_overruns():
+    assert work_item_overruns_line(None) == "work_item_overruns judged=0"
+    assert work_item_overruns_line(({"imu": 0, "link": 0}, 1)) == "work_item_overruns judged=1 stalls=1 real=0"
+    assert work_item_overruns_line(({"link": 2, "imu": 0, "act": 1}, 0)) == \
+        "work_item_overruns judged=1 stalls=0 real=3 overran=act:1,link:2"
 
 
 def test_work_item_overruns_need_two_reports_with_every_work_item():

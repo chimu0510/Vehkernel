@@ -69,6 +69,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from vklink.enums import BringupResult, GamepadButton  # noqa: E402
 from vklink.monitor import (  # noqa: E402
     LinkMonitor,
+    WorkItemOverruns,
     gamepad_line,
     local_menu_line,
     speeds_text,
@@ -81,6 +82,7 @@ from vklink.monitor import (  # noqa: E402
     load_messages,
     load_param_metadata,
     parse_param_text,
+    work_item_overruns_line,
 )
 from vklink.session import (  # noqa: E402
     BRINGUP_CASES,
@@ -488,8 +490,12 @@ def main() -> int:
         if args.command is not None:
             return run_control(monitor, args)
         if args.check:
+            overruns = WorkItemOverruns()
+            monitor.listeners.append(
+                lambda name, _instance, message: overruns.record(message) if name == "work_item_status" else None)
             monitor.run(args.duration)
             print("\n".join(monitor.summary()))
+            print(work_item_overruns_line(overruns.judge()))
             result = check(monitor, args.expect_rate, args.tolerance)
             for failure in result.failures:
                 print(f"FAIL: {failure}", file=sys.stderr)

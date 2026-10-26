@@ -404,6 +404,19 @@ class WorkItemOverruns:
         return overruns, stalls
 
 
+def work_item_overruns_line(judged: tuple[dict[str, int], int] | None) -> str:
+    """WorkItemOverruns' judgement as a key=value line: the host stalls, the real
+    overruns in all, and the work items that overran with their counts."""
+    if judged is None:
+        return "work_item_overruns judged=0"
+    overruns, stalls = judged
+    line = f"work_item_overruns judged=1 stalls={stalls} real={sum(overruns.values())}"
+    overran = [f"{name}:{count}" for name, count in sorted(overruns.items()) if count]
+    if overran:
+        line += f" overran={','.join(overran)}"
+    return line
+
+
 @dataclass
 class Mismatch:
     name: str
