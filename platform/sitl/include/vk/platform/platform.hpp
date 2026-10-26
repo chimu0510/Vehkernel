@@ -31,9 +31,11 @@ sim::I2cBus& imu_bus();
 sim::Ssd1306& display();
 
 // SITL's user key (ADR-0022): released at start, pressed and released by the
-// Link's sim_user_key frame.
+// Link's sim_user_key frame. A press with `hold_us` releases itself that long
+// after, on SITL's own clock, so the hold the local menu sees does not depend
+// on the host's timing; 0 holds it until the release.
 bool user_key_pressed();
-void set_user_key(bool pressed);
+void set_user_key(bool pressed, std::uint32_t hold_us);
 
 // SITL's gamepad (spec 0010): disconnected at start, set by the Link's
 // sim_gamepad frame: `state` 0 unplugged, 1 connected, 2 connected but

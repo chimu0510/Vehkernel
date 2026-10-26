@@ -285,8 +285,12 @@ class HostSession:
     def make_sim_actuator_power(self, powered: bool) -> bytes:
         return self.writer.write(FrameType.SIM_ACTUATOR_POWER, struct.pack("<B", int(powered)))
 
-    def make_sim_user_key(self, pressed: bool) -> bytes:
-        return self.writer.write(FrameType.SIM_USER_KEY, struct.pack("<B", int(pressed)))
+    def make_sim_user_key(self, pressed: bool, hold_s: float | None = None) -> bytes:
+        """hold_s: a press that SITL releases itself after this long, on its own clock."""
+        if hold_s is None:
+            return self.writer.write(FrameType.SIM_USER_KEY, struct.pack("<B", int(pressed)))
+        hold_ms = max(1, min(0xFFFF, round(hold_s * 1000)))
+        return self.writer.write(FrameType.SIM_USER_KEY, struct.pack("<BH", int(pressed), hold_ms))
 
     def make_sim_gamepad(self, connected: bool, sticks=(0.0, 0.0, 0.0, 0.0), triggers=(0.0, 0.0),
                          buttons: int = 0, silent: bool = False) -> bytes:
@@ -385,6 +389,7 @@ class McuControl:
     arming_result: int = 0  # vk::core::ArmingResult
     sim_actuator_power: bool = True
     sim_user_key: bool = False
+    sim_user_key_hold_ms: int = 0
     sim_gamepad: bytes = b""  # the body of the last sim_gamepad frame
     bringup_result: int = 0  # vk::core::BringupStart
     reboot_result: int = 0   # vk::core::RebootResult
@@ -476,6 +481,7 @@ class McuSession:
             control.sim_actuator_power = bool(value)
         if frame.type == FrameType.SIM_USER_KEY:
             control.sim_user_key = bool(value)
+            control.sim_user_key_hold_ms = struct.unpack_from("<H", frame.body, 1)[0] if len(frame.body) >= 3 else 0
         if frame.type == FrameType.SIM_GAMEPAD:
             control.sim_gamepad = bytes(frame.body)
         if frame.type == FrameType.BRINGUP_RUN:

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The SITL-only frames of a Link session (ADR-0018): sim_actuator_power cuts
 // or restores the simulated actuator power, sim_user_key presses or releases
-// the simulated user key, and sim_gamepad sets the simulated gamepad
+// the simulated user key (u8 pressed, then optionally u16 hold_ms: a press
+// that SITL releases itself after that many milliseconds), and sim_gamepad sets the simulated gamepad
 // (spec 0010), none with a reply. sim_gamepad's body: its state (u8: 0
 // unplugged, 1 connected, 2 connected but silent, as a pad whose reports
 // stop), the
@@ -23,7 +24,7 @@ namespace vk::link {
 // The simulator a session may act on.
 struct SimAccess {
     void (*set_actuator_power)(bool powered) = nullptr;
-    void (*set_user_key)(bool pressed) = nullptr;
+    void (*set_user_key)(bool pressed, std::uint32_t hold_us) = nullptr;
     void (*set_gamepad)(std::uint8_t state, const std::array<float, 4>& sticks, const std::array<float, 2>& triggers,
                         std::uint16_t buttons) = nullptr;
 };

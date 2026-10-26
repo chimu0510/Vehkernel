@@ -62,6 +62,8 @@ def test_estop_and_sim_power_frames():
     assert control.sim_user_key
     assert exchange(mcu, host.make_sim_user_key(False)) == []
     assert not control.sim_user_key
+    assert exchange(mcu, host.make_sim_user_key(True, 1.1)) == []
+    assert control.sim_user_key and control.sim_user_key_hold_ms == 1100
 
 
 def test_reboot_request_frames():
