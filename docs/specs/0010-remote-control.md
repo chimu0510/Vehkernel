@@ -1,6 +1,6 @@
 # Spec 0010: the remote control (a USB gamepad, the manual mode, takeover and the RC failsafe)
 
-**Status**: in progress. Issue: [#120](https://github.com/chimu0510/Vehkernel/issues/120); tickets #121 to #126, with the hardware check in #126.
+**Status**: done. Issue: [#120](https://github.com/chimu0510/Vehkernel/issues/120); tickets #121 to #126, with the hardware check in #126.
 
 Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
 
@@ -77,7 +77,7 @@ Deliver the tenth milestone: **a USB gamepad as the remote control, a `MANUAL` m
   - The pad enumerates and `manual_control_input` follows the sticks and buttons.
   - Arm, drive, turn and disarm with the pad; directions and speeds as the parameters say.
   - Take over from a host driving in `TEST`; the emergency stop from the pad; unplug the pad while driving: the vehicle stops and disarms.
-  - Drive a measured 5 m straight and a square, and record the odometry's position and heading error against the measured ground truth.
+  - Drive a measured 5 m straight and record the odometry's distance error against the measured ground truth. The square and the heading error against ground truth wait for the state estimation work (an EKF), when the estimate is checked as a whole; the IMU's heading is enough until then (decided with the maintainer at the bench check).
   - No work item overruns with the USB host running.
   Results are recorded on the ticket.
 - **Prior art**: `test/sitl/check_body_velocity.py` and `check_routes.py` for driving SITL by body velocity against the truth; the `sim_user_key` frame and `check_local_menu.py` for simulated input over the Link; `bringup_command` and `bringup_status` for a command and its result on the bus.
