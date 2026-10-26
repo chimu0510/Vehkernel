@@ -1,6 +1,6 @@
 # SITL
 
-SITL runs the firmware on the FreeRTOS POSIX port on the development host (ADR-0018), with the real drivers reading simulated devices: the ICM20948 driver reads a simulated ICM20948 on a simulated I2C bus. Build and run it in the devcontainer:
+SITL runs the firmware on the FreeRTOS POSIX port on the development host (ADR-0018), with the real drivers reading simulated devices: the ICM20948 driver reads a simulated ICM20948 on a simulated I2C bus. Build and run it in the development container ([Building](building.md#development-environment); with Docker, prefix each command with `vk`):
 
 ```bash
 cmake --preset sitl

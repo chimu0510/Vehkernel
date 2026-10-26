@@ -4,7 +4,7 @@ Tests are split into six layers, L0 to L5 (ADR-0018). The directories under `tes
 
 ## Host tests and SITL tests
 
-Unit tests and SITL tests run through `ctest` in the devcontainer:
+Unit tests and SITL tests run through `ctest` in the development container ([Building](building.md#development-environment); with Docker, prefix each command with `vk`):
 
 ```bash
 cmake --preset test
@@ -12,7 +12,7 @@ cmake --build --preset test
 ctest --preset test
 ```
 
-The SITL tests (`sitl_*`) start the SITL executable and check it from the development host with the scripts in `test/sitl/`; each guide names the tests that cover it ([SITL](sitl.md), [Link monitor](link-monitor.md), [Driving the wheels](driving.md), [Local display](local-display.md)). SITL tests run serially under `ctest -j`, since they judge timing on the shared host. CI builds every preset and runs the tests inside the devcontainer image.
+The SITL tests (`sitl_*`) start the SITL executable and check it from the development host with the scripts in `test/sitl/`; each guide names the tests that cover it ([SITL](sitl.md), [Link monitor](link-monitor.md), [Driving the wheels](driving.md), [Local display](local-display.md)). SITL tests run serially under `ctest -j`, since they judge timing on the shared host. CI builds every preset and runs the tests in the same image.
 
 ## Fuzzing the Link decoders
 
@@ -45,11 +45,16 @@ A finding leaves its input in `build/fuzz/test/fuzz/artifacts/`. Run the target 
 
 ## Bring-up image
 
-The bring-up test build (L4) runs the hardware bring-up cases at boot instead of the application: it reads the ICM20948's WHO_AM_I over software I2C and measures the IMU read rate. It never configures actuator outputs, so it is safe with motors connected. Build it in the devcontainer, then run the bring-up runner on the host, which flashes it over SWD, reads the result block back and exits non-zero if a case fails or no results arrive:
+The bring-up test build (L4) runs the hardware bring-up cases at boot instead of the application: it reads the ICM20948's WHO_AM_I over software I2C and measures the IMU read rate. It never configures actuator outputs, so it is safe with motors connected. Build it in the development container, then run the bring-up runner on the host, which flashes it over SWD, reads the result block back and exits non-zero if a case fails or no results arrive:
 
 ```bash
 cmake --preset c50c-v1_1-bringup
 cmake --build --preset c50c-v1_1-bringup
+```
+
+On the host:
+
+```bash
 tools/bringup/run_bringup.py build/c50c-v1_1-bringup/app/vehkernel.elf
 ```
 

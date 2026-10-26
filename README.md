@@ -66,14 +66,19 @@ The design as the ADRs decide it; [Status](#status) says which parts run today.
 
 ## Quick start
 
-Clone with the submodules, open the repo in the devcontainer (VS Code Dev Containers or the `devcontainer` CLI), then build and run SITL for 5 s:
+Vehkernel builds in a container: `cmake` and `ctest` run inside the image that `.devcontainer/Dockerfile` builds, and fail on the host ([Building](docs/guide/building.md#development-environment)). Clone with the submodules, build the image, then build and run SITL for 5 s inside it:
 
 ```bash
 git clone --recurse-submodules https://github.com/chimu0510/Vehkernel.git
-cmake --preset sitl
-cmake --build --preset sitl
-build/sitl/app/vehkernel-sitl --duration 5
+cd Vehkernel
+docker build -t vehkernel-dev -f .devcontainer/Dockerfile .
+vk() { docker run --rm -it -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -w "$PWD" --network host vehkernel-dev "$@"; }
+vk cmake --preset sitl
+vk cmake --build --preset sitl
+vk build/sitl/app/vehkernel-sitl --duration 5
 ```
+
+In VS Code, "Reopen in Container" instead, and run the commands without `vk`.
 
 To watch it live, start SITL with `--duration 0` and connect the Link monitor from another terminal:
 

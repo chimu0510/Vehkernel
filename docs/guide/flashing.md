@@ -50,7 +50,7 @@ python3 tools/bootloader/external/uploader.py --port /dev/ttyACM0 --no-extf buil
 
 ## Over SWD
 
-Connect an ST-Link to the board's SWD header. OpenOCD runs on the host, outside the devcontainer, since the probe is a USB device. A new board gets the bootloader and the firmware; later, the firmware alone:
+Connect an ST-Link to the board's SWD header. OpenOCD runs on the host, outside the development container, since the probe is a USB device. A new board gets the bootloader and the firmware; later, the firmware alone:
 
 ```bash
 openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program build/c50c-v1_1/app/vehkernel_with_bl.hex verify reset exit"

@@ -10,7 +10,7 @@ Thank you for helping. This page covers how work is proposed, how it is built an
 
 ## Development environment
 
-Everything that affects build output is pinned and runs in the devcontainer ([ADR-0016](docs/adr/0016-dependency-policy.md)). Clone with submodules and open the repository in VS Code Dev Containers or the `devcontainer` CLI:
+Everything that affects build output is pinned in the development container's image, and `cmake` and `ctest` run inside it, never on the host ([ADR-0016](docs/adr/0016-dependency-policy.md)). Clone with submodules, then open the repository in VS Code Dev Containers or run each command through Docker, as [Building](docs/guide/building.md#development-environment) shows:
 
 ```bash
 git clone --recurse-submodules https://github.com/chimu0510/Vehkernel.git
@@ -20,7 +20,7 @@ git clone --recurse-submodules https://github.com/chimu0510/Vehkernel.git
 
 ## Checking your change
 
-Run what CI runs before you open a pull request:
+Run what CI runs before you open a pull request, in the container (with Docker, prefix each command with `vk`):
 
 ```bash
 cmake --preset test
