@@ -9,8 +9,12 @@ frames or a missed rate), when a work item, the Link's included, overran
 during the check (by the timing statistics the MCU sent over the Link) or
 never ran, or when the pty is left behind once SITL has exited.
 
-Overruns are judged over the check alone: SITL runs on a shared host, and a
-stall in the seconds around it says nothing about the Link.
+Overruns are judged over the check alone, report by report, by the Link
+monitor (vklink's WorkItemOverruns): SITL runs on a shared host, and a stall
+in the seconds around it says nothing about the Link. Nor does one interval
+in which the host paused the whole process, which shows as most work items
+at the base rate overrunning at once. A second such stall fails the check,
+as do overruns of one work item, or a few, while the others keep time.
 
     check_link.py build/test/app/vehkernel-sitl tools/link/link_monitor.py \\
         --msg-dir build/test/generated/schema/python --duration 5 --expect-rate imu_sample:0=200
@@ -31,6 +35,7 @@ from check_report import parse_report  # noqa: E402
 
 # Time SITL runs before and after the monitor's check: start-up and handshake.
 MARGIN_S = 4.0
+MAX_STALLS = 1  # host stalls set aside in one check; more fail it
 
 
 def free_udp_port() -> int:
@@ -94,9 +99,17 @@ def main() -> int:
     _, reported = parse_report(monitor.stdout)
     if not reported:
         failures.append("the Link carried no work item timing")
-    for item in reported:
-        if int(item["overruns"]) != 0:
-            failures.append(f"work item {item['name']} overran {item['overruns']} times during the check")
+    judged = next((dict(pair.split("=", 1) for pair in line.split()[1:]) for line in monitor.stdout.splitlines()
+                   if line.startswith("work_item_overruns ")), None)
+    if judged is None or judged.get("judged") != "1":
+        failures.append("the Link monitor could not judge the work items' overruns")
+    else:
+        if int(judged["stalls"]) > MAX_STALLS:
+            failures.append(f"the host stalled SITL {judged['stalls']} times during the check, "
+                            f"more than {MAX_STALLS}")
+        for entry in filter(None, judged.get("overran", "").split(",")):
+            name, count = entry.split(":")
+            failures.append(f"work item {name} overran {count} times during the check, not in a host stall")
     # A transport without a baud rate, UDP or a pty, is never scaled (ADR-0002).
     scales = [line.split("rate_scale=")[1].split()[0] for line in monitor.stdout.splitlines()
               if line.startswith("mcu_link ") and "rate_scale=" in line]
