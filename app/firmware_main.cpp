@@ -447,6 +447,10 @@ int main()
     start_imu();
 #endif
     start_commander();
+#ifdef CONFIG_RC_USB_GAMEPAD
+    // The gamepad's state goes out on manual_control_input (spec 0010).
+    vk::platform::start_usb_gamepad(vk::core::work_queue(vk::core::WorkQueueTier::Io));
+#endif
     start_remote_control();
 #ifdef CONFIG_ACTUATOR_CONTROL
     start_vehicle_model();

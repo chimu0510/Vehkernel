@@ -133,6 +133,20 @@ config BRINGUP_MOTORS
 
 endmenu
 
+menu "Remote control"
+
+config RC_USB_GAMEPAD
+	bool "USB gamepad"
+	depends on PLATFORM_STM32F4
+	help
+	  An XInput gamepad, such as an Xbox 360 controller or a Flydigi pad
+	  in its Xbox 360 mode, on the board's USB OTG FS port as the remote
+	  control (spec 0010): TinyUSB as the USB host stack and an XInput
+	  class driver, publishing manual_control_input. A board turns it on
+	  in its defconfig when it has a USB host port.
+
+endmenu
+
 menu "Local interface"
 
 config LOCAL_DISPLAY

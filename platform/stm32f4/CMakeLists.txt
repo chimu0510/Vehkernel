@@ -18,6 +18,11 @@ target_compile_definitions(vk_platform PRIVATE
 vk_target_link_libraries(vk_platform PUBLIC vk_hal vk_core vk_board)
 target_link_libraries(vk_platform PUBLIC st_ll_f4)
 target_link_libraries(vk_platform PRIVATE freertos_kernel vk_warnings vk_cxx_subset)
+if(CONFIG_RC_USB_GAMEPAD)
+  # The USB gamepad (spec 0010) over TinyUSB.
+  target_sources(vk_platform PRIVATE src/usb_gamepad.cpp)
+  target_link_libraries(vk_platform PRIVATE tinyusb_host)
+endif()
 
 if(NOT EXISTS ${VK_BOARD_GENERATED_DIR}/memory.ld)
   message(FATAL_ERROR "Board ${VK_BOARD} has no Flash layout; STM32 builds need one (ADR-0020)")
