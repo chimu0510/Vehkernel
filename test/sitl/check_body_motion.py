@@ -17,6 +17,13 @@ vehicle_local_odometry_groundtruth and allocation_status:
   10 rad/s (the wheels would need 12 and 4): allocation_status reports vx
   and the yaw rate limited with a scale near 5/6, and the true path keeps
   the commanded curvature, yaw rate over speed 5 rad/m, within 5 %.
+- Stopping from the circle, without slip and with it (#133): the setpoint
+  steps to zero, and the true speed falls no faster than VEL_DEC_MAX
+  (1 m/s²) allows, taking at least 0.9 × 0.3 s. Once stopped the heading
+  holds within 1.5°: with slip the yaw rate loop's integral has grown to
+  make up for it, and held over a stop it turned the vehicle 4.5° in 2.8 s
+  and kept turning; at rest it is held at zero, and the heading settles
+  within about 0.6°.
 
     check_body_motion.py build/test/app/vehkernel-sitl --msg-dir build/test/generated/schema/python
 """
@@ -24,6 +31,7 @@ vehicle_local_odometry_groundtruth and allocation_status:
 from __future__ import annotations
 
 import argparse
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -44,6 +52,10 @@ SATURATED = (0.4, 0.0, 2.0)
 SATURATED_MAX_SPD = 10.0
 CURVATURE_TOLERANCE = 0.05
 VX, YAW_RATE = 1, 4
+DEC_MAX = 1.0             # VEL_DEC_MAX's default
+STOPPED_SPEED = 0.01      # m/s
+STOP_HOLD_S = 2.0         # judged from the stop on
+HEADING_TOLERANCE = 1.5   # degrees
 
 
 class MotionVehicle(BodyVehicle):
@@ -102,6 +114,33 @@ def check_circle(vehicle: MotionVehicle, slip: float, failures: list[str]) -> No
         failures.append(f"{what}: a true yaw rate sample was {worst:.3f} rad/s, more than 10 % off {target}")
 
 
+def heading_deg(t) -> float:
+    w, x, y, z = t.q
+    return math.degrees(math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z)))
+
+
+def check_stop(vehicle: MotionVehicle, slip: float, failures: list[str]) -> None:
+    what = f"stop with slip {slip}" if slip else "stop"
+    start = len(vehicle.truth)
+    first, _ = send_for(vehicle, lambda: vehicle.send_body(0.0, 0.0, 0.0), STOP_HOLD_S + 1.0)
+    truth = [t for t in vehicle.truth[start:] if t.timestamp >= vehicle.mcu_us(first)]
+    stopped = next((t for t in truth if abs(t.velocity[0]) < STOPPED_SPEED), None)
+    if stopped is None:
+        failures.append(f"{what}: the vehicle did not stop")
+        return
+    took_s = (stopped.timestamp - vehicle.mcu_us(first)) / 1e6
+    shortest_s = 0.9 * CIRCLE[0] / DEC_MAX
+    held = [heading_deg(t) for t in truth if t.timestamp >= stopped.timestamp + 200_000]
+    drift = max(held) - min(held) if held else 0.0
+    print(f"{what}: stopped after {took_s:.3f} s, heading drifted {drift:.2f} degrees")
+    if took_s < shortest_s:
+        failures.append(f"{what}: the vehicle stopped in {took_s:.3f} s, faster than VEL_DEC_MAX allows "
+                        f"({shortest_s:.2f} s)")
+    if drift > HEADING_TOLERANCE:
+        failures.append(f"{what}: the heading drifted {drift:.2f} degrees after stopping, more than "
+                        f"{HEADING_TOLERANCE}")
+
+
 def check_saturated(vehicle: MotionVehicle, failures: list[str]) -> None:
     if not isinstance(set_param(vehicle, "MOT_MAX_SPD", ParamType.FLOAT, SATURATED_MAX_SPD), ParamValue):
         failures.append("MOT_MAX_SPD could not be set")
@@ -137,6 +176,7 @@ def run(args, slip: float, failures: list[str]) -> None:
     try:
         if connect_and_arm(vehicle, failures):
             check_circle(vehicle, slip, failures)
+            check_stop(vehicle, slip, failures)
             if not slip:
                 check_saturated(vehicle, failures)
     finally:

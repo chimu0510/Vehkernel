@@ -22,8 +22,9 @@ drives it through the Link monitor library. In order:
 
 A source not in control cannot be shown here, as SITL has a single Link:
 the Link work item's unit tests check it with two. The yaw rate loop's P
-and I are set to 0 first, so the targets are the kinematics' exactly;
-check_body_motion.py checks the loop.
+and I and the speed limits VEL_ACC_MAX and VEL_DEC_MAX are set to 0 first,
+so the targets are the kinematics' exactly and at once; check_body_motion.py
+checks the loop and the limits.
 
     check_body_velocity.py build/test/app/vehkernel-sitl tools/link/link_monitor.py \\
         --msg-dir build/test/generated/schema/python
@@ -206,7 +207,7 @@ def main() -> int:
         if not vehicle.connect():
             failures.append("no handshake with SITL")
         else:
-            for name in ("RATE_YAW_P", "RATE_YAW_I"):
+            for name in ("RATE_YAW_P", "RATE_YAW_I", "VEL_ACC_MAX", "VEL_DEC_MAX"):
                 if not isinstance(set_param(vehicle, name, ParamType.FLOAT, 0.0), ParamValue):
                     failures.append(f"{name} could not be set to 0")
             check_refused_in_standby(vehicle, failures)

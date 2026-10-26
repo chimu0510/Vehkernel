@@ -5,7 +5,7 @@
 // Each run takes the newest body velocity setpoint that setpoint arbitration
 // accepts (core::setpoint_accepted, judged on the newest vehicle_status)
 // through the control chain with the RATE_YAW_*
-// parameters, the yaw rate of vehicle_attitude and MOT_MAX_SPD, and
+// and VEL_* parameters, the yaw rate of vehicle_attitude and MOT_MAX_SPD, and
 // publishes the wheel speed targets on actuator_demand, stamped with the
 // time that setpoint was accepted (0 and every target NaN before the first
 // one), and what allocation made of the demand on allocation_status.

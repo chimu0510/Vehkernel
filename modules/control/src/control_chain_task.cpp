@@ -71,6 +71,7 @@ void ControlChainTask::run()
         yaw_rate = attitude_message_.angular_velocity[2];
     }
     const RateSettings settings{.p = params::rate.yaw_p, .i = params::rate.yaw_i, .ff = params::rate.yaw_ff};
+    const VelocityLimits limits{.acc_max = params::vel.acc_max, .dec_max = params::vel.dec_max};
     const Twist setpoint{.vx = setpoint_message_.vx, .vy = setpoint_message_.vy,
                          .yaw_rate = setpoint_message_.yaw_rate};
 
@@ -78,7 +79,7 @@ void ControlChainTask::run()
     demand.timestamp = now;
     demand.timestamp_setpoint = accepted;
     const ChainResult result =
-        chain_.step(dt, setpoint, yaw_rate, closed, settings, params::mot.max_spd, std::span(demand.wheel_speed));
+        chain_.step(dt, setpoint, yaw_rate, closed, settings, params::mot.max_spd, std::span(demand.wheel_speed), limits);
     demand_publication_.publish(demand);
     if (closed) {
         msg::AllocationStatus allocation{};

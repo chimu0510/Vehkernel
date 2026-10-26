@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Parameters of the control chain's velocity control (ADR-0012, ADR-0013,
+# #133): how fast the body velocity setpoint's vx and vy may change, for
+# every source, as PX4's RO_ACCEL_LIM and RO_DECEL_LIM and ArduPilot's
+# ATC_ACCEL_MAX and ATC_DECEL_MAX. Stopping at once (disarm, the emergency
+# stop, the failsafes) does not go through it. Changes apply from the next
+# control cycle.
+prefix = "VEL"
+kconfig = "CONTROL_CHAIN"
+# Control tuning never changes from the local menu (ADR-0022).
+menu = false
+
+[[param]]
+name = "VEL_ACC_MAX"
+type = "FLOAT"
+default = 1.0
+min = 0.0
+max = 20.0
+unit = "m/s^2"
+description = "Largest rate at which the speed setpoint grows; 0 for no limit."
+
+[[param]]
+name = "VEL_DEC_MAX"
+type = "FLOAT"
+default = 1.0
+min = 0.0
+max = 20.0
+unit = "m/s^2"
+description = "Largest rate at which the speed setpoint shrinks towards zero; 0 for no limit."
