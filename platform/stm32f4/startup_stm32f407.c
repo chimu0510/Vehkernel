@@ -32,6 +32,7 @@ VK_WEAK_HANDLER(PendSV_Handler);  /* FreeRTOS */
 VK_WEAK_HANDLER(SysTick_Handler); /* FreeRTOS tick */
 VK_WEAK_HANDLER(TIM6_DAC_IRQHandler); /* output watchdog */
 VK_WEAK_HANDLER(TIM7_IRQHandler); /* microsecond clock overflow */
+VK_WEAK_HANDLER(OTG_FS_IRQHandler); /* USB gamepad host (spec 0010) */
 
 /* Vector numbers: system exceptions first, then IRQn + VK_SYSTEM_VECTORS. */
 #define VK_HARDFAULT_VECTOR  3
@@ -43,6 +44,7 @@ VK_WEAK_HANDLER(TIM7_IRQHandler); /* microsecond clock overflow */
 #define VK_SYSTICK_VECTOR 15
 #define VK_TIM6_VECTOR    (VK_SYSTEM_VECTORS + 54)
 #define VK_TIM7_VECTOR    (VK_SYSTEM_VECTORS + 55)
+#define VK_OTG_FS_VECTOR  (VK_SYSTEM_VECTORS + 67)
 #define VK_LAST_VECTOR    (VK_SYSTEM_VECTORS + VK_STM32F407_IRQS - 1)
 
 typedef void (*vk_vector_t)(void);
@@ -64,7 +66,9 @@ const vk_vector_t vk_vector_table[VK_SYSTEM_VECTORS + VK_STM32F407_IRQS] = {
     [VK_SYSTICK_VECTOR + 1 ... VK_TIM6_VECTOR - 1] = Default_Handler,
     [VK_TIM6_VECTOR] = TIM6_DAC_IRQHandler,
     [VK_TIM7_VECTOR] = TIM7_IRQHandler,
-    [VK_TIM7_VECTOR + 1 ... VK_LAST_VECTOR] = Default_Handler,
+    [VK_TIM7_VECTOR + 1 ... VK_OTG_FS_VECTOR - 1] = Default_Handler,
+    [VK_OTG_FS_VECTOR] = OTG_FS_IRQHandler,
+    [VK_OTG_FS_VECTOR + 1 ... VK_LAST_VECTOR] = Default_Handler,
 };
 
 /* The fault stop as an unexpected interrupt (fault.enum: UNEXPECTED_INTERRUPT = 8). */

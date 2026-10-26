@@ -46,6 +46,21 @@ if(VK_PLATFORM STREQUAL "stm32f4")
   target_include_directories(st_ll_f4 SYSTEM PUBLIC ${_ll}/Inc)
   target_compile_definitions(st_ll_f4 PUBLIC USE_FULL_LL_DRIVER)
   target_link_libraries(st_ll_f4 PUBLIC st_cmsis_f4)
+
+  # TinyUSB (spec 0010): only the host stack and the DWC2 host controller
+  # driver of the STM32F4's USB OTG FS core; the platform supplies the
+  # configuration and the class driver.
+  if(CONFIG_RC_USB_GAMEPAD)
+    set(_tusb ${CMAKE_CURRENT_SOURCE_DIR}/tinyusb/src)
+    add_library(tinyusb_host STATIC
+      ${_tusb}/tusb.c
+      ${_tusb}/common/tusb_fifo.c
+      ${_tusb}/host/usbh.c
+      ${_tusb}/portable/synopsys/dwc2/hcd_dwc2.c
+      ${_tusb}/portable/synopsys/dwc2/dwc2_common.c)
+    target_include_directories(tinyusb_host SYSTEM PUBLIC ${_tusb} ${CMAKE_SOURCE_DIR}/platform/stm32f4/usb)
+    target_link_libraries(tinyusb_host PUBLIC freertos_kernel st_cmsis_f4)
+  endif()
 else()
   set(_posix ${_freertos}/portable/ThirdParty/GCC/Posix)
   target_sources(freertos_kernel PRIVATE ${_posix}/port.c ${_posix}/utils/wait_for_event.c)

@@ -3,6 +3,7 @@
 #pragma once
 
 #include <vk/core/fault.hpp>
+#include <vk/core/work_queue.hpp>
 #include <vk/hal/reset.hpp>
 
 #include <cstdint>
@@ -30,6 +31,12 @@ void refresh_hardware_watchdog();
 // `stop` too.
 void start_output_watchdog(std::uint32_t period_us, void (*stop)());
 std::uint32_t output_watchdog_trips();
+
+// Starts the USB gamepad (spec 0010): the board's USB OTG FS port as a
+// TinyUSB host in its own task, with an XInput class driver, and a work item
+// on `queue` that publishes manual_control_input. Built with
+// CONFIG_RC_USB_GAMEPAD.
+void start_usb_gamepad(core::WorkQueue& queue);
 
 // Restarts the board into the firmware or the bootloader (ADR-0023); a
 // hal::Reset.

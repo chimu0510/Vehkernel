@@ -14,3 +14,7 @@
 	path = external/stm32f4xx-hal-driver
 	url = https://github.com/STMicroelectronics/stm32f4xx-hal-driver
 	shallow = true
+[submodule "external/tinyusb"]
+	path = external/tinyusb
+	url = https://github.com/hathach/tinyusb
+	shallow = true
