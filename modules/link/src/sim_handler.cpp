@@ -34,7 +34,7 @@ void SimHandler::handle(FrameType type, BodyReader body, FrameSender& /*out*/)
         }
         const std::uint16_t buttons = body.u16();
         if (body.ok() && access_.set_gamepad != nullptr) {
-            access_.set_gamepad(value != 0, sticks, triggers, buttons);
+            access_.set_gamepad(value, sticks, triggers, buttons);
         }
         break;
     }

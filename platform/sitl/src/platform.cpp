@@ -175,6 +175,7 @@ core::StaticInstance<GroundTruth> ground_truth;
 // The simulated gamepad, set from the Link's work queue.
 struct Gamepad {
     bool connected = false;
+    bool silent = false;
     std::array<float, 4> sticks{};
     std::array<float, 2> triggers{};
     std::uint16_t buttons = 0;
@@ -198,7 +199,7 @@ protected:
             const core::CriticalSection lock;
             now = simulated_gamepad;
         }
-        if (!now.connected && !was_connected_) {
+        if (now.silent || (!now.connected && !was_connected_)) {
             return;
         }
         was_connected_ = now.connected;
@@ -296,11 +297,12 @@ void set_user_key(bool pressed)
     simulated_user_key.store(pressed);
 }
 
-void set_gamepad(bool connected, const std::array<float, 4>& sticks, const std::array<float, 2>& triggers,
+void set_gamepad(std::uint8_t state, const std::array<float, 4>& sticks, const std::array<float, 2>& triggers,
                  std::uint16_t buttons)
 {
     const core::CriticalSection lock;
-    simulated_gamepad = {.connected = connected, .sticks = sticks, .triggers = triggers, .buttons = buttons};
+    simulated_gamepad = {.connected = state != 0, .silent = state == 2, .sticks = sticks, .triggers = triggers,
+                         .buttons = buttons};
 }
 
 void start_sim_gamepad(core::WorkQueue& queue)

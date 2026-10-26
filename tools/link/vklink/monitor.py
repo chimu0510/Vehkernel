@@ -667,9 +667,10 @@ class LinkMonitor:
         self.connection.send(self.session.make_sim_actuator_power(powered))
 
     def sim_gamepad(self, connected: bool, sticks=(0.0, 0.0, 0.0, 0.0), triggers=(0.0, 0.0),
-                    buttons: int = 0) -> None:
-        """SITL only: sets the simulated gamepad, which stays so until set again. The MCU does not answer."""
-        self.connection.send(self.session.make_sim_gamepad(connected, sticks, triggers, buttons))
+                    buttons: int = 0, silent: bool = False) -> None:
+        """SITL only: sets the simulated gamepad, which stays so until set again; silent, it stays
+        connected but stops reporting. The MCU does not answer."""
+        self.connection.send(self.session.make_sim_gamepad(connected, sticks, triggers, buttons, silent))
 
     def press_key(self, duration_s: float) -> None:
         """SITL only: holds the simulated user key down for the duration, keeping the Link alive."""

@@ -283,6 +283,8 @@ def run_sim_gamepad(monitor: LinkMonitor, args: argparse.Namespace) -> int:
     """The sim-gamepad command: set SITL's simulated gamepad, hold it for a while if asked, then print it."""
     if args.off:
         monitor.sim_gamepad(False)
+    elif args.silent:
+        monitor.sim_gamepad(True, silent=True)
     else:
         sticks = (*args.left, *args.right)
         monitor.sim_gamepad(True, sticks, buttons=args.buttons)
@@ -415,6 +417,7 @@ def main() -> int:
     bringup.add_argument("case", choices=list(BRINGUP_CASES))
     gamepad = commands.add_parser("sim-gamepad", help="SITL only: set the simulated gamepad")
     gamepad.add_argument("--off", action="store_true", help="disconnect it")
+    gamepad.add_argument("--silent", action="store_true", help="keep it connected but stop its reports")
     gamepad.add_argument("--left", type=parse_stick, default=(0.0, 0.0), metavar="X,Y",
                          help="left stick, -1 to 1, y forward (default centred)")
     gamepad.add_argument("--right", type=parse_stick, default=(0.0, 0.0), metavar="X,Y",
