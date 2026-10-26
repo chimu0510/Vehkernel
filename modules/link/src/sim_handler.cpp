@@ -18,11 +18,14 @@ void SimHandler::handle(FrameType type, BodyReader body, FrameSender& /*out*/)
             access_.set_actuator_power(value != 0);
         }
         break;
-    case FrameType::SimUserKey:
+    case FrameType::SimUserKey: {
+        // The hold time is optional: a body without it reads past the end.
+        const std::uint16_t hold_ms = body.u16();
         if (access_.set_user_key != nullptr) {
-            access_.set_user_key(value != 0);
+            access_.set_user_key(value != 0, body.ok() ? hold_ms * 1'000U : 0);
         }
         break;
+    }
     case FrameType::SimGamepad: {
         std::array<float, 4> sticks{};
         for (float& stick : sticks) {

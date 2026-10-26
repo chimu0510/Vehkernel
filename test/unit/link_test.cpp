@@ -964,9 +964,11 @@ void set_sim_power(bool powered)
 }
 
 bool sim_key = false;
-void set_sim_key(bool pressed)
+std::uint32_t sim_key_hold_us = 0;
+void set_sim_key(bool pressed, std::uint32_t hold_us)
 {
     sim_key = pressed;
+    sim_key_hold_us = hold_us;
 }
 
 struct Reply {
@@ -1073,8 +1075,15 @@ TEST_F(SessionControl, SimUserKeyGoesToTheHookWithoutAReply)
 {
     request(session, FrameType::SimUserKey, 1);
     EXPECT_TRUE(sim_key);
+    EXPECT_EQ(sim_key_hold_us, 0U) << "held until released";
     request(session, FrameType::SimUserKey, 0);
     EXPECT_FALSE(sim_key);
+    // A press with a hold time, which SITL ends itself: 1100 ms.
+    const std::array<std::uint8_t, 3> timed{1, 0x4C, 0x04};
+    session.handle({.version = protocol_version, .type = FrameType::SimUserKey, .sequence = 1, .body = timed}, 2000,
+                   sink);
+    EXPECT_TRUE(sim_key);
+    EXPECT_EQ(sim_key_hold_us, 1'100'000U);
     EXPECT_TRUE(sink.sent.empty());
 }
 

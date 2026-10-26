@@ -673,10 +673,14 @@ class LinkMonitor:
         self.connection.send(self.session.make_sim_gamepad(connected, sticks, triggers, buttons, silent))
 
     def press_key(self, duration_s: float) -> None:
-        """SITL only: holds the simulated user key down for the duration, keeping the Link alive."""
-        self.connection.send(self.session.make_sim_user_key(True))
+        """SITL only: holds the simulated user key down for the duration, keeping the Link alive.
+
+        SITL times the hold and releases the key itself, so a slow host or
+        Link neither stretches nor shortens it. No release follows: arriving
+        in the same Link cycle as a delayed press, it would cut the press short.
+        """
+        self.connection.send(self.session.make_sim_user_key(True, duration_s))
         self.run(duration_s)
-        self.connection.send(self.session.make_sim_user_key(False))
 
     def send_topic(self, name: str, message: object, instance: int = 0) -> None:
         """Sends a message as inbound topic data; the MCU drops it unless its topic map declares it inbound.

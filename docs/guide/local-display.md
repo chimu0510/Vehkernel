@@ -40,4 +40,6 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600 key short
 tools/link/link_monitor.py --udp 127.0.0.1:15600 key hold 5
 ```
 
+SITL times each press itself and releases the key when it ends, so a slow host or Link does not change how long the menu sees it held (#79).
+
 CI reads the status page back from the image (`sitl_display`), and opens the menu, saves parameters, sees arming refused while it is open and the menu time out (`sitl_local_menu`).

@@ -41,6 +41,7 @@ std::uint64_t stop_duration_us = 0;
 
 std::atomic<bool> simulated_actuator_power{true};
 std::atomic<bool> simulated_user_key{false};
+std::atomic<std::uint64_t> user_key_release_us{0};  // 0: held until released
 
 core::StaticInstance<hal::OutputWatchdog> watchdog;
 StaticTask_t watchdog_tcb;
@@ -289,11 +290,14 @@ sim::Ssd1306& display()
 
 bool user_key_pressed()
 {
-    return simulated_user_key.load();
+    const std::uint64_t release_us = user_key_release_us.load();
+    return simulated_user_key.load() && (release_us == 0 || hal::SystemClock::now_us() < release_us);
 }
 
-void set_user_key(bool pressed)
+void set_user_key(bool pressed, std::uint32_t hold_us)
 {
+    simulated_user_key.store(false);
+    user_key_release_us.store(pressed && hold_us != 0 ? hal::SystemClock::now_us() + hold_us : 0);
     simulated_user_key.store(pressed);
 }
 
