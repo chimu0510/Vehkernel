@@ -76,6 +76,18 @@ CI checks spec 0009 against the ground vehicle's truth with these scenarios, eac
 | `sitl_odometry` (`check_odometry.py`) | 0.6 m, a 90° turn in place, 0.6 m; turning in place with `--slip 0.25` | Odometry within 3 % of the distance plus 2 cm and 3° of the truth, measured speed within 2 %. With slip, its heading within 3° while the wheels' heading runs a third ahead |
 | `sitl_routes` (`check_routes.py`) | Forward 1 m at 0.25 m/s; a square of 0.5 m sides and right turns in place | Forward: within 5 % of 1 m, feedforward with the wheels' 0.1 s lag at either end; odometry within 3 % of the truth; heading within 2°. Square: the odometry ends within 5 cm and 3° of the truth, and the truth turned a full circle within 15° |
 
+### Remote control scenarios
+
+`test/sitl/check_remote_control.py` (`sitl_remote_control`) checks spec 0010 with the simulated gamepad, `sim-gamepad`, whose `--silent` keeps it connected but stops its reports:
+
+| Scenario | Tolerance, and why |
+|---|---|
+| Arming refused: a Link in `MANUAL`, a stick off centre | The refusal's reason exactly. `RC_NOT_CONNECTED` cannot be asked for by a pad that is gone, so the commander's unit tests check it |
+| A square with the sticks: half speed for 2 s, half yaw rate for pi s, four times | A full circle of turns within 20° and the start within 0.15 m: the sticks are timed by the host's frames. The odometry within 5 cm and 3° of the truth |
+| Takeover: the host driving in `TEST`, then `A` | `MANUAL` without disarming; the host's setpoints counted dropped; stopped within 1 s with the sticks centred; the sticks drive |
+| RC failsafe: unplugged, and silent | `RC_LOST` with every output zero; silent, between `RC_TIMEOUT` less 50 ms (the last report) and `RC_TIMEOUT` + 0.3 s (`vehicle_status`'s 5 Hz and the host's timing) |
+| The gamepad's emergency stop | `B` zeroes the outputs within 0.1 s; `Y` held releases and the sticks drive; held 5 s, `EMERGENCY_STOP` |
+
 A source not in control cannot send setpoints in these scenarios, since SITL has a single Link; the Link work item's unit tests check that refusal with two Links.
 
 ## Motion profiles

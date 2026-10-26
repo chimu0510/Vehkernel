@@ -289,11 +289,13 @@ class HostSession:
         return self.writer.write(FrameType.SIM_USER_KEY, struct.pack("<B", int(pressed)))
 
     def make_sim_gamepad(self, connected: bool, sticks=(0.0, 0.0, 0.0, 0.0), triggers=(0.0, 0.0),
-                         buttons: int = 0) -> bytes:
-        """sticks -1 to 1 (left x, left y, right x, right y), triggers 0 to 1, buttons a gamepad_button bitmask."""
+                         buttons: int = 0, silent: bool = False) -> bytes:
+        """sticks -1 to 1 (left x, left y, right x, right y), triggers 0 to 1, buttons a gamepad_button bitmask;
+        silent: connected, but its reports stop."""
         axes = [round(max(-1.0, min(1.0, s)) * 32767) for s in sticks]
         pulls = [round(max(0.0, min(1.0, t)) * 255) for t in triggers]
-        body = struct.pack("<B4h2BH", int(connected), *axes, *pulls, buttons & 0xFFFF)
+        state = 2 if connected and silent else int(connected)
+        body = struct.pack("<B4h2BH", state, *axes, *pulls, buttons & 0xFFFF)
         return self.writer.write(FrameType.SIM_GAMEPAD, body)
 
     def make_topic_data(self, name: str, message: bytes, instance: int = 0) -> bytes:

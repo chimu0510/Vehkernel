@@ -53,3 +53,12 @@ def test_cli_sim_gamepad_sends_the_state_and_needs_valid_arguments(tmp_path: Pat
     assert buttons == (1 << GamepadButton.START) | (1 << GamepadButton.A)
     assert bad_stick.returncode == 2 and "expected a stick position" in bad_stick.stderr
     assert bad_button.returncode == 2 and "unknown button 'Z'" in bad_button.stderr
+
+
+def test_a_silent_gamepad_stays_connected_but_stops_reporting():
+    control = McuControl()
+    mcu, host = connected_pair(control)
+    exchange(mcu, host.make_sim_gamepad(True, silent=True))
+    assert control.sim_gamepad[0] == 2
+    exchange(mcu, host.make_sim_gamepad(False, silent=True))
+    assert control.sim_gamepad[0] == 0, "unplugged wins over silent"
