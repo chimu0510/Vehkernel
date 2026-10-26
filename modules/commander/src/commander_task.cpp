@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/commander/commander_task.hpp>
 
+#include <vk/core/manual_control.hpp>
 #include <vk/params/params.hpp>
 
 #include <algorithm>
@@ -42,6 +43,10 @@ void CommanderTask::run()
     while (local_menu_.copy(menu)) {
         local_menu_open_ = menu.state != 0;  // list or edit
     }
+    while (manual_input_.copy(manual_input_message_)) {
+    }
+    const auto rc_timeout_us = static_cast<std::uint64_t>(params::rc.timeout * 1e6F);
+    const bool rc_connected = core::rc_connected(manual_input_message_, now, rc_timeout_us);
     // The setpoint level accepted last decides whether the targets are idle.
     const auto unset = [](float target) { return std::isnan(target) || target == 0.0F; };
     const bool body = last_body_setpoint_.timestamp > last_setpoint_.timestamp;
@@ -57,6 +62,8 @@ void CommanderTask::run()
         .bringup_running = bringup_running_,
         .bringup_available = config_.bringup,
         .local_menu_open = local_menu_open_,
+        .remote_control_connected = rc_connected,
+        .sticks_centred = rc_connected && core::sticks_centred(manual_input_message_.sticks, params::man.deadzone),
         .last_setpoint_us = std::max(last_setpoint_.timestamp, last_body_setpoint_.timestamp),
         .output_watchdog_trips = config_.output_watchdog_trips == nullptr ? 0 : config_.output_watchdog_trips(),
         .reset_report = config_.reset_report,

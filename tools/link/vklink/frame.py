@@ -54,6 +54,7 @@ class FrameType(enum.IntEnum):
     SIM_ACTUATOR_POWER = 0x70
     # SITL only: presses or releases the simulated user key.
     SIM_USER_KEY = 0x71
+    SIM_GAMEPAD = 0x72
 
 
 @dataclass(frozen=True)

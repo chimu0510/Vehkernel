@@ -29,6 +29,9 @@ bootloader (ADR-0023); both are refused while armed, and the board resets
 just after it replies.
 key presses SITL's simulated user key (spec 0007): short for 0.1 s, long for
 1.1 s, or hold for the given time; it prints the local menu's state after.
+sim-gamepad sets SITL's simulated gamepad (spec 0010): its sticks and the
+buttons held, for a given time if asked (then centred and released), or
+disconnects it with --off; it prints manual_control_input after.
 bringup motors runs the motor-to-encoder bring-up case in test mode while
 armed, prints each output's result and what to change, and exits non-zero
 unless every output passes.
@@ -63,9 +66,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from vklink.enums import BringupResult  # noqa: E402
+from vklink.enums import BringupResult, GamepadButton  # noqa: E402
 from vklink.monitor import (  # noqa: E402
     LinkMonitor,
+    gamepad_line,
     local_menu_line,
     speeds_text,
     ParamMetadata,
@@ -255,6 +259,46 @@ def run_key(monitor: LinkMonitor, args: argparse.Namespace) -> int:
     return 0
 
 
+def parse_stick(text: str) -> tuple[float, float]:
+    try:
+        stick = tuple(float(value) for value in text.split(","))
+    except ValueError:
+        stick = ()
+    if len(stick) != 2 or not all(-1.0 <= value <= 1.0 for value in stick):
+        raise argparse.ArgumentTypeError(f"expected a stick position <x>,<y> from -1 to 1, got '{text}'")
+    return stick
+
+
+def parse_buttons(text: str) -> int:
+    bits = 0
+    for name in filter(None, text.upper().split(",")):
+        if name not in GamepadButton.__members__:
+            raise argparse.ArgumentTypeError(
+                f"unknown button '{name}'; expected some of {', '.join(GamepadButton.__members__)}")
+        bits |= 1 << GamepadButton[name].value
+    return bits
+
+
+def run_sim_gamepad(monitor: LinkMonitor, args: argparse.Namespace) -> int:
+    """The sim-gamepad command: set SITL's simulated gamepad, hold it for a while if asked, then print it."""
+    if args.off:
+        monitor.sim_gamepad(False)
+    else:
+        sticks = (*args.left, *args.right)
+        monitor.sim_gamepad(True, sticks, buttons=args.buttons)
+        if args.hold_duration:
+            monitor.run(args.hold_duration)
+            # Released: connected, centred, no button.
+            monitor.sim_gamepad(True)
+    monitor.run(0.3)
+    gamepads = monitor.latest("manual_control_input")
+    if not gamepads:
+        print("FAIL: no manual_control_input from the MCU; is it SITL?", file=sys.stderr)
+        return 1
+    print(gamepad_line(gamepads[0][1]))
+    return 0
+
+
 def run_control(monitor: LinkMonitor, args: argparse.Namespace) -> int:
     """The mode, arm, disarm, estop, reboot and sim-power commands, once the handshake is done."""
     if args.command == "sim-power":
@@ -369,6 +413,16 @@ def main() -> int:
     reboot.add_argument("--bootloader", action="store_true", help="stay in the bootloader, ready to be flashed")
     bringup = commands.add_parser("bringup", help="run a bring-up case; needs TEST and armed")
     bringup.add_argument("case", choices=list(BRINGUP_CASES))
+    gamepad = commands.add_parser("sim-gamepad", help="SITL only: set the simulated gamepad")
+    gamepad.add_argument("--off", action="store_true", help="disconnect it")
+    gamepad.add_argument("--left", type=parse_stick, default=(0.0, 0.0), metavar="X,Y",
+                         help="left stick, -1 to 1, y forward (default centred)")
+    gamepad.add_argument("--right", type=parse_stick, default=(0.0, 0.0), metavar="X,Y",
+                         help="right stick, -1 to 1, x right (default centred)")
+    gamepad.add_argument("--buttons", type=parse_buttons, default=0, metavar="A,START",
+                         help="buttons held, by gamepad_button name")
+    gamepad.add_argument("--duration", dest="hold_duration", type=parse_duration, metavar="SECONDS",
+                         help="hold it for this long, then release to connected and centred")
     sim_power = commands.add_parser("sim-power", help="SITL only: cut or restore the simulated actuator power")
     sim_power.add_argument("state", choices=["on", "off"])
     key = commands.add_parser("key", help="SITL only: press the simulated user key")
@@ -426,6 +480,8 @@ def main() -> int:
             return run_bringup(monitor, args)
         if args.command == "key":
             return run_key(monitor, args)
+        if args.command == "sim-gamepad":
+            return run_sim_gamepad(monitor, args)
         if args.command is not None:
             return run_control(monitor, args)
         if args.check:

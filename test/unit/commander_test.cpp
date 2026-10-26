@@ -438,6 +438,7 @@ TEST_F(CommanderTest, TheRemoteControlTakesOverWhileArmed)
 TEST_F(CommanderTest, TakingOverRestartsTheSetpointTimeoutForTheNewSource)
 {
     arm();
+    inputs.remote_control_connected = true;
     inputs.last_setpoint_us = now;
     inputs.setpoints_idle = false;
     step(400'000);
@@ -481,6 +482,58 @@ TEST_F(CommanderTest, ArmingInManualNeedsTheRemoteControlReadyAndInControl)
 TEST_F(CommanderTest, TestNeedsNoRemoteControl)
 {
     arm();  // inputs.remote_control_connected is false
+    EXPECT_TRUE(commander.state().armed);
+}
+
+}  // namespace
+
+// --- The RC failsafe (spec 0010) ---
+
+namespace {
+
+class ManualCommanderTest : public CommanderTest {
+protected:
+    void arm_manual()
+    {
+        inputs.remote_control_connected = true;
+        inputs.sticks_centred = true;
+        step(Commander::power_settle_us + cycle_us);
+        ASSERT_EQ(commander.request_mode(now, vk::core::remote_control, Mode::Manual), ModeResult::Ok);
+        ASSERT_EQ(commander.request_arming(now, vk::core::remote_control, true), ArmingResult::Ok);
+        inputs.last_setpoint_us = now;
+        inputs.setpoints_idle = false;
+    }
+};
+
+TEST_F(ManualCommanderTest, LosingTheRemoteControlStopsAndDisarms)
+{
+    arm_manual();
+    step(100'000);
+    EXPECT_TRUE(commander.state().armed);
+    inputs.remote_control_connected = false;
+    step();
+    EXPECT_FALSE(commander.state().armed);
+    EXPECT_EQ(commander.state().disarm_reason, DisarmReason::RcLost);
+    // It does not re-arm when the remote control comes back.
+    inputs.remote_control_connected = true;
+    step(100'000);
+    EXPECT_FALSE(commander.state().armed);
+}
+
+TEST_F(ManualCommanderTest, SticksOffCentreWhileArmedDoNotDisarm)
+{
+    arm_manual();
+    inputs.sticks_centred = false;
+    step(100'000);
+    EXPECT_TRUE(commander.state().armed) << "the sticks matter only for arming";
+}
+
+TEST_F(CommanderTest, TheRemoteControlDoesNotMatterInTest)
+{
+    arm();
+    inputs.last_setpoint_us = now;
+    inputs.setpoints_idle = false;
+    step(100'000);
     EXPECT_TRUE(commander.state().armed);
 }
 

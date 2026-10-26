@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Parameters of the remote control input, whatever reads it (spec 0010).
+prefix = "RC"
+# The failsafe's timing never changes from the local menu (ADR-0022).
+menu = false
+
+[[param]]
+name = "RC_TIMEOUT"
+type = "FLOAT"
+default = 0.5
+min = 0.1
+max = 5.0
+unit = "s"
+description = "The remote control counts as lost after this long without input; in MANUAL the vehicle then stops and disarms."

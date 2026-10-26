@@ -46,16 +46,17 @@ Some boards let the MCU read whether the actuators' power circuit is closed; on 
 - A single unpowered sample while armed disarms in that cycle, with actuator power lost as the reason, so the speed loops do not wind up against motors that have lost power and the wheels cannot jump when it returns. Power returning never re-arms.
 - With the bit cleared nothing is checked.
 
-**Before the remote control exists**
+**Test mode and the manual mode**
 
-Until the remote control is implemented, actuators may move only in test mode, under these conditions, which stand in for the RC takeover rule:
+Actuators move only in `TEST` or `MANUAL`, under these conditions:
 
-- Only direct-actuator and body velocity setpoints are accepted (ADR-0018). The two levels never drive at once: the newer one replaces the other until it times out. Body velocity goes through the control chain and the vehicle model (ADR-0013), and every condition below holds for it as for direct-actuator setpoints.
-- The emergency stop can be engaged from any connected Link.
+- In `TEST` only direct-actuator and body velocity setpoints are accepted (ADR-0018). The two levels never drive at once: the newer one replaces the other until it times out. Body velocity goes through the control chain and the vehicle model (ADR-0013), and every condition below holds for it as for direct-actuator setpoints.
+- In `MANUAL` the remote control drives by body velocity from its sticks; it takes over from any mode with one button, arms and disarms with deliberate holds, and arming needs it connected with its sticks centred (spec 0010).
+- The emergency stop can be engaged from any connected Link and from the remote control.
 - Actuator output is capped by a parameter, low by default.
-- If the source in control times out, the failsafe action is stop and disarm; if no setpoint arrives within a set time after arming, or all targets stay zero for that time, the vehicle disarms as well.
+- If the source in control times out, the failsafe action is stop and disarm; if no setpoint arrives within a set time after arming, or all targets stay zero for that time, the vehicle disarms as well. In `MANUAL`, the remote control lost (`RC_TIMEOUT` without input, or disconnected) stops and disarms with `RC_LOST`. A failsafe action other than stop and disarm waits until a vehicle needs one.
 
-When the remote control exists these conditions stay; it adds a takeover path, it does not replace them.
+The remote control's input is repeated at a steady rate while it is connected, as a gamepad that sends only changes would otherwise fall silent while held still; silence then always means it is lost.
 
 **Modes while armed**
 

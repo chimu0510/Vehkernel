@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Parameters of the manual mode (spec 0010): how the remote control's sticks
+# map to a body velocity. Changes apply from the next control cycle.
+prefix = "MAN"
+# Not in the local menu for now (ADR-0022).
+menu = false
+
+[[param]]
+name = "MAN_VX_MAX"
+type = "FLOAT"
+default = 0.5
+min = 0.0
+max = 5.0
+unit = "m/s"
+description = "Manual mode: forward speed with the left stick fully forward."
+
+[[param]]
+name = "MAN_YAW_MAX"
+type = "FLOAT"
+default = 1.0
+min = 0.0
+max = 10.0
+unit = "rad/s"
+description = "Manual mode: yaw rate with the right stick fully right, positive turning right."
+
+[[param]]
+name = "MAN_DEADZONE"
+type = "FLOAT"
+default = 0.08
+min = 0.0
+max = 0.5
+description = "Manual mode: stick travel around the centre that counts as centred, as a fraction of full travel."

@@ -11,6 +11,7 @@
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/link_status.hpp>
 #include <vk/msg/local_menu.hpp>
+#include <vk/msg/manual_control_input.hpp>
 #include <vk/msg/parameter_status.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
 #include <vk/msg/vehicle_attitude_groundtruth.hpp>
@@ -67,17 +68,18 @@ struct DefaultStreams {
     TopicStreamOf<msg::AllocationStatus> allocation{MaxRate{50.0F}, 0};  // with the control chain
     TopicStreamOf<msg::BodyVelocityMeasurement> measurement{MaxRate{50.0F}, 0};
     TopicStreamOf<msg::VehicleLocalOdometry> odometry{MaxRate{50.0F}, 0};
+    TopicStreamOf<msg::ManualControlInput> gamepad{MaxRate{50.0F}, 0};
     TopicStreamOf<msg::ActuatorSetpoint> setpoint{Inbound{.setpoint = true}, 0};
     TopicStreamOf<msg::BodyVelocitySetpoint> body_setpoint{Inbound{.setpoint = true}, 0};
     TopicStreamOf<msg::LocalMenu> menu{MaxRate{5.0F}, 0};  // with the local menu
     std::array<TopicStreamOf<msg::WorkItemStatus>, msg::WorkItemStatus::instances> work_items =
         make_status_streams<msg::WorkItemStatus>();
     std::array<TopicStreamOf<msg::LinkStatus>, msg::LinkStatus::instances> links = make_status_streams<msg::LinkStatus>();
-    std::array<TopicStream*, 14> first{&imu,         &attitude, &truth,       &odometry_truth, &parameters,
-                                       &vehicle,     &wheels,   &outputs,     &allocation,     &measurement,
-                                       &odometry,    &setpoint, &body_setpoint, &menu};
-    std::array<TopicStream*, 14 + msg::WorkItemStatus::instances + msg::LinkStatus::instances> map =
-        make_map(first, std::make_index_sequence<14>{}, work_items,
+    std::array<TopicStream*, 15> first{&imu,      &attitude,   &truth,       &odometry_truth, &parameters,
+                                       &vehicle,  &wheels,     &outputs,     &allocation,     &measurement,
+                                       &odometry, &gamepad,    &setpoint,    &body_setpoint,  &menu};
+    std::array<TopicStream*, 15 + msg::WorkItemStatus::instances + msg::LinkStatus::instances> map =
+        make_map(first, std::make_index_sequence<15>{}, work_items,
                  std::make_index_sequence<msg::WorkItemStatus::instances>{}, links,
                  std::make_index_sequence<msg::LinkStatus::instances>{});
 };

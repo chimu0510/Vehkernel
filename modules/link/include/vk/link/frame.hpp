@@ -72,6 +72,8 @@ enum class FrameType : std::uint8_t {
     SimActuatorPower = 0x70,
     // SITL only: presses or releases the simulated user key.
     SimUserKey = 0x71,
+    // SITL only: sets the simulated gamepad (spec 0010).
+    SimGamepad = 0x72,
 };
 
 constexpr std::optional<FrameType> to_frame_type(std::uint8_t raw)
@@ -131,6 +133,8 @@ constexpr std::optional<FrameType> to_frame_type(std::uint8_t raw)
         return FrameType::SimActuatorPower;
     case static_cast<std::uint8_t>(FrameType::SimUserKey):
         return FrameType::SimUserKey;
+    case static_cast<std::uint8_t>(FrameType::SimGamepad):
+        return FrameType::SimGamepad;
     default:
         return std::nullopt;
     }

@@ -39,6 +39,7 @@ void Session::handle(const Frame& frame, std::uint64_t now_us, FrameSink& sink)
         break;
     case FrameType::SimActuatorPower:
     case FrameType::SimUserKey:
+    case FrameType::SimGamepad:
         if (sim_frames_ != nullptr) {
             sim_frames_->handle(frame.type, body, out);
         }

@@ -31,6 +31,17 @@ vk_target_link_libraries(vk_vehicle_model PUBLIC vk_msg_headers vk_core vk_param
 target_link_libraries(vk_vehicle_model PUBLIC vk_config PRIVATE vk_warnings vk_cxx_subset)
 vk_target_link_libraries(vk_modules INTERFACE vk_vehicle_model)
 
+# The remote control (spec 0010): the gamepad's sticks and buttons as body
+# velocity setpoints and requests. Its logic uses neither the bus nor
+# FreeRTOS and is tested on the development host; the work item wraps it.
+vk_add_library(vk_remote_control LAYER module STATIC
+  remote_control/src/remote_control.cpp
+  remote_control/src/remote_control_task.cpp)
+target_include_directories(vk_remote_control PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/remote_control/include)
+vk_target_link_libraries(vk_remote_control PUBLIC vk_msg_headers vk_core vk_params vk_lib_estimation)
+target_link_libraries(vk_remote_control PRIVATE vk_warnings vk_cxx_subset)
+vk_target_link_libraries(vk_modules INTERFACE vk_remote_control)
+
 if(CONFIG_ACTUATOR_CONTROL)
   # Actuator control (ADR-0013): the speed loops use neither the bus nor
   # FreeRTOS and are tested on the development host; the work item wraps them.

@@ -30,7 +30,8 @@
 // once per output, for the bring-up case.
 // Its display is a simulated SSD1306; --display writes what it shows to a
 // PBM file after every change (ADR-0022). Its user key is pressed and
-// released by the Link's sim_user_key frame.
+// released by the Link's sim_user_key frame, and its gamepad, disconnected
+// at start, is set by the sim_gamepad frame (spec 0010).
 // A reboot request over the Link ends the run at once, without the report,
 // with exit status 10 to start the firmware again or 11 for the bootloader
 // (ADR-0023). The fault stop ends it with exit status 12 (ADR-0005); --fault
@@ -44,6 +45,7 @@
 #include <vk/actuators/actuator_task.hpp>
 #endif
 #include <vk/commander/commander_task.hpp>
+#include <vk/remote_control/remote_control_task.hpp>
 #include <vk/core/bus.hpp>
 #include <vk/core/fault.hpp>
 #include <vk/core/scheduler.hpp>
@@ -327,6 +329,17 @@ void start_commander()
     commander->start();
 }
 
+vk::core::StaticInstance<vk::remote_control::RemoteControlTask> remote_control;
+
+// The remote control on wq:ctrl after the commander (spec 0010).
+void start_remote_control()
+{
+    remote_control.emplace(vk::remote_control::RemoteControlTask::Config{.interval_us = control_interval_us},
+                           vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    remote_control->start();
+}
+
+
 #ifdef CONFIG_ACTUATOR_CONTROL
 vk::core::StaticInstance<vk::actuators::ActuatorTask> actuator_control;
 
@@ -415,9 +428,10 @@ void start_local_display(const Options& options)
 
 #ifdef CONFIG_LINK
 vk::core::StaticInstance<vk::link::Link> host_link;
-// The Link's sim_actuator_power and sim_user_key frames act on the simulator.
+// The Link's sim_actuator_power, sim_user_key and sim_gamepad frames act on the simulator.
 vk::link::SimHandler sim_frames({.set_actuator_power = &vk::platform::set_actuator_power,
-                                 .set_user_key = &vk::platform::set_user_key});
+                                 .set_user_key = &vk::platform::set_user_key,
+                                 .set_gamepad = &vk::platform::set_gamepad});
 #endif
 #ifdef CONFIG_LINK_UDP
 vk::platform::UdpTransport udp;
@@ -567,6 +581,8 @@ int main(int argc, char** argv)
     start_estimator();
 #endif
     start_commander();
+    vk::platform::start_sim_gamepad(vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    start_remote_control();
 #ifdef CONFIG_ACTUATOR_CONTROL
     start_vehicle_model();
 #ifdef CONFIG_CONTROL_CHAIN
