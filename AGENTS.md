@@ -25,3 +25,7 @@ Single-context: root `GLOSSARY.md` plus `docs/adr/`. See `docs/agents/domain.md`
 ### Handoff
 
 Progress lives in the issues and specs, not in agent memory. When starting a session, finishing a ticket or ending a session, follow `docs/agents/handoff.md`.
+
+### Delegation
+
+With the agy-bridge MCP server, the main agent decides, publishes specs and issues and accepts the work, and delegates implementation to agy. See `docs/agents/delegation.md`.
