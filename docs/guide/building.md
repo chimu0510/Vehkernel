@@ -27,10 +27,12 @@ vk() { docker run --rm -it -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -w "$PWD" --net
 ```
 
 ```bash
-vk cmake --preset sitl
-vk cmake --build --preset sitl
+vk cmake --preset test
+vk cmake --build --preset test
 vk ctest --preset test
 ```
+
+`ctest` runs what its own preset built: configure and build `test` before `ctest --preset test`.
 
 The function's options:
 
