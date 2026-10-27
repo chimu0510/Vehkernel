@@ -11,20 +11,22 @@ build/sitl/app/vehkernel-sitl --duration 0
 tools/link/link_monitor.py --udp 127.0.0.1:15600 record log.ulg --profile estimator_replay --duration 10
 ```
 
-On a serial connection to hardware (for example [C50C V1.1](../boards/c50c-v1_1.md)):
+On a serial connection to hardware (for example [C50C V1.1](../boards/c50c-v1_1.md)), run the recorder on the host, which has the board's USB devices ([Container or host](building.md#container-or-host)):
 
 ```bash
 tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/c50c-v1_1/generated/schema/python \
     record log.ulg --profile estimator_replay --duration 60
 ```
 
-Logging stops when `--duration` expires, on `Ctrl-C`, or when the Link disconnects.
+The recorder stops when `--duration` expires or on `Ctrl-C`, and fails with exit code 1 when the serial port goes away. The MCU stops logging when the recorder asks it to, and on its own when the host stays silent past the Link's peer timeout.
+
+CI records SITL for 30 s with `test/sitl/check_log.py` (the `sitl_log` test): pyulog must open the file, it must hold no dropouts, and every profile topic SITL publishes must arrive within 5 % of its rate.
 
 ### What is written to the log
 
 Before streaming high-rate data, the recorder writes:
-- **Header and info (`I`)**: board name (`board::name`), board ID, firmware version, git commit hash, and the schema hashes of all negotiated topics.
 - **Formats (`F`)**: message layouts generated from schema definitions (`.msg`).
+- **Info (`I`)**: from the MCU's `log_info`, the board name (`sys_name`), `board_id`, the firmware version (`ver_sw`), the git commit hash (`ver_git`) and the profile's `bandwidth`; and the schema hash of every topic the MCU declared at the handshake (`sys_schema_<topic>`).
 - **Initial parameters (`P`)**: every parameter read from the MCU before logging starts.
 
 During the session:
@@ -35,7 +37,7 @@ During the session:
 
 ## Log profiles
 
-Log profiles are declared in `schema/log_profiles.toml` and emitted by the profile generator (ADR-0019). The MCU refuses `log_start` while armed, when an unknown profile is requested, or when the profile's estimated bandwidth together with the Link's status streams exceeds 80 % of the port capacity.
+Log profiles are declared in `schema/log_profiles.toml` and emitted by the profile generator (ADR-0019). The MCU refuses `log_start` while armed, when an unknown profile is requested, when another Link is already logging, or when the profile's estimated bandwidth together with the Link's status streams (those at 1 Hz or less) exceeds 80 % of the port capacity. While logging, the normal topic map leaves out the topics the profile carries and is scaled into what remains of the port.
 
 The `estimator_replay` profile records estimator inputs and outputs:
 

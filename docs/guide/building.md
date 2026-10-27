@@ -49,8 +49,8 @@ Rebuild the image after `.devcontainer/Dockerfile`, `pyproject.toml`, `uv.lock` 
 
 | In the container | On the host |
 |---|---|
-| `cmake`, `ctest` and every preset's build | The Link monitor on a serial port (`--serial /dev/ttyACM0`) |
-| SITL, and the SITL and unit tests | Flashing: `tools/flash/flash_serial.py`, `stm32flash`, ArduPilot's `uploader.py` and OpenOCD |
+| `cmake`, `ctest` and every preset's build | The Link monitor on a serial port (`--serial /dev/ttyACM0`), including recording a log from a board |
+| SITL, and the SITL and unit tests; estimator replay and comparison (`tools/log/`) and pyulog's tools | Flashing: `tools/flash/flash_serial.py`, `stm32flash`, ArduPilot's `uploader.py` and OpenOCD |
 | clang-tidy, the generators and the license check (`reuse lint`) | `tools/bringup/run_bringup.py`, which flashes over SWD |
 
 The host tools need the board's USB devices. They read the build tree that the container wrote, and need only Python 3 with pyserial besides the tools below, at these versions:
@@ -72,7 +72,7 @@ There is one CMake preset per build target:
 | `c50c-v1_1` | C50C V1.1 firmware and bootloader. In `app/`: `vehkernel.elf`, `vehkernel.hex` and `vehkernel.bin` (the firmware alone, from S4), `vehkernel.apj` (ArduPilot's firmware file, ADR-0023) and `vehkernel_with_bl.hex` (the bootloader and the firmware, for a new board). In `bootloader/`: `vehkernel-bootloader.elf` and `.bin` (S0). Every firmware image carries ArduPilot's app descriptor, filled after linking with its CRCs, size, git hash, version and board ID |
 | `c50c-v1_1-bringup` | The C50C V1.1 bring-up image ([Testing](testing.md#bring-up-image)) |
 | `sitl` | SITL executable for the development host ([SITL](sitl.md)) |
-| `test` | Host tests, run with `ctest --preset test` ([Testing](testing.md)) |
+| `test` | Host tests, run with `ctest --preset test` ([Testing](testing.md)), and `vehkernel-replay` in `test/`, the replay executable that `tools/log/replay.py` runs ([Logging](logging.md#estimator-replay-and-comparison)) |
 | `fuzz` | The Link fuzz targets, built with Clang, libFuzzer and the sanitizers, run with `ctest --preset fuzz` ([Testing](testing.md#fuzzing-the-link-decoders)) |
 
 Configure and build a preset in the container; with Docker, prefix each command with `vk`:

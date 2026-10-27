@@ -14,6 +14,8 @@ At every start it reads RTC backup register 0, where the firmware leaves its req
 
 It starts the firmware only when the app descriptor is present and its CRCs, size and board ID match, and when its reset handler lies in the FIRMWARE region; otherwise it stays, so a cut-off update or an image for another board never runs. An update erases and writes the FIRMWARE region only (S4 to S7), so the stored parameters and the event log survive it.
 
+CI runs the bootloader's SITL build on a pty against the pinned `uploader.py` (`test/sitl/check_bootloader.py`, the `sitl_bootloader` test): an image for the board flashes, verifies and starts; an image for another board is refused before anything is erased; an upload cut off midway leaves an image that does not start until a new upload recovers it; and the boot requests and the boot window behave as above.
+
 ## A new board: `new-board`
 
 On a board with a download circuit, such as the C50C's one-key download port, the adapter's RTS drives BOOT0 and its DTR, with RTS, drives NRST, so the STM32 system bootloader is entered and left without touching the board; the board definition declares this circuit on the port (`download = "DTR_RTS"`). `tools/flash/flash_serial.py` runs `stm32flash` on the host with that sequence and takes the Flash layout from the build's board definition. It reads `build/c50c-v1_1` and `/dev/ttyACM0` unless given `--build` and `--port`, which go before the command, as in `flash_serial.py --port /dev/ttyACM1 reset`. Device numbers follow the order the cables were plugged in; the board page says how to tell the ports apart.

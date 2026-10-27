@@ -103,15 +103,11 @@ The hardware check of the parameters (L4): set `ATT_KP` and `SENS_BOARD_ROT`, po
 
 ## Logging
 
-The `record` command records a ULog file over the Link with a selected log profile (spec 0011, ADR-0019):
+The `record` command records a ULog file over the Link with a log profile (spec 0011, ADR-0019); [Logging](logging.md) describes what the file holds, the profiles and replay:
 
 ```bash
-tools/link/link_monitor.py record log.ulg --profile estimator_replay --duration 30
+tools/link/link_monitor.py --udp 127.0.0.1:15600 record log.ulg --profile estimator_replay --duration 30
 ```
-
-Before streaming topic data, the monitor reads the board's parameter set and writes them as `P` messages. During logging, parameters updated on the MCU are written dynamically at the time of each `parameter_update`. Hardware and firmware details from `log_info` (board name, ID, version, git hash, bandwidth) and schema hashes from the handshake are recorded as `I` info messages. Logged topics travel as `D` messages with MCU timestamps. Missed samples reported by the MCU via `log_dropout` or frames lost in transport are recorded as `O` dropout messages, and periodic `S` sync messages keep the ULog stream seekable.
-
-Logging ends when `--duration` expires, on `Ctrl-C`, or when the session closes.
 
 ## Commands
 
