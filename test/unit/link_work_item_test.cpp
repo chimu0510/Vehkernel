@@ -216,6 +216,8 @@ protected:
         host.send_hello();
         const std::size_t topics = vk::link::schema_topics.size();
         for (std::size_t run = 0; run < (topics + Link::paced_frames_per_run - 1) / Link::paced_frames_per_run; ++run) {
+            // A time sync in each run keeps a short peer_timeout_us from expiring during the handshake.
+            host.send_time_sync();
             step();
         }
         host.receive();
@@ -384,7 +386,8 @@ TEST_F(LinkTest, DropsAndCountsFramesTheTransportCannotTakeWithoutBlocking)
     step();
     EXPECT_TRUE(transport.written.empty());
     EXPECT_EQ(link.link_stats().drops, 3U);
-    EXPECT_EQ(link.link_stats().frames_sent, 1 + vk::link::schema_topics.size());  // the handshake only
+    const std::size_t handshake_runs = (vk::link::schema_topics.size() + Link::paced_frames_per_run - 1) / Link::paced_frames_per_run;
+    EXPECT_EQ(link.link_stats().frames_sent, 1 + vk::link::schema_topics.size() + handshake_runs);  // the handshake and its time sync replies
     EXPECT_EQ(link.stats().overruns, 0U);
 
     // Dropped frames give their sequence numbers back: the host loses none.
