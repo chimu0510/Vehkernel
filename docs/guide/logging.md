@@ -130,12 +130,24 @@ Compare the replayed log against the recorded log:
 tools/log/compare.py log.ulg replayed.ulg
 ```
 
+### Cutting a log
+
+`tools/log/cut.py` keeps the part of a log from its first `estimator_restart` for a number of seconds, with the topics the replay reads and the estimates it is compared with (`imu_sample`, `body_velocity_measurement`, `estimator_restart`, `vehicle_attitude`, `vehicle_local_odometry`) and the log's formats, information and parameters:
+
+```bash
+tools/log/cut.py log.ulg cut.ulg --duration 30
+```
+
+The log of the `replay_board_log` test was cut so, from a drive recorded on the C50C V1.1.
+
+On a board log, `replay.py` sets aside the parameters a board's definition adds (`SERIAL<n>_BAUD`), which the replay program does not know and no estimator reads; any other parameter it does not know still fails the replay unless `--allow-unknown-parameters` is given.
+
 ### Pass criteria
 
 1. **Faithfulness**:
    - For every `vehicle_attitude` and `vehicle_local_odometry` sample in the evaluation window (from `estimator_restart` onward), the replayed sample with the same `timestamp_sample` must match the recorded sample field-for-field.
    - For SITL logs, where the replay binary and SITL executable share the same host toolchain, the match is exact (`--tolerance 0.0`).
-   - For board logs, differences due to hardware FPU fused multiply-add and newlib `libm` are accepted within a tight measured tolerance.
+   - For board logs, differences due to hardware FPU fused multiply-add and newlib `libm` are accepted within a tight measured tolerance: 1e-4 per field in `replay_board_log`, against a largest difference of 1.4e-5 (position, in metres) over a 70 s drive on the C50C V1.1.
 2. **Estimation metrics**:
    - `compare.py` aligns the logged ground truth into the local odometry frame at the restart point and computes the mean and maximum attitude error, final position error, and final heading error.
    - CI runs `sitl_replay` (`test/sitl/check_replay.py`), which records a SITL square drive over UDP, replays it, checks exact faithfulness, verifies zero dropouts, and verifies that the odometry error is within `check_odometry.py`'s bounds against ground truth.

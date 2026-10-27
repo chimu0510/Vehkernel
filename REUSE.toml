@@ -38,6 +38,7 @@ path = [
     "test/unit/golden/**",
     "test/cmake/bad_overlay.config",
     "tools/generators/tests/**",
+    "test/replay/data/**",
 ]
 SPDX-FileCopyrightText = "Vehkernel contributors"
 SPDX-License-Identifier = "GPL-3.0-or-later"

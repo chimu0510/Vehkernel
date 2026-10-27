@@ -35,6 +35,8 @@ Replay re-runs the firmware's estimator work items on recorded ULog files on the
 - Odometry metrics: the replayed odometry ends within `check_odometry.py`'s bounds against the logged ground truth.
 - Dropouts: the recorded log has no dropouts.
 
+The test `replay_board_log` replays a log recorded on the C50C V1.1 (`test/replay/data/c50c_v1_1_drive.ulg`, 30 s from the estimators' restart, kept under 1 MB) and checks the replayed estimate within 1e-4 of the recorded one, per field. The board's float maths is not the host's, so the match is not exact; the largest difference seen was 2.6e-6 on the cut and 1.4e-5 on the whole drive. When the estimators change on purpose, the log is recorded again on the board, or the test is switched to metrics against the previous estimate, and the commit says which.
+
 ## Fuzzing the Link decoders
 
 The Link decodes bytes from any connected host, so its decoders are fuzzed with libFuzzer (L1, ADR-0018). The `fuzz` preset builds three fuzz targets with Clang, AddressSanitizer, UndefinedBehaviorSanitizer and libstdc++'s bounds checks; the last catch an overrun from one array member into the next, which AddressSanitizer cannot see. The targets live in `test/fuzz/`:

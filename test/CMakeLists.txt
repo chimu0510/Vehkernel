@@ -256,6 +256,13 @@ add_test(NAME ulog
 set_tests_properties(ulog PROPERTIES ENVIRONMENT
   "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log;PYTHONDONTWRITEBYTECODE=1;VEHKERNEL_REPLAY=$<TARGET_FILE:vehkernel-replay>")
 
+# L2 board log test (spec 0011, ADR-0018): replays a log recorded on the C50C V1.1 and checks the
+# estimators' output within the tolerance measured in the hardware check.
+add_test(NAME replay_board_log
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_CURRENT_SOURCE_DIR}/replay/test_board_log.py)
+set_tests_properties(replay_board_log PROPERTIES ENVIRONMENT
+  "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log;PYTHONDONTWRITEBYTECODE=1;VEHKERNEL_REPLAY=$<TARGET_FILE:vehkernel-replay>")
+
 # Layer rules (ADR-0009): configure a scratch project that links one layer to
 # another and check that the rule helper accepts or rejects it.
 set(_vk_layer_project ${CMAKE_CURRENT_SOURCE_DIR}/cmake/layer_rules)

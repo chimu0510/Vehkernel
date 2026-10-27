@@ -20,7 +20,7 @@ The bootloader (spec 0008) is in progress; the hardware check of the first wheel
 - The local display and local menu on the board's OLED and user key.
 - ArduPilot's app descriptor and `.apj` file, reboot into the bootloader over the Link, and the Vehkernel bootloader in S0 of the board, flashed by ArduPilot's `uploader.py` and checked against it in SITL; its hardware check is still to come.
 
-Decided but not built yet: the ROS2 Bridge (`bridge/` is a placeholder), the vehicle models and the control chain above the wheel speed loops, the remote control, logging, the replay (L2) and ROS2 (L5) test layers (`test/replay/` and `test/ros2/` are placeholders), and boards other than the C50C V1.1.
+Decided but not built yet: the ROS2 Bridge (`bridge/` is a placeholder), the vehicle models and the control chain above the wheel speed loops, and the ROS2 (L5) test layer (`test/ros2/` is a placeholder), and boards other than the C50C V1.1.
 
 Every decision is recorded in [`docs/adr/`](docs/adr/), each milestone in [`docs/specs/`](docs/specs/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary.
 

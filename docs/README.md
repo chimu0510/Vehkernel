@@ -50,7 +50,7 @@
 | `tools/kconfig/` | Layered Kconfig solve and `menuconfig` with overlay saving | 0017 |
 | `tools/generators/` | Schema, board and parameter generators; the schema generator also emits the log profiles | 0006, 0011, 0012, 0019 |
 | `tools/link/` | Link monitor: live view, checks, parameters, vehicle commands and recording ULog files | 0002, 0006, 0019 |
-| `tools/log/` | ULog reading and writing, estimator replay (`replay.py`) and comparison (`compare.py`) | 0018, 0019 |
+| `tools/log/` | ULog reading and writing, estimator replay (`replay.py`), comparison (`compare.py`) and cutting (`cut.py`) | 0018, 0019 |
 | `tools/flash/` | Serial flasher through the STM32 system bootloader | 0020, 0023 |
 | `tools/firmware/` | Fills the app descriptor after linking and writes the `.apj` | 0023 |
 | `tools/bootloader/` | ArduPilot's `uploader.py`, pinned, and the script listing upstream bootloader changes | 0023 |
