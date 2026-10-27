@@ -44,7 +44,7 @@ Deliver the eleventh milestone: **logging over a Link to a ULog file on the host
 - **Log profiles** (ADR-0019): one TOML file, `schema/log_profiles.toml`, lists each profile's topics and their rates; a rate is a frequency, `every_sample`, which needs a queued topic (`@queue`, ADR-0008), or `as_published`. An entry may carry a Kconfig condition (`kconfig = "PLATFORM_SITL"`), so that SITL-only topics are left out of the board's table. The generator checks each topic against the schema and emits the profile tables for the firmware and the host, and each profile's bandwidth on the wire. The one profile now is `estimator_replay`:
   - every sample: `imu_sample` (instance 0), `body_velocity_measurement` (instance 0);
   - 50 Hz: `vehicle_attitude`, `vehicle_local_odometry`, `actuator_outputs`;
-  - as published: `vehicle_status` (5 Hz), `work_item_status` and `link_status` (1 Hz), and `parameter_update` (on each change);
+  - as published: `vehicle_status` (5 Hz), `work_item_status` and `link_status` (1 Hz), `parameter_update` (on each change), and `estimator_restart` (once, when the Link asks for the restart: replay restarts its estimators at the same time);
   - SITL adds `vehicle_attitude_groundtruth` and `vehicle_local_odometry_groundtruth` at 50 Hz.
 
   About 33 KB/s with the Link's framing, about 45 % of SERIAL1 at 921600 baud.
@@ -70,7 +70,7 @@ Deliver the eleventh milestone: **logging over a Link to a ULog file on the host
   The writer and a small reader live in `tools/log/vkulog/`, so the replay tools need no third-party parser. pyulog is pinned as a test dependency (ADR-0016) only, to check that standard tools read our files.
 - **Replay program** (`vehkernel-replay`, a host executable in the `test` preset, ADR-0018 L2): it builds the firmware's estimator work items (`AttitudeEstimator`, `LocalOdometry`) unchanged, on a `WorkQueue` with a replay clock.
   - Before the first input, it applies the log's parameters; a parameter that changed while logging is applied, and `parameter_update` published, at its logged time.
-  - It then publishes each logged input in timestamp order, sets the clock to its timestamp and runs the queue.
+  - It then publishes each logged input in timestamp order, `estimator_restart` included, sets the clock to its timestamp and runs the queue. The faithfulness check covers the samples from the logged restart on.
   - The order between topics follows the order the work items run in on `wq:ctrl`: the IMU driver, and so the attitude estimator, before the vehicle model's measurement and local odometry. The implementer confirms this order from the firmware, and SITL's exactness checks it.
   - What the estimators publish goes to stdout.
   - `tools/log/replay.py <in.ulg> <out.ulg>` feeds the program from a log and writes its output as a log with the same information and parameters.
