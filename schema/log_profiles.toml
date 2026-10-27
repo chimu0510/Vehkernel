@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Log profiles (spec 0011, ADR-0019).
+#
+# A profile selects the topics and rates recorded by a sink or streamed over
+# a Link for logging. Rates are:
+#   - a frequency in Hz (e.g. 50);
+#   - "every_sample", which requires a queued topic (@queue, ADR-0008);
+#   - "as_published", which logs at the topic's schema rate on each publication.
+# An entry may carry a Kconfig condition so platform-specific topics are left
+# out of other targets' tables.
+
+[estimator_replay]
+description = "Inputs and outputs for replaying estimators on recorded logs (spec 0011)"
+entries = [
+    { topic = "imu_sample", instance = 0, rate = "every_sample" },
+    { topic = "body_velocity_measurement", instance = 0, rate = "every_sample" },
+    { topic = "vehicle_attitude", rate = 50 },
+    { topic = "vehicle_local_odometry", rate = 50 },
+    { topic = "actuator_outputs", rate = 50 },
+    { topic = "vehicle_status", rate = "as_published" },
+    { topic = "work_item_status", rate = "as_published" },
+    { topic = "link_status", rate = "as_published" },
+    { topic = "parameter_update", rate = "as_published" },
+    { topic = "vehicle_attitude_groundtruth", rate = 50, kconfig = "PLATFORM_SITL" },
+    { topic = "vehicle_local_odometry_groundtruth", rate = 50, kconfig = "PLATFORM_SITL" },
+]

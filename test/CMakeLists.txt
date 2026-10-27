@@ -216,6 +216,10 @@ add_test(NAME link_protocol
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/link/tests)
 set_tests_properties(link_protocol PROPERTIES ENVIRONMENT
   "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/link")
+add_test(NAME ulog
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/log/tests)
+set_tests_properties(ulog PROPERTIES ENVIRONMENT
+  "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log;PYTHONDONTWRITEBYTECODE=1")
 
 # Layer rules (ADR-0009): configure a scratch project that links one layer to
 # another and check that the rule helper accepts or rejects it.

@@ -15,6 +15,7 @@ function(vk_generate_schema)
   list(SORT messages)
   file(GLOB enums RELATIVE ${CMAKE_SOURCE_DIR} CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/schema/enum/*.enum)
   list(SORT enums)
+  set(profiles ${CMAKE_SOURCE_DIR}/schema/log_profiles.toml)
   file(GLOB generator_sources CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/tools/generators/vkschema/*.py
     ${CMAKE_SOURCE_DIR}/tools/generators/vkboard/diagnostics.py)
@@ -25,8 +26,11 @@ function(vk_generate_schema)
     ${out_dir}/vk/msg/topics.hpp
     ${out_dir}/vk/msg/wire.hpp
     ${out_dir}/vk/msg/enums.hpp
+    ${out_dir}/vk/msg/log_profiles.hpp
     ${out_dir}/python/vkmsg.py
-    ${out_dir}/python/vkenums.py)
+    ${out_dir}/python/vkenums.py
+    ${out_dir}/python/vklog_profiles.py
+    ${out_dir}/python/vkformats.py)
   foreach(message IN LISTS messages)
     get_filename_component(name ${message} NAME_WE)
     list(APPEND headers ${out_dir}/vk/msg/${name}.hpp)
@@ -34,12 +38,12 @@ function(vk_generate_schema)
 
   add_custom_command(
     OUTPUT ${headers}
-    COMMAND ${Python3_EXECUTABLE} -I ${generator} ${messages} ${enums} --output-dir ${out_dir}
+    COMMAND ${Python3_EXECUTABLE} -I ${generator} ${messages} ${enums} --profiles ${profiles} --output-dir ${out_dir}
     # The generator leaves unchanged files alone; touch them so the outputs
     # are newer than the inputs and the command does not run again.
     COMMAND ${CMAKE_COMMAND} -E touch ${headers}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    DEPENDS ${messages} ${enums} ${generator} ${generator_sources}
+    DEPENDS ${messages} ${enums} ${profiles} ${generator} ${generator_sources}
     COMMENT "Generating topics and enums from the schema"
     VERBATIM)
 
@@ -51,6 +55,7 @@ function(vk_generate_schema)
   set(VK_MSG_PYTHON_DIR ${out_dir}/python PARENT_SCOPE)
   vk_add_library(vk_msg_headers LAYER core INTERFACE)
   target_include_directories(vk_msg_headers INTERFACE ${out_dir})
+  target_link_libraries(vk_msg_headers INTERFACE vk_config)
   add_dependencies(vk_msg_headers vk_msg_generate)
 
   vk_add_library(vk_msg LAYER core STATIC ${out_dir}/vk/msg/registry.cpp)
