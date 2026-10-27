@@ -101,30 +101,45 @@ def main() -> int:
         for d in ulog.data_list:
             data_by_topic[(d.name, d.multi_id)] = d
 
+        sitl_publications: dict[tuple[str, int], int] = {}
+        for line in sitl_stdout.splitlines():
+            if not line.startswith("topic "):
+                continue
+            pairs = dict(pair.split("=", 1) for pair in line.split()[1:] if "=" in pair)
+            if "name" in pairs and "instance" in pairs and "publications" in pairs:
+                sitl_publications[(pairs["name"], int(pairs["instance"]))] = int(pairs["publications"])
+
         print(f"\n--- Measured topic rates over {args.duration:g} s ---")
         for entry in profile.entries:
             if entry.kconfig == "PLATFORM_SITL" or entry.kconfig is None:
-                inst = entry.instance if entry.instance is not None else 0
                 expected_hz = entry.rate_hz
                 if expected_hz <= 0.0:
                     continue  # as_published without nominal rate, e.g. parameter_update
 
-                dataset = data_by_topic.get((entry.topic, inst))
-                if dataset is None:
-                    failures.append(f"profile topic {entry.topic}:{inst} missing in log")
-                    continue
+                instances = [entry.instance] if entry.instance is not None else list(range(entry.instance_count))
+                for inst in instances:
+                    # Unused work item slots or inactive links are never published by SITL
+                    # (publications == 0 in SITL exit report). Skip rate check and do not fail.
+                    if sitl_publications and sitl_publications.get((entry.topic, inst), 0) == 0:
+                        print(f"  {entry.topic}:{inst:<2} skipped (never published in SITL)")
+                        continue
 
-                count = len(dataset.data["timestamp"])
-                measured_hz = count / args.duration
-                rel_err = abs(measured_hz - expected_hz) / expected_hz
-                print(f"  {entry.topic}:{inst:<2} expected={expected_hz:6.1f} Hz  "
-                      f"measured={measured_hz:6.2f} Hz  error={rel_err*100.0:4.1f}% ({count} msgs)")
+                    dataset = data_by_topic.get((entry.topic, inst))
+                    if dataset is None:
+                        failures.append(f"profile topic {entry.topic}:{inst} missing in log")
+                        continue
 
-                if rel_err > 0.05:
-                    failures.append(
-                        f"topic {entry.topic}:{inst} rate {measured_hz:.2f} Hz exceeds 5% tolerance "
-                        f"from expected {expected_hz:.1f} Hz (error {rel_err*100.0:.1f}%)"
-                    )
+                    count = len(dataset.data["timestamp"])
+                    measured_hz = count / args.duration
+                    rel_err = abs(measured_hz - expected_hz) / expected_hz
+                    print(f"  {entry.topic}:{inst:<2} expected={expected_hz:6.1f} Hz  "
+                          f"measured={measured_hz:6.2f} Hz  error={rel_err*100.0:4.1f}% ({count} msgs)")
+
+                    if rel_err > 0.05:
+                        failures.append(
+                            f"topic {entry.topic}:{inst} rate {measured_hz:.2f} Hz exceeds 5% tolerance "
+                            f"from expected {expected_hz:.1f} Hz (error {rel_err*100.0:.1f}%)"
+                        )
 
         for failure in failures:
             print(f"FAIL: {failure}", file=sys.stderr)

@@ -121,11 +121,14 @@ class ULogRecorder:
         entry_rates: dict[tuple[int, int], float] = {}
         next_msg_id = 1
         for entry in profile.entries:
-            inst = entry.instance if entry.instance is not None else 0
-            topic_map_msg_id[(entry.topic_id, inst)] = next_msg_id
-            entry_rates[(entry.topic_id, inst)] = entry.rate_hz
-            self.writer.write_add_logged(next_msg_id, entry.topic, multi_id=inst)
-            next_msg_id += 1
+            # An entry without an instance logs every instance of its topic.
+            instances = [entry.instance] if entry.instance is not None else list(range(entry.instance_count))
+
+            for inst in instances:
+                topic_map_msg_id[(entry.topic_id, inst)] = next_msg_id
+                entry_rates[(entry.topic_id, inst)] = entry.rate_hz
+                self.writer.write_add_logged(next_msg_id, entry.topic, multi_id=inst)
+                next_msg_id += 1
 
         param_update_topic = self.monitor.session.peer_topics_by_name.get("parameter_update")
         param_update_id = param_update_topic.id if param_update_topic else None
