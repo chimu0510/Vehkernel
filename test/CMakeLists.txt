@@ -1,6 +1,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 add_subdirectory(unit)
 
+# Replay program (ADR-0018 L2, spec 0011)
+add_executable(vehkernel-replay replay/main.cpp)
+target_link_libraries(vehkernel-replay PRIVATE
+  vk_hal
+  vk_platform
+  vk_core
+  vk_msg
+  vk_params
+  vk_estimation
+  vk_lib_estimation
+  vk_warnings
+)
+
 # L3 SITL smoke test (ADR-0018): the IMU sample topic is published at the
 # configured 200 Hz, and no work item overruns. With the UDP Link, overruns
 # are judged over a check window after start-up, by the MCU's own timing.
@@ -230,7 +243,7 @@ set_tests_properties(link_protocol PROPERTIES ENVIRONMENT
 add_test(NAME ulog
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/log/tests)
 set_tests_properties(ulog PROPERTIES ENVIRONMENT
-  "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log;PYTHONDONTWRITEBYTECODE=1")
+  "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log;PYTHONDONTWRITEBYTECODE=1;VEHKERNEL_REPLAY=$<TARGET_FILE:vehkernel-replay>")
 
 # Layer rules (ADR-0009): configure a scratch project that links one layer to
 # another and check that the rule helper accepts or rejects it.

@@ -54,6 +54,21 @@ class MessageFormat:
     fields: tuple[FormatField, ...]
     raw: str
 
+    _TYPE_MAP = {
+        "uint8_t": "B",
+        "int8_t": "b",
+        "uint16_t": "H",
+        "int16_t": "h",
+        "uint32_t": "I",
+        "int32_t": "i",
+        "uint64_t": "Q",
+        "int64_t": "q",
+        "float": "f",
+        "double": "d",
+        "bool": "?",
+        "char": "s",
+    }
+
     @classmethod
     def parse(cls, format_str: str) -> "MessageFormat":
         parts = format_str.split(":", 1)
@@ -75,6 +90,45 @@ class MessageFormat:
                     type_name = type_part
                 fields.append(FormatField(type_name, array_size, field_name))
         return cls(name=name, fields=tuple(fields), raw=format_str)
+
+    def struct_format(self) -> str:
+        parts = ["<"]
+        for f in self.fields:
+            code = self._TYPE_MAP.get(f.type_name)
+            if code is None:
+                raise ValueError(f"Unknown field type {f.type_name!r} in format {self.name}")
+            if f.array_size > 0:
+                if f.type_name == "char":
+                    parts.append(f"{f.array_size}s")
+                else:
+                    parts.append(f"{f.array_size}{code}")
+            else:
+                parts.append(code)
+        return "".join(parts)
+
+    def decode(self, data: bytes | DataMessage) -> dict[str, Any]:
+        """Decode packed message bytes into a dict mapping field name to value or tuple."""
+        raw_bytes = data.data if isinstance(data, DataMessage) else data
+        fmt_str = self.struct_format()
+        expected_size = struct.calcsize(fmt_str)
+        if len(raw_bytes) < expected_size:
+            raise ValueError(
+                f"Data length {len(raw_bytes)} is less than expected {expected_size} for format {self.name}"
+            )
+        unpacked = struct.unpack(fmt_str, raw_bytes[:expected_size])
+        result: dict[str, Any] = {}
+        idx = 0
+        for f in self.fields:
+            if f.array_size == 0:
+                result[f.name] = unpacked[idx]
+                idx += 1
+            elif f.type_name == "char":
+                result[f.name] = unpacked[idx]
+                idx += 1
+            else:
+                result[f.name] = tuple(unpacked[idx : idx + f.array_size])
+                idx += f.array_size
+        return result
 
 
 @dataclass(frozen=True)
@@ -236,6 +290,16 @@ class ULogReader:
         else:
             val = val_bytes
         return key, val
+
+    def decode_message(self, data_msg: DataMessage) -> dict[str, Any]:
+        """Decode a DataMessage using its format from this log."""
+        sub = self.subscriptions.get(data_msg.msg_id)
+        if sub is None:
+            raise KeyError(f"Unknown msg_id {data_msg.msg_id}")
+        fmt = self.formats.get(sub.message_name)
+        if fmt is None:
+            raise KeyError(f"Unknown format for message '{sub.message_name}'")
+        return fmt.decode(data_msg)
 
     def close(self) -> None:
         if self._close_on_exit:

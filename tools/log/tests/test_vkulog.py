@@ -128,6 +128,39 @@ def test_round_trip_every_message_kind(tmp_path: Path):
     assert abs(dataset_vel.data["vx"][0] - 1.2) < 1e-4
 
 
+def test_decode_data_message(tmp_path: Path):
+    """Verify generic DataMessage decoding from MessageFormat."""
+    log_file = tmp_path / "decode_test.ulg"
+    ts = 1_000_100
+    imu_data = struct.pack("<QB3f3ff", ts, 0, 0.0, 0.0, 9.81, 0.01, -0.02, 0.03, 28.5)
+
+    with vkulog.ULogWriter(log_file, start_timestamp_us=ts) as w:
+        w.write_format(vkulog.FORMATS["imu_sample"])
+        w.write_add_logged(msg_id=1, message_name="imu_sample", multi_id=0)
+        w.write_data(msg_id=1, data=imu_data)
+
+    reader = vkulog.ULogReader(log_file)
+    assert len(reader.data_messages) == 1
+    dm = reader.data_messages[0]
+
+    # Decode via reader
+    decoded = reader.decode_message(dm)
+    assert decoded["timestamp"] == ts
+    assert decoded["device_instance"] == 0
+    assert isinstance(decoded["accel"], tuple)
+    assert len(decoded["accel"]) == 3
+    assert abs(decoded["accel"][2] - 9.81) < 1e-4
+    assert isinstance(decoded["gyro"], tuple)
+    assert len(decoded["gyro"]) == 3
+    assert abs(decoded["gyro"][0] - 0.01) < 1e-4
+    assert abs(decoded["temperature"] - 28.5) < 1e-4
+
+    # Decode directly via MessageFormat
+    fmt = reader.formats["imu_sample"]
+    decoded_fmt = fmt.decode(dm.data)
+    assert decoded_fmt == decoded
+
+
 def test_corrupt_files():
     """Verify reader error handling on malformed files."""
     with pytest.raises(ValueError, match="too short"):
