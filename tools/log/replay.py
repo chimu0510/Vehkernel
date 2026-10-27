@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import re
 import shutil
 import struct
 import subprocess
@@ -19,6 +20,12 @@ sys.path.insert(0, str(REPO / "tools" / "log"))
 
 import vkulog  # noqa: E402
 from vkulog.reader import DataMessage, ParameterChange  # noqa: E402
+
+
+# Parameters a board's definition adds (the baud rate of each serial port). A board log holds them, the
+# replay program, built for the host, does not know them, and no estimator reads them: they are set aside
+# without --allow-unknown-parameters, while any other unknown name still fails the replay.
+BOARD_ONLY_PARAMETER = re.compile(r"SERIAL\d+_BAUD")
 
 
 def find_replay_executable(explicit: str | Path | None = None) -> Path:
@@ -180,6 +187,10 @@ def replay(
             if param_name and param_name not in unknown_params:
                 unknown_params.append(param_name)
 
+    board_only = [name for name in unknown_params if BOARD_ONLY_PARAMETER.fullmatch(name)]
+    unknown_params = [name for name in unknown_params if name not in board_only]
+    if board_only:
+        print(f"Board-only parameters in log, ignored: {', '.join(board_only)}", file=sys.stderr)
     if unknown_params:
         print(f"Unknown parameters in log: {len(unknown_params)} ({', '.join(unknown_params)})", file=sys.stderr)
         if not allow_unknown_parameters:

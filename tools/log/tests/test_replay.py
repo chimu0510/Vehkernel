@@ -229,3 +229,34 @@ def test_unknown_parameter_allowed_with_flag(tmp_path: Path):
     replay(in_log, out_log, allow_unknown_parameters=True)
     assert out_log.exists()
 
+
+
+def test_board_only_parameters_are_set_aside(tmp_path: Path):
+    """A board's serial baud rates do not fail the replay, a name the replay does not know still does."""
+    in_log = tmp_path / "board_param_in.ulg"
+    out_log = tmp_path / "board_param_out.ulg"
+
+    ts_start = 1_000_000
+
+    with vkulog.ULogWriter(in_log, start_timestamp_us=ts_start) as w:
+        w.write_format(vkulog.FORMATS["imu_sample"])
+        w.write_parameter("ATT_KP", 1.0)
+        w.write_parameter("SERIAL1_BAUD", 921600)
+        w.write_parameter("SERIAL2_BAUD", 115200)
+        w.write_add_logged(1, "imu_sample", 0)
+        w.write_data(1, make_imu_sample_data(ts_start))
+
+    replay(in_log, out_log)
+    assert out_log.exists()
+
+    with vkulog.ULogWriter(in_log, start_timestamp_us=ts_start) as w:
+        w.write_format(vkulog.FORMATS["imu_sample"])
+        w.write_parameter("SERIAL1_BAUD", 921600)
+        w.write_parameter("SERIAL1_BAUDS", 1)
+        w.write_add_logged(1, "imu_sample", 0)
+        w.write_data(1, make_imu_sample_data(ts_start))
+
+    with pytest.raises(RuntimeError) as exc_info:
+        replay(in_log, out_log)
+    assert "SERIAL1_BAUDS" in str(exc_info.value)
+    assert "SERIAL1_BAUD," not in str(exc_info.value)
