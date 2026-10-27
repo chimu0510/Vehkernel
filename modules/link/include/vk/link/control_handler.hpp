@@ -52,6 +52,9 @@ public:
     // Tells the commander the peer fell silent, which aborts a bring-up case it started.
     void source_lost(std::uint64_t now_us);
 
+    // Requests the commander to restart the estimators (ticket #139).
+    void restart_estimators(std::uint64_t now_us);
+
     // Sends the result of a bring-up case this session started.
     bool send_bringup_result(const msg::BringupStatus& status, FrameSender& out);
 

@@ -23,8 +23,10 @@
 #include <vk/msg/bringup_status.hpp>
 #include <vk/msg/enums.hpp>
 #include <vk/link/frame.hpp>
+#include <vk/link/log_streams.hpp>
 #include <vk/link/session.hpp>
 #include <vk/link/topic_map.hpp>
+#include <vk/msg/arming_state.hpp>
 #include <vk/msg/link_status.hpp>
 
 #include <array>
@@ -64,6 +66,7 @@ public:
         ParameterAccess parameters{};                     // what the peer may read and change
         ControlAccess control{};                          // requests to the commander; the source is the instance
         FrameHandler* sim_frames = nullptr;               // SITL only: the SITL-only frames
+        BoardInfo board_info{};                           // board and firmware descriptor for log_info
     };
 
     // topic_info and parameter list frames sent per run: at the default
@@ -73,12 +76,16 @@ public:
 
     Link(std::string_view name, hal::Transport& transport, TopicMap map, const Config& config,
          core::WorkQueue& queue);
+    ~Link() override;
 
     // Starts the periodic runs.
     void start();
 
     // From the Link's own work queue, or once the scheduler has stopped.
     [[nodiscard]] LinkStats link_stats() const;
+
+    [[nodiscard]] bool logging() const { return logging_; }
+    void stop_logging();
 
 protected:
     void run() override;
@@ -99,15 +106,29 @@ private:
         hal::Transport* transport_;
     };
 
+    class LogHandler final : public FrameHandler {
+    public:
+        explicit LogHandler(Link& link) : link_(&link) {}
+        void handle(FrameType type, BodyReader body, FrameSender& out) override;
+
+    private:
+        Link* link_;
+    };
+
     void receive(std::uint64_t now_us);
     void on_topic_data(BodyReader body, std::uint64_t now_us);
     void follow_control(HandshakeState previous, std::uint64_t now_us);
     void send_topics(std::uint64_t now_us);
     void publish_status(std::uint64_t now_us);
+    void on_log_start(BodyReader body, std::uint64_t now_us, FrameSender& out);
+    void on_log_stop();
+    [[nodiscard]] bool is_profile_topic(std::uint16_t topic_id, std::uint8_t instance) const;
+    static bool is_profile_stream(std::uint16_t topic_id, std::uint8_t instance, void* context);
 
     hal::Transport* transport_;
     TopicMap map_;
     Config config_;
+    LogHandler log_handler_{*this};
     Session session_;
     FrameReader reader_;
     TransportSink sink_;
@@ -118,6 +139,15 @@ private:
     std::uint8_t rate_scale_ = 100;
     std::uint32_t inbound_undeclared_ = 0;
     core::Subscription<msg::BringupStatus> bringup_status_{0};
+    core::Subscription<msg::ArmingState> arming_{0};
+    bool armed_ = false;
+    bool logging_ = false;
+    const msg::LogProfile* active_profile_ = nullptr;
+    std::span<TopicStream* const> profile_streams_{};
+    static constexpr std::size_t max_profile_streams = 32;
+    std::array<std::uint64_t, max_profile_streams> last_missed_{};
+    std::array<std::uint16_t, max_profile_streams> unsent_dropouts_{};
+    std::uint64_t current_run_now_us_ = 0;
     bool bringup_started_ = false;     // a case this Link started is running
     bool bringup_result_due_ = false;  // its result is to be sent
     msg::BringupStatus bringup_result_{};

@@ -8,10 +8,10 @@
 
 #include <cstdint>
 
-namespace {
+namespace vk::core {
 
-[[gnu::section(".app_descriptor"), gnu::used]] const vk::core::AppDescriptor app_descriptor{
-    .signature = vk::core::app_descriptor_signature,
+[[gnu::section(".app_descriptor"), gnu::used]] const AppDescriptor app_descriptor{
+    .signature = app_descriptor_signature,
     .image_crc1 = 0,
     .image_crc2 = 0,
     .image_size = 0,
@@ -22,4 +22,4 @@ namespace {
     .reserved = {},
 };
 
-}  // namespace
+}  // namespace vk::core

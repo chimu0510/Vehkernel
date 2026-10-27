@@ -505,7 +505,12 @@ bool start_link(const Options& options)
                                                             .set_hash = vk::params::set_hash,
                                                             .storage = stored_parameters()},
                                              .control = {.enabled = true},
-                                             .sim_frames = &sim_frames},
+                                             .sim_frames = &sim_frames,
+                                             .board_info = {.name = "sitl",
+                                                            .board_id = 0,
+                                                            .version_major = VK_VERSION_MAJOR,
+                                                            .version_minor = VK_VERSION_MINOR,
+                                                            .git_hash = 0}},
                       vk::core::work_queue(vk::core::WorkQueueTier::Io));
     host_link->start();
     return true;

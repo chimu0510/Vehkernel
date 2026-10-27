@@ -192,3 +192,21 @@ def test_vkulog_formats_match_schema(repo_schema):
     # REUSE-IgnoreEnd
     actual = VKULOG_FORMATS.read_text(encoding="utf-8")
     assert actual == expected
+
+
+def test_log_profile_streams_header(repo_schema):
+    """The generator emits typed stream holders for each profile."""
+    from vkschema.emit import log_profile_streams_header
+    diag = Diagnostics(str(SCHEMA_DIR / "log_profiles.toml"))
+    profiles = load_profiles(SCHEMA_DIR / "log_profiles.toml", repo_schema, diag)
+    assert not diag.errors
+    assert profiles is not None
+
+    header = log_profile_streams_header(profiles, repo_schema)
+    assert "class EstimatorReplayStreams" in header
+    assert "estimator_replay_stream_count = 27;" in header
+    assert "estimator_replay_stream_count = 25;" in header
+    assert "TopicStreamOf<msg::ImuSample>" in header
+    assert "TopicStreamOf<msg::BodyVelocityMeasurement>" in header
+    assert "TopicStreamOf<msg::VehicleAttitude>" in header
+    assert "CONFIG_PLATFORM_SITL" in header

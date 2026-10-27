@@ -3,6 +3,7 @@
 // work queues, then hand over to FreeRTOS.
 #include <board.hpp>
 #include <vk/config.h>
+#include <vk/core/app_descriptor.hpp>
 #include <vk/core/critical_section.hpp>
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
@@ -357,7 +358,12 @@ struct SerialLink {
                                                            .storage = &*param_storage,
 #endif
                                                            },
-                                            .control = {.enabled = true}},
+                                            .control = {.enabled = true},
+                                            .board_info = {.name = vk::board::name,
+                                                           .board_id = vk::core::read_descriptor_field(vk::core::app_descriptor.board_id),
+                                                           .version_major = vk::core::read_descriptor_field(vk::core::app_descriptor.version_major),
+                                                           .version_minor = vk::core::read_descriptor_field(vk::core::app_descriptor.version_minor),
+                                                           .git_hash = vk::core::read_descriptor_field(vk::core::app_descriptor.git_hash)}},
                      vk::core::work_queue(vk::core::WorkQueueTier::Io));
         link->start();
     }

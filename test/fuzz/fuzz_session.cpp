@@ -250,6 +250,10 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
             status.outputs = body[1];
             session.send_bringup_result(status, sink);
         }
+        if (*type == FrameType::LogStart) {
+            session.send_log_info(vk::link::LogStartResult::Ok, {}, 1000.0F, sink);
+            session.send_log_dropout(0, 0, 1, sink);
+        }
         session.send_pending(fake_now, sink, 4);
         const std::array<std::uint8_t, 4> message{1, 2, 3, 4};
         session.send_topic(0, 0, message, fake_now, sink);

@@ -39,5 +39,7 @@ if(VK_PLATFORM STREQUAL "stm32f4")
     VERBATIM)
 else()
   add_executable(vehkernel-sitl sitl_main.cpp)
+  target_compile_definitions(vehkernel-sitl PRIVATE
+    VK_VERSION_MAJOR=${PROJECT_VERSION_MAJOR} VK_VERSION_MINOR=${PROJECT_VERSION_MINOR})
   target_link_libraries(vehkernel-sitl PRIVATE vk_platform vk_core vk_msg vk_drivers vk_config vk_modules vk_params vk_warnings)
 endif()

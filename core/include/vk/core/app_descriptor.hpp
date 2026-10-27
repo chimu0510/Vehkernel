@@ -39,4 +39,16 @@ static_assert(sizeof(AppDescriptor) == 36, "APP_DESCRIPTOR_UNSIGNED_TOTAL_LENGTH
 static_assert(offsetof(AppDescriptor, image_crc1) == 8 && offsetof(AppDescriptor, version_major) == 24 &&
               offsetof(AppDescriptor, board_id) == 26);
 
+// The firmware image's descriptor (defined in the platform).
+extern const AppDescriptor app_descriptor;
+
+// Reads fields from an AppDescriptor through volatile access so that the compiler
+// or link-time optimization does not fold the compile-time zero initializers of
+// fields that the build fills into the image after linking (finalize_image.py, ADR-0023).
+template <typename T>
+[[nodiscard]] inline T read_descriptor_field(const T& field) noexcept
+{
+    return *static_cast<const volatile T*>(&field);
+}
+
 }  // namespace vk::core

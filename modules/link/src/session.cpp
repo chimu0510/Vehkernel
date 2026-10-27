@@ -44,6 +44,12 @@ void Session::handle(const Frame& frame, std::uint64_t now_us, FrameSink& sink)
             sim_frames_->handle(frame.type, body, out);
         }
         break;
+    case FrameType::LogStart:
+    case FrameType::LogStop:
+        if (log_handler_ != nullptr) {
+            log_handler_->handle(frame.type, body, out);
+        }
+        break;
     default:
         break;  // Frames only the MCU sends, or not meant for a session.
     }
@@ -154,6 +160,33 @@ bool Session::send_topic(std::uint16_t topic_id, std::uint8_t instance, std::spa
     writer.bytes(message);
     FrameSender out = sender(sink);
     return writer.ok() && out.send(FrameType::TopicData, writer.written());
+}
+
+bool Session::send_log_info(LogStartResult status, const BoardInfo& board, float bandwidth, FrameSink& sink)
+{
+    std::array<std::uint8_t, max_body_size> body{};
+    BodyWriter writer(body);
+    writer.u8(static_cast<std::uint8_t>(status));
+    writer.u16(board.board_id);
+    writer.u8(board.version_major);
+    writer.u8(board.version_minor);
+    writer.u32(board.git_hash);
+    writer.float32(bandwidth);
+    writer.u8(static_cast<std::uint8_t>(board.name.size()));
+    writer.bytes({reinterpret_cast<const std::uint8_t*>(board.name.data()), board.name.size()});
+    FrameSender out = sender(sink);
+    return writer.ok() && out.send(FrameType::LogInfo, writer.written());
+}
+
+bool Session::send_log_dropout(std::uint16_t topic_id, std::uint8_t instance, std::uint16_t count, FrameSink& sink)
+{
+    std::array<std::uint8_t, 5> body{};
+    BodyWriter writer(body);
+    writer.u16(topic_id);
+    writer.u8(instance);
+    writer.u16(count);
+    FrameSender out = sender(sink);
+    return writer.ok() && out.send(FrameType::LogDropout, writer.written());
 }
 
 }  // namespace vk::link

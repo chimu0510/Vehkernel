@@ -46,6 +46,15 @@ struct TopicDescription {
     std::string_view name;
 };
 
+// Information describing the board and firmware version (ADR-0023, spec 0011).
+struct BoardInfo {
+    std::string_view name = "";
+    std::uint16_t board_id = 0;
+    std::uint8_t version_major = 0;
+    std::uint8_t version_minor = 0;
+    std::uint32_t git_hash = 0;
+};
+
 namespace detail {
 template <class... Messages>
 constexpr std::array<TopicDescription, sizeof...(Messages)> describe(msg::TopicList<Messages...> /*unused*/)
@@ -65,9 +74,10 @@ public:
     // `sim_frames` handles the SITL-only frames; only SITL gives one.
     explicit Session(std::span<const TopicDescription> topics = schema_topics,
                      std::uint64_t peer_timeout_us = default_peer_timeout_us, ParameterAccess parameters = {},
-                     ControlAccess control = {}, FrameHandler* sim_frames = nullptr)
+                     ControlAccess control = {}, FrameHandler* sim_frames = nullptr,
+                     FrameHandler* log_handler = nullptr)
         : topics_(topics), peer_timeout_us_(peer_timeout_us), parameters_(parameters), control_(control),
-          sim_frames_(sim_frames)
+          sim_frames_(sim_frames), log_handler_(log_handler)
     {
     }
 
@@ -103,6 +113,15 @@ public:
     // Sends the result of a bring-up case this session started.
     bool send_bringup_result(const msg::BringupStatus& status, FrameSink& sink);
 
+    // Sends a log_info reply frame (spec 0011).
+    bool send_log_info(LogStartResult status, const BoardInfo& board, float bandwidth, FrameSink& sink);
+
+    // Sends a log_dropout notification frame (spec 0011).
+    bool send_log_dropout(std::uint16_t topic_id, std::uint8_t instance, std::uint16_t count, FrameSink& sink);
+
+    // Requests the commander to restart the estimators (ticket #139).
+    void request_restart_estimators(std::uint64_t now_us) { control_.restart_estimators(now_us); }
+
     // Whether topic_info frames of the handshake are still to be sent.
     [[nodiscard]] bool describing() const { return info_next_ < topics_.size(); }
 
@@ -122,6 +141,7 @@ private:
     ParameterHandler parameters_;
     ControlHandler control_;
     FrameHandler* sim_frames_;  // SITL only
+    FrameHandler* log_handler_ = nullptr;
     // Next topic to describe with topic_info; none at or past the topic count.
     std::size_t info_next_ = std::numeric_limits<std::size_t>::max();
     FrameWriter writer_;

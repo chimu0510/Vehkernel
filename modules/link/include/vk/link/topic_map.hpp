@@ -74,6 +74,12 @@ public:
     [[nodiscard]] std::uint16_t topic_id() const { return topic_id_; }
     [[nodiscard]] std::uint8_t instance() const { return instance_; }
 
+    // Number of missed publications on this stream's subscription.
+    [[nodiscard]] virtual std::uint64_t missed() const { return 0; }
+
+    // Restores the stream to its initial configured rate / interval.
+    virtual void restore_rate() = 0;
+
 protected:
     TopicStream(std::uint16_t topic_id, std::uint8_t instance) : topic_id_(topic_id), instance_(instance) {}
     ~TopicStream() = default;
@@ -96,7 +102,8 @@ public:
 
     explicit TopicStreamOf(MaxRate rate, std::size_t instance = 0)
         : TopicStream(T::topic_id, static_cast<std::uint8_t>(instance)), subscription_(instance),
-          publication_(instance), interval_us_(static_cast<std::uint32_t>(1e6F / rate.hz)), nominal_hz_(rate.hz)
+          publication_(instance), interval_us_(static_cast<std::uint32_t>(1e6F / rate.hz)),
+          configured_interval_us_(interval_us_), nominal_hz_(rate.hz)
     {
     }
 
@@ -129,7 +136,15 @@ public:
         return interval_us_ == 0 ? nominal_hz_ : 1e6F / static_cast<float>(interval_us_);
     }
     [[nodiscard]] std::size_t message_size() const override { return T::encoded_size; }
+    [[nodiscard]] std::uint64_t missed() const override
+    {
+        if (interval_us_ == 0 || T::queue_length > 1) {
+            return subscription_.missed();
+        }
+        return 0;
+    }
     void limit_rate(float hz) override { interval_us_ = static_cast<std::uint32_t>(1e6F / hz); }
+    void restore_rate() override { interval_us_ = configured_interval_us_; }
 
     std::size_t next(std::uint64_t now_us, std::span<std::uint8_t> out) override
     {
@@ -158,6 +173,7 @@ private:
     core::Subscription<T> subscription_;
     core::Publication<T> publication_;
     std::uint32_t interval_us_ = 0;  // 0 sends every sample
+    std::uint32_t configured_interval_us_ = 0;
     float nominal_hz_ = 0.0F;  // 0 for an inbound stream, which the rate scaling leaves alone
     bool inbound_ = false;
     bool setpoint_ = false;
@@ -185,10 +201,14 @@ std::size_t topic_map_burst(TopicMap map);
 // does not fit is dropped whole and counted in link_status.
 inline constexpr std::size_t serial_transmit_buffer_size = 2048;
 
+using StreamFilter = bool (*)(std::uint16_t topic_id, std::uint8_t instance, void* context);
+
 // Scales `map` down to fit a port at `baud` bits a second (8N1, 10 bits a
-// byte); returns the common factor in percent, 100 when nothing was scaled
-// or the transport has no baud rate (0).
-std::uint8_t scale_to_baud(TopicMap map, std::uint32_t baud);
+// byte), with optional `reserved_bandwidth` in bytes/s and optional `should_ignore`
+// filter (e.g. for topic map streams suppressed while logging); returns the common factor in percent,
+// 100 when nothing was scaled or the transport has no baud rate (0).
+std::uint8_t scale_to_baud(TopicMap map, std::uint32_t baud, float reserved_bandwidth = 0.0F,
+                           StreamFilter should_ignore = nullptr, void* context = nullptr);
 
 // The default topic map: imu_sample instance 0 at every sample,
 // vehicle_attitude, (in SITL) vehicle_attitude_groundtruth and

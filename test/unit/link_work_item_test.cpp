@@ -11,8 +11,13 @@
 #include <vk/link/link.hpp>
 #include <vk/link/topic_map.hpp>
 #include <vk/core/vehicle_control.hpp>
+#include <vk/msg/arming_state.hpp>
 #include <vk/msg/body_velocity_setpoint.hpp>
+#include <vk/msg/imu_sample.hpp>
 #include <vk/msg/link_status.hpp>
+#include <vk/msg/log_profiles.hpp>
+#include <vk/msg/vehicle_attitude.hpp>
+#include <vk/msg/vehicle_command.hpp>
 #include <vk/msg/wire.hpp>
 
 #include <gtest/gtest.h>
@@ -201,7 +206,10 @@ private:
 
 class LinkTest : public ::testing::Test {
 protected:
-    void SetUp() override { fake_now = 1'000'000; }
+    void SetUp() override
+    {
+        fake_now = 1'000'000;
+    }
 
     // Runs the Link once, one interval later.
     void step()
@@ -651,4 +659,267 @@ TEST(SetpointArbitration, OnlyTheSourceInControlAtALevelItsModeAccepts)
     EXPECT_FALSE(setpoint_accepted(Mode::Standby, vk::core::no_source, vk::core::no_source,
                                    SetpointLevel::BodyVelocity));
     EXPECT_FALSE(setpoint_accepted(Mode::Standby, 0, 0, SetpointLevel::DirectActuator));
+}
+
+TEST_F(LinkTest, LogStartOkAndLogInfoContentsAndEstimatorsRestarted)
+{
+    const vk::link::BoardInfo board_info{
+        .name = "test_board",
+        .board_id = 0x42,
+        .version_major = 1,
+        .version_minor = 2,
+        .git_hash = 0xCAFEBABE,
+    };
+    Link link("link_test", transport, {}, {.control = {.enabled = true}, .board_info = board_info}, queue);
+    link.start();
+    connect();
+
+    vk::core::Subscription<vk::msg::VehicleCommand> commands{0};
+    vk::msg::VehicleCommand cmd{};
+    while (commands.copy(cmd)) {
+    }
+
+    const std::array<std::uint8_t, 4> profile_body{1, 0, 0, 0};  // estimator_replay
+    host.send(FrameType::LogStart, profile_body);
+    step();
+
+    auto frames = host.receive();
+    auto it = std::ranges::find_if(frames, [](const ReceivedFrame& f) { return f.type == FrameType::LogInfo; });
+    ASSERT_NE(it, frames.end());
+
+    vk::link::BodyReader reader(it->body);
+    EXPECT_EQ(reader.u8(), static_cast<std::uint8_t>(vk::link::LogStartResult::Ok));
+    EXPECT_EQ(reader.u16(), 0x42);
+    EXPECT_EQ(reader.u8(), 1);
+    EXPECT_EQ(reader.u8(), 2);
+    EXPECT_EQ(reader.u32(), 0xCAFEBABE);
+    EXPECT_GT(reader.float32(), 0.0F);
+    const std::uint8_t name_len = reader.u8();
+    EXPECT_EQ(name_len, 10);
+    const auto name = reader.bytes(name_len);
+    EXPECT_EQ(std::string_view(reinterpret_cast<const char*>(name.data()), name.size()), "test_board");
+    EXPECT_TRUE(reader.ok());
+    EXPECT_TRUE(link.logging());
+
+    ASSERT_TRUE(commands.copy(cmd));
+    EXPECT_EQ(cmd.command, static_cast<std::uint8_t>(vk::core::Command::RestartEstimators));
+}
+
+TEST_F(LinkTest, LogStartRefusals)
+{
+    Link link("link_test", transport, {}, {}, queue);
+    link.start();
+    connect();
+
+    // 1. Refusal: Armed
+    vk::core::Publication<vk::msg::ArmingState> arming_pub;
+    arming_pub.publish({.timestamp = fake_now, .armed = true});
+    step();
+
+    const std::array<std::uint8_t, 4> profile_body{1, 0, 0, 0};  // estimator_replay
+    host.send(FrameType::LogStart, profile_body);
+    step();
+
+    auto frames = host.receive();
+    auto it = std::ranges::find_if(frames, [](const ReceivedFrame& f) { return f.type == FrameType::LogInfo; });
+    ASSERT_NE(it, frames.end());
+    vk::link::BodyReader reader1(it->body);
+    EXPECT_EQ(reader1.u8(), static_cast<std::uint8_t>(vk::link::LogStartResult::Armed));
+    EXPECT_FALSE(link.logging());
+
+    // Disarm vehicle
+    arming_pub.publish({.timestamp = fake_now, .armed = false});
+    step();
+
+    // 2. Refusal: UnknownProfile
+    const std::array<std::uint8_t, 4> unknown_profile{0, 0x80, 0, 0};
+    host.send(FrameType::LogStart, unknown_profile);
+    step();
+
+    frames = host.receive();
+    it = std::ranges::find_if(frames, [](const ReceivedFrame& f) { return f.type == FrameType::LogInfo; });
+    ASSERT_NE(it, frames.end());
+    vk::link::BodyReader reader2(it->body);
+    EXPECT_EQ(reader2.u8(), static_cast<std::uint8_t>(vk::link::LogStartResult::UnknownProfile));
+    EXPECT_FALSE(link.logging());
+
+    // 3. Refusal: OverBudget (transport capacity < profile bandwidth)
+    FakeTransport slow_transport;
+    slow_transport.baud = 9600;  // capacity = 768 B/s < estimator_replay bandwidth (~33 kB/s)
+    Host slow_host{slow_transport};
+    Link slow_link("slow_link", slow_transport, {}, {}, queue);
+    slow_link.start();
+    slow_host.send_hello();
+    for (std::size_t run = 0;
+         run < (vk::link::schema_topics.size() + Link::paced_frames_per_run - 1) / Link::paced_frames_per_run; ++run) {
+        slow_host.send_time_sync();
+        step();
+    }
+    slow_host.receive();
+
+    slow_host.send(FrameType::LogStart, profile_body);
+    step();
+    frames = slow_host.receive();
+    it = std::ranges::find_if(frames, [](const ReceivedFrame& f) { return f.type == FrameType::LogInfo; });
+    ASSERT_NE(it, frames.end());
+    vk::link::BodyReader reader3(it->body);
+    EXPECT_EQ(reader3.u8(), static_cast<std::uint8_t>(vk::link::LogStartResult::OverBudget));
+    EXPECT_FALSE(slow_link.logging());
+
+    // 4. Refusal: AlreadyLogging
+    // First, start logging on link
+    host.send(FrameType::LogStart, profile_body);
+    step();
+    EXPECT_TRUE(link.logging());
+    host.receive();
+
+    // Now try starting on another link (with enough baud)
+    FakeTransport other_transport;
+    other_transport.baud = 921600;
+    Host other_host{other_transport};
+    Link other_link("other_link", other_transport, {}, {}, queue);
+    other_link.start();
+    other_host.send_hello();
+    for (std::size_t run = 0;
+         run < (vk::link::schema_topics.size() + Link::paced_frames_per_run - 1) / Link::paced_frames_per_run; ++run) {
+        other_host.send_time_sync();
+        step();
+    }
+    other_host.receive();
+
+    other_host.send(FrameType::LogStart, profile_body);
+    step();
+    frames = other_host.receive();
+    it = std::ranges::find_if(frames, [](const ReceivedFrame& f) { return f.type == FrameType::LogInfo; });
+    ASSERT_NE(it, frames.end());
+    vk::link::BodyReader reader4(it->body);
+    EXPECT_EQ(reader4.u8(), static_cast<std::uint8_t>(vk::link::LogStartResult::AlreadyLogging));
+}
+
+TEST_F(LinkTest, ProfileStreamsRunUnscaledWhileTopicMapIsScaled)
+{
+    TopicStreamOf<vk::msg::AllocationStatus> stream(vk::link::MaxRate{500.0F});
+    const std::array<TopicStream*, 1> map{&stream};
+    // At baud = 576000, capacity = 57600 * 0.8 = 46080 B/s.
+    // AllocationStatus alone (500 Hz * ~34 bytes = 17000 B/s) fits easily, rate is 500 Hz.
+    // When estimator_replay starts (~39754 B/s on SITL), capacity remaining is ~6326 B/s.
+    // AllocationStatus is not in the profile, so it must scale down.
+    transport.baud = 576000;
+    Link link("link_test", transport, map, {}, queue);
+    link.start();
+    connect();
+
+    EXPECT_FLOAT_EQ(stream.rate_hz(), 500.0F);
+
+    const std::array<std::uint8_t, 4> profile_body{1, 0, 0, 0};
+    host.send(FrameType::LogStart, profile_body);
+    step();
+    EXPECT_TRUE(link.logging());
+    host.receive();
+
+    EXPECT_LT(stream.rate_hz(), 500.0F);
+
+    // Stop logging: rate restored to nominal
+    host.send(FrameType::LogStop, {});
+    step();
+    EXPECT_FALSE(link.logging());
+    EXPECT_FLOAT_EQ(stream.rate_hz(), 500.0F);
+}
+
+TEST_F(LinkTest, LogDropoutReportedWhenMissed)
+{
+    Link link("link_test", transport, {}, {}, queue);
+    link.start();
+    connect();
+
+    const std::array<std::uint8_t, 4> profile_body{1, 0, 0, 0};  // estimator_replay
+    host.send(FrameType::LogStart, profile_body);
+    step();
+    EXPECT_TRUE(link.logging());
+    host.receive();
+
+    // Publish more samples than the queue can hold to induce drops
+    vk::core::Publication<vk::msg::ImuSample> imu_pub;
+    for (int i = 0; i < 20; ++i) {
+        imu_pub.publish({.timestamp = fake_now, .accel = {0, 0, 9.81F}});
+    }
+
+    step();
+    auto frames = host.receive();
+    auto it = std::ranges::find_if(frames, [](const ReceivedFrame& f) { return f.type == FrameType::LogDropout; });
+    ASSERT_NE(it, frames.end());
+
+    vk::link::BodyReader reader(it->body);
+    EXPECT_EQ(reader.u16(), vk::msg::ImuSample::topic_id);
+    EXPECT_EQ(reader.u8(), 0);  // instance 0
+    EXPECT_GT(reader.u16(), 0);  // missed count
+}
+
+TEST_F(LinkTest, LoggingStoppedByLogStopAndSessionEnd)
+{
+    Link link("link_test", transport, {}, {}, queue);
+    link.start();
+    connect();
+
+    const std::array<std::uint8_t, 4> profile_body{1, 0, 0, 0};
+    host.send(FrameType::LogStart, profile_body);
+    step();
+    EXPECT_TRUE(link.logging());
+    host.receive();
+
+    // 1. Stopped by LogStop
+    host.send(FrameType::LogStop, {});
+    step();
+    EXPECT_FALSE(link.logging());
+
+    // 2. Stopped by session end (peer silent timeout)
+    host.send(FrameType::LogStart, profile_body);
+    step();
+    EXPECT_TRUE(link.logging());
+    host.receive();
+
+    // Advance beyond peer timeout
+    fake_now += vk::link::Session::default_peer_timeout_us + 100'000;
+    step();
+    EXPECT_EQ(link.link_stats().handshake_state, vk::link::HandshakeState::PeerSilent);
+    EXPECT_FALSE(link.logging());
+}
+
+TEST_F(LinkTest, DefaultMapImuSampleIsEverySampleAfterRescaling)
+{
+    // Configure with baud rate 921600; profile logging triggers rescaling
+    transport.baud = 921600;
+    Link link("link_test", transport, vk::link::default_topic_map(200.0F, 0), {}, queue);
+    link.start();
+    connect();
+
+    // Start and stop logging to trigger rescaling
+    const std::array<std::uint8_t, 4> profile_body{1, 0, 0, 0};
+    host.send(FrameType::LogStart, profile_body);
+    step();
+    EXPECT_TRUE(link.logging());
+    host.receive();
+
+    host.send(FrameType::LogStop, {});
+    step();
+    EXPECT_FALSE(link.logging());
+    host.receive();
+
+    // Publish multiple samples within one step
+    vk::core::Publication<vk::msg::ImuSample> imu_pub;
+    for (int i = 0; i < 3; ++i) {
+        imu_pub.publish({.timestamp = fake_now + i, .accel = {0, 0, static_cast<float>(i)}});
+    }
+    step();
+
+    std::size_t imu_count = 0;
+    for (const auto& frame : host.receive()) {
+        if (frame.type == FrameType::TopicData && frame.body.size() >= 3) {
+            const auto tid = static_cast<std::uint16_t>(frame.body[0] | (frame.body[1] << 8));
+            if (tid == vk::msg::ImuSample::topic_id) {
+                ++imu_count;
+            }
+        }
+    }
+    EXPECT_EQ(imu_count, 3U);
 }

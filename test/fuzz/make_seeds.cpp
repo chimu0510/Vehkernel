@@ -91,6 +91,8 @@ std::vector<Seed> make_seeds()
         {"reboot_request", FrameType::RebootRequest, {static_cast<std::uint8_t>(vk::core::RebootAction::Reboot)}},
         {"reboot_bootloader", FrameType::RebootRequest,
          {static_cast<std::uint8_t>(vk::core::RebootAction::Bootloader)}},
+        {"log_start", FrameType::LogStart, {1, 0, 0, 0}},
+        {"log_stop", FrameType::LogStop, {}},
     };
     add_topic_data(vk::msg::AllTopics{}, seeds);
     return seeds;

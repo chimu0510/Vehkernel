@@ -75,6 +75,19 @@ void ControlHandler::source_lost(std::uint64_t now_us)
                                           .argument = 0});
 }
 
+void ControlHandler::restart_estimators(std::uint64_t now_us)
+{
+    if (!access_.enabled) {
+        return;
+    }
+    ++sequence_;
+    commands_.publish(msg::VehicleCommand{.timestamp = now_us,
+                                          .source = access_.source,
+                                          .sequence = sequence_,
+                                          .command = static_cast<std::uint8_t>(core::Command::RestartEstimators),
+                                          .argument = 0});
+}
+
 void ControlHandler::send_answers(std::uint64_t now_us, FrameSender& out)
 {
     msg::VehicleCommandAck ack{};

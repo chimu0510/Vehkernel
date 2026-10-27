@@ -79,6 +79,7 @@ if(CONFIG_LINK)
     link/src/frame.cpp
     link/src/frame_handler.cpp
     link/src/link.cpp
+    link/src/log_streams.cpp
     link/src/parameter_handler.cpp
     link/src/session.cpp
     link/src/topic_map.cpp)

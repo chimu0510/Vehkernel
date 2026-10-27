@@ -20,6 +20,11 @@
 //   param_set           u8 name length, name, u8 type, u32 value
 //   param_value         u16 index, u16 count, u8 type, u32 value, u8 flags, u8 name length, name
 //   param_reject        u8 reason, u8 name length, name
+//   log_start           u32 profile bitmask
+//   log_info            u8 status, u16 board_id, u8 version_major, u8 version_minor,
+//                       u32 git_hash, float bandwidth, u8 name length, name
+//   log_stop
+//   log_dropout         u16 topic ID, u8 instance, u16 count
 //
 // Parameter values travel as their 32 bits with the type: 1 int32, 2 float32
 // (ADR-0012). Reject reasons are those of vk::core::ParamResult; the flags of
@@ -31,6 +36,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <optional>
 #include <span>
 
@@ -38,9 +44,18 @@ namespace vk::link {
 
 // Protocol version; peers negotiate it with hello (ADR-0002). Version 2 added
 // parameter access, version 3 mode, arming and emergency stop requests,
-// version 4 reboot requests (ADR-0023); the MCU offers only the current
-// version.
-inline constexpr std::uint8_t protocol_version = 4;
+// version 4 reboot requests (ADR-0023), version 5 logging (spec 0011, ADR-0019);
+// the MCU offers only the current version.
+inline constexpr std::uint8_t protocol_version = 5;
+
+// Result of a log_start request; status in log_info.
+enum class LogStartResult : std::uint8_t {
+    Ok = 0,
+    Armed = 1,
+    UnknownProfile = 2,
+    OverBudget = 3,
+    AlreadyLogging = 4,
+};
 
 enum class FrameType : std::uint8_t {
     TopicData = 0x01,
@@ -68,6 +83,10 @@ enum class FrameType : std::uint8_t {
     RebootRequest = 0x4B,
     RebootReply = 0x4C,
     RebootReject = 0x4D,
+    LogStart = 0x50,
+    LogInfo = 0x51,
+    LogStop = 0x52,
+    LogDropout = 0x53,
     // SITL only: cuts or restores the simulated actuator power.
     SimActuatorPower = 0x70,
     // SITL only: presses or releases the simulated user key.
@@ -129,6 +148,14 @@ constexpr std::optional<FrameType> to_frame_type(std::uint8_t raw)
         return FrameType::RebootReply;
     case static_cast<std::uint8_t>(FrameType::RebootReject):
         return FrameType::RebootReject;
+    case static_cast<std::uint8_t>(FrameType::LogStart):
+        return FrameType::LogStart;
+    case static_cast<std::uint8_t>(FrameType::LogInfo):
+        return FrameType::LogInfo;
+    case static_cast<std::uint8_t>(FrameType::LogStop):
+        return FrameType::LogStop;
+    case static_cast<std::uint8_t>(FrameType::LogDropout):
+        return FrameType::LogDropout;
     case static_cast<std::uint8_t>(FrameType::SimActuatorPower):
         return FrameType::SimActuatorPower;
     case static_cast<std::uint8_t>(FrameType::SimUserKey):
@@ -231,6 +258,12 @@ public:
     void u16(std::uint16_t value) { put(value, 2); }
     void u32(std::uint32_t value) { put(value, 4); }
     void u64(std::uint64_t value) { put(value, 8); }
+    void float32(float value)
+    {
+        std::uint32_t raw{};
+        std::memcpy(&raw, &value, sizeof(raw));
+        u32(raw);
+    }
     void bytes(std::span<const std::uint8_t> data);
 
     // False if anything did not fit.
@@ -253,6 +286,13 @@ public:
     std::uint16_t u16() { return static_cast<std::uint16_t>(get(2)); }
     std::uint32_t u32() { return static_cast<std::uint32_t>(get(4)); }
     std::uint64_t u64() { return get(8); }
+    [[nodiscard]] float float32()
+    {
+        const std::uint32_t raw = u32();
+        float value{};
+        std::memcpy(&value, &raw, sizeof(value));
+        return value;
+    }
     std::span<const std::uint8_t> bytes(std::size_t size);
     std::span<const std::uint8_t> rest();
 

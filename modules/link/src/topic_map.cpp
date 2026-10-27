@@ -42,21 +42,36 @@ float topic_map_load(TopicMap map)
     return load;
 }
 
-std::uint8_t scale_to_baud(TopicMap map, std::uint32_t baud)
+std::uint8_t scale_to_baud(TopicMap map, std::uint32_t baud, float reserved_bandwidth,
+                           StreamFilter should_ignore, void* context)
 {
     if (baud == 0 || map.size() > max_streams) {
+        for (TopicStream* stream : map) {
+            stream->restore_rate();
+        }
         return 100;
     }
     const float capacity = static_cast<float>(baud) / 10.0F * max_port_load;
-    float fixed = 0.0F;     // streams that keep their rate or sit at the 1 Hz floor
+    float fixed = reserved_bandwidth;     // profile's unscaled bandwidth is fixed
     float scalable = 0.0F;  // streams the common factor applies to
     std::array<bool, max_streams> floored{};
+    std::array<bool, max_streams> ignored{};
     for (std::size_t i = 0; i < map.size(); ++i) {
+        if (should_ignore != nullptr && should_ignore(map[i]->topic_id(), map[i]->instance(), context)) {
+            ignored[i] = true;
+            map[i]->restore_rate();
+            continue;
+        }
         const float bytes = map[i]->nominal_hz() * wire_bytes(*map[i]);
         floored[i] = map[i]->nominal_hz() <= 1.0F;
         (floored[i] ? fixed : scalable) += bytes;
     }
     if (fixed + scalable <= capacity) {
+        for (std::size_t i = 0; i < map.size(); ++i) {
+            if (!ignored[i]) {
+                map[i]->restore_rate();
+            }
+        }
         return 100;
     }
     // A stream the factor would take below 1 Hz stays at 1 Hz, which leaves
@@ -66,7 +81,7 @@ std::uint8_t scale_to_baud(TopicMap map, std::uint32_t baud)
         changed = false;
         factor = scalable > 0.0F ? std::max(0.0F, (capacity - fixed) / scalable) : 0.0F;
         for (std::size_t i = 0; i < map.size(); ++i) {
-            if (!floored[i] && map[i]->nominal_hz() * factor < 1.0F) {
+            if (!ignored[i] && !floored[i] && map[i]->nominal_hz() * factor < 1.0F) {
                 floored[i] = true;
                 scalable -= map[i]->nominal_hz() * wire_bytes(*map[i]);
                 fixed += wire_bytes(*map[i]);
@@ -75,7 +90,7 @@ std::uint8_t scale_to_baud(TopicMap map, std::uint32_t baud)
         }
     }
     for (std::size_t i = 0; i < map.size(); ++i) {
-        if (map[i]->nominal_hz() > 1.0F) {
+        if (!ignored[i] && map[i]->nominal_hz() > 1.0F) {
             map[i]->limit_rate(floored[i] ? 1.0F : map[i]->nominal_hz() * factor);
         }
     }
