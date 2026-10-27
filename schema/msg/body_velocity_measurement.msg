@@ -4,6 +4,7 @@
 # publishes on its own instance: instance 0 is the vehicle model's, from the
 # wheel encoders through the pseudo-inverse of its wheel matrix; velocities
 # over a Link come later on others.
+@queue 4
 @instances 2
 @rate 200
 uint64 timestamp                              # time of publication

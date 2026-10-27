@@ -8,6 +8,10 @@ namespace vk::estimation {
 LocalOdometry::LocalOdometry(const Config& config, core::WorkQueue& queue)
     : WorkItem("local_odometry", queue), config_(config), measurement_(config.measurement)
 {
+    // Only samples published from now on count.
+    msg::BodyVelocityMeasurement stale{};
+    while (measurement_.copy(stale)) {
+    }
 }
 
 void LocalOdometry::start()
