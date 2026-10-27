@@ -9,6 +9,10 @@
 // aligning. Then every sample steps the filter and is published on
 // vehicle_attitude.
 //
+// An estimator_restart returns it to aligning (ADR-0014). A sample whose timestamp is
+// before the restart's is dropped, however late it reaches the queue, so what the
+// estimator does depends only on the timestamps a log records (ADR-0018).
+//
 // The filter gains and the accelerometer rejection are the ATT_* parameters
 // (ADR-0012), read at construction and again after each parameter_update, so
 // a change applies from the next sample.
@@ -59,8 +63,8 @@ protected:
 
 private:
     void apply_parameters();
-    // Returns the estimator to its state at boot.
-    void restart();
+    // Returns the estimator to its state at boot. Samples taken before `at_us` no longer count.
+    void restart(std::uint64_t at_us);
     void align(const msg::ImuSample& sample, const Vector3& gyro, const Vector3& accel);
     void estimate(const msg::ImuSample& sample, const Vector3& gyro, const Vector3& accel, std::uint64_t now);
 
@@ -71,6 +75,7 @@ private:
     core::Publication<msg::VehicleAttitude> attitude_;
     MahonyFilter filter_;
     State state_ = State::Aligning;
+    std::uint64_t restarted_at_us_ = 0;  // timestamp of the last estimator_restart
 
     // Alignment: sums since the vehicle became still.
     std::uint64_t still_since_us_ = 0;

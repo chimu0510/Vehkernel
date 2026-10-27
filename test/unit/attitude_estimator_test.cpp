@@ -227,4 +227,30 @@ TEST_F(AttitudeEstimatorTest, RestartsAlignmentOnEstimatorRestart)
     EXPECT_NEAR(out.gyro_bias[2], new_bias.z, 1e-3F);
 }
 
+TEST_F(AttitudeEstimatorTest, IgnoresSamplesTakenBeforeTheRestart)
+{
+    AttitudeEstimator estimator(config, queue);
+    estimator.start();
+
+    // A sample taken just before the restart reaches the queue after it, as on the board, where a
+    // sample is published after the time it was taken at.
+    vk::msg::ImuSample early{};
+    early.timestamp = fake_now;
+    early.device_instance = imu_instance;
+    early.accel = level.array();
+    imu.publish(early);
+    fake_now += period_us / 2;
+    vk::core::Publication<vk::msg::EstimatorRestart> restart;
+    restart.publish(vk::msg::EstimatorRestart{.timestamp = fake_now});
+    fake_now += period_us / 2;
+    queue.process();
+
+    // The alignment needs 1 s from the first sample taken after the restart: the early one does not
+    // count, so 200 samples (995 ms after the first of them) are not enough and the 201st is.
+    feed(200, level, {});
+    EXPECT_EQ(estimator.state(), AttitudeEstimator::State::Aligning);
+    feed(1, level, {});
+    EXPECT_EQ(estimator.state(), AttitudeEstimator::State::Running);
+}
+
 }  // namespace

@@ -61,7 +61,7 @@ On the C50C the profile takes about 33.9 KB/s with the Link's framing, about 45 
 ## Stillness after starting
 
 When logging begins, the MCU Link sends `RESTART_ESTIMATORS` on `vehicle_command`. The commander accepts this only while disarmed and publishes `estimator_restart`:
-1. The attitude estimator returns to its aligning state. It collects accelerometer and gyro samples to determine initial tilt and calibrate gyro biases. This alignment requires the vehicle to remain stationary for **1.0 second**.
+1. The attitude estimator returns to its aligning state and drops any IMU sample taken before the restart. It collects accelerometer and gyro samples to determine initial tilt and calibrate gyro biases. This alignment requires the vehicle to remain stationary for **1.0 second**.
 2. Local odometry clears its accumulated position and fixes its coordinate origin at the position where the attitude estimator finishes aligning.
 
 Keep the vehicle still for at least a second after starting a log, before arming or driving; 1.5 s leaves a margin. Moving it while the attitude estimator aligns spoils the gyro bias and the initial tilt, and every estimate after them.

@@ -28,9 +28,10 @@ void AttitudeEstimator::apply_parameters()
     filter_.set_gains(params::att.kp, params::att.ki, params::att.acc_rej);
 }
 
-void AttitudeEstimator::restart()
+void AttitudeEstimator::restart(std::uint64_t at_us)
 {
     state_ = State::Aligning;
+    restarted_at_us_ = at_us;
     still_since_us_ = 0;
     still_samples_ = 0;
     gyro_sum_ = {};
@@ -53,10 +54,15 @@ void AttitudeEstimator::run()
     }
     msg::EstimatorRestart restart_msg{};
     while (restart_.copy(restart_msg)) {
-        restart();
+        restart(restart_msg.timestamp);
     }
     msg::ImuSample sample{};
     while (imu_.copy(sample)) {
+        if (sample.timestamp < restarted_at_us_) {
+            // Taken before the restart, though it reaches the queue after it: the log orders
+            // inputs by these timestamps, and so does the replay (ADR-0018).
+            continue;
+        }
         const Vector3 gyro = Vector3::from(sample.gyro);
         const Vector3 accel = Vector3::from(sample.accel);
         if (state_ == State::Aligning) {
