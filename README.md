@@ -96,6 +96,7 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600
 | [Link monitor](docs/guide/link-monitor.md) | Live view, checks, attitude, parameters |
 | [Driving the wheels](docs/guide/driving.md) | Safety conditions, arming, motor bring-up, driving |
 | [Local display](docs/guide/local-display.md) | Pages, user key, local menu |
+| [Logging](docs/guide/logging.md) | Recording, profiles, dropouts, opening logs, replay |
 | [Testing](docs/guide/testing.md) | Test layers, `ctest`, bring-up image, hardware checks |
 | [C50C V1.1](docs/boards/c50c-v1_1.md) | The first board: connectors, ports and wiring |
 

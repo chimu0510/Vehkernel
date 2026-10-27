@@ -19,6 +19,7 @@
 | [Link monitor](guide/link-monitor.md) | Live view, checks, attitude, parameters |
 | [Driving the wheels](guide/driving.md) | Safety conditions, arming, motor bring-up, driving |
 | [Local display](guide/local-display.md) | Pages, user key, local menu |
+| [Logging](guide/logging.md) | Recording, profiles, dropouts, opening logs, replay |
 | [Testing](guide/testing.md) | Test layers, `ctest`, bring-up image, hardware checks |
 
 ## Boards
