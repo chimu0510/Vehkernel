@@ -30,7 +30,7 @@ tools/link/link_monitor.py --check --duration 5 --expect-rate imu_sample:0=200
 ```
 
 ```text
-link handshake=ok version=4 mismatches=0 params=26 param_set_hash=0x71B05295612E4195 frames=2121 crc_errors=0 malformed=0 lost=0 rtt_us=4183 clock_offset_us=-45587244269
+link handshake=ok version=5 mismatches=0 params=26 param_set_hash=0x71B05295612E4195 frames=2121 crc_errors=0 malformed=0 lost=0 rtt_us=4183 clock_offset_us=-45587244269
 topic name=imu_sample instance=0 messages=1004 rate_hz=200.01
 topic name=link_status instance=0 messages=5 rate_hz=1.00
 topic name=vehicle_attitude instance=0 messages=250 rate_hz=49.95
@@ -101,10 +101,23 @@ CI runs `test/sitl/check_params.py` (the `sitl_params` test): the `param` comman
 
 The hardware check of the parameters (L4): set `ATT_KP` and `SENS_BOARD_ROT`, power-cycle the board, and `param get` returns both while the attitude follows the new board orientation; then set `SERIAL1_BAUD` to 460800, reboot, and connect with `--baud 460800`. The `param_storage` line of the work item timing shows the cost of each Flash write.
 
+## Logging
+
+The `record` command records a ULog file over the Link with a selected log profile (spec 0011, ADR-0019):
+
+```bash
+tools/link/link_monitor.py record log.ulg --profile estimator_replay --duration 30
+```
+
+Before streaming topic data, the monitor reads the board's parameter set and writes them as `P` messages. During logging, parameters updated on the MCU are written dynamically at the time of each `parameter_update`. Hardware and firmware details from `log_info` (board name, ID, version, git hash, bandwidth) and schema hashes from the handshake are recorded as `I` info messages. Logged topics travel as `D` messages with MCU timestamps. Missed samples reported by the MCU via `log_dropout` or frames lost in transport are recorded as `O` dropout messages, and periodic `S` sync messages keep the ULog stream seekable.
+
+Logging ends when `--duration` expires, on `Ctrl-C`, or when the session closes.
+
 ## Commands
 
 | Command | Guide |
 |---|---|
+| `record <file.ulg> --profile <name> [--duration <s>]` | [Logging](#logging) |
 | `param list`, `param get <name>`, `param set <name> <value>` | [Parameters](#parameters) |
 | `mode`, `arm`, `disarm`, `estop`, `drive`, `drive-body`, `bringup motors`, `sim-power` | [Driving the wheels](driving.md) |
 | `sim-gamepad` | [Remote control](driving.md#remote-control) |

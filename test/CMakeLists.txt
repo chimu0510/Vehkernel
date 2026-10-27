@@ -29,6 +29,17 @@ if(CONFIG_LINK_PTY)
       --msg-dir ${VK_MSG_PYTHON_DIR} --duration 5 --expect-rate imu_sample:0=200)
 endif()
 
+# L3 SITL log recording test (spec 0011): records 30 s with estimator_replay,
+# checks no dropouts, checks topic rates within 5%, and pyulog opens it.
+if(CONFIG_LINK_UDP)
+  add_test(NAME sitl_log
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_log.py
+      $<TARGET_FILE:vehkernel-sitl> ${CMAKE_SOURCE_DIR}/tools/link/link_monitor.py
+      --msg-dir ${VK_MSG_PYTHON_DIR} --duration 30)
+  set_tests_properties(sitl_log PROPERTIES ENVIRONMENT
+    "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log:${CMAKE_SOURCE_DIR}/tools/link;PYTHONDONTWRITEBYTECODE=1")
+endif()
+
 # L3 SITL attitude tests (spec 0004): the estimate against the simulated
 # IMU's true attitude, under each motion profile.
 if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_LINK_UDP)
@@ -215,7 +226,7 @@ add_test(NAME params_generator
 add_test(NAME link_protocol
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/link/tests)
 set_tests_properties(link_protocol PROPERTIES ENVIRONMENT
-  "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/link")
+  "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/link:${CMAKE_SOURCE_DIR}/tools/log:${VK_MSG_PYTHON_DIR};PYTHONDONTWRITEBYTECODE=1;VK_MSG_PYTHON_DIR=${VK_MSG_PYTHON_DIR}")
 add_test(NAME ulog
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/log/tests)
 set_tests_properties(ulog PROPERTIES ENVIRONMENT

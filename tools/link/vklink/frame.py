@@ -13,8 +13,9 @@ from .cobs import cobs_decode, cobs_encode, cobs_max_encoded_size
 from .crc16 import crc16
 
 # Version 2 added parameter access (ADR-0012), version 3 mode, arming and
-# emergency stop requests (ADR-0005); the MCU offers only its current version.
-PROTOCOL_VERSION = 4
+# emergency stop requests (ADR-0005), version 4 reboot requests (ADR-0023),
+# version 5 logging (spec 0011, ADR-0019); the MCU offers only its current version.
+PROTOCOL_VERSION = 5
 
 HEADER_SIZE = 4
 CRC_SIZE = 2
@@ -22,6 +23,14 @@ MAX_MESSAGE_SIZE = 240
 MAX_BODY_SIZE = 3 + MAX_MESSAGE_SIZE
 MAX_FRAME_SIZE = HEADER_SIZE + MAX_BODY_SIZE + CRC_SIZE
 MAX_WIRE_SIZE = cobs_max_encoded_size(MAX_FRAME_SIZE) + 1
+
+
+class LogStartResult(enum.IntEnum):
+    OK = 0
+    ARMED = 1
+    UNKNOWN_PROFILE = 2
+    OVER_BUDGET = 3
+    ALREADY_LOGGING = 4
 
 
 class FrameType(enum.IntEnum):
@@ -50,11 +59,50 @@ class FrameType(enum.IntEnum):
     REBOOT_REQUEST = 0x4B
     REBOOT_REPLY = 0x4C
     REBOOT_REJECT = 0x4D
+    LOG_START = 0x50
+    LOG_INFO = 0x51
+    LOG_STOP = 0x52
+    LOG_DROPOUT = 0x53
     # SITL only: cuts or restores the simulated actuator power.
     SIM_ACTUATOR_POWER = 0x70
     # SITL only: presses or releases the simulated user key.
     SIM_USER_KEY = 0x71
     SIM_GAMEPAD = 0x72
+
+
+@dataclass(frozen=True)
+class LogInfo:
+    status: LogStartResult
+    board_id: int
+    version_major: int
+    version_minor: int
+    git_hash: int
+    bandwidth: float
+    board_name: str
+
+    @classmethod
+    def parse(cls, body: bytes) -> "LogInfo | None":
+        if len(body) < 14:
+            return None
+        raw_status, board_id, ver_maj, ver_min, git_hash, bandwidth, name_len = struct.unpack("<BHBBIfB", body[:14])
+        if len(body) < 14 + name_len:
+            return None
+        name = body[14:14 + name_len].decode("utf-8", errors="replace")
+        return cls(LogStartResult(raw_status), board_id, ver_maj, ver_min, git_hash, bandwidth, name)
+
+
+@dataclass(frozen=True)
+class LogDropout:
+    topic_id: int
+    instance: int
+    count: int
+
+    @classmethod
+    def parse(cls, body: bytes) -> "LogDropout | None":
+        if len(body) < 5:
+            return None
+        topic_id, instance, count = struct.unpack("<HBH", body[:5])
+        return cls(topic_id, instance, count)
 
 
 @dataclass(frozen=True)

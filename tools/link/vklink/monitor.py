@@ -28,7 +28,7 @@ from types import ModuleType
 from typing import Callable, Protocol
 
 from .enums import GamepadButton, HandshakeState, MenuState
-from .frame import Frame, FrameReader, FrameType
+from .frame import Frame, FrameReader, FrameType, LogDropout, LogInfo
 from .session import (
     ACTUATOR_POWER_STATES,
     ARMING_REJECT_REASONS,
@@ -447,6 +447,8 @@ class LinkMonitor:
         self.time_sync: TimeSyncResult | None = None
         # Called with (topic name, instance, message) for every decoded message.
         self.listeners: list[Callable[[str, int, object], None]] = []
+        # Called with each raw Frame as it arrives.
+        self.frame_listeners: list[Callable[[Frame], None]] = []
         self._next_time_sync = 0.0
         # Frames lost before the handshake are not the Link's: a serial adapter
         # may still hold the end of the previous session, whose sequence numbers
@@ -465,6 +467,8 @@ class LinkMonitor:
         # Mode, arming, emergency stop and reboot replies, as they arrive.
         self.control_replies: list[ControlReply] = []
         self.bringup_replies: list[BringupReply] = []
+        self.log_info: LogInfo | None = None
+        self.log_dropouts: list[LogDropout] = []
 
     @property
     def connected(self) -> bool:
@@ -541,8 +545,18 @@ class LinkMonitor:
             reply = ControlReply.parse(frame)
             if reply is not None:
                 self.control_replies.append(reply)
+        elif frame.type == FrameType.LOG_INFO:
+            info = LogInfo.parse(frame.body)
+            if info is not None:
+                self.log_info = info
+        elif frame.type == FrameType.LOG_DROPOUT:
+            dropout = LogDropout.parse(frame.body)
+            if dropout is not None:
+                self.log_dropouts.append(dropout)
         else:
             self.session.handle_frame(frame)
+        for listener in self.frame_listeners:
+            listener(frame)
 
     def _on_topic_data(self, body: bytes) -> None:
         if len(body) < 3:
@@ -674,6 +688,25 @@ class LinkMonitor:
         """
         return self._await_control(lambda: self.session.make_reboot_request(action),
                                    (FrameType.REBOOT_REPLY, FrameType.REBOOT_REJECT), timeout_s)
+
+    def start_logging(self, profile_mask: int, timeout_s: float) -> LogInfo | None:
+        """Requests logging to start with profile_mask; returns log_info reply or None on timeout."""
+        self.log_info = None
+        deadline = self.clock() + timeout_s
+        next_request = 0.0
+        while self.log_info is None:
+            now = self.clock()
+            if now >= deadline:
+                return None
+            if now >= next_request:
+                self.connection.send(self.session.make_log_start(profile_mask))
+                next_request = now + self.REQUEST_INTERVAL_S
+            self.poll(min(0.05, deadline - now))
+        return self.log_info
+
+    def stop_logging(self) -> None:
+        """Sends log_stop to stop logging."""
+        self.connection.send(self.session.make_log_stop())
 
     def sim_actuator_power(self, powered: bool) -> None:
         """SITL only: cuts or restores the simulated actuator power. The MCU does not answer."""

@@ -14,6 +14,9 @@ from .frame import (
     FrameReader,
     FrameType,
     FrameWriter,
+    LogDropout,
+    LogInfo,
+    LogStartResult,
     ReaderStats,
 )
 from .session import (
@@ -29,6 +32,7 @@ from .session import (
     ParamValue,
     TimeSyncResult,
     TopicDescription,
+    name_hash,
 )
 
 __all__ = [
@@ -43,6 +47,9 @@ __all__ = [
     "MAX_FRAME_SIZE",
     "MAX_WIRE_SIZE",
     "FrameType",
+    "LogStartResult",
+    "LogInfo",
+    "LogDropout",
     "Frame",
     "ReaderStats",
     "FrameWriter",
@@ -59,4 +66,5 @@ __all__ = [
     "ControlReply",
     "McuControl",
     "BringupReply",
+    "name_hash",
 ]

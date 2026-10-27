@@ -142,6 +142,14 @@ class ControlReply:
         return None
 
 
+def name_hash(name: str) -> int:
+    """FNV-1a, 32 bits, over the name's ASCII bytes: the key of stored values."""
+    h = 0x811C9DC5
+    for byte in name.encode("ascii"):
+        h = ((h ^ byte) * 0x01000193) & 0xFFFFFFFF
+    return h
+
+
 def encode_param(param_type: ParamType, value: int | float) -> int:
     """The 32 bits of a value as the MCU stores it."""
     if param_type == ParamType.FLOAT:
@@ -262,6 +270,14 @@ class HostSession:
 
     def make_param_get(self, name: str) -> bytes:
         return self.writer.write(FrameType.PARAM_GET, _name(name))
+
+    def make_log_start(self, profile_mask: int) -> bytes:
+        """Encodes a LogStart wire frame."""
+        return self.writer.write(FrameType.LOG_START, struct.pack("<I", profile_mask))
+
+    def make_log_stop(self) -> bytes:
+        """Encodes a LogStop wire frame."""
+        return self.writer.write(FrameType.LOG_STOP, b"")
 
     def make_param_set(self, name: str, param_type: ParamType, value: int | float) -> bytes:
         body = _name(name) + struct.pack("<BI", int(param_type), encode_param(param_type, value))
@@ -450,6 +466,12 @@ class McuSession:
         if frame.type == FrameType.TOPIC_DATA and len(frame.body) >= 3:
             topic_id, instance = struct.unpack("<HB", frame.body[:3])
             self.topic_data.append((topic_id, instance, bytes(frame.body[3:])))
+            return []
+        if frame.type == FrameType.LOG_START and len(frame.body) >= 4:
+            name = b"sitl"
+            reply = struct.pack("<BHBBIfB", 0, 0, 0, 1, 0, 39754.0, len(name)) + name
+            return [self._send(FrameType.LOG_INFO, reply)]
+        if frame.type == FrameType.LOG_STOP:
             return []
         if self.control is not None and frame.body:
             return self._on_control(frame)

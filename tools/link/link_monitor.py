@@ -61,11 +61,17 @@ import argparse
 import math
 import os
 import shutil
+import struct
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+log_tools_dir = str(Path(__file__).resolve().parents[1] / "log")
+if log_tools_dir not in sys.path:
+    sys.path.insert(0, log_tools_dir)
 
+from vklink.frame import Frame, FrameType, LogDropout, LogInfo, LogStartResult  # noqa: E402
 from vklink.enums import BringupResult, GamepadButton  # noqa: E402
 from vklink.monitor import (  # noqa: E402
     LinkMonitor,
@@ -381,6 +387,19 @@ def run_drive(monitor: LinkMonitor, args: argparse.Namespace) -> int:
     return 0
 
 
+def run_record(monitor: LinkMonitor, args: argparse.Namespace) -> int:
+    from vklink.recorder import record
+
+    return record(
+        monitor,
+        args.profile,
+        args.file,
+        duration=args.duration,
+        msg_dir=args.msg_dir,
+        handshake_timeout=args.handshake_timeout,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     target = parser.add_mutually_exclusive_group()
@@ -445,6 +464,10 @@ def main() -> int:
                                  "put -- before a negative first one")
     drive_body.add_argument("--duration", dest="drive_duration", type=parse_duration, required=True,
                             metavar="SECONDS", help="seconds to send the setpoints")
+    record_cmd = commands.add_parser("record", help="record a log file over the Link")
+    record_cmd.add_argument("file", help="output .ulg file path")
+    record_cmd.add_argument("--profile", required=True, help="log profile to record (e.g. estimator_replay)")
+    record_cmd.add_argument("--duration", type=float, default=None, help="record for duration in seconds")
     args = parser.parse_args()
 
     metadata = None
@@ -487,6 +510,8 @@ def main() -> int:
             return run_key(monitor, args)
         if args.command == "sim-gamepad":
             return run_sim_gamepad(monitor, args)
+        if args.command == "record":
+            return run_record(monitor, args)
         if args.command is not None:
             return run_control(monitor, args)
         if args.check:
