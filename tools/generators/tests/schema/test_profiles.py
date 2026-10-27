@@ -49,6 +49,7 @@ def test_estimator_replay_bandwidth(repo_schema):
     # - work_item_status: 1 Hz * 60 B * 16 insts = 960 B/s
     # - link_status: 1 Hz * 57 B * 2 insts = 114 B/s
     # - parameter_update: 0 Hz = 0 B/s
+    # - estimator_restart: 0 Hz = 0 B/s
     # Sum: 9600 + 11200 + 4200 + 5000 + 2550 + 230 + 960 + 114 = 33854 B/s (~33 KB/s)
     hand_count_c50c = 33854.0
 
@@ -204,8 +205,8 @@ def test_log_profile_streams_header(repo_schema):
 
     header = log_profile_streams_header(profiles, repo_schema)
     assert "class EstimatorReplayStreams" in header
-    assert "estimator_replay_stream_count = 27;" in header
-    assert "estimator_replay_stream_count = 25;" in header
+    assert "estimator_replay_stream_count = 28;" in header
+    assert "estimator_replay_stream_count = 26;" in header
     assert "TopicStreamOf<msg::ImuSample>" in header
     assert "TopicStreamOf<msg::BodyVelocityMeasurement>" in header
     assert "TopicStreamOf<msg::VehicleAttitude>" in header

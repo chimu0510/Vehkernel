@@ -47,9 +47,9 @@ TEST(LogProfiles, EntryCountForBuildPlatform)
     const auto* profile = find_log_profile(LogProfileId::EstimatorReplay);
     ASSERT_NE(profile, nullptr);
 #ifdef CONFIG_PLATFORM_SITL
-    EXPECT_EQ(profile->entries.size(), 27U);
+    EXPECT_EQ(profile->entries.size(), 28U);
 #else
-    EXPECT_EQ(profile->entries.size(), 25U);
+    EXPECT_EQ(profile->entries.size(), 26U);
 #endif
 }
 
@@ -111,18 +111,23 @@ TEST(LogProfiles, EntriesNameExpectedTopics)
     EXPECT_EQ(entries[24].instance, 0);
     EXPECT_EQ(entries[24].rate_kind, LogRateKind::AsPublished);
 
-#ifdef CONFIG_PLATFORM_SITL
-    // Entry 25: vehicle_attitude_groundtruth, instance 0, 50 Hz
-    EXPECT_EQ(entries[25].topic_id, vk::msg::VehicleAttitudeGroundtruth::topic_id);
+    // Entry 25: estimator_restart, instance 0, as_published
+    EXPECT_EQ(entries[25].topic_id, vk::msg::EstimatorRestart::topic_id);
     EXPECT_EQ(entries[25].instance, 0);
-    EXPECT_EQ(entries[25].rate_kind, LogRateKind::RateHz);
-    EXPECT_FLOAT_EQ(entries[25].rate_hz, 50.0F);
+    EXPECT_EQ(entries[25].rate_kind, LogRateKind::AsPublished);
 
-    // Entry 26: vehicle_local_odometry_groundtruth, instance 0, 50 Hz
-    EXPECT_EQ(entries[26].topic_id, vk::msg::VehicleLocalOdometryGroundtruth::topic_id);
+#ifdef CONFIG_PLATFORM_SITL
+    // Entry 26: vehicle_attitude_groundtruth, instance 0, 50 Hz
+    EXPECT_EQ(entries[26].topic_id, vk::msg::VehicleAttitudeGroundtruth::topic_id);
     EXPECT_EQ(entries[26].instance, 0);
     EXPECT_EQ(entries[26].rate_kind, LogRateKind::RateHz);
     EXPECT_FLOAT_EQ(entries[26].rate_hz, 50.0F);
+
+    // Entry 27: vehicle_local_odometry_groundtruth, instance 0, 50 Hz
+    EXPECT_EQ(entries[27].topic_id, vk::msg::VehicleLocalOdometryGroundtruth::topic_id);
+    EXPECT_EQ(entries[27].instance, 0);
+    EXPECT_EQ(entries[27].rate_kind, LogRateKind::RateHz);
+    EXPECT_FLOAT_EQ(entries[27].rate_hz, 50.0F);
 #endif
 }
 
