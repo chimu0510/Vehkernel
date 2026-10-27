@@ -401,6 +401,71 @@ def compare_logs(
     return len(failures) == 0
 
 
+def compute_odometry_metrics(
+    recorded_path: str | Path,
+    replayed_path: str | Path,
+) -> tuple[float, float, float]:
+    """Returns (pos_error_m, heading_error_deg, distance_driven_m) between replayed odometry and truth."""
+    rec_data = extract_log(recorded_path)
+    rep_data = extract_log(replayed_path)
+
+    truth_odom_gt = rec_data.get("vehicle_local_odometry_groundtruth", [])
+    rep_odom_list = rep_data.get("vehicle_local_odometry", [])
+    if not truth_odom_gt or not rep_odom_list:
+        return (0.0, 0.0, 0.0)
+
+    restart_ts: int = 0
+    if "estimator_restart" in rec_data and rec_data["estimator_restart"]:
+        restart_ts = rec_data["estimator_restart"][0].get("timestamp", 0)
+
+    rep_odom = {
+        s["timestamp_sample"]: s
+        for s in rep_odom_list
+        if s.get("timestamp_sample", 0) >= restart_ts
+    }
+    if not rep_odom:
+        return (0.0, 0.0, 0.0)
+
+    first_rep_ts = min(rep_odom.keys())
+    last_ts = max(rep_odom.keys())
+    last_sample = rep_odom[last_ts]
+
+    truth_pos_start, truth_yaw_start = interpolate_truth_odometry(truth_odom_gt, first_rep_ts)
+    truth_pos_world, truth_yaw_world = interpolate_truth_odometry(truth_odom_gt, last_ts)
+
+    dx_w = truth_pos_world[0] - truth_pos_start[0]
+    dy_w = truth_pos_world[1] - truth_pos_start[1]
+    dz_w = truth_pos_world[2] - truth_pos_start[2]
+
+    cos_y = math.cos(truth_yaw_start)
+    sin_y = math.sin(truth_yaw_start)
+    x_aligned = cos_y * dx_w + sin_y * dy_w
+    y_aligned = -sin_y * dx_w + cos_y * dy_w
+    truth_pos_aligned = (x_aligned, y_aligned, dz_w)
+
+    truth_yaw_aligned = wrap(truth_yaw_world - truth_yaw_start)
+
+    pos_error = math.hypot(
+        last_sample["position"][0] - truth_pos_aligned[0],
+        last_sample["position"][1] - truth_pos_aligned[1],
+    )
+    heading_error_deg = math.degrees(abs(wrap(yaw_of(last_sample["q"]) - truth_yaw_aligned)))
+
+    # Compute distance driven along truth between first_rep_ts and last_ts
+    in_window = [
+        t["position"]
+        for t in truth_odom_gt
+        if first_rep_ts <= t["timestamp"] <= last_ts
+    ]
+    points = [truth_pos_start] + in_window + [truth_pos_world]
+    distance_driven = sum(
+        math.hypot(b[0] - a[0], b[1] - a[1])
+        for a, b in zip(points, points[1:])
+    )
+
+    return (pos_error, heading_error_deg, distance_driven)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("recorded", help="path to recorded log file")

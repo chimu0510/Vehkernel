@@ -157,6 +157,17 @@ if(CONFIG_CONTROL_CHAIN AND CONFIG_VEHICLE_MODEL_WHEELED AND CONFIG_LINK_UDP)
       $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
 endif()
 
+# L2 SITL replay test (spec 0011, ADR-0018): records SITL driving a square,
+# replays the estimators on the log, and judges faithfulness and odometry metrics.
+if(CONFIG_ESTIMATOR_LOCAL_ODOMETRY AND CONFIG_CONTROL_CHAIN AND CONFIG_VEHICLE_MODEL_WHEELED AND CONFIG_LINK_UDP)
+  add_test(NAME sitl_replay
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_replay.py
+      $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR}
+      --replay-bin $<TARGET_FILE:vehkernel-replay>)
+  set_tests_properties(sitl_replay PROPERTIES ENVIRONMENT
+    "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log:${CMAKE_SOURCE_DIR}/tools/link:${CMAKE_CURRENT_SOURCE_DIR}/sitl;PYTHONDONTWRITEBYTECODE=1;VEHKERNEL_REPLAY=$<TARGET_FILE:vehkernel-replay>")
+endif()
+
 # L3 SITL fault test (ADR-0005): a failed assertion and fail() while driving
 # end SITL with every output stopped, and a watchdog or fault reset refuses
 # arming.

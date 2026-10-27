@@ -12,7 +12,7 @@ cmake --build --preset test
 ctest --preset test
 ```
 
-The SITL tests (`sitl_*`) start the SITL executable and check it from the development host with the scripts in `test/sitl/`; each guide names the tests that cover it ([SITL](sitl.md), [Link monitor](link-monitor.md), [Driving the wheels](driving.md), [Local display](local-display.md)). SITL tests run serially under `ctest -j`, since they judge timing on the shared host. CI builds every preset and runs the tests in the same image.
+The SITL tests (`sitl_*`) start the SITL executable and check it from the development host with the scripts in `test/sitl/`; each guide names the tests that cover it ([SITL](sitl.md), [Link monitor](link-monitor.md), [Driving the wheels](driving.md), [Local display](local-display.md), [Logging](logging.md)). SITL tests run serially under `ctest -j`, since they judge timing on the shared host. CI builds every preset and runs the tests in the same image.
 
 The license check, `reuse_lint`, covers every file in the working tree that git does not ignore, untracked ones included. A stray file such as a log written to the repository root fails it with `The following files have no licensing information`: move it out of the tree, or under `build/`, which git ignores.
 
@@ -27,6 +27,13 @@ ctest --preset test -E '^sitl_' -j "$(nproc)"
 ```
 
 Run one SITL test by name with `ctest --preset test -R sitl_body_motion`. Before a pull request, turn clang-tidy back on (`cmake --preset test -DVK_CLANG_TIDY=ON`) and run the whole suite, as CI does.
+
+## Estimator replay (L2)
+
+Replay re-runs the firmware's estimator work items on recorded ULog files on the development host, fed from a log in recorded order with the recorded parameters, and compares what they publish with what the log holds (spec 0011, [Logging](logging.md#estimator-replay-and-comparison)). The test `sitl_replay` records a SITL ground vehicle driving a square over UDP, replays it and checks both:
+- Faithfulness: the replayed estimate matches the recorded estimate exactly from the estimators' restart to the end of the log.
+- Odometry metrics: the replayed odometry ends within `check_odometry.py`'s bounds against the logged ground truth.
+- Dropouts: the recorded log has no dropouts.
 
 ## Fuzzing the Link decoders
 
