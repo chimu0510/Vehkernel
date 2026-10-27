@@ -36,3 +36,7 @@ An estimator = one algorithm + several models. The library depends on neither th
 The initial implementation covers attitude estimation with a complementary filter (Mahony) + quaternion kinematics + accelerometer model, local odometry by dead reckoning, and two body velocity sources: the `WHEELED` vehicle model and velocities injected over a Link. For the external estimator, only the interface and schema are defined at first. Directories and interfaces follow this structure from the start; EKF and other algorithms come later. Attitude estimation came first, with spec 0004; local odometry and the body velocity sources follow with the `WHEELED` vehicle model.
 
 The attitude estimator's alignment time and stillness thresholds are compile-time constants for now; they become parameters when a vehicle must align with motors or pumps running, as ArduPilot's `INS_STILL_THRESH` is (ADR-0012). Its variance models stay internal.
+
+**Restarting the estimators**
+
+A log over the Link starts long after boot, and replay cannot rebuild an estimator's state from what it publishes, so a log holds the estimators' start (spec 0011). On an `estimator_restart` publication from the commander (ADR-0005), the estimators return to their initial state: the attitude estimator returns to aligning and needs the vehicle still for 1 s, publishing nothing while aligning; local odometry clears its position and its dead reckoning, and its origin becomes where the vehicle stands once the attitude estimator runs again.

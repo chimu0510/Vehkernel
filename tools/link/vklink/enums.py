@@ -86,6 +86,7 @@ class Command(enum.IntEnum):
     BRINGUP = 3  # argument: the bring-up case
     REBOOT = 4  # argument: the reboot action
     SOURCE_LOST = 5  # the source fell silent; no argument
+    RESTART_ESTIMATORS = 6  # restart the estimators; no argument
 
 
 class DisarmReason(enum.IntEnum):
@@ -237,6 +238,13 @@ class ResetCause(enum.IntEnum):
     WATCHDOG = 4  # the hardware watchdog, after the scheduler stalled
     FAULT = 5  # the fault stop, after a fault, a failed assertion or a stack overflow
     LOW_POWER = 6  # the low-power reset of the MCU
+
+
+class RestartEstimatorsResult(enum.IntEnum):
+    """Why a restart_estimators request was refused."""
+
+    OK = 0
+    ARMED = 1  # estimators restart only while disarmed
 
 
 class VehicleType(enum.IntEnum):

@@ -18,6 +18,7 @@
 #include <vk/core/work_queue.hpp>
 #include <vk/estimation/filters/mahony.hpp>
 #include <vk/estimation/math/vector3.hpp>
+#include <vk/msg/estimator_restart.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/parameter_update.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
@@ -58,12 +59,15 @@ protected:
 
 private:
     void apply_parameters();
+    // Returns the estimator to its state at boot.
+    void restart();
     void align(const msg::ImuSample& sample, const Vector3& gyro, const Vector3& accel);
     void estimate(const msg::ImuSample& sample, const Vector3& gyro, const Vector3& accel, std::uint64_t now);
 
     Config config_;
     core::Subscription<msg::ImuSample> imu_;
     core::Subscription<msg::ParameterUpdate> parameter_update_;
+    core::Subscription<msg::EstimatorRestart> restart_{0};
     core::Publication<msg::VehicleAttitude> attitude_;
     MahonyFilter filter_;
     State state_ = State::Aligning;

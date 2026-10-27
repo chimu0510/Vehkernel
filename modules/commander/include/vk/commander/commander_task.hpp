@@ -38,6 +38,7 @@
 #include <vk/msg/body_velocity_setpoint.hpp>
 #include <vk/msg/bringup_command.hpp>
 #include <vk/msg/bringup_status.hpp>
+#include <vk/msg/estimator_restart.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/local_menu.hpp>
 #include <vk/msg/manual_control_input.hpp>
@@ -82,6 +83,7 @@ protected:
 private:
     void handle(std::uint64_t now_us, const msg::VehicleCommand& command);
     [[nodiscard]] core::RebootResult request_reboot(std::uint64_t now_us, std::uint8_t action);
+    [[nodiscard]] core::RestartEstimatorsResult request_restart_estimators(std::uint64_t now_us);
     void follow_setpoints();
     void publish(std::uint64_t now_us, const State& state);
 
@@ -102,6 +104,7 @@ private:
     bool local_menu_open_ = false;
     core::Publication<msg::BringupCommand> bringup_publication_;
     bool bringup_running_ = false;
+    core::Publication<msg::EstimatorRestart> estimator_restart_publication_;
     core::Publication<msg::ArmingState> arming_publication_;
     core::Publication<msg::VehicleStatus> status_publication_;
     bool imu_answered_ = false;

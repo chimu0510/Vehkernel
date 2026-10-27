@@ -9,6 +9,7 @@
 #include <vk/estimation/models/dead_reckoning.hpp>
 #include <vk/estimation/models/wheel_kinematics.hpp>
 #include <vk/msg/body_velocity_measurement.hpp>
+#include <vk/msg/estimator_restart.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
 #include <vk/msg/vehicle_local_odometry.hpp>
 
@@ -122,6 +123,23 @@ TEST(DeadReckoning, CovarianceGrowsWithTheResidual)
     EXPECT_GT(b.covariance()[0], a.covariance()[0]);
 }
 
+TEST(DeadReckoning, ResetClearsPositionAndCovariance)
+{
+    DeadReckoning d;
+    float heading = 0.0F;
+    d.step(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, heading, 0.0F);
+    drive(d, 0.5F, 0.0F, 0.0F, 2.0F, heading);
+    EXPECT_GT(d.distance(), 0.0F);
+    EXPECT_GT(d.north(), 0.0);
+    d.reset();
+    EXPECT_EQ(d.north(), 0.0);
+    EXPECT_EQ(d.east(), 0.0);
+    EXPECT_FLOAT_EQ(d.distance(), 0.0F);
+    EXPECT_FLOAT_EQ(d.covariance()[0], 0.0F);
+    EXPECT_FLOAT_EQ(d.covariance()[1], 0.0F);
+    EXPECT_FLOAT_EQ(d.covariance()[2], 0.0F);
+}
+
 // The estimator work item.
 std::uint64_t fake_now = 0;
 
@@ -211,6 +229,36 @@ TEST_F(LocalOdometryTest, WaitsForAHeading)
     ASSERT_TRUE(odometry.copy(out));
     // The first step with a heading moves by its own 5 ms only.
     EXPECT_NEAR(out.position[0], 0.005F, 1e-6F);
+}
+
+TEST_F(LocalOdometryTest, RestartsFromZeroOnEstimatorRestart)
+{
+    publish_attitude(pi / 2);  // facing east
+    for (int i = 0; i < 201; ++i) {
+        measure(0.5F, 0.0F);
+        publish_attitude(pi / 2);
+    }
+    vk::msg::VehicleLocalOdometry out{};
+    ASSERT_TRUE(odometry.copy(out));
+    EXPECT_NEAR(out.position[1], 0.5F, 1e-4F);
+
+    // Estimator restart arrives.
+    vk::core::Publication<vk::msg::EstimatorRestart> restart;
+    restart.publish(vk::msg::EstimatorRestart{.timestamp = fake_now});
+
+    // While attitude is not available (aligning), no odometry is published.
+    for (int i = 0; i < 20; ++i) {
+        measure(0.5F, 0.0F);
+    }
+    EXPECT_FALSE(odometry.copy(out));
+
+    // Attitude estimator has aligned and publishes again.
+    publish_attitude(0.0F);  // facing north now
+    measure(0.5F, 0.0F);
+    ASSERT_TRUE(odometry.copy(out));
+    // Restarts from zero: moves by only the 5 ms step.
+    EXPECT_NEAR(out.position[0], 0.0025F, 1e-5F);
+    EXPECT_NEAR(out.position[1], 0.0F, 1e-5F);
 }
 
 }  // namespace

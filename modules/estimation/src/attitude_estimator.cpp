@@ -17,12 +17,27 @@ AttitudeEstimator::AttitudeEstimator(const Config& config, core::WorkQueue& queu
     }
     msg::ParameterUpdate seen{};
     parameter_update_.copy(seen);
+    msg::EstimatorRestart stale_restart{};
+    while (restart_.copy(stale_restart)) {
+    }
     apply_parameters();
 }
 
 void AttitudeEstimator::apply_parameters()
 {
     filter_.set_gains(params::att.kp, params::att.ki, params::att.acc_rej);
+}
+
+void AttitudeEstimator::restart()
+{
+    state_ = State::Aligning;
+    still_since_us_ = 0;
+    still_samples_ = 0;
+    gyro_sum_ = {};
+    accel_sum_ = {};
+    aligned_at_us_ = 0;
+    filter_ = MahonyFilter(config_.filter);
+    apply_parameters();
 }
 
 void AttitudeEstimator::start()
@@ -35,6 +50,10 @@ void AttitudeEstimator::run()
     msg::ParameterUpdate update{};
     if (parameter_update_.copy(update)) {
         apply_parameters();
+    }
+    msg::EstimatorRestart restart_msg{};
+    while (restart_.copy(restart_msg)) {
+        restart();
     }
     msg::ImuSample sample{};
     while (imu_.copy(sample)) {

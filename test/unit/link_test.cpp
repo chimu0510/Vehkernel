@@ -930,6 +930,8 @@ public:
             case Command::SourceLost:
                 lost = command.source;
                 break;
+            case Command::RestartEstimators:
+                break;
             }
             ack.mode = static_cast<std::uint8_t>(current_mode);
             ack.armed = is_armed;

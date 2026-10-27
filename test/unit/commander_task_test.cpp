@@ -14,6 +14,7 @@
 #include <vk/hal/reset.hpp>
 #include <vk/msg/actuator_setpoint.hpp>
 #include <vk/msg/body_velocity_setpoint.hpp>
+#include <vk/msg/estimator_restart.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_command.hpp>
 #include <vk/msg/vehicle_command_ack.hpp>
@@ -32,6 +33,7 @@ using vk::commander::CommanderTask;
 using vk::core::ArmingResult;
 using vk::core::RebootAction;
 using vk::core::RebootResult;
+using vk::core::RestartEstimatorsResult;
 using vk::hal::BootTarget;
 
 constexpr std::uint32_t interval_us = 5'000;
@@ -302,6 +304,34 @@ TEST_F(CommanderTaskTest, ABringupRequestIsAnsweredWithItsRefusal)
     arm();
     const auto started = request(queue, vk::core::Command::Bringup, to_u8(vk::core::BringupCase::Motors));
     EXPECT_EQ(started.result, to_u8(vk::core::BringupStart::NotAvailable)) << "not built into this task";
+}
+
+TEST_F(CommanderTaskTest, RestartEstimatorsIsRefusedWhileArmed)
+{
+    vk::core::Subscription<vk::msg::EstimatorRestart> restart{0};
+    vk::msg::EstimatorRestart msg{};
+    while (restart.copy(msg)) {
+    }
+    arm();
+    const auto ack = request(queue, vk::core::Command::RestartEstimators, 0);
+    EXPECT_EQ(ack.command, to_u8(vk::core::Command::RestartEstimators));
+    EXPECT_EQ(ack.result, to_u8(RestartEstimatorsResult::Armed));
+    EXPECT_TRUE(ack.armed);
+    EXPECT_FALSE(restart.copy(msg));
+}
+
+TEST_F(CommanderTaskTest, RestartEstimatorsIsAcceptedWhileDisarmed)
+{
+    vk::core::Subscription<vk::msg::EstimatorRestart> restart{0};
+    vk::msg::EstimatorRestart msg{};
+    while (restart.copy(msg)) {
+    }
+    const auto ack = request(queue, vk::core::Command::RestartEstimators, 0);
+    EXPECT_EQ(ack.command, to_u8(vk::core::Command::RestartEstimators));
+    EXPECT_EQ(ack.result, to_u8(RestartEstimatorsResult::Ok));
+    EXPECT_FALSE(ack.armed);
+    ASSERT_TRUE(restart.copy(msg));
+    EXPECT_EQ(msg.timestamp, fake_now);
 }
 
 }  // namespace

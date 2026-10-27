@@ -28,6 +28,7 @@ using DisarmReason = msg::DisarmReason;  // why the vehicle last disarmed
 using BringupCase = msg::BringupCase;    // bring-up cases run in test mode (ADR-0018)
 using BringupStart = msg::BringupStart;  // why a bring-up request was refused
 using Command = msg::Command;            // what a vehicle_command asks
+using RestartEstimatorsResult = msg::RestartEstimatorsResult;  // why a restart_estimators request was refused
 
 // A Link instance, or later the remote control or the Bridge.
 using ControlSource = std::uint8_t;

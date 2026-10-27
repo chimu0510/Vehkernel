@@ -12,6 +12,9 @@ LocalOdometry::LocalOdometry(const Config& config, core::WorkQueue& queue)
     msg::BodyVelocityMeasurement stale{};
     while (measurement_.copy(stale)) {
     }
+    msg::EstimatorRestart stale_restart{};
+    while (restart_.copy(stale_restart)) {
+    }
 }
 
 void LocalOdometry::start()
@@ -21,6 +24,15 @@ void LocalOdometry::start()
 
 void LocalOdometry::run()
 {
+    msg::EstimatorRestart restart{};
+    while (restart_.copy(restart)) {
+        dead_reckoning_.reset();
+        attitude_message_ = {};
+        last_sample_us_ = 0;
+        msg::VehicleAttitude stale{};
+        while (attitude_.copy(stale)) {
+        }
+    }
     msg::BodyVelocityMeasurement measurement{};
     while (measurement_.copy(measurement)) {
         while (attitude_.copy(attitude_message_)) {

@@ -140,6 +140,9 @@ void CommanderTask::handle(std::uint64_t now_us, const msg::VehicleCommand& comm
     case core::Command::SourceLost:
         commander_.source_lost(command.source);
         break;
+    case core::Command::RestartEstimators:
+        ack.result = static_cast<std::uint8_t>(request_restart_estimators(now_us));
+        break;
     default:
         return;  // Not a command this commander knows: no answer.
     }
@@ -175,6 +178,15 @@ core::RebootResult CommanderTask::request_reboot(std::uint64_t now_us, std::uint
         reboot_->target = target;
     }
     return core::RebootResult::Ok;
+}
+
+core::RestartEstimatorsResult CommanderTask::request_restart_estimators(std::uint64_t now_us)
+{
+    if (commander_.state().armed) {
+        return core::RestartEstimatorsResult::Armed;
+    }
+    estimator_restart_publication_.publish(msg::EstimatorRestart{.timestamp = now_us});
+    return core::RestartEstimatorsResult::Ok;
 }
 
 void CommanderTask::publish(std::uint64_t now_us, const State& state)

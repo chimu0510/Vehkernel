@@ -214,6 +214,10 @@ _Avoid_: IWDG (except for the STM32 peripheral itself), dog
 What caused the last reset, read by the platform at boot and published on `vehicle_status`; a watchdog or fault reset is an unexpected reset, after which arming is refused until the next deliberate reset.
 _Avoid_: boot reason
 
+**Estimator Restart**:
+The request that returns the attitude estimator and local odometry to their initial state while disarmed, so that a log holds their start.
+_Avoid_: filter reset, AHRS reset
+
 ### Local interface
 
 **Local Display**:

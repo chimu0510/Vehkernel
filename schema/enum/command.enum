@@ -7,3 +7,4 @@ EMERGENCY_STOP = 2                # argument: 1 to engage, 0 to release
 BRINGUP = 3                       # argument: the bring-up case
 REBOOT = 4                        # argument: the reboot action
 SOURCE_LOST = 5                   # the source fell silent; no argument
+RESTART_ESTIMATORS = 6            # restart the estimators; no argument

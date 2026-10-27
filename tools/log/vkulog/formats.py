@@ -17,6 +17,7 @@ FORMATS = {
     'body_velocity_setpoint': 'body_velocity_setpoint:uint64_t timestamp;uint8_t source;float vx;float vy;float yaw_rate;',
     'bringup_command': 'bringup_command:uint64_t timestamp;uint8_t bringup_case;uint8_t source;',
     'bringup_status': 'bringup_status:uint64_t timestamp;uint16_t run;uint8_t bringup_case;uint8_t source;uint8_t state;uint8_t outputs;uint8_t[4] result;uint8_t[4] encoder;int8_t[4] sign;',
+    'estimator_restart': 'estimator_restart:uint64_t timestamp;',
     'imu_sample': 'imu_sample:uint64_t timestamp;uint8_t device_instance;float[3] accel;float[3] gyro;float temperature;',
     'link_status': 'link_status:uint64_t timestamp;uint32_t frames_sent;uint32_t bytes_sent;uint32_t frames_received;uint32_t bytes_received;uint32_t drops;uint32_t crc_errors;uint32_t malformed;uint32_t lost;uint8_t handshake_state;uint8_t rate_scale;uint32_t inbound_undeclared;',
     'local_menu': 'local_menu:uint64_t timestamp;uint8_t state;uint16_t item;uint8_t last_result;uint16_t last_parameter;bool reboot_required;',

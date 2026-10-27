@@ -8,6 +8,7 @@
 #include <vk/estimation/attitude_estimator.hpp>
 #include <vk/estimation/math/quaternion.hpp>
 #include <vk/estimation/models/accelerometer_model.hpp>
+#include <vk/msg/estimator_restart.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
 #include <vk/params/params.hpp>
@@ -183,6 +184,47 @@ TEST_F(AttitudeEstimatorTest, AppliesNewGainsFromTheNextSample)
     feed(200, tilted, {});
     drain(out);
     EXPECT_NEAR(Quaternion::from(out.q).euler().roll, 0.2F, 0.005F);
+}
+
+TEST_F(AttitudeEstimatorTest, RestartsAlignmentOnEstimatorRestart)
+{
+    const Quaternion tilted = Quaternion::from_euler({.roll = 0.3F, .pitch = -0.2F, .yaw = 1.0F});
+    const Vector3 bias{0.01F, -0.02F, 0.005F};
+    AttitudeEstimator estimator(config, queue);
+    estimator.start();
+    feed(201, AccelerometerModel::predict(tilted), bias);
+    ASSERT_EQ(estimator.state(), AttitudeEstimator::State::Running);
+    feed(10, AccelerometerModel::predict(tilted), bias);
+    vk::msg::VehicleAttitude out{};
+    EXPECT_EQ(drain(out), 10);
+
+    // Restart the estimators.
+    vk::core::Publication<vk::msg::EstimatorRestart> restart;
+    restart.publish(vk::msg::EstimatorRestart{.timestamp = fake_now});
+
+    // A different tilt and bias for the new alignment.
+    const Quaternion new_tilted = Quaternion::from_euler({.roll = -0.15F, .pitch = 0.25F, .yaw = 0.5F});
+    const Vector3 new_bias{-0.02F, 0.01F, -0.01F};
+
+    // 0.5 s still: publishes nothing, stays in Aligning.
+    feed(100, AccelerometerModel::predict(new_tilted), new_bias);
+    EXPECT_EQ(drain(out), 0);
+    EXPECT_EQ(estimator.state(), AttitudeEstimator::State::Aligning);
+
+    // Another 101 samples (total > 1 s still): finishes alignment.
+    feed(101, AccelerometerModel::predict(new_tilted), new_bias);
+    ASSERT_EQ(estimator.state(), AttitudeEstimator::State::Running);
+
+    // Now it runs and publishes from the new samples.
+    feed(10, AccelerometerModel::predict(new_tilted), new_bias);
+    EXPECT_EQ(drain(out), 10);
+    const auto e = Quaternion::from(out.q).euler();
+    EXPECT_NEAR(e.roll, -0.15F, 1e-3F);
+    EXPECT_NEAR(e.pitch, 0.25F, 1e-3F);
+    EXPECT_NEAR(e.yaw, 0.0F, 1e-3F);  // yaw starts at 0
+    EXPECT_NEAR(out.gyro_bias[0], new_bias.x, 1e-3F);
+    EXPECT_NEAR(out.gyro_bias[1], new_bias.y, 1e-3F);
+    EXPECT_NEAR(out.gyro_bias[2], new_bias.z, 1e-3F);
 }
 
 }  // namespace

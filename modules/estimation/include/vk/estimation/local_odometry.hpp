@@ -17,6 +17,7 @@
 #include <vk/core/work_queue.hpp>
 #include <vk/estimation/models/dead_reckoning.hpp>
 #include <vk/msg/body_velocity_measurement.hpp>
+#include <vk/msg/estimator_restart.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
 #include <vk/msg/vehicle_local_odometry.hpp>
 
@@ -47,6 +48,7 @@ private:
     Config config_;
     core::Subscription<msg::BodyVelocityMeasurement> measurement_;
     core::Subscription<msg::VehicleAttitude> attitude_{0};
+    core::Subscription<msg::EstimatorRestart> restart_{0};
     core::Publication<msg::VehicleLocalOdometry> publication_;
     msg::VehicleAttitude attitude_message_{};
     DeadReckoning dead_reckoning_;

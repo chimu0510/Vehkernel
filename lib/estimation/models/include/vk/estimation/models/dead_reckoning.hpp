@@ -67,6 +67,17 @@ public:
     // The position's covariance [m²]: north-north, north-east, east-east.
     [[nodiscard]] const std::array<float, 3>& covariance() const { return covariance_; }
 
+    // Clears the position, distance and covariance back to zero.
+    void reset()
+    {
+        north_ = 0.0;
+        east_ = 0.0;
+        distance_ = 0.0F;
+        heading_ = 0.0F;
+        has_heading_ = false;
+        covariance_ = {};
+    }
+
 private:
     static constexpr float pi = std::numbers::pi_v<float>;
 
