@@ -1,8 +1,8 @@
 # Spec 0011: logging over the Link and estimator replay (ULog, log profiles and the L2 replay layer)
 
-**Status**: in progress. Issue: [#137](https://github.com/chimu0510/Vehkernel/issues/137); tickets #138 to #143, with the hardware check in #143.
+**Status**: done. Issue: [#137](https://github.com/chimu0510/Vehkernel/issues/137); tickets #138 to #143. The hardware check in #143 confirmed it on the C50C V1.1 on 2026-10-28, on the ground, with the vehicle of #126 and the Flydigi pad: a 70 s log over SERIAL1 with no dropouts, replayed within 3.5e-6 on the attitude and 1.4e-5 m on the position.
 
-Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
+This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 
 ## Problem Statement
 
