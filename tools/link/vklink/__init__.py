@@ -9,6 +9,7 @@ from .frame import (
     MAX_FRAME_SIZE,
     MAX_MESSAGE_SIZE,
     MAX_WIRE_SIZE,
+    OLDEST_PROTOCOL_VERSION,
     PROTOCOL_VERSION,
     Frame,
     FrameReader,
@@ -17,6 +18,7 @@ from .frame import (
     LogDropout,
     LogInfo,
     LogStartResult,
+    ProtocolVersionError,
     ReaderStats,
 )
 from .session import (
@@ -41,6 +43,8 @@ __all__ = [
     "cobs_max_encoded_size",
     "crc16",
     "PROTOCOL_VERSION",
+    "OLDEST_PROTOCOL_VERSION",
+    "ProtocolVersionError",
     "HEADER_SIZE",
     "MAX_MESSAGE_SIZE",
     "MAX_BODY_SIZE",

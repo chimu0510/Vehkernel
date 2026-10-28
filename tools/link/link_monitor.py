@@ -71,7 +71,15 @@ log_tools_dir = str(Path(__file__).resolve().parents[1] / "log")
 if log_tools_dir not in sys.path:
     sys.path.insert(0, log_tools_dir)
 
-from vklink.frame import Frame, FrameType, LogDropout, LogInfo, LogStartResult  # noqa: E402
+from vklink.frame import (  # noqa: E402
+    PROTOCOL_VERSION,
+    Frame,
+    FrameType,
+    LogDropout,
+    LogInfo,
+    LogStartResult,
+    ProtocolVersionError,
+)
 from vklink.enums import BringupResult, GamepadButton  # noqa: E402
 from vklink.monitor import (  # noqa: E402
     LinkMonitor,
@@ -500,6 +508,9 @@ def main() -> int:
             print("\n".join(monitor.summary()))
             print(f"FAIL: no handshake with the MCU within {args.handshake_timeout:g} s", file=sys.stderr)
             return 1
+        if monitor.session.version < PROTOCOL_VERSION:
+            print(f"warning: the MCU speaks protocol version {monitor.session.version}, older than the host's "
+                  f"{PROTOCOL_VERSION}; newer requests are refused", file=sys.stderr)
         if args.command == "param":
             return run_param(monitor, args, metadata)
         if args.command in ("drive", "drive-body"):
@@ -538,6 +549,9 @@ def main() -> int:
                 print("\n".join(monitor.summary()), flush=True)
     except KeyboardInterrupt:
         return 0
+    except ProtocolVersionError as error:
+        print(f"FAIL: {error}", file=sys.stderr)
+        return 1
     except OSError as error:
         # The port went away, as when its USB cable is pulled: the MCU's own
         # timeouts stop the vehicle; the tool reports it instead of a traceback.

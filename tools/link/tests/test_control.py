@@ -6,9 +6,21 @@ import subprocess
 import sys
 from pathlib import Path
 
-from test_monitor import FakeMcu
+from test_monitor import FakeMcu, messages
 from test_params import MONITOR, VKMSG
-from vklink import BringupReply, ControlReply, FrameReader, FrameType, HostSession, McuControl, McuSession
+import pytest
+from vklink import (
+    PROTOCOL_VERSION,
+    BringupReply,
+    ControlReply,
+    FrameReader,
+    FrameType,
+    HostSession,
+    McuControl,
+    McuSession,
+    ProtocolVersionError,
+)
+from vklink.monitor import LinkMonitor, UdpConnection
 
 
 def connected_pair(control: McuControl):
@@ -154,3 +166,37 @@ def test_cli_reboots_into_the_bootloader_and_fails_while_armed(tmp_path: Path):
     assert (plain.returncode, plain.stdout) == (0, "reboot=firmware\n")
     assert refused.returncode == 1
     assert "FAIL: reboot refused: armed" in refused.stderr
+
+
+def test_a_newer_host_reboots_an_older_mcu_and_refuses_what_it_lacks():
+    # A version only adds to the one before, so the host offers every version it speaks (ADR-0002, #144).
+    control = McuControl()
+    mcu = McuSession(control=control, protocol_version=4)
+    host = HostSession()
+    for frame in FrameReader().feed(host.make_hello()):
+        for reply in mcu.handle(frame, now_us=1000):
+            for answer in FrameReader().feed(reply):
+                host.handle_frame(answer)
+    assert (mcu.version, host.version) == (4, 4)
+    wire = host.make_reboot_request(3)
+    assert next(iter(FrameReader().feed(wire))).version == 4
+    assert exchange(mcu, wire) == [ControlReply(FrameType.REBOOT_REPLY, 3)]
+    with pytest.raises(ProtocolVersionError, match="log_start needs protocol version 5, but the MCU speaks version 4"):
+        host.make_log_start(1)
+
+
+def test_cli_reboots_an_older_mcu_and_refuses_logging(tmp_path: Path):
+    control = McuControl()
+    with FakeMcu(control=control, protocol_version=4) as mcu:
+        bootloader = run_cli(mcu.port, tmp_path, "reboot", "--bootloader")
+        connection = UdpConnection("127.0.0.1", mcu.port)
+        try:
+            monitor = LinkMonitor(connection, messages())
+            assert monitor.handshake(2.0)
+            with pytest.raises(ProtocolVersionError):
+                monitor.start_logging(1, 0.5)
+        finally:
+            connection.close()
+    assert (bootloader.returncode, bootloader.stdout) == (0, "reboot=bootloader\n"), bootloader.stderr
+    assert control.reboot_action == 3
+    assert f"the MCU speaks protocol version 4, older than the host's {PROTOCOL_VERSION}" in bootloader.stderr

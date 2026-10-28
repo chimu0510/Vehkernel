@@ -4,6 +4,8 @@
 import os
 import socket
 import struct
+import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -189,3 +191,21 @@ def test_record_logs_all_instances_of_topic(tmp_path):
     assert len(ds1.data["timestamp"]) > 0
     assert ds0.data["frames_sent"][0] == 1
     assert ds1.data["frames_sent"][0] == 2
+
+
+def test_cli_record_fails_on_an_older_mcu(tmp_path):
+    if not MSG_DIR or not Path(MSG_DIR).exists():
+        pytest.skip("VK_MSG_PYTHON_DIR not set or generated messages missing")
+    from test_monitor import FakeMcu
+    from test_params import MONITOR
+
+    # Logging came with protocol version 5; the host refuses to ask a version 4 MCU for it (ADR-0002).
+    with FakeMcu(protocol_version=4) as mcu:
+        result = subprocess.run(
+            [sys.executable, str(MONITOR), "--udp", f"127.0.0.1:{mcu.port}", "--msg-dir", MSG_DIR,
+             "--handshake-timeout", "2", "record", str(tmp_path / "old.ulg"), "--profile", "estimator_replay",
+             "--duration", "1"],
+            capture_output=True, text=True, timeout=30, check=False)
+    assert result.returncode == 1, result.stderr
+    assert "FAIL: log_start needs protocol version 5, but the MCU speaks version 4" in result.stderr
+    assert not (tmp_path / "old.ulg").exists()

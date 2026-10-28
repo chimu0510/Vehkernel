@@ -24,7 +24,15 @@ from .enums import (
     RebootResult,
     ResetCause,
 )
-from .frame import PROTOCOL_VERSION, Frame, FrameType, FrameWriter
+from .frame import (
+    HOST_FRAME_VERSIONS,
+    OLDEST_PROTOCOL_VERSION,
+    PROTOCOL_VERSION,
+    Frame,
+    FrameType,
+    FrameWriter,
+    ProtocolVersionError,
+)
 
 
 class ParamType(enum.IntEnum):
@@ -241,7 +249,8 @@ class HostSession:
         supported_versions: list[int] | None = None,
     ):
         self.local_schema = local_schema or {}
-        self.supported_versions = supported_versions or [PROTOCOL_VERSION]
+        # Every version from the oldest the host speaks: a version only adds to the one before (ADR-0002).
+        self.supported_versions = supported_versions or list(range(OLDEST_PROTOCOL_VERSION, PROTOCOL_VERSION + 1))
         self.writer = FrameWriter()
         self.version = 0
         self.handshake_done = False
@@ -252,61 +261,68 @@ class HostSession:
         self.param_set_hash = 0
         self.param_count = 0
 
+    def _write(self, frame_type: FrameType, body: bytes) -> bytes:
+        """Encodes a frame, refusing one the negotiated version does not have (ADR-0002)."""
+        needed = HOST_FRAME_VERSIONS.get(frame_type, PROTOCOL_VERSION)
+        if self.version != 0 and needed > self.version:
+            raise ProtocolVersionError(frame_type, needed, self.version)
+        return self.writer.write(frame_type, body)
+
     def make_hello(self) -> bytes:
         """Encodes a Hello wire frame proposing supported protocol versions."""
         body = struct.pack("<B", len(self.supported_versions))
         for v in self.supported_versions:
             body += struct.pack("<B", v)
-        return self.writer.write(FrameType.HELLO, body)
+        return self._write(FrameType.HELLO, body)
 
     def make_time_sync(self, host_send_time_us: int) -> bytes:
         """Encodes a TimeSyncRequest wire frame."""
         body = struct.pack("<Q", host_send_time_us)
-        return self.writer.write(FrameType.TIME_SYNC_REQUEST, body)
+        return self._write(FrameType.TIME_SYNC_REQUEST, body)
 
     def make_param_list_request(self, first: int = 0) -> bytes:
         """Asks for every parameter from index `first` on, as param_value frames."""
-        return self.writer.write(FrameType.PARAM_LIST_REQUEST, struct.pack("<H", first))
+        return self._write(FrameType.PARAM_LIST_REQUEST, struct.pack("<H", first))
 
     def make_param_get(self, name: str) -> bytes:
-        return self.writer.write(FrameType.PARAM_GET, _name(name))
+        return self._write(FrameType.PARAM_GET, _name(name))
 
     def make_log_start(self, profile_mask: int) -> bytes:
         """Encodes a LogStart wire frame."""
-        return self.writer.write(FrameType.LOG_START, struct.pack("<I", profile_mask))
+        return self._write(FrameType.LOG_START, struct.pack("<I", profile_mask))
 
     def make_log_stop(self) -> bytes:
         """Encodes a LogStop wire frame."""
-        return self.writer.write(FrameType.LOG_STOP, b"")
+        return self._write(FrameType.LOG_STOP, b"")
 
     def make_param_set(self, name: str, param_type: ParamType, value: int | float) -> bytes:
         body = _name(name) + struct.pack("<BI", int(param_type), encode_param(param_type, value))
-        return self.writer.write(FrameType.PARAM_SET, body)
+        return self._write(FrameType.PARAM_SET, body)
 
     def make_mode_request(self, mode: int) -> bytes:
-        return self.writer.write(FrameType.MODE_REQUEST, struct.pack("<B", mode))
+        return self._write(FrameType.MODE_REQUEST, struct.pack("<B", mode))
 
     def make_arming_request(self, arm: bool) -> bytes:
-        return self.writer.write(FrameType.ARMING_REQUEST, struct.pack("<B", int(arm)))
+        return self._write(FrameType.ARMING_REQUEST, struct.pack("<B", int(arm)))
 
     def make_estop_request(self, engage: bool) -> bytes:
-        return self.writer.write(FrameType.ESTOP_REQUEST, struct.pack("<B", int(engage)))
+        return self._write(FrameType.ESTOP_REQUEST, struct.pack("<B", int(engage)))
 
     def make_bringup_run(self, bringup_case: int) -> bytes:
-        return self.writer.write(FrameType.BRINGUP_RUN, struct.pack("<B", bringup_case))
+        return self._write(FrameType.BRINGUP_RUN, struct.pack("<B", bringup_case))
 
     def make_reboot_request(self, action: int) -> bytes:
-        return self.writer.write(FrameType.REBOOT_REQUEST, struct.pack("<B", action))
+        return self._write(FrameType.REBOOT_REQUEST, struct.pack("<B", action))
 
     def make_sim_actuator_power(self, powered: bool) -> bytes:
-        return self.writer.write(FrameType.SIM_ACTUATOR_POWER, struct.pack("<B", int(powered)))
+        return self._write(FrameType.SIM_ACTUATOR_POWER, struct.pack("<B", int(powered)))
 
     def make_sim_user_key(self, pressed: bool, hold_s: float | None = None) -> bytes:
         """hold_s: a press that SITL releases itself after this long, on its own clock."""
         if hold_s is None:
-            return self.writer.write(FrameType.SIM_USER_KEY, struct.pack("<B", int(pressed)))
+            return self._write(FrameType.SIM_USER_KEY, struct.pack("<B", int(pressed)))
         hold_ms = max(1, min(0xFFFF, round(hold_s * 1000)))
-        return self.writer.write(FrameType.SIM_USER_KEY, struct.pack("<BH", int(pressed), hold_ms))
+        return self._write(FrameType.SIM_USER_KEY, struct.pack("<BH", int(pressed), hold_ms))
 
     def make_sim_gamepad(self, connected: bool, sticks=(0.0, 0.0, 0.0, 0.0), triggers=(0.0, 0.0),
                          buttons: int = 0, silent: bool = False) -> bytes:
@@ -316,7 +332,7 @@ class HostSession:
         pulls = [round(max(0.0, min(1.0, t)) * 255) for t in triggers]
         state = 2 if connected and silent else int(connected)
         body = struct.pack("<B4h2BH", state, *axes, *pulls, buttons & 0xFFFF)
-        return self.writer.write(FrameType.SIM_GAMEPAD, body)
+        return self._write(FrameType.SIM_GAMEPAD, body)
 
     def make_topic_data(self, name: str, message: bytes, instance: int = 0) -> bytes:
         """Encodes an inbound TopicData frame for a topic the MCU announced at the handshake.
@@ -324,7 +340,7 @@ class HostSession:
         Raises KeyError when the MCU did not announce the topic.
         """
         topic = self.peer_topics_by_name[name]
-        return self.writer.write(FrameType.TOPIC_DATA, struct.pack("<HB", topic.id, instance) + message)
+        return self._write(FrameType.TOPIC_DATA, struct.pack("<HB", topic.id, instance) + message)
 
     def handle_frame(self, frame: Frame) -> None:
         """Consumes one frame received from the MCU."""
@@ -337,6 +353,7 @@ class HostSession:
                 self.version = 0
                 return
             self.version = chosen
+            self.writer.version = chosen
             self.expected_topic_count = topic_count
             self.param_set_hash, self.param_count = struct.unpack("<QH", frame.body[3:13])
             self.peer_topics.clear()
@@ -430,13 +447,17 @@ class McuSession:
         param_set_hash: int = 0,
         params: list[McuParam] | None = None,
         control: McuControl | None = None,
+        protocol_version: int = PROTOCOL_VERSION,
     ):
         self.control = control
+        # The version this MCU speaks; firmware offers only its own (ADR-0002).
+        self.protocol_version = protocol_version
         self.topics = topics or []
         self.param_set_hash = param_set_hash
         self.params = sorted(params or [], key=lambda p: p.name)
         self.peer_timeout_us = peer_timeout_us
         self.writer = FrameWriter()
+        self.writer.version = protocol_version
         self.version = 0
         self.handshake_done = False
         self.last_heard_us = 0
@@ -456,6 +477,8 @@ class McuSession:
             return []
 
         self.last_heard_us = now_us
+        if HOST_FRAME_VERSIONS.get(frame.type, PROTOCOL_VERSION) > self.protocol_version:
+            return []  # A frame type newer than this MCU's version is unknown to it.
         if frame.type == FrameType.TIME_SYNC_REQUEST:
             return self._on_time_sync(frame.body, now_us)
         if frame.type == FrameType.PARAM_LIST_REQUEST and len(frame.body) >= 2:
@@ -539,7 +562,7 @@ class McuSession:
             return []
         count = body[0]
         offered_versions = body[1 : 1 + count]
-        chosen = PROTOCOL_VERSION if PROTOCOL_VERSION in offered_versions else 0
+        chosen = self.protocol_version if self.protocol_version in offered_versions else 0
 
         self.version = chosen
         self.handshake_done = chosen != 0

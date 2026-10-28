@@ -16,6 +16,10 @@ from .crc16 import crc16
 # emergency stop requests (ADR-0005), version 4 reboot requests (ADR-0023),
 # version 5 logging (spec 0011, ADR-0019); the MCU offers only its current version.
 PROTOCOL_VERSION = 5
+# A version only adds to the one before, so the host offers every version from
+# the oldest it speaks (ADR-0002). Version 1's hello_reply lacks the parameter
+# fields that version 2 appended.
+OLDEST_PROTOCOL_VERSION = 2
 
 HEADER_SIZE = 4
 CRC_SIZE = 2
@@ -68,6 +72,39 @@ class FrameType(enum.IntEnum):
     # SITL only: presses or releases the simulated user key.
     SIM_USER_KEY = 0x71
     SIM_GAMEPAD = 0x72
+
+
+# The version each frame the host sends first appeared in; the host refuses to
+# send one the negotiated version does not have (ADR-0002).
+HOST_FRAME_VERSIONS = {
+    FrameType.TOPIC_DATA: 1,
+    FrameType.HELLO: 1,
+    FrameType.TIME_SYNC_REQUEST: 1,
+    FrameType.PARAM_LIST_REQUEST: 2,
+    FrameType.PARAM_GET: 2,
+    FrameType.PARAM_SET: 2,
+    FrameType.MODE_REQUEST: 3,
+    FrameType.ARMING_REQUEST: 3,
+    FrameType.ESTOP_REQUEST: 3,
+    FrameType.BRINGUP_RUN: 3,
+    FrameType.SIM_ACTUATOR_POWER: 3,
+    FrameType.SIM_USER_KEY: 3,
+    FrameType.REBOOT_REQUEST: 4,
+    FrameType.SIM_GAMEPAD: 4,
+    FrameType.LOG_START: 5,
+    FrameType.LOG_STOP: 5,
+}
+
+
+class ProtocolVersionError(ValueError):
+    """A frame the negotiated protocol version does not have."""
+
+    def __init__(self, frame_type: FrameType, needed: int, negotiated: int):
+        super().__init__(f"{frame_type.name.lower()} needs protocol version {needed}, "
+                         f"but the MCU speaks version {negotiated}; update its firmware")
+        self.frame_type = frame_type
+        self.needed = needed
+        self.negotiated = negotiated
 
 
 @dataclass(frozen=True)
@@ -126,6 +163,8 @@ class FrameWriter:
 
     def __init__(self, start_sequence: int = 0):
         self._sequence = start_sequence
+        # Written in each frame's header: the negotiated version once there is one.
+        self.version = PROTOCOL_VERSION
 
     @property
     def next_sequence(self) -> int:
@@ -134,7 +173,7 @@ class FrameWriter:
     def write(self, frame_type: FrameType, body: bytes) -> bytes:
         if len(body) > MAX_BODY_SIZE:
             raise ValueError(f"Body size {len(body)} exceeds maximum {MAX_BODY_SIZE}")
-        header = struct.pack("<BBH", PROTOCOL_VERSION, int(frame_type), self._sequence)
+        header = struct.pack("<BBH", self.version, int(frame_type), self._sequence)
         plain = header + body
         plain += struct.pack("<H", crc16(plain))
         wire = cobs_encode(plain) + b"\x00"
