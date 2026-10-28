@@ -49,7 +49,7 @@ The function's options:
 
 Chain commands with `vk bash -c "cmake --preset sitl && cmake --build --preset sitl"`.
 
-Rebuild the image after `.devcontainer/Dockerfile`, `pyproject.toml`, `uv.lock` or `.python-version` change; an outdated image lacks newer tools. A build directory configured anywhere else, on the host or at another mount path such as CI's `/work`, fails to configure again: delete it, for example `rm -rf build/sitl`, and configure again in the container.
+Rebuild the image after `.devcontainer/Dockerfile`, `pyproject.toml`, `uv.lock` or `.python-version` change; an outdated image lacks newer tools. To update the OS packages in the image, the host compiler among them, move `UBUNTU_SNAPSHOT` in the Dockerfile: they come from the Ubuntu snapshot service at that timestamp, so two builds of the same Dockerfile install the same versions. A build directory configured anywhere else, on the host or at another mount path such as CI's `/work`, fails to configure again: delete it, for example `rm -rf build/sitl`, and configure again in the container.
 
 ### Container or host
 

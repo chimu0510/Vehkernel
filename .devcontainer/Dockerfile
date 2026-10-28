@@ -15,13 +15,32 @@ ARG ARM_TOOLCHAIN_SHA256=62a63b981fe391a9cbad7ef51b17e49aeaa3e7b0d029b36ca1e9c3b
 ARG GTEST_VERSION=1.17.0
 ARG GTEST_SHA256=65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c
 
-# Host compiler for the sitl and test presets comes from this Ubuntu release (GCC 13).
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        ca-certificates curl git g++ python3 xz-utils \
+# OS packages come from the Ubuntu snapshot service at one timestamp, so every
+# build installs the same versions; move the timestamp to update them. The
+# snapshot is served over HTTPS only, so ca-certificates comes first from the
+# release pocket, which never changes, and is then updated from the snapshot.
+ARG UBUNTU_SNAPSHOT=20261027T000000Z
+RUN mv /etc/apt/sources.list.d/ubuntu.sources /tmp/ \
+    && echo "deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://archive.ubuntu.com/ubuntu noble main" \
+        > /etc/apt/sources.list.d/release.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm /etc/apt/sources.list.d/release.list \
+    && mv /tmp/ubuntu.sources /etc/apt/sources.list.d/ \
+    && echo "APT::Snapshot \"${UBUNTU_SNAPSHOT}\";" > /etc/apt/apt.conf.d/50vk-snapshot \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:0.12.17 /uv /uvx /usr/local/bin/
+# Host compiler for the sitl and test presets: GCC 13, named, not the g++
+# metapackage, which also follows the release's default.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates curl git g++-13 python3 xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+ENV CC=gcc-13 \
+    CXX=g++-13
+
+COPY --from=ghcr.io/astral-sh/uv:0.12.17@sha256:10787c682e4184e4f290de1171fd4703dc63de99221f10fe1c99002ce7fa9acc \
+    /uv /uvx /usr/local/bin/
 
 # Python tools (CMake, Ninja, clang-tidy, ...) from the repo's lock file.
 ENV UV_PROJECT_ENVIRONMENT=/opt/vk-venv \
@@ -53,7 +72,8 @@ ENV CMAKE_PREFIX_PATH=/opt/googletest
 
 # Clang with libFuzzer and the sanitizer runtimes, for the fuzz preset only
 # (ADR-0018); every other host build stays on GCC. llvm-18 brings
-# llvm-symbolizer, so sanitizer reports name source lines.
+# llvm-symbolizer, so sanitizer reports name source lines. The snapshot pins
+# their version; the explicit one also fails the build if a timestamp moves it.
 ARG CLANG_VERSION=1:18.1.3-1ubuntu1
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
