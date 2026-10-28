@@ -28,4 +28,4 @@ Progress lives in the issues and specs, not in agent memory. When starting a ses
 
 ### Delegation
 
-With the Antigravity CLI (agy) and its `agy-delegate` wrapper, the main agent decides, publishes specs and issues and accepts the work, and delegates implementation to agy, one worktree and one agy conversation per ticket. See `docs/agents/delegation.md`.
+With the Antigravity CLI (agy) and its `agy-delegate` wrapper, the main agent decides, publishes specs and issues and accepts the work, and delegates writing the code to agy, sandboxed in one worktree with one agy conversation per ticket, and runs every check itself. See `docs/agents/delegation.md` and `docs/guide/delegating-to-agy.md`.

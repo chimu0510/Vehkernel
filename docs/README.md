@@ -21,6 +21,7 @@
 | [Local display](guide/local-display.md) | Pages, user key, local menu |
 | [Logging](guide/logging.md) | Recording, profiles, dropouts, opening logs, replay |
 | [Testing](guide/testing.md) | Test layers, `ctest`, estimator replay, fuzzing, bring-up image, hardware checks |
+| [Delegating to agy](guide/delegating-to-agy.md) | Sandboxing the Antigravity CLI for ticket work: install, login, running, checking the sandbox |
 
 ## Boards
 
