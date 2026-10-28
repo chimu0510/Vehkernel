@@ -84,6 +84,17 @@ bwrap: setting up uid map: Permission denied
 
 A program with an AppArmor profile that allows user namespaces is not restricted, and the programs it starts inherit that. The Claude desktop app has one (`/etc/apparmor.d/claude-desktop`), so its agent shells and its Terminal panel can run `bwrap`. Run the sandbox from there. This guide does not change the system setting.
 
+## The worktree directory
+
+Each ticket's worktree, and the directory beside it with the ticket's prompts and agy's reports (`vk-<ticket>.agy/`), go in one directory of their own, outside the main checkout and away from other projects. Set it in the shell that creates worktrees and runs agy, for example in `~/.bashrc`:
+
+```bash
+export VK_WORKTREES="$HOME/WorkSpace/SubAgents"
+mkdir -p "$VK_WORKTREES"
+```
+
+A ticket's worktree is then `$VK_WORKTREES/vk-<ticket>`, and its files `$VK_WORKTREES/vk-<ticket>.agy/`. The sandbox needs nothing else from this directory: it binds the worktree it is started in and the repository's `.git`, wherever they are.
+
 ## The sandbox
 
 Define this shell function, in the shell that runs agy (for example in `~/.bashrc`). Run it from inside the ticket's worktree: it finds the worktree and the repository's `.git` from there.

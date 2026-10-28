@@ -51,7 +51,7 @@ Delegate a ticket when its implementation is larger than the cost of writing the
 ## One ticket, step by step
 
 1. The main agent picks the ticket from the frontier and claims it, as in `handoff.md`, **Starting a session**.
-2. The main agent creates the ticket's worktree on a new branch from `main`: `git worktree add ../vk-<ticket> -b ticket/<ticket> main`, and runs `git submodule update --init` in it. The worktree is the `cwd` of every agy call on the ticket; its build trees stay inside it (`build/<preset>`).
+2. The main agent creates the ticket's worktree on a new branch from `main`, in the worktree directory `$VK_WORKTREES` that [Delegating to agy](../guide/delegating-to-agy.md#the-worktree-directory) sets, never beside or inside the main checkout: `git worktree add "$VK_WORKTREES/vk-<ticket>" -b ticket/<ticket> main`, and runs `git submodule update --init` in it. The worktree is the `cwd` of every agy call on the ticket; its build trees stay inside it (`build/<preset>`).
 3. The main agent writes the prompt to `../vk-<ticket>.agy/prompt-1.md` and runs agy from the worktree, as **Running agy** says. The prompt holds:
    - the ticket number and its acceptance criteria, copied from the issue, not paraphrased;
    - the files to read first: the spec, the ADRs the ticket touches, `GLOSSARY.md` and `CONTRIBUTING.md`;
