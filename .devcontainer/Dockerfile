@@ -3,6 +3,13 @@
 # output is pinned (ADR-0016); bump versions here and rebuild the container.
 FROM ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
 
+# The image supports linux/amd64 hosts only (ADR-0016): the Arm toolchain below
+# is the x86_64 build. Stop here, before any download, on anything else.
+RUN arch="$(dpkg --print-architecture)"; [ "$arch" = amd64 ] || { \
+        echo "error: the Vehkernel development image supports linux/amd64 hosts only, not ${arch}." >&2; \
+        echo "error: on an arm64 host, build it emulated (slow): docker build --platform linux/amd64 ..." >&2; \
+        exit 1; }
+
 ARG ARM_TOOLCHAIN_VERSION=14.2.rel1
 ARG ARM_TOOLCHAIN_SHA256=62a63b981fe391a9cbad7ef51b17e49aeaa3e7b0d029b36ca1e9c3b2a9b78823
 ARG GTEST_VERSION=1.17.0
