@@ -1,0 +1,132 @@
+# Spec 0012: the EKF attitude estimator and the magnetometer
+
+**Status**: in progress. Issue: [#149](https://github.com/chimu0510/Vehkernel/issues/149); tickets #150 to #155, with the hardware check in #155.
+
+Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
+
+## Problem Statement
+
+The firmware estimates attitude with a Mahony filter (spec 0004) and dead-reckons local odometry along its heading (spec 0009). Spec 0011 made it possible to record what the estimators see and to replay them on the development host. What the estimate lacks is now the limit:
+
+- **Yaw drifts.** Without a magnetometer, yaw is relative to the start and drifts with the residual gyro bias; the AK09916 inside the ICM20948 is not read (specs 0002, 0004). A ground vehicle driving a square does not come back facing the way it started, and the local odometry's track bends with it.
+- **The variances are not computed.** The Mahony filter publishes a fixed roll and pitch variance and a yaw variance that grows linearly with time since alignment. The local odometry passes that yaw variance into its position covariance, and the Bridge will publish both on `/odom` (ADR-0003), so consumers above get numbers that do not follow what the filter has seen.
+- **Nothing judges a measurement.** The accelerometer correction is skipped only when the specific force differs from gravity by a fixed amount; there is no test of a measurement against the estimate's own uncertainty, which a magnetometer near motors and steel needs.
+- **The heading and square checks of spec 0010 are still deferred** to "the EKF".
+
+ADR-0014 already places this work: attitude estimation, fused with the magnetometer when enabled, as a replaceable estimator module made of a filter and measurement models from `lib/estimation/`, selected as the primary estimator by a parameter, with the others running alongside on diagnostic topics. ADR-0001 bounds it: the MCU does local estimation only, and global localization, mapping and navigation belong to ROS2 above it. So this EKF estimates attitude, not position: the MCU has no absolute position measurement, and fusing wheels and IMU into a pose is already what `robot_localization` does above the Bridge, if an application wants it.
+
+## Solution
+
+Deliver the twelfth milestone: **an EKF attitude estimator, the primary by default, and the ICM20948's magnetometer, calibrated from a log**. Afterwards:
+
+- The ICM20948 driver reads the AK09916 through the ICM20948's own I2C master, in the same burst as the accelerometer and gyroscope, and publishes `magnetometer_sample` in the body frame, calibrated, at the magnetometer's 100 Hz.
+- An EKF attitude estimator runs on `wq:ctrl` beside the Mahony filter: a quaternion and a gyro bias, an error-state covariance, the accelerometer as a gravity measurement and the magnetometer as a heading measurement, each tested against its innovation's variance before it is fused. It publishes real variances.
+- `EST_PRIMARY` selects which attitude estimator publishes `vehicle_attitude`, EKF by default; the other publishes `estimator_attitude`, so both can be compared live and in a log. Local odometry is unchanged and follows whichever is primary.
+- `EKF_MAG_TYPE` turns heading fusion on or off. Its default, `AUTO`, depends on the vehicle type (ADR-0013): off for `GROUND`, the only vehicle type now, because a ground vehicle indoors sits among motors and steel. With the magnetometer on, yaw is relative to north (magnetic north plus `EKF_MAG_DECL`) instead of to the start.
+- The magnetometer is calibrated by turning the vehicle in place while logging, then running a host tool that fits the hard-iron offsets and the scale factors from the log and writes them as parameters. The MCU has no calibration procedure of its own.
+- SITL simulates the magnetometer, with an Earth field and a configurable hard- and soft-iron error, and CI checks the EKF against the truth, with and without the magnetometer, and replays it exactly.
+- On the C50C, the heading and square checks deferred from spec 0010 are done.
+
+## User Stories
+
+1. As a vehicle operator, I want the vehicle's heading to stay put while it drives, so that a square comes back facing the way it started and the odometry's track closes.
+2. As a vehicle operator, I want to turn the magnetometer on or off with a parameter, with a safe default for my vehicle type, so that a ground vehicle indoors is not misled by its motors and a boat outdoors gets a heading that does not drift (ADR-0013, ADR-0014).
+3. As a vehicle integrator, I want to calibrate the magnetometer by turning the vehicle in place and running one host tool on the log, so that I need no special firmware mode and the fit can be checked and repeated on the host.
+4. As a ROS2 developer, I want the attitude's and the odometry's variances to come from the filter, so that `/odom` and `/imu` carry covariances `robot_localization` and Nav2 can use (ADR-0003).
+5. As a vehicle operator, I want a magnetometer reading that disagrees with the estimate, or a field whose strength is off, rejected and counted, so that passing a steel door does not turn the vehicle's heading.
+6. As an estimation developer, I want the Mahony filter to keep running beside the EKF on a diagnostic topic, so that I can compare them on the board, in a log and in replay (ADR-0014).
+7. As an estimation developer, I want to choose the primary attitude estimator with a parameter, so that I can fall back to Mahony on a vehicle where the EKF is not yet tuned.
+8. As an estimation developer, I want the EKF's filter and measurement models in `lib/estimation/`, independent of the bus and the HAL, so that they are unit-tested on the host and reused by later estimators (ADR-0014).
+9. As an estimation developer, I want the magnetometer logged at every sample and the EKF replayed exactly, so that an EKF change is judged on recorded drives as spec 0011 judges the Mahony filter.
+10. As a firmware developer, I want SITL to simulate the magnetometer with calibration errors, so that the driver, the EKF and the calibration tool are tested in CI.
+11. As a C50C user, I want a documented hardware check of the magnetometer, its calibration and the heading over a square drive, so that the estimate is confirmed on the real vehicle (ADR-0018 L4).
+
+## Implementation Decisions
+
+- **Scope** (ADR-0001, decided with the maintainer): the EKF estimates attitude and gyro bias only. Local odometry stays the dead reckoning of spec 0009, with the heading and the heading variance of `vehicle_attitude`. Position or velocity states, wheel slip estimation from the IMU, 3D magnetic field fusion and the external estimator are not part of this spec.
+- **Reading the magnetometer** (driver layer, ADR-0009, ADR-0015):
+  - At configuration, the ICM20948 driver enables its I2C master, checks the AK09916's WHO_AM_I (`0x09` at `0x01`) through slave 4, sets it to continuous mode 4 (100 Hz), and sets slave 0 to read the nine bytes from ST1 (`0x10`) to ST2 (`0x18`) on every master cycle into `EXT_SLV_SENS_DATA_00`. ST2 must be read for the AK09916 to release the next sample.
+  - `EXT_SLV_SENS_DATA_00` (`0x3B`) follows `TEMP_OUT_L`, so each run reads one burst of 23 bytes from `ACCEL_XOUT_H` instead of 14. On the C50C's software I2C this adds about 0.25 ms to the 0.50 ms read (ADR-0015); the hardware check measures it.
+  - When ST1's data-ready bit is set and ST2's overflow bit is clear, the driver converts the field to microtesla (0.15 µT per LSB), turns the AK09916's axes into the ICM20948's (the AK09916's y and z point the other way, per the ICM20948 datasheet; the implementer confirms the signs in SITL and the hardware check confirms them on the board), applies the mounting rotation and the board orientation as it does for the IMU, then the calibration, and publishes `magnetometer_sample`. An overflowed sample is counted and dropped.
+  - A missing or failing AK09916 never stops the IMU: the driver counts magnetometer failures, publishes no `magnetometer_sample`, and retries the AK09916 alone at the probe interval.
+  - Kconfig `DRIVER_ICM20948_MAG`, default y, builds this in.
+- **`magnetometer_sample`** (ADR-0006): `timestamp` (the time of the burst that read it), `device_instance`, `field[3]` in µT in the body frame, calibrated, and `overflows` and `failures` counters. `@queue 4`, `@instances 2`, nominal 100 Hz. The uncalibrated field is not published: the calibration tool undoes the logged calibration with the logged parameters (below).
+- **Calibration parameters** (ADR-0012, ADR-0014), applied by the driver in the body frame, `field = (raw - offset) * scale` per axis:
+  - `CAL_MAG_XOFF`, `CAL_MAG_YOFF`, `CAL_MAG_ZOFF` (µT, default 0) and `CAL_MAG_XSCALE`, `CAL_MAG_YSCALE`, `CAL_MAG_ZSCALE` (default 1, from 0.5 to 2). They apply from the next sample.
+  - They are in the body frame, so changing `SENS_BOARD_ROT` needs a new calibration; the guide says so, as ArduPilot's does for a changed compass orientation.
+- **EKF math** (`lib/estimation/`, ADR-0014), float, no allocation, header-only where small:
+  - `filters/attitude_eskf.hpp`: an error-state (multiplicative) EKF. The nominal state is the quaternion (body to the local level frame, NED) and the gyro bias; the error state is the attitude error angle and the gyro bias error, six states, with a 6x6 covariance kept symmetric and positive.
+  - Prediction integrates the bias-corrected gyro with the existing quaternion kinematics and propagates the covariance with gyro noise `EKF_GYR_NOISE` and gyro bias random walk `EKF_GYR_B_NOISE`, both in continuous time and scaled by the sample's time step.
+  - An update takes a measurement model's innovation, its Jacobian on the error state and its variance, applies a chi-squared gate in standard deviations, and on acceptance corrects the error state, resets it into the nominal state and resets the covariance (Joseph form).
+  - `models/accelerometer_model.hpp` gains the gravity measurement: the normalized specific force against the estimate's down axis, with noise `EKF_ACC_NOISE`. As in the Mahony filter, a specific force differing from gravity by more than `EKF_ACC_REJ` is not fused at all; the gate `EKF_ACC_GATE` then tests what is left.
+  - `models/magnetometer_model.hpp`: the heading measurement. The field is levelled with the estimate's roll and pitch, its heading is taken from north and east and compared with the estimate's yaw (minus `EKF_MAG_DECL`), wrapped to ±π, with noise `EKF_MAG_NOISE` and gate `EKF_MAG_GATE`. Its Jacobian touches the yaw error only, so a disturbed field can never tilt roll and pitch, as PX4 EKF2's heading fusion for ground vehicles does.
+  - Small fixed-size matrix types join `math/`, with only the operations the filter needs.
+- **The EKF estimator module** (`modules/estimation/`, a work item on `wq:ctrl`, Kconfig `ESTIMATOR_EKF`, default y, `estimator_id` 2):
+  - It is woken by `imu_sample` instance 0, as the Mahony estimator is, and drains `magnetometer_sample` instance 0 on each run, fusing each magnetometer sample whose timestamp is not after the IMU sample just predicted to.
+  - **Alignment**: the same 1 s still-vehicle alignment as the Mahony estimator, moved into a shared helper so that both start alike. It sets roll and pitch from the mean specific force and the gyro bias from the mean rate. With heading fusion on, the yaw starts at the mean magnetometer heading, and the mean field strength becomes the reference for `EKF_MAG_REJ`; with it off, the yaw starts at zero.
+  - **Field strength rejection**: a magnetometer sample whose field strength differs from the reference by more than the fraction `EKF_MAG_REJ` is not fused, before the gate.
+  - **Restart**: on `estimator_restart` it returns to aligning, dropping samples taken before the restart, as the Mahony estimator does (spec 0011).
+  - It publishes the quaternion, the bias-corrected rate, the gyro bias, the roll, pitch and yaw variances from the covariance, and counters of accelerometer and magnetometer samples rejected and fused.
+  - With heading fusion off, the yaw variance grows only through the gyro noise and bias states; with it on, it stays bounded by the magnetometer.
+- **`vehicle_attitude` and `estimator_attitude`**: `vehicle_attitude` gains `mag_rejected` and `mag_fused` counters (the Mahony filter publishes 0). A new topic `estimator_attitude`, same fields, `@instances 2`, carries the attitude estimator that is not primary, on the instance of its slot (0 Mahony, 1 EKF). The schema comment of `vehicle_attitude` says the yaw is relative to north when the magnetometer is fused, and to the start otherwise.
+- **`EST_PRIMARY`** (decided with the maintainer): `MAHONY` (1) or `EKF` (2), default `EKF`, `reboot_required`. Each attitude estimator chooses at construction whether it publishes `vehicle_attitude` or `estimator_attitude`. If the selected one is not built in, the other one is primary, and the boot report says so. Both run; automatic fallback on an unhealthy primary is not part of this spec. Local odometry reads `vehicle_attitude`, so it follows the primary without change.
+- **`EKF_MAG_TYPE`** (ADR-0013, decided with the maintainer): `AUTO` (0, default), `OFF` (1) or `HEADING` (2), `reboot_required`. `AUTO` resolves at boot from `VEHICLE_TYPE`: off for `GROUND`. When `SURFACE` and `UNDERWATER` are added, they resolve `AUTO` to `HEADING`; a frame preset can set the parameter directly. With heading fusion on and no magnetometer sample in the alignment second, the EKF aligns with the yaw at zero, does not fuse the magnetometer, and raises a warning on `vehicle_status`.
+- **EKF parameters** (`EKF` prefix, `kconfig = "ESTIMATOR_EKF"`): `EKF_GYR_NOISE` (rad/s, default 0.015), `EKF_GYR_B_NOISE` (rad/s², default 0.001), `EKF_ACC_NOISE` (m/s², default 0.5), `EKF_ACC_REJ` (g, default 0.1), `EKF_ACC_GATE` (SD, default 5), `EKF_MAG_TYPE`, `EKF_MAG_NOISE` (rad, default 0.1), `EKF_MAG_GATE` (SD, default 3), `EKF_MAG_DECL` (deg, default 0) and `EKF_MAG_REJ` (fraction, default 0.2). Changes apply from the next sample, except the `reboot_required` ones. The defaults are a starting point, tuned in SITL and confirmed in the hardware check; a changed default is written into this spec and its issue. `EKF_MAG_TYPE` and `EKF_MAG_DECL` are in the local menu (ADR-0022); the noises and gates are not.
+- **Local odometry**: unchanged; it already takes the heading and the heading variance from `vehicle_attitude`. Its schema comment says the heading is relative to north when the magnetometer is fused.
+- **Logging and replay** (spec 0011):
+  - `estimator_replay` gains `magnetometer_sample` (instance 0, every sample) and `estimator_attitude` (instance 0 and 1, 50 Hz). The generator's bandwidth estimate must stay under the 80 % budget on SERIAL1 at 921600 baud; about 40 KB/s is expected.
+  - `vehkernel-replay` builds the EKF estimator as well, with `EST_PRIMARY` from the log, and feeds it `magnetometer_sample` in timestamp order with the other inputs, in the work item order of `wq:ctrl`.
+  - `compare.py` compares `estimator_attitude` as it does `vehicle_attitude`, and reports the yaw error against the truth separately.
+  - The board log of spec 0011, which has no magnetometer, stays in the repository and in `replay_board_log`: its replay with `EST_PRIMARY` set to `MAHONY` must still match. Its EKF is checked for exactness on SITL logs, and on the new board log of the hardware check.
+- **Calibration tool** (`tools/log/mag_cal.py`, decided with the maintainer): it reads `magnetometer_sample` and the logged `CAL_MAG_*` parameters from a log, undoes the logged calibration, and fits an axis-aligned ellipse to the horizontal field by least squares: the x and y offsets and scales. A ground vehicle turns only about its z axis, so the z offset and scale are not observable; they are kept, and the tool says so. With `--3d`, for a vehicle that can be turned about every axis, it fits an axis-aligned ellipsoid instead.
+  - It refuses a log whose turn covers less than 360° of heading, judged from the fitted circle, or whose residual is above a threshold, and prints the coverage and the residual.
+  - It prints the new parameters as `link_monitor.py param set` commands, and with `--apply --serial <port>` sets them over the Link.
+  - The Estimation guide gives the procedure: start a log, leave the vehicle still for a second, turn it in place twice slowly, stop the log, run the tool.
+- **SITL** (ADR-0018):
+  - The simulated ICM20948 gains the I2C master and the AK09916 behind it: WHO_AM_I, continuous mode 4, ST1, ST2 and overflow, at 100 Hz.
+  - The field is a constant Earth field in NED (by default 30 µT north, 0 east, 30 µT down, a mid-latitude field), turned into the body frame by the true attitude, plus an optional hard-iron offset and soft-iron scale set by SITL options, plus noise. SITL's ground vehicle and motion profiles drive it as they drive the IMU.
+  - `--mag-off` simulates a missing AK09916.
+- **Documentation**: an Estimation guide, `docs/guide/estimation.md`: the two attitude estimators, `EST_PRIMARY`, heading fusion and when to turn it on, calibration, what the counters mean, and the declination. The Link monitor, Logging and SITL guides are updated for the new topics. ADR-0014 is edited for what is built (the EKF, its heading fusion, `estimator_attitude`), ADR-0013 for `AUTO`, and `GLOSSARY.md` gains Heading Fusion and Magnetometer Calibration.
+
+## Testing Decisions
+
+- **Seam A: the EKF library (L1).**
+  - With no measurements, the covariance grows as the noises predict, and the bias variance as the random walk does.
+  - A constant gravity measurement converges roll and pitch from a 30° error, and estimates a constant gyro bias on x and y; a heading measurement does the same for yaw and the z bias.
+  - The heading measurement's Jacobian changes roll and pitch by nothing; a heading innovation across ±π wraps.
+  - A measurement outside the gate is rejected and leaves the state and covariance untouched.
+  - The covariance stays symmetric and positive over a long random run.
+  - The matrix types and the ellipse fit get their own unit tests.
+- **Seam B: the driver (L1, L3).** On the simulated ICM20948: the AK09916 setup sequence; a burst with data ready publishes a sample, without it publishes none, with overflow counts and drops; the axis signs and the calibration; a missing AK09916 leaves the IMU running and is retried.
+- **Seam C: the estimator module (L1).** Alignment with and without heading fusion; `EST_PRIMARY` selects which topic each estimator publishes on; `AUTO` resolves to off for `GROUND`; the field strength rejection; the warning with heading fusion on and no magnetometer; restart.
+- **Seam D: SITL (L3) and replay (L2).**
+  - `check_attitude.py` runs the EKF as primary on its motion profiles: roll and pitch within the bounds the Mahony filter meets; with heading fusion, the yaw within 3° of the truth after the profile; without it, the yaw drift no worse than the Mahony filter's; at least 95 % of samples within three standard deviations of the truth on each axis.
+  - With a hard-iron offset and soft-iron scale set in SITL, a turn-in-place log calibrated by `mag_cal.py` recovers them within 2 µT and 2 %, and the heading error afterwards is within 3°.
+  - `sitl_replay` records the square drive with the EKF primary and heading fusion on, replays it exactly (both attitude estimators and the odometry), and checks that the odometry closes the square within the bounds `check_odometry.py` uses.
+  - `replay_board_log` keeps passing with `EST_PRIMARY` `MAHONY`.
+- **Seam E: hardware (L4, manual).** On the C50C V1.1, with the vehicle of #126 and the pad:
+  - The burst read time with the magnetometer, and the `wq:ctrl` load, with no overruns.
+  - `magnetometer_sample` at about 100 Hz; the field's direction agrees with a phone compass at four headings, which confirms the axis signs.
+  - Calibrate by turning in place with `mag_cal.py`; record the fit, the coverage and the residual.
+  - With heading fusion on, the heading against a phone compass at four headings, and how close to the motors the field strength rejection starts to act while driving.
+  - Drive a taped square of known size with heading fusion off and on: the heading error and the odometry's position error on returning to the start (deferred from spec 0010).
+  - Record the square with `estimator_replay` and replay it; the largest difference sets the EKF's tolerance in `replay_board_log`, and a cut of it, under 1 MB, joins the repository as the second board log.
+
+  Results are recorded on the ticket.
+- **Prior art**: the Mahony estimator's tests and `check_attitude.py`; PX4 EKF2's heading fusion and `EKF2_MAG_TYPE`; ArduPilot's `COMPASS_OFS_*` and `COMPASS_SCALE`; the ICM20948 and AK09916 datasheets for the I2C master and the register map.
+
+## Out of Scope
+
+- Position, velocity or accelerometer bias states on the MCU, and any global estimate: ADR-0001 leaves localization to ROS2.
+- 3D magnetic field fusion, learning the Earth field or the offsets in flight, and motor current compensation (ArduPilot `COMPASS_MOT`).
+- Automatic fallback from an unhealthy primary estimator to the other one.
+- A calibration procedure on the MCU, from the local menu or over the Link.
+- The accelerometer's and the gyroscope's own calibration, and temperature compensation.
+- Wheel slip detection from the IMU, and a second local odometry estimator.
+- The external estimator (ADR-0014).
+- `SURFACE` and `UNDERWATER` as vehicle types; only the rule for their `AUTO` default is decided here.
+
+## Further Notes
+
+- The Bridge's covariances for `/imu` and `/odom` (ADR-0003) come from this spec's variances once the Bridge exists.
+- Declination is a parameter because the MCU has no position to look it up from (ADR-0001); the Bridge or an application can set it from the vehicle's location.
