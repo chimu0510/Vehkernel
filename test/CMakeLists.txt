@@ -95,6 +95,9 @@ if(CONFIG_DRIVER_ICM20948_MAG AND CONFIG_LINK_UDP)
   add_test(NAME sitl_magnetometer
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_magnetometer.py
       $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
+  add_test(NAME sitl_mag_cal
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_mag_cal.py
+      $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
 endif()
 
 # L3 SITL parameter test (spec 0005): list, read, set and refusals through the
@@ -290,7 +293,7 @@ set_tests_properties(link_protocol PROPERTIES ENVIRONMENT
 add_test(NAME ulog
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/log/tests)
 set_tests_properties(ulog PROPERTIES ENVIRONMENT
-  "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log;PYTHONDONTWRITEBYTECODE=1;VEHKERNEL_REPLAY=$<TARGET_FILE:vehkernel-replay>")
+  "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log:${CMAKE_SOURCE_DIR}/tools/link;PYTHONDONTWRITEBYTECODE=1;VEHKERNEL_REPLAY=$<TARGET_FILE:vehkernel-replay>")
 
 # L2 board log test (spec 0011, ADR-0018): replays a log recorded on the C50C V1.1 and checks the
 # estimators' output within the tolerance measured in the hardware check.
