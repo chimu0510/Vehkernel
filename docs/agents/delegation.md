@@ -66,7 +66,7 @@ Delegate a ticket when its implementation is larger than the cost of writing the
    - reads the whole diff against `main` (`git diff main`, `git status` for new files);
    - checks that agy changed nothing outside the ticket's purpose: not `.devcontainer/`, `.github/`, `uv.lock`, `pyproject.toml` or the submodules, unless the ticket asks for it, and nothing outside the worktree;
    - checks that no existing test was removed, skipped or loosened, and that no tolerance, threshold or number in the acceptance criteria was changed;
-   - runs the checks in a fresh container (`vk` starts one per command), from a clean build tree (`rm -rf build/<preset>` first), from the worktree, never on the host (ADR-0016): `vk cmake --preset test`, `vk cmake --build --preset test`, `vk ctest --preset test`, a build of every firmware preset the change touches, and the fuzz presets when it changes the Link's decoders ([Building](../guide/building.md#development-environment) defines `vk`);
+   - runs the checks in a fresh container (`vk`, or `vk_wt` below, starts one per command), from a clean build tree (`rm -rf build/<preset>` first), from the worktree, never on the host (ADR-0016): `vk cmake --preset test`, `vk cmake --build --preset test`, `vk ctest --preset test`, a build of every firmware preset the change touches, and the fuzz presets when it changes the Link's decoders ([Building](../guide/building.md#development-environment) defines `vk`);
    - checks the change against the ticket's acceptance criteria and the spec;
    - checks the coding rules in `CONTRIBUTING.md`: the C++20 subset, modules talking only through the bus, no hand-edited generated files, the SPDX line, the ADR reference at the top of each file, the glossary's terms.
 7. On a failed check or a rejection, the reviewer writes the concrete findings as the next round's prompt: the failing command and the relevant part of its output (the first compiler errors, the failing test and its assertion), not the whole log, and no context agy already has. It resumes the ticket's conversation with `--conversation <id>` and returns to step 6. After five rounds without passing, it stops and reports to the main agent.
@@ -86,7 +86,13 @@ The main agent hands each ticket to a background ticket subagent, which runs ste
 
 The main agent then accepts the tickets one at a time, in frontier order, as in step 8. Only the implementation runs in parallel: the first accepted ticket lands on `main`, and the next is rebased onto it and checked again before it lands. If two tickets turn out to touch the same file, the later one waits for the earlier to land.
 
-A firmware image built in a worktree carries no git hash: the worktree's `.git` points outside the directory `vk` mounts, so `finalize_image.py` writes 0. Images for flashing are built on `main`.
+In a worktree, `.git` is a file pointing into the main checkout's `.git`, which `vk` does not mount, so `reuse lint` cannot see which files git ignores and fails on the build trees, and a firmware image gets no git hash (`finalize_image.py` writes 0). Checks in a worktree therefore mount the repository's `.git` read-only as well:
+
+```bash
+vk_wt() { docker run --rm -it -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -v "$(git rev-parse --path-format=absolute --git-common-dir):$(git rev-parse --path-format=absolute --git-common-dir):ro" -w "$PWD" --network host vehkernel-dev "$@"; }
+```
+
+Images for flashing are still built on `main`.
 
 ## What agy must not do
 
