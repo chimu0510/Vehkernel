@@ -20,6 +20,7 @@ agy_sandboxed "$AGY_DELEGATE" --yolo --timeout 60m -d "$PWD" - < ../vk-<ticket>.
 - `--yolo` lets agy edit files and run commands without asking; the sandbox is what keeps it in its worktree. The limits in **What agy must not do** that the sandbox does not enforce hold because the prompt states them.
 - The first round starts a new agy conversation. Its id is the `conversation_id` in the `AGY_USAGE` line of `agy-1.log`.
 - Every later round on the ticket adds `--conversation <id>`, so agy continues with what it already knows about the ticket.
+- The main agent tells the maintainer, in the conversation, the ticket and its agy conversation id each time a delegation starts or resumes, and again in its report when the ticket is accepted or stopped, with the number of rounds. A ticket subagent gives the id to the main agent as soon as the first round returns it, and in its final report.
 - The exit code says how it ended: 0 done, 2 agy failed, 10 quota, 11 not logged in, 12 timed out (the report then holds agy's partial answer). On 12, the next round resumes the same conversation.
 - The default model tier (`flash`) suits most tickets; `--tier pro` is for a ticket that is mostly algorithm, such as a filter's mathematics.
 
@@ -106,4 +107,4 @@ The agy-bridge MCP server's short tools fit within the MCP call limit. The main 
 
 ## Handoff
 
-An agy conversation id never goes into an issue or into memory. When a session of the main agent ends with a delegation unfinished, the `Progress:` comment records what is done and what is left, and the name of the ticket's branch; the worktree's changes are committed to that branch first, as a work-in-progress commit that is never pushed to `main`. The next session continues in that worktree with a new agy conversation, as **One issue, one agy conversation** says. Prompts to agy, the ticket subagents' reports and agy's reports are written in English, with the glossary's terms.
+An agy conversation id never goes into an issue or into memory; it is reported to the maintainer in the conversation only, as **Running agy** says. When a session of the main agent ends with a delegation unfinished, the `Progress:` comment records what is done and what is left, and the name of the ticket's branch; the worktree's changes are committed to that branch first, as a work-in-progress commit that is never pushed to `main`. The next session continues in that worktree with a new agy conversation, as **One issue, one agy conversation** says. Prompts to agy, the ticket subagents' reports and agy's reports are written in English, with the glossary's terms.
