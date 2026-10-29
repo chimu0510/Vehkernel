@@ -55,19 +55,21 @@ tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/c50c-v1_1/gener
 
 ## Attitude
 
-The attitude estimator (ADR-0014) runs on `wq:ctrl` right after the IMU: a Mahony filter that aligns roll and pitch from the accelerometer once the vehicle has been still for 1 s (yaw starts at 0, and the gyro bias is the mean gyro reading), then publishes `vehicle_attitude` for every IMU sample. The Link sends it at 50 Hz, and the monitor shows it as roll, pitch and yaw in degrees, in the live view and as an `attitude` line in the `--check` summary; in SITL the true attitude follows ([Motion profiles](sitl.md#motion-profiles)):
+The attitude estimator (ADR-0014, spec 0012) runs on `wq:ctrl` right after the IMU: an error-state EKF (or Mahony filter fallback, selected by `EST_PRIMARY`) that aligns roll and pitch from the accelerometer once the vehicle has been still for 1 s. With heading fusion enabled (`EKF_MAG_TYPE=HEADING`), yaw aligns with magnetic north; otherwise yaw starts at 0 and is relative to boot heading.
+
+The primary estimator publishes `vehicle_attitude` and the other one `estimator_attitude` (instance 0 Mahony, instance 1 EKF); the Link carries each at 50 Hz. The monitor shows attitude as roll, pitch and yaw in degrees, in the live view and as an `attitude` line in the `--check` summary; in SITL the true attitude follows ([Motion profiles](sitl.md#motion-profiles)):
 
 ```text
 attitude name=vehicle_attitude instance=0 roll_deg=-0.00 pitch_deg=-0.00 yaw_deg=-0.08
 attitude name=vehicle_attitude_groundtruth instance=0 roll_deg=0.00 pitch_deg=0.00 yaw_deg=0.00
 ```
 
-Without a magnetometer, yaw is relative to the start and drifts slowly with the remaining gyro bias.
+The attitude topics also provide diagnostic counters for estimation health: `accel_rejected`, `mag_rejected`, `mag_fused`, `zero_rate_fused`, and the `mag_missing` warning flag. When the ICM20948 driver reads the internal AK09916 magnetometer via its FIFO, it publishes calibrated readings at 100 Hz on `magnetometer_sample`. See the [Estimation guide](estimation.md) for full details on estimator configuration, heading fusion, and calibrating the magnetometer from logs with `tools/log/mag_cal.py`.
 
 On a board: lift its front edge and pitch goes positive, lower its right edge and roll goes positive, turn it clockwise seen from above and yaw goes positive (body frame x forward, y right, z down). Two rotations bring the IMU's axes into the body frame (ADR-0014):
 
 - The **mounting rotation** is how the IMU chip sits on the board, a hardware fact, set as `rotation` in the board definition and measured this way with the board's front edge forward. Correct it there only if the board itself is described wrongly.
-- The **board orientation** is how the board sits in the vehicle, the `SENS_BOARD_ROT` parameter, `NONE` by default and numbered as ArduPilot's and PX4's rotation table: a board mounted turned or upside down in a vehicle needs only this parameter, which takes effect at the next boot.
+- The **board orientation** is how the board sits in the vehicle, the `SENS_BOARD_ROT` parameter, `NONE` by default and numbered as ArduPilot's and PX4's rotation table: a board mounted turned or upside down in a vehicle needs only this parameter, which takes effect at the next boot. Changing `SENS_BOARD_ROT` requires recalibrating the magnetometer (`CAL_MAG_*`), as calibration parameters are defined in the body frame.
 
 ## Parameters
 

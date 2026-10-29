@@ -37,9 +37,12 @@ link transport=udp address=127.0.0.1:15600
 report duration_s=5.000
 topic name=actuator_setpoint instance=0 publications=0 rate_hz=0.00 last_update_us=0
 topic name=imu_sample instance=0 publications=979 rate_hz=200.00 last_update_us=5000196
+topic name=magnetometer_sample instance=0 publications=490 rate_hz=100.01 last_update_us=5000196
 topic name=vehicle_attitude instance=0 publications=778 rate_hz=200.04 last_update_us=5000240
+topic name=estimator_attitude instance=0 publications=245 rate_hz=50.00 last_update_us=5000240
 topic name=work_item_status instance=0 publications=5 rate_hz=1.00 last_update_us=5000532
 work_item name=icm20948 queue=wq:ctrl runs=1000 overruns=0 run_time_last_us=29 run_time_max_us=106 run_time_mean_us=16 jitter_max_us=2113
+work_item name=ekf_attitude queue=wq:ctrl runs=979 overruns=0 run_time_last_us=18 run_time_max_us=45 run_time_mean_us=14 jitter_max_us=65
 work_item name=mahony_attitude queue=wq:ctrl runs=979 overruns=0 run_time_last_us=14 run_time_max_us=31 run_time_mean_us=10 jitter_max_us=59
 work_item name=commander queue=wq:ctrl runs=1000 overruns=0 run_time_last_us=15 run_time_max_us=26 run_time_mean_us=10 jitter_max_us=2156
 work_item name=local_display queue=wq:slow runs=100 overruns=0 run_time_last_us=24 run_time_max_us=53 run_time_mean_us=20 jitter_max_us=1125
@@ -93,6 +96,19 @@ CI checks spec 0009 against the ground vehicle's truth with these scenarios, eac
 | The gamepad's emergency stop | `B` zeroes the outputs within 0.1 s; `Y` held releases and the sticks drive; held 5 s, `EMERGENCY_STOP` |
 
 A source not in control cannot send setpoints in these scenarios, since SITL has a single Link; the Link work item's unit tests check that refusal with two Links.
+
+## Simulated magnetometer and calibration
+
+The simulated ICM20948 models an internal AK09916 magnetometer connected through the ICM20948 I2C master and FIFO (ADR-0018, spec 0012). The simulated device experiences a mid-latitude Earth field (30 µT north, 0 east, 30 µT down) rotated into the vehicle body frame by true attitude, with 0.3 µT uniform sensor noise:
+- `--mag-offset <x>,<y>,<z>` introduces hard-iron magnetic offset in µT in the body frame.
+- `--mag-scale <x>,<y>,<z>` introduces soft-iron axis scale distortion.
+- `--mag-off` simulates a disconnected or non-responding magnetometer.
+
+CI validates the driver, EKF heading fusion, and calibration tool with:
+- `sitl_magnetometer` (`test/sitl/check_magnetometer.py`): checks 100 Hz publication rate within 5 %, levelled heading error within 1° of truth under rotation, I2C transfer lengths, zero work item overruns, and no samples published when `--mag-off` is set.
+- `sitl_mag_cal` (`test/sitl/check_mag_cal.py`): drives a turn-in-place log under `--mag-offset 12,-8,5` and `--mag-scale 1.08,0.94,1.0`, runs `tools/log/mag_cal.py` to recover hard-iron offsets within 2 µT and soft-iron scales within 2 %, applies the parameters over UDP, and verifies that the post-calibration heading error stays within 3° across all headings.
+
+See [Magnetometer calibration](estimation.md#magnetometer-calibration) in the Estimation guide for complete details on fitting and parameter application.
 
 ## Motion profiles
 

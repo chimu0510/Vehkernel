@@ -111,6 +111,16 @@ ulog2csv log.ulg
 2. Select **File > Load Data** and choose your `.ulg` file.
 3. Drag curves from the topic tree into plotting panes (for example, `vehicle_attitude/q[0..3]` and `vehicle_local_odometry/position[0..1]`).
 
+### Magnetometer calibration
+
+A recorded turn-in-place log with the `estimator_replay` profile calibrates the vehicle's magnetometer hard-iron offsets and soft-iron scales (ADR-0014, spec 0012). `tools/log/mag_cal.py` reads `magnetometer_sample`, undoes the logged calibration, fits an axis-aligned ellipse to the horizontal field, and optionally applies the fitted `CAL_MAG_*` parameters over the Link:
+
+```bash
+tools/log/mag_cal.py log.ulg --apply --serial /dev/ttyACM0
+```
+
+See [Magnetometer calibration](estimation.md#magnetometer-calibration) in the Estimation guide for the complete procedure and 3D ellipsoid options.
+
 ## Estimator replay and comparison
 
 The replay toolchain (spec 0011, spec 0012, ADR-0018 L2) executes the firmware's estimator algorithms on recorded data on the development host:

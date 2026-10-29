@@ -22,7 +22,7 @@ Direct-actuator setpoints skip steps 1 to 3.
 The `VEHICLE_TYPE` parameter describes the environment the vehicle operates in: `GROUND`, `SURFACE` or `UNDERWATER`, independent of the frame. Frame classes follow allocation math and cannot tell surface from underwater, so environment-dependent behaviour is decided by the vehicle type:
 
 - Whether the control chain enables the depth layer.
-- The defaults of the timeout failsafe action (ADR-0005) and of magnetometer use (ADR-0014); these remain separate parameters that a frame preset can override.
+- The defaults of the timeout failsafe action (ADR-0005) and of magnetometer use (ADR-0014); these remain separate parameters that a frame preset can override. Magnetometer use is `EKF_MAG_TYPE`, whose `AUTO` resolves at boot: off for `GROUND`, since a ground vehicle indoors sits among motors and steel, and heading fusion for `SURFACE` and `UNDERWATER` once they exist (spec 0012).
 - The `MAV_TYPE` reported by the MAVLink protocol.
 
 A twin-thruster differential USV, for example, is `SURFACE` + `THRUSTER` + `DIFF_2`; a UUV with the same layout differs only in `UNDERWATER`.

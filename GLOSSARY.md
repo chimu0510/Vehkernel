@@ -53,6 +53,18 @@ _Avoid_: wheel odometry
 An estimator whose output is a pose sent down by the companion computer, for example from VIO.
 _Avoid_: VIO passthrough
 
+**Heading Fusion**:
+The attitude estimator's use of the magnetometer as a measurement of the heading only, so that the yaw is relative to north instead of to the start; turned on by `EKF_MAG_TYPE`.
+_Avoid_: compass mode, mag fusion
+
+**Magnetometer Calibration**:
+The hard-iron offsets and soft-iron scales, per body axis, that the magnetometer driver applies to its field; fitted on the development host from a log of the vehicle turning in place.
+_Avoid_: compass calibration, mag cal
+
+**Zero Rate Update**:
+The attitude estimator's use of the gyro while the vehicle is at rest as a measurement of the gyro bias.
+_Avoid_: ZUPT, zero gyro update
+
 **Body Motion Demand**:
 The body-level demand the control chain hands to the vehicle model, such as a twist or a wrench.
 _Avoid_: body command

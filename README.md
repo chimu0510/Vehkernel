@@ -94,6 +94,7 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600
 | [Flashing](docs/guide/flashing.md) | SWD, the serial flasher, rebooting into the bootloader |
 | [SITL](docs/guide/sitl.md) | Options, report, motion profiles, transports |
 | [Link monitor](docs/guide/link-monitor.md) | Live view, checks, attitude, parameters |
+| [Estimation](docs/guide/estimation.md) | Attitude estimators, heading fusion, magnetometer calibration |
 | [Driving the wheels](docs/guide/driving.md) | Safety conditions, arming, motor bring-up, driving |
 | [Local display](docs/guide/local-display.md) | Pages, user key, local menu |
 | [Logging](docs/guide/logging.md) | Recording, profiles, dropouts, opening logs, replay |

@@ -17,6 +17,7 @@
 | [Flashing](guide/flashing.md) | SWD, the serial flasher, rebooting into the bootloader |
 | [SITL](guide/sitl.md) | Options, report, motion profiles, transports |
 | [Link monitor](guide/link-monitor.md) | Live view, checks, attitude, parameters, recording a log |
+| [Estimation](guide/estimation.md) | Attitude estimators, heading fusion, magnetometer calibration |
 | [Driving the wheels](guide/driving.md) | Safety conditions, arming, motor bring-up, driving, odometry, remote control |
 | [Local display](guide/local-display.md) | Pages, user key, local menu |
 | [Logging](guide/logging.md) | Recording, profiles, dropouts, opening logs, replay |
