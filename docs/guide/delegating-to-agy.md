@@ -178,6 +178,27 @@ agy_sandboxed "$AGY_DELEGATE" --yolo --timeout 60m -d "$PWD" - \
 - The exit code says how it ended: 0 done, 2 agy failed, 10 quota, 11 not logged in, 12 timed out.
 - An agent runs this as a background command, so that a long round is not cut off by a tool call time limit.
 
+## Watching a running conversation
+
+Do not open a conversation in another agy (`agy`, then `/resume`) while a delegation runs in it: agy allows a conversation to be open in one place at a time, and opening it a second time interrupts the delegation's round (seen on 2026-10-29: the round stopped producing and had to be stopped and resumed).
+
+`tools/agy/agy_watch.py` shows what agy is doing instead, without touching the conversation. It runs outside the sandbox, from the main checkout:
+
+```bash
+python3 tools/agy/agy_watch.py <conversation-id> --last 10
+python3 tools/agy/agy_watch.py <conversation-id> --follow
+```
+
+Each step is printed with its index, kind and status: `prompt` for a message sent to agy, `agy` for agy's reasoning and the tools it calls, the tool's name (`ReadFile`, `RunCommand`, `FileEdit`, ...) for its arguments and result, and `system` for agy's own notices. The status is `done`, `running` or `stopped`. `--follow` reads again every 5 s (`--interval`) and prints new steps, and a step again when its status changes; `--full` prints whole texts instead of one line per field.
+
+What makes it safe:
+
+- It never runs agy and never opens agy's files for writing. It copies the conversation's database and its write-ahead log into a private temporary directory, reads the copy and deletes it.
+- It takes no lock and leaves agy's presence files (`presence/<id>.lock`) alone, which is how agy notices a second instance.
+- It accepts only a conversation id, never a path.
+
+The steps are stored as protobuf messages with no published schema; the tool reads the fields it knows from agy 1.4.9 and skips the rest, so after an agy update it may show less, and needs its field numbers updated.
+
 ## Checking the sandbox
 
 Check the sandbox after setting it up, after changing the function, and after updating agy, the plugin or the system. Run a plain shell in it from a worktree, not agy: agy may refuse a prompt that probes its sandbox, and the sandbox does not depend on what runs inside it. Each line prints `ALLOWED` or `blocked` and changes nothing. The main checkout's own files must not be visible: only its `.git` is.

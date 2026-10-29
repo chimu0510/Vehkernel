@@ -56,6 +56,7 @@
 | `tools/firmware/` | Fills the app descriptor after linking and writes the `.apj` | 0023 |
 | `tools/bootloader/` | ArduPilot's `uploader.py`, pinned, and the script listing upstream bootloader changes | 0023 |
 | `tools/bringup/` | Bring-up runner for the hardware cases over SWD | 0018 |
+| `tools/agy/` | `agy_watch.py`: shows an agy conversation's progress from a copy, without disturbing a delegation ([Delegating to agy](guide/delegating-to-agy.md)) | |
 | `app/` | Entry points: firmware image and SITL executable | 0017 |
 | `external/` | External code, pinned as git submodules: FreeRTOS kernel, CMSIS core, STM32F4 device headers and LL drivers, TinyUSB. A tool's own pinned external files sit beside it, as `tools/bootloader/external/` | 0004, 0016 |
 | `bridge/` | ROS2 Bridge for the companion computer; a placeholder, nothing is built yet | 0002, 0003 |
