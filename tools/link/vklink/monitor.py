@@ -366,22 +366,25 @@ class WorkItemOverruns:
     running at the base rate mean the host paused SITL: the POSIX port runs
     the whole MCU in one process, so a host that does not schedule it delays
     every periodic work item together. Such an interval is a stall and its
-    overruns do not count. Most, not all: one triggered by a topic cannot
-    overrun in a pause. And only those at the base rate, those that ran at
-    least half as often as the busiest one in the interval, since a slower
-    one may not have been due in it; counting them would let a vehicle with
-    more slow or triggered work items hide a stall. Overruns of one work
+    overruns do not count. Only the periodic work items are judged: one
+    triggered by a topic cannot overrun in a pause, so counting it would let
+    each new estimator dilute a stall (#170); a log without work_item_status's
+    periodic field judges them all, as before. And only those at the base
+    rate, those that ran at least half as often as the busiest one in the
+    interval, since a slower one may not have been due in it. Overruns of one work
     item, or a few, while the others keep time count. Overruns before the
     first report are start-up's and do not count either.
     """
 
     def __init__(self) -> None:
         self._reports: dict[int, dict[str, tuple[int, int]]] = {}
+        self._periodic: dict[str, bool] = {}
 
     def record(self, status: object) -> None:
         """Adds one work_item_status message."""
-        self._reports.setdefault(status.timestamp, {})[work_item_name(status)] = (
-            status.overruns, getattr(status, "runs", 0))
+        name = work_item_name(status)
+        self._reports.setdefault(status.timestamp, {})[name] = (status.overruns, getattr(status, "runs", 0))
+        self._periodic[name] = bool(getattr(status, "periodic", True))
 
     def judge(self) -> tuple[dict[str, int], int] | None:
         """Real overruns by work item and the number of stalls; None with fewer than two whole reports."""
@@ -395,7 +398,7 @@ class WorkItemOverruns:
             counts = {name: after[name][0] - before[name][0] for name in names}
             runs = {name: after[name][1] - before[name][1] for name in names}
             busiest = max(runs.values())
-            base_rate = [name for name in names if 2 * runs[name] >= busiest]
+            base_rate = [name for name in names if 2 * runs[name] >= busiest and self._periodic.get(name, True)]
             if 2 * sum(1 for name in base_rate if counts[name] > 0) >= len(base_rate):
                 stalls += 1
                 continue

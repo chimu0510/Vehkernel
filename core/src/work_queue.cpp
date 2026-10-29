@@ -112,7 +112,8 @@ WorkItemStats WorkItem::stats() const
             .run_time_last_us = run_time_last_us_,
             .run_time_max_us = run_time_max_us_,
             .run_time_mean_us = runs_ == 0 ? 0 : clamp_us(run_time_total_us_ / runs_),
-            .jitter_max_us = jitter_max_us_};
+            .jitter_max_us = jitter_max_us_,
+            .periodic = interval_us_ != 0};
 }
 
 void WorkItem::record_run(std::uint64_t start_us, std::uint64_t end_us, std::uint64_t reference_us)

@@ -12,3 +12,4 @@ uint32 run_time_last_us  @unit us
 uint32 run_time_max_us   @unit us
 uint32 run_time_mean_us  @unit us
 uint32 jitter_max_us     @unit us        # largest start delay after the due time
+bool periodic                            # runs on a timer period; false when only a topic triggers it

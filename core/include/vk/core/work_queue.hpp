@@ -31,6 +31,7 @@ struct WorkItemStats {
     std::uint32_t run_time_max_us;
     std::uint32_t run_time_mean_us;
     std::uint32_t jitter_max_us;     // largest delay from due (or scheduled) time to start
+    bool periodic;                   // scheduled on a timer period, not only triggered by a topic
 };
 
 class WorkItem {

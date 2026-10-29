@@ -34,5 +34,5 @@ FORMATS = {
     'vehicle_local_odometry_groundtruth': 'vehicle_local_odometry_groundtruth:uint64_t timestamp;float[3] position;float[4] q;float[3] velocity;float[3] angular_velocity;',
     'vehicle_status': 'vehicle_status:uint64_t timestamp;uint8_t mode;bool armed;uint8_t source;bool board_verified;bool emergency_stop;uint8_t actuator_power;bool actuator_power_raw;uint32_t skipped_checks;uint8_t arming_refusal;uint8_t disarm_reason;uint32_t output_watchdog_trips;uint8_t reset_cause;uint8_t fault;uint32_t fault_address;uint32_t setpoints_rejected;bool mag_missing;',
     'wheel_encoders': 'wheel_encoders:uint64_t timestamp;float[4] angle;float[4] speed;uint8_t valid;',
-    'work_item_status': 'work_item_status:uint64_t timestamp;uint8_t work_item;uint8_t[16] name;uint32_t runs;uint32_t overruns;uint32_t run_time_last_us;uint32_t run_time_max_us;uint32_t run_time_mean_us;uint32_t jitter_max_us;',
+    'work_item_status': 'work_item_status:uint64_t timestamp;uint8_t work_item;uint8_t[16] name;uint32_t runs;uint32_t overruns;uint32_t run_time_last_us;uint32_t run_time_max_us;uint32_t run_time_mean_us;uint32_t jitter_max_us;bool periodic;',
 }

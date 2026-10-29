@@ -227,16 +227,20 @@ def test_only_losses_and_drops_after_the_handshake_count():
 
 
 
-def work_item_reports(*reports, rates=None):
+def work_item_reports(*reports, rates=None, triggered=None):
     """WorkItemOverruns fed one report a second, each a {name: overruns} map;
-    `rates` gives each work item's runs a second (none: every one 200)."""
+    `rates` gives each work item's runs a second (none: every one 200), and
+    `triggered` names the work items a topic triggers (reported not periodic);
+    with neither, the reports carry no periodic field, as a log before #170."""
     tracker = WorkItemOverruns()
     for second, report in enumerate(reports):
         for index, (name, overruns) in enumerate(report.items()):
             runs = second * (rates or {}).get(name, 200)
-            tracker.record(types.SimpleNamespace(timestamp=second * 1_000_000, work_item=index,
-                                                 name=tuple(name.encode().ljust(16, b"\0")), overruns=overruns,
-                                                 runs=runs))
+            status = types.SimpleNamespace(timestamp=second * 1_000_000, work_item=index,
+                                           name=tuple(name.encode().ljust(16, b"\0")), overruns=overruns, runs=runs)
+            if triggered is not None:
+                status.periodic = name not in triggered
+            tracker.record(status)
     return tracker
 
 
@@ -263,6 +267,23 @@ def test_work_item_overruns_judge_a_stall_among_the_work_items_at_the_base_rate(
     tracker = work_item_reports({"imu": 0, "ctrl": 0, "act": 0, "link": 0, "est": 0, "odom": 0, **slow},
                                 {"imu": 0, "ctrl": 1, "act": 0, "link": 0, "est": 0, "odom": 0, **slow},
                                 rates=rates)
+    assert tracker.judge()[0]["ctrl"] == 1
+
+
+def test_work_item_overruns_judge_a_stall_among_the_periodic_work_items():
+    # As on SITL with both attitude estimators: four periodic items at 200 Hz
+    # overran together, six triggered ones at 200 Hz could not have. Among the
+    # ten at the base rate that is fewer than half, among the periodic ones all.
+    triggered = {"mahony", "ekf", "velocity", "odom", "link_rx", "logger"}
+    quiet = dict.fromkeys(triggered, 0)
+    tracker = work_item_reports({"imu": 0, "ctrl": 0, "act": 0, "cmd": 0, **quiet},
+                                {"imu": 1, "ctrl": 1, "act": 1, "cmd": 1, **quiet},
+                                triggered=triggered)
+    assert tracker.judge() == (dict.fromkeys(["imu", "ctrl", "act", "cmd", *triggered], 0), 1)
+    # One periodic item alone still counts.
+    tracker = work_item_reports({"imu": 0, "ctrl": 0, "act": 0, "cmd": 0, **quiet},
+                                {"imu": 0, "ctrl": 1, "act": 0, "cmd": 0, **quiet},
+                                triggered=triggered)
     assert tracker.judge()[0]["ctrl"] == 1
 
 

@@ -52,18 +52,18 @@ def test_estimator_replay_bandwidth(repo_schema):
     # | vehicle_local_odometry    | 89 B    | 100 B | 50 Hz          | 1     | 50 * 100 * 1  = 5000  |
     # | actuator_outputs          | 40 B    | 51 B  | 50 Hz          | 1     | 50 * 51 * 1   = 2550  |
     # | vehicle_status            | 36 B    | 47 B  | 5 Hz           | 1     | 5 * 47 * 1    = 235   |
-    # | work_item_status          | 49 B    | 60 B  | 1 Hz           | 16    | 1 * 60 * 16   = 960   |
+    # | work_item_status          | 50 B    | 61 B  | 1 Hz           | 16    | 1 * 61 * 16   = 976   |
     # | link_status               | 46 B    | 57 B  | 1 Hz           | 2     | 1 * 57 * 2    = 114   |
     # | parameter_update          | 16 B    | 27 B  | 0 Hz           | 1     | 0 * 27 * 1    = 0     |
     # | estimator_restart         | 8 B     | 19 B  | 0 Hz           | 1     | 0 * 19 * 1    = 0     |
-    # Sum: 9600 + 11200 + 4000 + 4850 + 9700 + 5000 + 2550 + 235 + 960 + 114 = 48209 B/s (~48.2 KB/s)
-    hand_count_c50c = 48209.0
+    # Sum: 9600 + 11200 + 4000 + 4850 + 9700 + 5000 + 2550 + 235 + 976 + 114 = 48225 B/s (~48.2 KB/s)
+    hand_count_c50c = 48225.0
 
     # Hand count for SITL adds (PLATFORM_SITL):
     # | vehicle_attitude_groundtruth       | 36 B | 47 B | 50 Hz | 1 | 50 * 47 * 1 = 2350 |
     # | vehicle_local_odometry_groundtruth | 60 B | 71 B | 50 Hz | 1 | 50 * 71 * 1 = 3550 |
-    # Sum: 48209 + 2350 + 3550 = 54109 B/s (~54.1 KB/s)
-    hand_count_sitl = 54109.0
+    # Sum: 48225 + 2350 + 3550 = 54125 B/s (~54.1 KB/s)
+    hand_count_sitl = 54125.0
 
     bw_c50c = replay.bandwidth_c50c(repo_schema)
     bw_sitl = replay.bandwidth_sitl(repo_schema)

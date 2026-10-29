@@ -182,7 +182,7 @@ def main() -> int:
     if sitl.returncode != 0:
         failures.append(f"vehkernel-sitl exited with {sitl.returncode}\n{errors}")
 
-    topics, work_items, i2c_reads = parse_report(out)
+    topics, _, i2c_reads = parse_report(out)
 
     # 1. Check magnetometer_sample rate from topic line in report
     mag_topic = topics.get(("magnetometer_sample", 0))
@@ -222,12 +222,7 @@ def main() -> int:
     if 0x72 not in seen_registers:
         failures.append("no read from FIFO_R_W (0x72) recorded")
 
-    # 3. Check work item overruns
-    for item in work_items:
-        overruns_count = int(item.get("overruns", 0))
-        if overruns_count > 0:
-            failures.append(f"work item {item.get('name')} reported {overruns_count} overruns in report")
-
+    # 3. Check work item overruns, setting host stalls aside as the other checks do (#170)
     judged = overruns.judge()
     if judged is None:
         failures.append("the Link carried too little work item timing")

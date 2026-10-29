@@ -38,6 +38,7 @@ void TimingMonitor::publish_all()
         status.run_time_max_us = stats.run_time_max_us;
         status.run_time_mean_us = stats.run_time_mean_us;
         status.jitter_max_us = stats.jitter_max_us;
+        status.periodic = stats.periodic;
         topic<msg::WorkItemStatus>(item->index()).publish(status);
     }
 }

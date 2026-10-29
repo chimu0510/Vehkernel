@@ -143,6 +143,16 @@ TEST_F(WorkQueueTest, TopicTriggeredItemRunsOncePerPublication)
     EXPECT_EQ(item.runs, 1);
 }
 
+TEST_F(WorkQueueTest, StatsSayWhetherAWorkItemIsPeriodic)
+{
+    CountingItem periodic(queue);
+    periodic.schedule_periodic(5000);
+    CountingItem triggered(queue);
+    triggered.trigger_on(vk::core::topic<Trigger>(0));
+    EXPECT_TRUE(periodic.stats().periodic);
+    EXPECT_FALSE(triggered.stats().periodic);
+}
+
 TEST_F(WorkQueueTest, ScheduleNowRunsOnce)
 {
     CountingItem item(queue);
@@ -185,6 +195,7 @@ TEST_F(WorkQueueTest, TimingMonitorPublishesEachWorkItemOnItsOwnInstance)
     EXPECT_EQ(status.runs, 1U);
     EXPECT_EQ(status.run_time_last_us, 120U);
     EXPECT_EQ(status.overruns, 0U);
+    EXPECT_TRUE(status.periodic);
     EXPECT_EQ(status.timestamp, fake_now);
 
     Subscription<vk::msg::WorkItemStatus> own(monitor.index());
