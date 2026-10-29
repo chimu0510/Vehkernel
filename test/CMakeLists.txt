@@ -53,13 +53,39 @@ if(CONFIG_LINK_UDP)
     "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log:${CMAKE_SOURCE_DIR}/tools/link;PYTHONDONTWRITEBYTECODE=1")
 endif()
 
+set(attitude_secondary_arg)
+if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_ESTIMATOR_EKF)
+  set(attitude_secondary_arg --expect-secondary)
+endif()
+
 # L3 SITL attitude tests (spec 0004): the estimate against the simulated
 # IMU's true attitude, under each motion profile.
 if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_LINK_UDP)
   foreach(motion IN ITEMS tilt rotate shake)
     add_test(NAME sitl_attitude_${motion}
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_attitude.py
-        $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR} --motion ${motion})
+        $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR} --motion ${motion}
+        ${attitude_secondary_arg})
+  endforeach()
+endif()
+
+# L3 SITL attitude tests with heading fusion (spec 0012): yaw within 3 deg of truth.
+if(CONFIG_ESTIMATOR_EKF AND CONFIG_DRIVER_ICM20948_MAG AND CONFIG_LINK_UDP)
+  foreach(motion IN ITEMS tilt rotate shake)
+    add_test(NAME sitl_attitude_heading_${motion}
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_attitude.py
+        $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR} --motion ${motion}
+        --primary EKF --mag-type HEADING ${attitude_secondary_arg})
+  endforeach()
+endif()
+
+# L3 SITL attitude tests with Mahony primary and EKF secondary (spec 0012).
+if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_ESTIMATOR_EKF AND CONFIG_LINK_UDP)
+  foreach(motion IN ITEMS tilt rotate shake)
+    add_test(NAME sitl_attitude_mahony_primary_${motion}
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_attitude.py
+        $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR} --motion ${motion}
+        --primary MAHONY --expect-secondary)
   endforeach()
 endif()
 

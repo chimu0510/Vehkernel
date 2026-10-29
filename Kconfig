@@ -89,9 +89,19 @@ config ESTIMATOR_MAHONY
 	  Attitude from the IMU with the Mahony complementary filter
 	  (ADR-0014), published on vehicle_attitude.
 
+config ESTIMATOR_EKF
+	bool "EKF attitude estimator"
+	depends on DRIVER_ICM20948
+	default y
+	select MATH_QUATERNION
+	help
+	  Attitude and gyro bias from the IMU and magnetometer with an
+	  error-state Extended Kalman Filter (ADR-0014, spec 0012),
+	  published on vehicle_attitude.
+
 config ESTIMATOR_LOCAL_ODOMETRY
 	bool "Local odometry"
-	depends on ESTIMATOR_MAHONY && ACTUATOR_CONTROL
+	depends on (ESTIMATOR_MAHONY || ESTIMATOR_EKF) && ACTUATOR_CONTROL
 	default y
 	help
 	  Dead reckoning from the vehicle model's body velocity measurement

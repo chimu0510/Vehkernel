@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Primary attitude estimator selection (ADR-0014, spec 0012).
+prefix = "EST"
+kconfig = "ESTIMATOR_EKF"
+
+[[param]]
+name = "EST_PRIMARY"
+type = "INT32"
+default = "EKF"
+reboot_required = true
+values = [
+    { name = "MAHONY", value = 1 },
+    { name = "EKF", value = 2 },
+]
+description = "Which attitude estimator publishes vehicle_attitude: MAHONY (1) or EKF (2)."

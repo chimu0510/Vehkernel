@@ -8,6 +8,7 @@
 #include <vk/estimation/attitude_estimator.hpp>
 #include <vk/estimation/math/quaternion.hpp>
 #include <vk/estimation/models/accelerometer_model.hpp>
+#include <vk/msg/estimator_attitude.hpp>
 #include <vk/msg/estimator_restart.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
@@ -95,7 +96,7 @@ protected:
     vk::core::WorkQueue queue{"wq:test", 1, &fake_clock};
     vk::core::Publication<vk::msg::ImuSample> imu{imu_instance};
     vk::core::Subscription<vk::msg::VehicleAttitude> attitude;
-    AttitudeEstimator::Config config{.imu_instance = imu_instance};
+    AttitudeEstimator::Config config{.imu_instance = imu_instance, .primary = true};
     std::uint64_t seen_ = 0;
 };
 
@@ -251,6 +252,35 @@ TEST_F(AttitudeEstimatorTest, IgnoresSamplesTakenBeforeTheRestart)
     EXPECT_EQ(estimator.state(), AttitudeEstimator::State::Aligning);
     feed(1, level, {});
     EXPECT_EQ(estimator.state(), AttitudeEstimator::State::Running);
+}
+
+TEST_F(AttitudeEstimatorTest, SecondaryMahonyPublishesOnEstimatorAttitudeInstanceZero)
+{
+    AttitudeEstimator::Config sec_config{.imu_instance = imu_instance, .primary = false};
+    AttitudeEstimator estimator(sec_config, queue);
+    estimator.start();
+
+    vk::core::Subscription<vk::msg::EstimatorAttitude> sec_attitude{0};
+    vk::msg::EstimatorAttitude stale_sec{};
+    while (sec_attitude.copy(stale_sec)) {
+    }
+
+    feed(201, level, {});  // 1 s still, completes alignment
+    ASSERT_EQ(estimator.state(), AttitudeEstimator::State::Running);
+
+    const std::uint64_t gen_before = vk::core::topic<vk::msg::EstimatorAttitude>(0).generation();
+    feed(5, level, {});
+    const std::uint64_t gen_after = vk::core::topic<vk::msg::EstimatorAttitude>(0).generation();
+    EXPECT_EQ(gen_after - gen_before, 5U);
+
+    // Nothing on vehicle_attitude.
+    vk::msg::VehicleAttitude primary_out{};
+    EXPECT_EQ(drain(primary_out), 0);
+
+    // estimator_attitude instance 0 has the latest sample.
+    vk::msg::EstimatorAttitude sec_out{};
+    EXPECT_TRUE(sec_attitude.copy(sec_out));
+    EXPECT_EQ(sec_out.estimator_id, AttitudeEstimator::estimator_id);
 }
 
 }  // namespace

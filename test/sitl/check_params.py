@@ -23,14 +23,14 @@ import bisect
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools" / "link"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from check_attitude import free_udp_port, from_rotation_vector, multiply, tilt_between  # noqa: E402
+from sitl_support import Sitl, free_udp_port  # noqa: E402
+from check_attitude import from_rotation_vector, multiply, tilt_between  # noqa: E402
 from vklink.monitor import LinkMonitor, UdpConnection, WorkItemOverruns, load_messages, load_param_metadata  # noqa: E402
 from vklink.session import ParamType, ParamValue  # noqa: E402
 
@@ -129,7 +129,7 @@ def check_gain(args) -> list[str]:
         if name == "vehicle_attitude_groundtruth":
             truth_times.append(message.timestamp)
             truths.append((tuple(message.q), tuple(message.angular_velocity)))
-        elif name == "vehicle_attitude":
+        elif name in ("vehicle_attitude", "estimator_attitude") and getattr(message, "estimator_id", None) == 1:
             estimates.append((message.timestamp_sample, tuple(message.q)))
 
     def run_until(t_s: float) -> None:
@@ -193,38 +193,6 @@ def check_gain(args) -> list[str]:
             if count != 0:
                 failures.append(f"work item {name} overran {count} times during the check")
     return failures
-
-
-class Sitl:
-    """SITL with its UDP Link and the Link monitor library connected to it."""
-
-    def __init__(self, args, *extra: str):
-        port = free_udp_port()
-        self.process = subprocess.Popen([args.sitl, "--duration", "0", "--udp", f"127.0.0.1:{port}", *extra],
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        print(self.process.stdout.readline(), end="")
-        self.connection = UdpConnection("127.0.0.1", port)
-        self.monitor = LinkMonitor(self.connection, load_messages(args.msg_dir))
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        self.connection.close()
-        self.process.terminate()
-        self.process.communicate(timeout=30)
-
-    def status(self, timeout_s: float = 3.0):
-        """The next parameter_status to arrive."""
-        stats = self.monitor.topics.get(("parameter_status", 0))
-        count = stats.messages if stats else 0
-        deadline = time.monotonic() + timeout_s
-        while time.monotonic() < deadline:
-            self.monitor.poll(0.05)
-            stats = self.monitor.topics.get(("parameter_status", 0))
-            if stats and stats.messages > count and stats.latest is not None:
-                return stats.latest
-        return None
 
 
 def check_persistence(args) -> list[str]:

@@ -1,0 +1,111 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Parameters of the EKF attitude estimator (ADR-0012, ADR-0014, spec 0012).
+# Noise and gate changes apply from the next sample.
+prefix = "EKF"
+kconfig = "ESTIMATOR_EKF"
+
+# Continuous-time noise density (spec 0012). PX4 EKF2 and ArduPilot EKF3 use a
+# per-sample discrete rate standard deviation (0.015 rad/s); multiplying by
+# sqrt(dt) for continuous-time noise density at 200 Hz (dt = 0.005 s) gives
+# 0.015 * sqrt(0.005) ~= 1.1e-3 rad/s/sqrt(Hz).
+[[param]]
+name = "EKF_GYR_NOISE"
+type = "FLOAT"
+default = 0.0011
+min = 0.0
+max = 1.0
+unit = "rad/s/sqrt(Hz)"
+description = "Continuous-time gyro rate noise density."
+
+# Continuous-time gyro bias random walk density (spec 0012). Multiplying PX4's
+# per-sample rate (0.001 rad/s^2) by sqrt(dt) at 200 Hz (dt = 0.005 s) gives
+# 0.001 * sqrt(0.005) ~= 7.0e-5 rad/s^2/sqrt(Hz).
+[[param]]
+name = "EKF_GYR_B_NOISE"
+type = "FLOAT"
+default = 0.00007
+min = 0.0
+max = 0.1
+unit = "rad/s^2/sqrt(Hz)"
+description = "Continuous-time gyro bias random walk noise density."
+
+# Tuned in SITL (spec 0012): 2.0 puts the gravity correction's bandwidth at
+# about 1/s, as ATT_KP does for the Mahony filter. At 0.5 (about 4/s), the
+# centripetal acceleration of a ground vehicle's turns tilted the estimate and
+# turned the heading 3.8 deg over the square drive.
+[[param]]
+name = "EKF_ACC_NOISE"
+type = "FLOAT"
+default = 2.0
+min = 0.0
+max = 10.0
+unit = "m/s^2"
+description = "Accelerometer gravity measurement noise."
+
+[[param]]
+name = "EKF_ACC_REJ"
+type = "FLOAT"
+default = 0.1
+min = 0.01
+max = 1.0
+unit = "g"
+description = "Accelerometer rejection: the correction is skipped when specific force differs from gravity by more than this."
+
+[[param]]
+name = "EKF_ACC_GATE"
+type = "FLOAT"
+default = 5.0
+min = 1.0
+max = 20.0
+unit = "SD"
+description = "Accelerometer innovation gate in standard deviations."
+
+[[param]]
+name = "EKF_MAG_TYPE"
+type = "INT32"
+default = "AUTO"
+reboot_required = true
+values = [
+    { name = "AUTO", value = 0 },
+    { name = "OFF", value = 1 },
+    { name = "HEADING", value = 2 },
+]
+description = "Magnetometer heading fusion: AUTO (0), OFF (1), or HEADING (2)."
+menu = true
+
+[[param]]
+name = "EKF_MAG_NOISE"
+type = "FLOAT"
+default = 0.1
+min = 0.0
+max = 2.0
+unit = "rad"
+description = "Magnetometer heading measurement noise."
+
+[[param]]
+name = "EKF_MAG_GATE"
+type = "FLOAT"
+default = 3.0
+min = 1.0
+max = 20.0
+unit = "SD"
+description = "Magnetometer innovation gate in standard deviations."
+
+[[param]]
+name = "EKF_MAG_DECL"
+type = "FLOAT"
+default = 0.0
+min = -180.0
+max = 180.0
+unit = "deg"
+description = "Magnetic declination: angle between magnetic north and true north."
+menu = true
+menu_step = 1.0
+
+[[param]]
+name = "EKF_MAG_REJ"
+type = "FLOAT"
+default = 0.2
+min = 0.01
+max = 1.0
+description = "Magnetometer field strength rejection: skipped when field strength differs from reference by more than this fraction."

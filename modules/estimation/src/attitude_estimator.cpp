@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <vk/estimation/attitude_estimator.hpp>
+#include <vk/estimation/estimator_selection.hpp>
 
 #include <vk/params/params.hpp>
 
@@ -7,9 +8,18 @@
 
 namespace vk::estimation {
 
+namespace {
+StillAlignment::Config make_alignment_config(const AttitudeEstimator::Config& config)
+{
+    StillAlignment::Config cfg = config.alignment;
+    cfg.gravity = config.filter.gravity;
+    return cfg;
+}
+}  // namespace
+
 AttitudeEstimator::AttitudeEstimator(const Config& config, core::WorkQueue& queue)
     : WorkItem("mahony_attitude", queue), config_(config), imu_(config.imu_instance),
-      filter_(config.filter)
+      filter_(config.filter), alignment_(make_alignment_config(config))
 {
     // Only samples published from now on count.
     msg::ImuSample stale{};
@@ -20,6 +30,13 @@ AttitudeEstimator::AttitudeEstimator(const Config& config, core::WorkQueue& queu
     msg::EstimatorRestart stale_restart{};
     while (restart_.copy(stale_restart)) {
     }
+
+    if (config_.primary.has_value()) {
+        is_primary_ = *config_.primary;
+    } else {
+        is_primary_ = (primary_estimator() == PrimaryEstimator::Mahony);
+    }
+
     apply_parameters();
 }
 
@@ -32,10 +49,7 @@ void AttitudeEstimator::restart(std::uint64_t at_us)
 {
     state_ = State::Aligning;
     restarted_at_us_ = at_us;
-    still_since_us_ = 0;
-    still_samples_ = 0;
-    gyro_sum_ = {};
-    accel_sum_ = {};
+    alignment_.reset();
     aligned_at_us_ = 0;
     filter_ = MahonyFilter(config_.filter);
     apply_parameters();
@@ -75,25 +89,10 @@ void AttitudeEstimator::run()
 
 void AttitudeEstimator::align(const msg::ImuSample& sample, const Vector3& gyro, const Vector3& accel)
 {
-    const float g = config_.filter.gravity;
-    const bool still = gyro.norm() < config_.still_gyro && std::abs(accel.norm() - g) < config_.still_accel * g;
-    if (!still) {
-        still_samples_ = 0;
+    if (!alignment_.feed_imu(sample.timestamp, gyro, accel)) {
         return;
     }
-    if (still_samples_ == 0) {
-        still_since_us_ = sample.timestamp;
-        gyro_sum_ = {};
-        accel_sum_ = {};
-    }
-    ++still_samples_;
-    gyro_sum_ += gyro;
-    accel_sum_ += accel;
-    if (sample.timestamp - still_since_us_ < config_.alignment_us) {
-        return;
-    }
-    const auto n = static_cast<float>(still_samples_);
-    filter_.reset_from(accel_sum_ * (1.0F / n), gyro_sum_ * (1.0F / n));
+    filter_.reset_from(alignment_.mean_accel(), alignment_.mean_gyro());
     filter_.update(gyro, accel, sample.timestamp);  // sets the filter's time
     aligned_at_us_ = sample.timestamp;
     state_ = State::Running;
@@ -114,7 +113,12 @@ void AttitudeEstimator::estimate(const msg::ImuSample& sample, const Vector3& gy
     out.gyro_bias = filter_.gyro_bias().array();
     out.variance = {config_.level_variance, config_.level_variance, config_.yaw_variance_rate * since_alignment_s};
     out.accel_rejected = filter_.accel_rejected();
-    attitude_.publish(out);
+    out.mag_rejected = 0;
+    out.mag_fused = 0;
+    out.zero_rate_fused = 0;
+    out.mag_missing = false;
+
+    publish_attitude(is_primary_, out, attitude_, secondary_attitude_);
 }
 
 }  // namespace vk::estimation

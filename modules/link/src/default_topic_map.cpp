@@ -8,6 +8,7 @@
 #include <vk/msg/allocation_status.hpp>
 #include <vk/msg/body_velocity_measurement.hpp>
 #include <vk/msg/body_velocity_setpoint.hpp>
+#include <vk/msg/estimator_attitude.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/link_status.hpp>
 #include <vk/msg/local_menu.hpp>
@@ -61,6 +62,8 @@ struct DefaultStreams {
     TopicStreamOf<msg::ImuSample> imu;
     TopicStreamOf<msg::MagnetometerSample> mag{MaxRate{50.0F}, 0};
     TopicStreamOf<msg::VehicleAttitude> attitude{MaxRate{50.0F}, 0};
+    TopicStreamOf<msg::EstimatorAttitude> estimator_attitude_0{MaxRate{50.0F}, 0};
+    TopicStreamOf<msg::EstimatorAttitude> estimator_attitude_1{MaxRate{50.0F}, 1};
     TopicStreamOf<msg::VehicleAttitudeGroundtruth> truth{MaxRate{50.0F}, 0};  // SITL only
     TopicStreamOf<msg::VehicleLocalOdometryGroundtruth> odometry_truth{MaxRate{50.0F}, 0};  // SITL only
     TopicStreamOf<msg::ParameterStatus> parameters{status_rate, 0};           // with parameter storage
@@ -77,11 +80,26 @@ struct DefaultStreams {
     std::array<TopicStreamOf<msg::WorkItemStatus>, msg::WorkItemStatus::instances> work_items =
         make_status_streams<msg::WorkItemStatus>();
     std::array<TopicStreamOf<msg::LinkStatus>, msg::LinkStatus::instances> links = make_status_streams<msg::LinkStatus>();
-    std::array<TopicStream*, 16> first{&imu,      &mag,        &attitude,   &truth,       &odometry_truth, &parameters,
-                                       &vehicle,  &wheels,     &outputs,     &allocation,     &measurement,
-                                       &odometry, &gamepad,    &setpoint,    &body_setpoint,  &menu};
-    std::array<TopicStream*, 16 + msg::WorkItemStatus::instances + msg::LinkStatus::instances> map =
-        make_map(first, std::make_index_sequence<16>{}, work_items,
+    std::array<TopicStream*, 18> first{&imu,
+                                       &mag,
+                                       &attitude,
+                                       &estimator_attitude_0,
+                                       &estimator_attitude_1,
+                                       &truth,
+                                       &odometry_truth,
+                                       &parameters,
+                                       &vehicle,
+                                       &wheels,
+                                       &outputs,
+                                       &allocation,
+                                       &measurement,
+                                       &odometry,
+                                       &gamepad,
+                                       &setpoint,
+                                       &body_setpoint,
+                                       &menu};
+    std::array<TopicStream*, 18 + msg::WorkItemStatus::instances + msg::LinkStatus::instances> map =
+        make_map(first, std::make_index_sequence<18>{}, work_items,
                  std::make_index_sequence<msg::WorkItemStatus::instances>{}, links,
                  std::make_index_sequence<msg::LinkStatus::instances>{});
 };

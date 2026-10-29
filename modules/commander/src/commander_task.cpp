@@ -30,6 +30,18 @@ void CommanderTask::run()
     if (imu_.updated()) {
         imu_answered_ = true;
     }
+    msg::VehicleAttitude att{};
+    while (vehicle_attitude_.copy(att)) {
+        if (att.estimator_id == 2) {
+            mag_missing_ = att.mag_missing;
+        }
+    }
+    msg::EstimatorAttitude est_att{};
+    while (estimator_attitude_.copy(est_att)) {
+        if (est_att.estimator_id == 2) {
+            mag_missing_ = est_att.mag_missing;
+        }
+    }
     msg::VehicleCommand command{};
     while (commands_.copy(command)) {
         handle(now, command);
@@ -194,11 +206,12 @@ void CommanderTask::publish(std::uint64_t now_us, const State& state)
     if (!published_ || state.armed != last_state_.armed) {
         arming_publication_.publish(msg::ArmingState{.timestamp = now_us, .armed = state.armed});
     }
-    if (published_ && state == last_state_ && now_us < next_status_us_) {
+    if (published_ && state == last_state_ && mag_missing_ == last_mag_missing_ && now_us < next_status_us_) {
         return;
     }
     published_ = true;
     last_state_ = state;
+    last_mag_missing_ = mag_missing_;
     next_status_us_ = now_us + status_interval_us;
     status_publication_.publish(msg::VehicleStatus{
         .timestamp = now_us,
@@ -217,6 +230,7 @@ void CommanderTask::publish(std::uint64_t now_us, const State& state)
         .fault = static_cast<std::uint8_t>(state.reset_report.fault),
         .fault_address = state.reset_report.fault_address,
         .setpoints_rejected = setpoints_rejected_,
+        .mag_missing = mag_missing_,
     });
 }
 

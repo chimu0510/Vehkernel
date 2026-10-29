@@ -59,6 +59,12 @@
 #ifdef CONFIG_ESTIMATOR_MAHONY
 #include <vk/estimation/attitude_estimator.hpp>
 #endif
+#if defined(CONFIG_ESTIMATOR_MAHONY) || defined(CONFIG_ESTIMATOR_EKF)
+#include <vk/estimation/estimator_selection.hpp>
+#endif
+#ifdef CONFIG_ESTIMATOR_EKF
+#include <vk/estimation/ekf_attitude_estimator.hpp>
+#endif
 #include <vk/hal/i2c.hpp>
 #ifdef CONFIG_LOCAL_DISPLAY
 #include <vk/drivers/ssd1306.hpp>
@@ -594,6 +600,17 @@ void start_estimator()
 }
 #endif
 
+#ifdef CONFIG_ESTIMATOR_EKF
+vk::core::StaticInstance<vk::estimation::EkfAttitudeEstimator> ekf_attitude_estimator;
+
+void start_ekf_estimator()
+{
+    ekf_attitude_estimator.emplace(vk::estimation::EkfAttitudeEstimator::Config{},
+                                   vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    ekf_attitude_estimator->start();
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv)
@@ -633,6 +650,21 @@ int main(int argc, char** argv)
     vk::platform::start_ground_truth(vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
 #ifdef CONFIG_ESTIMATOR_MAHONY
     start_estimator();
+#endif
+#ifdef CONFIG_ESTIMATOR_EKF
+    start_ekf_estimator();
+#endif
+#if defined(CONFIG_ESTIMATOR_MAHONY) || defined(CONFIG_ESTIMATOR_EKF)
+    const auto primary = vk::estimation::primary_estimator();
+#ifdef CONFIG_ESTIMATOR_EKF
+    const std::int32_t est_primary = vk::params::est.primary;
+#else
+    const std::int32_t est_primary = 1;
+#endif
+    if (vk::estimation::is_primary_fallback(est_primary, primary)) {
+        std::printf("estimator: EST_PRIMARY %d is not built in, falling back to %s\n",
+                    est_primary, primary == vk::estimation::PrimaryEstimator::Mahony ? "MAHONY" : "EKF");
+    }
 #endif
     start_commander();
     vk::platform::start_sim_gamepad(vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));

@@ -21,7 +21,7 @@ import vkulog  # noqa: E402
 from vklink.recorder import ULogRecorder  # noqa: E402
 from vklink.session import ParamType, ParamValue  # noqa: E402
 
-from check_attitude import free_udp_port  # noqa: E402
+from sitl_support import configure_persistent_params, free_udp_port  # noqa: E402
 from check_odometry import (  # noqa: E402
     HEADING_TOLERANCE_DEG,
     POSITION_FLOOR,
@@ -46,25 +46,34 @@ def main() -> int:
     args = parser.parse_args()
 
     failures: list[str] = []
-    port = free_udp_port()
-    sitl_cmd = [args.sitl, "--duration", "0", "--udp", f"127.0.0.1:{port}"]
-    sitl = subprocess.Popen(sitl_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    first_line = sitl.stdout.readline() if sitl.stdout else ""
-    print(first_line, end="")
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        param_file = str(Path(tmp_dir) / "params.bin")
 
-    vehicle = OdometryVehicle(args, port)
-    try:
-        if not vehicle.connect():
-            failures.append("no handshake with SITL")
+        # Ticket #153: vehkernel-replay builds only the Mahony estimator. Until #153 adds the EKF
+        # to replay, set EST_PRIMARY to MAHONY (1) via the Link so the recording runs Mahony primary.
+        err = configure_persistent_params(args, param_file, [("EST_PRIMARY", ParamType.INT32, 1)])
+        if err is not None:
+            failures.append(err)
             return 1
 
-        # Set a non-default parameter so that skipping parameters in replay causes a mismatch.
-        reply = vehicle.monitor.set_param("ATT_KP", ParamType.FLOAT, 1.5, 3.0)
-        if not isinstance(reply, ParamValue):
-            failures.append(f"could not set ATT_KP: {reply}")
-            return 1
+        port = free_udp_port()
+        sitl_cmd = [args.sitl, "--duration", "0", "--udp", f"127.0.0.1:{port}", "--param-file", param_file]
+        sitl = subprocess.Popen(sitl_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        first_line = sitl.stdout.readline() if sitl.stdout else ""
+        print(first_line, end="")
 
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        vehicle = OdometryVehicle(args, port)
+        try:
+            if not vehicle.connect():
+                failures.append("no handshake with SITL")
+                return 1
+
+            # Set a non-default parameter so that skipping parameters in replay causes a mismatch.
+            reply = vehicle.monitor.set_param("ATT_KP", ParamType.FLOAT, 1.5, 3.0)
+            if not isinstance(reply, ParamValue):
+                failures.append(f"could not set ATT_KP: {reply}")
+                return 1
+
             recorded_path = Path(tmp_dir) / "sitl_recorded.ulg"
             replayed_path = Path(tmp_dir) / "sitl_replayed.ulg"
 
@@ -147,11 +156,11 @@ def main() -> int:
             if heading_error_deg > HEADING_TOLERANCE_DEG:
                 failures.append(f"replayed odometry heading error {heading_error_deg:.2f} deg exceeds bound {HEADING_TOLERANCE_DEG:.1f} deg")
 
-    finally:
-        vehicle.close()
-        if sitl.poll() is None:
-            sitl.terminate()
-            sitl.communicate(timeout=10)
+        finally:
+            vehicle.close()
+            if sitl.poll() is None:
+                sitl.terminate()
+                sitl.communicate(timeout=10)
 
     for failure in failures:
         print(f"FAIL: {failure}", file=sys.stderr)

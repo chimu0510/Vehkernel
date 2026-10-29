@@ -70,6 +70,7 @@ def test_unknown_option_is_an_error(tmp_path):
 
 def test_selected_only_helpers_cannot_be_set_directly(tmp_path):
     result = solve(tmp_path, ["CONFIG_PLATFORM_SITL=y\n# CONFIG_ESTIMATOR_MAHONY is not set\n"
+                              "# CONFIG_ESTIMATOR_EKF is not set\n"
                               "# CONFIG_LOCAL_DISPLAY is not set\nCONFIG_MATH_QUATERNION=y\n"])
     assert result.returncode == 1
     assert "CONFIG_MATH_QUATERNION=y did not take effect" in result.stderr

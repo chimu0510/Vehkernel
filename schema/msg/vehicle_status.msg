@@ -19,3 +19,4 @@ uint8 reset_cause     @enum reset_cause  # what caused the last reset, read at b
 uint8 fault           @enum fault        # what the fault stop recorded before a FAULT reset, NONE otherwise
 uint32 fault_address                     # the faulting instruction, or the caller of the assertion or fail(); 0 if unknown
 uint32 setpoints_rejected                # setpoints dropped by setpoint arbitration since boot
+bool mag_missing                         # the EKF has heading fusion on but saw no magnetometer during alignment

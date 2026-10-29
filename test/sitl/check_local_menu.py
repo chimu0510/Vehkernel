@@ -46,7 +46,7 @@ SETTLE_S = 0.4      # for local_menu and the display (5 Hz) to follow
 IDLE_CLOSE_S = 30.0
 BOOT_S = 3.0        # board verified and actuator power settled
 # The menu parameters SITL compiles in, in table order, then Exit.
-POSITIONS = {"ATT_ACC_REJ": 0, "ATT_KI": 1, "ATT_KP": 2, "SENS_BOARD_ROT": 3}
+POSITIONS = {"ATT_ACC_REJ": 0, "ATT_KI": 1, "ATT_KP": 2, "EKF_MAG_DECL": 3, "EKF_MAG_TYPE": 4, "SENS_BOARD_ROT": 5}
 # Actions in an edit, in the order a short press moves through them.
 ACTIONS = ["+", "-", "default", "save", "cancel"]
 MODE_TEST = 1

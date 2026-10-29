@@ -7,7 +7,7 @@
 // the mean accelerometer reading, yaw is 0 and the gyro bias is the mean
 // gyro reading; movement restarts the wait. Nothing is published while
 // aligning. Then every sample steps the filter and is published on
-// vehicle_attitude.
+// vehicle_attitude (when primary) or estimator_attitude (instance 0, when secondary).
 //
 // An estimator_restart returns it to aligning (ADR-0014). A sample whose timestamp is
 // before the restart's is dropped, however late it reaches the queue, so what the
@@ -22,12 +22,15 @@
 #include <vk/core/work_queue.hpp>
 #include <vk/estimation/filters/mahony.hpp>
 #include <vk/estimation/math/vector3.hpp>
+#include <vk/estimation/still_alignment.hpp>
+#include <vk/msg/estimator_attitude.hpp>
 #include <vk/msg/estimator_restart.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/parameter_update.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
 
 #include <cstdint>
+#include <optional>
 
 namespace vk::estimation {
 
@@ -39,11 +42,10 @@ public:
     struct Config {
         std::uint8_t imu_instance = 0;           // imu_sample instance to read
         MahonyConfig filter{};
-        std::uint64_t alignment_us = 1'000'000;  // stillness needed to align
-        float still_gyro = 0.05F;                // [rad/s] largest gyro norm counted as still
-        float still_accel = 0.05F;               // largest | |a| - g | counted as still, as a fraction of g
+        StillAlignment::Config alignment{};
         float level_variance = 3e-4F;            // [rad^2] roll and pitch, about (1 deg)^2
         float yaw_variance_rate = 1e-5F;         // [rad^2/s] yaw variance growth after alignment
+        std::optional<bool> primary{};           // overrides EST_PRIMARY when set
     };
 
     enum class State : std::uint8_t {
@@ -57,6 +59,7 @@ public:
     void start();
 
     [[nodiscard]] State state() const { return state_; }
+    [[nodiscard]] bool is_primary() const { return is_primary_; }
 
 protected:
     void run() override;
@@ -72,16 +75,14 @@ private:
     core::Subscription<msg::ImuSample> imu_;
     core::Subscription<msg::ParameterUpdate> parameter_update_;
     core::Subscription<msg::EstimatorRestart> restart_{0};
-    core::Publication<msg::VehicleAttitude> attitude_;
+    core::Publication<msg::VehicleAttitude> attitude_{0};
+    core::Publication<msg::EstimatorAttitude> secondary_attitude_{0};
     MahonyFilter filter_;
     State state_ = State::Aligning;
+    bool is_primary_ = false;
     std::uint64_t restarted_at_us_ = 0;  // timestamp of the last estimator_restart
 
-    // Alignment: sums since the vehicle became still.
-    std::uint64_t still_since_us_ = 0;
-    std::uint32_t still_samples_ = 0;
-    Vector3 gyro_sum_;
-    Vector3 accel_sum_;
+    StillAlignment alignment_;
     std::uint64_t aligned_at_us_ = 0;
 };
 

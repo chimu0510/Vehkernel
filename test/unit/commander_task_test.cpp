@@ -14,8 +14,10 @@
 #include <vk/hal/reset.hpp>
 #include <vk/msg/actuator_setpoint.hpp>
 #include <vk/msg/body_velocity_setpoint.hpp>
+#include <vk/msg/estimator_attitude.hpp>
 #include <vk/msg/estimator_restart.hpp>
 #include <vk/msg/imu_sample.hpp>
+#include <vk/msg/vehicle_attitude.hpp>
 #include <vk/msg/vehicle_command.hpp>
 #include <vk/msg/vehicle_command_ack.hpp>
 #include <vk/msg/vehicle_status.hpp>
@@ -332,6 +334,49 @@ TEST_F(CommanderTaskTest, RestartEstimatorsIsAcceptedWhileDisarmed)
     EXPECT_FALSE(ack.armed);
     ASSERT_TRUE(restart.copy(msg));
     EXPECT_EQ(msg.timestamp, fake_now);
+}
+
+TEST_F(CommanderTaskTest, SetsMagMissingFromPrimaryEkfAttitude)
+{
+    vk::core::Publication<vk::msg::VehicleAttitude> attitude_pub{0};
+    vk::core::Subscription<vk::msg::VehicleStatus> status_sub{0};
+    vk::msg::VehicleStatus status{};
+
+    attitude_pub.publish(vk::msg::VehicleAttitude{.estimator_id = 2, .mag_missing = true});
+    step(interval_us);
+    while (status_sub.copy(status)) {
+    }
+    EXPECT_TRUE(status.mag_missing);
+
+    attitude_pub.publish(vk::msg::VehicleAttitude{.estimator_id = 2, .mag_missing = false});
+    step(interval_us);
+    while (status_sub.copy(status)) {
+    }
+    EXPECT_FALSE(status.mag_missing);
+}
+
+TEST_F(CommanderTaskTest, SetsMagMissingFromSecondaryEkfAttitude)
+{
+    vk::core::Publication<vk::msg::VehicleAttitude> primary_pub{0};
+    vk::core::Publication<vk::msg::EstimatorAttitude> secondary_pub{1};
+    vk::core::Subscription<vk::msg::VehicleStatus> status_sub{0};
+    vk::msg::VehicleStatus status{};
+
+    // Mahony is primary (estimator_id 1) and publishes mag_missing false.
+    primary_pub.publish(vk::msg::VehicleAttitude{.estimator_id = 1, .mag_missing = false});
+    // EKF is secondary on instance 1 (estimator_id 2) and publishes mag_missing true.
+    secondary_pub.publish(vk::msg::EstimatorAttitude{.estimator_id = 2, .mag_missing = true});
+    step(interval_us);
+    while (status_sub.copy(status)) {
+    }
+    EXPECT_TRUE(status.mag_missing);
+
+    // EKF secondary now clears mag_missing.
+    secondary_pub.publish(vk::msg::EstimatorAttitude{.estimator_id = 2, .mag_missing = false});
+    step(interval_us);
+    while (status_sub.copy(status)) {
+    }
+    EXPECT_FALSE(status.mag_missing);
 }
 
 }  // namespace

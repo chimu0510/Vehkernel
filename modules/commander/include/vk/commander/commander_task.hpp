@@ -38,10 +38,12 @@
 #include <vk/msg/body_velocity_setpoint.hpp>
 #include <vk/msg/bringup_command.hpp>
 #include <vk/msg/bringup_status.hpp>
+#include <vk/msg/estimator_attitude.hpp>
 #include <vk/msg/estimator_restart.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/local_menu.hpp>
 #include <vk/msg/manual_control_input.hpp>
+#include <vk/msg/vehicle_attitude.hpp>
 #include <vk/msg/vehicle_command.hpp>
 #include <vk/msg/vehicle_command_ack.hpp>
 #include <vk/msg/vehicle_status.hpp>
@@ -76,6 +78,7 @@ public:
     [[nodiscard]] const State& state() const { return commander_.state(); }
     [[nodiscard]] bool armed() const { return commander_.state().armed; }
     [[nodiscard]] std::uint32_t setpoints_rejected() const { return setpoints_rejected_; }
+    [[nodiscard]] bool mag_missing() const { return mag_missing_; }
 
 protected:
     void run() override;
@@ -107,6 +110,10 @@ private:
     core::Publication<msg::EstimatorRestart> estimator_restart_publication_;
     core::Publication<msg::ArmingState> arming_publication_;
     core::Publication<msg::VehicleStatus> status_publication_;
+    core::Subscription<msg::VehicleAttitude> vehicle_attitude_{0};
+    core::Subscription<msg::EstimatorAttitude> estimator_attitude_{1};
+    bool mag_missing_ = false;
+    bool last_mag_missing_ = false;
     bool imu_answered_ = false;
     bool published_ = false;
     State last_state_{};

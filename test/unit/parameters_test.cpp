@@ -271,7 +271,7 @@ TEST(GeneratedParameters, MenuListsTheWhitelistedParameters)
         }
     }
     // SERIAL1_BAUD is a menu parameter too, but only the STM32F4 platform compiles it in.
-    EXPECT_EQ(names, (std::vector<std::string_view>{"ATT_ACC_REJ", "ATT_KI", "ATT_KP", "SENS_BOARD_ROT"}));
+    EXPECT_EQ(names, (std::vector<std::string_view>{"ATT_ACC_REJ", "ATT_KI", "ATT_KP", "EKF_MAG_DECL", "EKF_MAG_TYPE", "SENS_BOARD_ROT"}));
 
     const auto& rot = vk::params::menu().back();
     const ParamInfo& info = table[rot.index];

@@ -24,11 +24,15 @@ def make_attitude_payload(
     gyro_bias: tuple[float, float, float] = (0.0, 0.0, 0.0),
     variance: tuple[float, float, float] = (1e-4, 1e-4, 1e-3),
     accel_rejected: int = 0,
+    mag_rejected: int = 0,
+    mag_fused: int = 0,
+    zero_rate_fused: int = 0,
+    mag_missing: bool = False,
 ) -> bytes:
     return struct.unpack(
-        "<73s",
+        "<86s",
         struct.pack(
-            "<QQB4f3f3f3fI",
+            "<QQB4f3f3f3fIIII?",
             ts,
             ts_sample,
             estimator_id,
@@ -37,6 +41,10 @@ def make_attitude_payload(
             *gyro_bias,
             *variance,
             accel_rejected,
+            mag_rejected,
+            mag_fused,
+            zero_rate_fused,
+            mag_missing,
         ),
     )[0]
 

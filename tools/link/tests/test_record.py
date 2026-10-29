@@ -131,20 +131,25 @@ def test_record_logs_all_instances_of_topic(tmp_path):
     log_file = tmp_path / "test_multi_instance.ulg"
 
     # link_status is an all-instances topic in estimator_replay (instances = 2)
+    # The topic id, hash and instances come from the generated messages, so a new topic does not shift them.
+    topic_id = messages.LinkStatus.TOPIC_ID
+    schema_hash = messages.LinkStatus.SCHEMA_HASH
+    instances = messages.LinkStatus.INSTANCES
+
     topics = [
-        TopicDescription(11, 2, 0x5D65F66B5AA01822, "link_status"),
+        TopicDescription(topic_id, instances, schema_hash, "link_status"),
     ]
 
     def send_link_status_instances(mcu: FakeLoggingMcu) -> None:
         mcu.now_us += 20_000
         # link_status wire format: uint64 timestamp, 8*uint32, 2*uint8, uint32
         payload_0 = struct.pack("<QIIIIIIIIBBI", mcu.now_us, 1, 100, 1, 100, 0, 0, 0, 0, 1, 1, 0)
-        wire_0 = mcu.session.send_topic(11, 0, payload_0, mcu.now_us)
+        wire_0 = mcu.session.send_topic(topic_id, 0, payload_0, mcu.now_us)
         if wire_0:
             mcu.socket.sendto(wire_0, mcu.peer)
 
         payload_1 = struct.pack("<QIIIIIIIIBBI", mcu.now_us, 2, 200, 2, 200, 0, 0, 0, 0, 1, 1, 0)
-        wire_1 = mcu.session.send_topic(11, 1, payload_1, mcu.now_us)
+        wire_1 = mcu.session.send_topic(topic_id, 1, payload_1, mcu.now_us)
         if wire_1:
             mcu.socket.sendto(wire_1, mcu.peer)
 

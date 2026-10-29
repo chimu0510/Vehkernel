@@ -29,6 +29,9 @@
 #ifdef CONFIG_ESTIMATOR_MAHONY
 #include <vk/estimation/attitude_estimator.hpp>
 #endif
+#ifdef CONFIG_ESTIMATOR_EKF
+#include <vk/estimation/ekf_attitude_estimator.hpp>
+#endif
 
 #ifdef CONFIG_ACTUATOR_CONTROL
 #include <FreeRTOS.h>
@@ -395,6 +398,17 @@ void start_estimator()
 }
 #endif
 
+#ifdef CONFIG_ESTIMATOR_EKF
+vk::core::StaticInstance<vk::estimation::EkfAttitudeEstimator> ekf_attitude_estimator;
+
+void start_ekf_estimator()
+{
+    ekf_attitude_estimator.emplace(vk::estimation::EkfAttitudeEstimator::Config{},
+                                   vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    ekf_attitude_estimator->start();
+}
+#endif
+
 #ifdef CONFIG_LOCAL_DISPLAY
 using Display = vk::board::devices::DISPLAY0;
 static_assert(Display::type == "SSD1306" && Display::bus == "SOFT_SPI",
@@ -473,6 +487,9 @@ int main()
 #endif
 #ifdef CONFIG_ESTIMATOR_MAHONY
     start_estimator();
+#endif
+#ifdef CONFIG_ESTIMATOR_EKF
+    start_ekf_estimator();
 #endif
 #ifdef CONFIG_LOCAL_DISPLAY
     start_local_display();

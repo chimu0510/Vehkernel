@@ -107,7 +107,7 @@ int main()
     // Stdin loop will first receive initial parameters with timestamp 0.
     vk::core::WorkQueue queue("wq:ctrl", 1, &replay_clock);
 
-    vk::estimation::AttitudeEstimator::Config att_config{.imu_instance = 0};
+    vk::estimation::AttitudeEstimator::Config att_config{.imu_instance = 0, .primary = true};
     vk::estimation::AttitudeEstimator attitude_estimator(att_config, queue);
     attitude_estimator.start();
 
