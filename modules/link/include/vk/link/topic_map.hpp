@@ -198,8 +198,9 @@ std::size_t topic_map_burst(TopicMap map);
 
 // The transmit buffer a Link's serial port needs for the default map's burst
 // (topic_map_burst) with a frame of the run before still in it. A frame that
-// does not fit is dropped whole and counted in link_status.
-inline constexpr std::size_t serial_transmit_buffer_size = 2048;
+// does not fit is dropped whole and counted in link_status. A power of two,
+// as the STM32F4 serial port needs; 4096 since magnetometer_sample (spec 0012).
+inline constexpr std::size_t serial_transmit_buffer_size = 4096;
 
 using StreamFilter = bool (*)(std::uint16_t topic_id, std::uint8_t instance, void* context);
 

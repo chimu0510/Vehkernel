@@ -11,6 +11,7 @@
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/link_status.hpp>
 #include <vk/msg/local_menu.hpp>
+#include <vk/msg/magnetometer_sample.hpp>
 #include <vk/msg/manual_control_input.hpp>
 #include <vk/msg/parameter_status.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
@@ -58,6 +59,7 @@ struct DefaultStreams {
     explicit DefaultStreams(float imu_rate_hz) : imu(every_sample, 0, imu_rate_hz) {}
 
     TopicStreamOf<msg::ImuSample> imu;
+    TopicStreamOf<msg::MagnetometerSample> mag{MaxRate{50.0F}, 0};
     TopicStreamOf<msg::VehicleAttitude> attitude{MaxRate{50.0F}, 0};
     TopicStreamOf<msg::VehicleAttitudeGroundtruth> truth{MaxRate{50.0F}, 0};  // SITL only
     TopicStreamOf<msg::VehicleLocalOdometryGroundtruth> odometry_truth{MaxRate{50.0F}, 0};  // SITL only
@@ -75,11 +77,11 @@ struct DefaultStreams {
     std::array<TopicStreamOf<msg::WorkItemStatus>, msg::WorkItemStatus::instances> work_items =
         make_status_streams<msg::WorkItemStatus>();
     std::array<TopicStreamOf<msg::LinkStatus>, msg::LinkStatus::instances> links = make_status_streams<msg::LinkStatus>();
-    std::array<TopicStream*, 15> first{&imu,      &attitude,   &truth,       &odometry_truth, &parameters,
+    std::array<TopicStream*, 16> first{&imu,      &mag,        &attitude,   &truth,       &odometry_truth, &parameters,
                                        &vehicle,  &wheels,     &outputs,     &allocation,     &measurement,
                                        &odometry, &gamepad,    &setpoint,    &body_setpoint,  &menu};
-    std::array<TopicStream*, 15 + msg::WorkItemStatus::instances + msg::LinkStatus::instances> map =
-        make_map(first, std::make_index_sequence<15>{}, work_items,
+    std::array<TopicStream*, 16 + msg::WorkItemStatus::instances + msg::LinkStatus::instances> map =
+        make_map(first, std::make_index_sequence<16>{}, work_items,
                  std::make_index_sequence<msg::WorkItemStatus::instances>{}, links,
                  std::make_index_sequence<msg::LinkStatus::instances>{});
 };
