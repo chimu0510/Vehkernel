@@ -81,6 +81,7 @@ add_subdirectory(platform)
 add_subdirectory(drivers)
 add_subdirectory(modules)
 add_subdirectory(app)
+include(VehkernelBundle)
 
 if(VK_BUILD_TESTS)
   enable_testing()

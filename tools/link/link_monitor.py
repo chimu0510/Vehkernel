@@ -71,6 +71,7 @@ log_tools_dir = str(Path(__file__).resolve().parents[1] / "log")
 if log_tools_dir not in sys.path:
     sys.path.insert(0, log_tools_dir)
 
+from vklink.bundle import bundle_root  # noqa: E402
 from vklink.frame import (  # noqa: E402
     PROTOCOL_VERSION,
     Frame,
@@ -409,22 +410,37 @@ def run_record(monitor: LinkMonitor, args: argparse.Namespace) -> int:
 
 
 def main() -> int:
+    bundle = bundle_root(Path(__file__))
+    if "VK_MSG_PYTHON_DIR" in os.environ:
+        default_msg_dir = os.environ["VK_MSG_PYTHON_DIR"]
+    elif bundle is not None:
+        default_msg_dir = str(bundle / "generated" / "schema" / "python")
+    else:
+        default_msg_dir = str(DEFAULT_MSG_DIR)
+
+    if "VK_PARAM_METADATA" in os.environ:
+        default_param_meta = os.environ["VK_PARAM_METADATA"]
+    elif bundle is not None:
+        default_param_meta = str(bundle / "generated" / "params" / "params.json")
+    else:
+        default_param_meta = str(DEFAULT_PARAM_META)
+
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     target = parser.add_mutually_exclusive_group()
     target.add_argument("--udp", type=parse_address, default=("127.0.0.1", 15600), metavar="ADDRESS:PORT",
                         help="the Link's UDP address (default 127.0.0.1:15600)")
     target.add_argument("--serial", metavar="PATH", help="the Link's serial port, such as /dev/ttyACM0 or a pty")
     parser.add_argument("--baud", type=int, default=921600, help="serial baud rate (default 921600)")
-    parser.add_argument("--msg-dir", default=os.environ.get("VK_MSG_PYTHON_DIR", DEFAULT_MSG_DIR),
-                        help="directory of the generated vkmsg.py (default: the sitl build)")
+    parser.add_argument("--msg-dir", default=default_msg_dir,
+                        help="directory of the generated vkmsg.py (default: the sitl build or bundle)")
     parser.add_argument("--handshake-timeout", type=float, default=5.0, help="seconds to wait for the MCU")
     parser.add_argument("--check", action="store_true", help="run for --duration, then judge the Link")
     parser.add_argument("--duration", type=float, default=5.0, help="seconds to run with --check")
     parser.add_argument("--expect-rate", type=parse_expectation, action="append", default=[],
                         metavar="TOPIC:INSTANCE=HZ", help="required rate of a topic instance, with --check")
     parser.add_argument("--tolerance", type=float, default=0.05, help="allowed relative rate error")
-    parser.add_argument("--param-meta", default=os.environ.get("VK_PARAM_METADATA", DEFAULT_PARAM_META),
-                        help="the parameter metadata file (default: the sitl build's)")
+    parser.add_argument("--param-meta", default=default_param_meta,
+                        help="the parameter metadata file (default: the sitl build's or bundle's)")
     commands = parser.add_subparsers(dest="command")
     param = commands.add_parser("param", help="list, read or set parameters")
     actions = param.add_subparsers(dest="action", required=True)

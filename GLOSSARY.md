@@ -136,6 +136,10 @@ _Avoid_: host, Pi
 The computer that runs builds, tests, SITL and flashing tools, such as a developer's machine or a CI runner.
 _Avoid_: PC, workstation
 
+**Host Tools Bundle**:
+The archive a firmware build writes with the host tools and that build's generated messages, parameter metadata, board layout and firmware images, so that a companion computer can run the tools and flash the firmware without building anything (ADR-0026).
+_Avoid_: SDK, release package
+
 ### Firmware update
 
 **Bootloader**:

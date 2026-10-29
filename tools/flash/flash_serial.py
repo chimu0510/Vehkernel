@@ -48,6 +48,12 @@ from datetime import datetime
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+link_tools_dir = str(REPO / "tools" / "link")
+if link_tools_dir not in sys.path:
+    sys.path.insert(0, link_tools_dir)
+
+from vklink.bundle import bundle_root  # noqa: E402
+
 UPLOADER = REPO / "tools" / "bootloader" / "external" / "uploader.py"
 LINK_MONITOR = REPO / "tools" / "link" / "link_monitor.py"
 # Runs uploader.py with the port's DTR and RTS released, so BOOT0 stays low (#92).
@@ -284,8 +290,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="the STM32 system bootloader's baud rate (default 115200)")
     parser.add_argument("--link-baud", type=int, default=921600,
                         help="the Link's baud rate on the port, for update (default 921600)")
-    parser.add_argument("--build", type=Path, default=Path("build/c50c-v1_1"),
-                        help="firmware build directory (default build/c50c-v1_1)")
+    bundle = bundle_root(Path(__file__))
+    default_build = bundle if bundle is not None else Path("build/c50c-v1_1")
+    parser.add_argument("--build", type=Path, default=default_build,
+                        help="firmware build directory (default build/c50c-v1_1 or bundle)")
     parser.add_argument("--stm32flash", default="stm32flash", help="stm32flash executable")
     parser.add_argument("--uploader", type=Path, default=UPLOADER, help="uploader.py (default: the pinned copy)")
     parser.add_argument("--link-monitor", type=Path, default=LINK_MONITOR, help="link_monitor.py (default: the repository's)")

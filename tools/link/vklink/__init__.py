@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Link protocol package for host-side tools (ADR-0002)."""
 
+from .bundle import bundle_root
 from .cobs import cobs_decode, cobs_encode, cobs_max_encoded_size
 from .crc16 import crc16
 from .frame import (
@@ -38,6 +39,7 @@ from .session import (
 )
 
 __all__ = [
+    "bundle_root",
     "cobs_encode",
     "cobs_decode",
     "cobs_max_encoded_size",

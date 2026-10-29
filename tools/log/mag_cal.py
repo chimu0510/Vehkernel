@@ -27,6 +27,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools" / "log"))
 sys.path.insert(0, str(REPO / "tools" / "link"))
 
+from vklink.bundle import bundle_root  # noqa: E402
 import vkulog  # noqa: E402
 from vkulog.reader import DataMessage, ParameterChange  # noqa: E402
 
@@ -496,9 +497,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--baud", type=int, default=921600, help="serial baud rate (default: 921600)")
     parser.add_argument("--udp", metavar="HOST:PORT", help="Link UDP address (e.g. 127.0.0.1:15600)")
     parser.add_argument("--apply", action="store_true", help="apply fitted parameters to the MCU over the Link")
+    bundle = bundle_root(Path(__file__))
+    if "VK_MSG_PYTHON_DIR" in os.environ:
+        default_msg_dir = os.environ["VK_MSG_PYTHON_DIR"]
+    elif bundle is not None:
+        default_msg_dir = str(bundle / "generated" / "schema" / "python")
+    else:
+        default_msg_dir = str(DEFAULT_MSG_DIR)
+
     parser.add_argument(
         "--msg-dir",
-        default=os.environ.get("VK_MSG_PYTHON_DIR", str(DEFAULT_MSG_DIR)),
+        default=default_msg_dir,
         help="path to directory containing generated vkmsg.py schema",
     )
     return parser.parse_args(argv)

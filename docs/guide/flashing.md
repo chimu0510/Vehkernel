@@ -50,6 +50,16 @@ tools/link/link_monitor.py --serial /dev/ttyACM0 reboot --bootloader
 python3 tools/bootloader/external/uploader.py --port /dev/ttyACM0 --no-extf build/c50c-v1_1/app/vehkernel.apj
 ```
 
+## Running from a bundle
+
+On a companion computer, `tools/flash/flash_serial.py` runs directly from an unpacked host tools bundle ([Companion computer](companion-computer.md)). When started from inside a bundle, `--build` defaults to the bundle directory itself:
+
+```bash
+tools/flash/flash_serial.py update
+```
+
+It reads `generated/board/board.json`, `app/vehkernel.apj` and `generated/schema/python/` from the bundle, without requiring a build tree on the companion computer.
+
 ## Over SWD
 
 Connect an ST-Link to the board's SWD header. OpenOCD runs on the host, outside the development container, since the probe is a USB device. A new board gets the bootloader and the firmware; later, the firmware alone:

@@ -113,6 +113,17 @@ The `record` command records a ULog file over the Link with a log profile (spec 
 tools/link/link_monitor.py --udp 127.0.0.1:15600 record log.ulg --profile estimator_replay --duration 30
 ```
 
+## Running from a bundle
+
+On a companion computer, `tools/link/link_monitor.py` runs directly from an unpacked host tools bundle ([Companion computer](companion-computer.md)). When started from inside a bundle, `--msg-dir` and `--param-meta` default to the bundle's `generated/schema/python/` and `generated/params/params.json`:
+
+```bash
+tools/link/link_monitor.py --serial /dev/ttyACM0
+tools/link/link_monitor.py --serial /dev/ttyACM0 param list
+```
+
+Explicit options and the `VK_MSG_PYTHON_DIR` and `VK_PARAM_METADATA` environment variables take precedence over the bundle defaults if provided.
+
 ## Commands
 
 | Command | Guide |

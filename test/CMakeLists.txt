@@ -53,6 +53,13 @@ if(CONFIG_LINK_UDP)
     "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log:${CMAKE_SOURCE_DIR}/tools/link;PYTHONDONTWRITEBYTECODE=1")
 endif()
 
+# L3 SITL bundle test (spec 0014, ADR-0026): bundle tools against SITL.
+if(CONFIG_LINK_UDP)
+  add_test(NAME sitl_bundle
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_bundle.py
+      $<TARGET_FILE:vehkernel-sitl> ${CMAKE_BINARY_DIR})
+endif()
+
 set(attitude_secondary_arg)
 if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_ESTIMATOR_EKF)
   set(attitude_secondary_arg --expect-secondary)
@@ -278,6 +285,8 @@ add_test(NAME bringup_runner
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/bringup/tests)
 add_test(NAME serial_flasher
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/flash/tests)
+add_test(NAME bundle_packer
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/bundle/tests)
 add_test(NAME firmware_finalize
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/firmware/tests)
 add_test(NAME agy_watch
@@ -301,6 +310,12 @@ add_test(NAME replay_board_log
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_CURRENT_SOURCE_DIR}/replay/test_board_log.py)
 set_tests_properties(replay_board_log PROPERTIES ENVIRONMENT
   "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/log;PYTHONDONTWRITEBYTECODE=1;VEHKERNEL_REPLAY=$<TARGET_FILE:vehkernel-replay>")
+
+# L0 bundle test (spec 0014, ADR-0026): checks bundle contents and reproducibility.
+add_test(NAME bundle
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_CURRENT_SOURCE_DIR}/bundle/test_bundle.py)
+set_tests_properties(bundle PROPERTIES ENVIRONMENT
+  "VK_BUILD_DIR=${CMAKE_BINARY_DIR};VK_SOURCE_DIR=${CMAKE_SOURCE_DIR};PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/bundle:${CMAKE_SOURCE_DIR}/tools/link;PYTHONDONTWRITEBYTECODE=1")
 
 # Layer rules (ADR-0009): configure a scratch project that links one layer to
 # another and check that the rule helper accepts or rejects it.
