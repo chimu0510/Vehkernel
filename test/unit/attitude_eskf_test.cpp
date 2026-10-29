@@ -317,4 +317,105 @@ TEST(AttitudeEskf, CovarianceStaysSymmetricAndPositiveOverLongRandomRun)
     EXPECT_GT(eskf.mag_fused(), 2000U);
 }
 
+TEST(AttitudeEskf, ZeroRateUpdateLearnsConstantBiasOnAllThreeAxes)
+{
+    AttitudeEskf eskf;
+    eskf.reset(Quaternion::identity(), {});
+
+    const Vector3 true_bias{0.02F, -0.015F, 0.025F};
+    constexpr float update_dt = 0.2F;  // 0.2 s window
+    constexpr float update_var = (1.1e-3F * 1.1e-3F) / update_dt;
+
+    // At rest, the true rate is zero, so the gyro measures true_bias.
+    for (int i = 0; i < 60; ++i) {
+        eskf.predict(true_bias, update_dt);
+        ASSERT_TRUE(eskf.fuse_zero_rate(true_bias, update_var));
+    }
+
+    // 1e-3F absorbs residual filtering estimation error across the 60 updates.
+    EXPECT_NEAR(eskf.gyro_bias().x, true_bias.x, 1e-3F);
+    EXPECT_NEAR(eskf.gyro_bias().y, true_bias.y, 1e-3F);
+    EXPECT_NEAR(eskf.gyro_bias().z, true_bias.z, 1e-3F);
+    EXPECT_EQ(eskf.zero_rate_fused(), 60U);
+    EXPECT_EQ(eskf.zero_rate_rejected(), 0U);
+}
+
+TEST(AttitudeEskf, ZBiasLearnedOnlyThroughZeroRateUpdateOnLevelGround)
+{
+    AttitudeEskf eskf;
+    eskf.reset(Quaternion::identity(), {});
+
+    const Vector3 true_bias{0.0F, 0.0F, 0.03F};
+    const Vector3 level_accel = AccelerometerModel::predict(Quaternion::identity());
+
+    // 10 s (2000 steps at 200 Hz) of gravity fusion on level ground.
+    // Gravity only observes roll and pitch; the z bias is unobservable from it.
+    for (int i = 0; i < 2000; ++i) {
+        eskf.predict(true_bias, dt_s);
+        ASSERT_TRUE(eskf.fuse_gravity(level_accel));
+    }
+
+    // 1e-4F absorbs numerical integration precision; z bias must remain unlearned without heading or zero rate.
+    EXPECT_NEAR(eskf.gyro_bias().z, 0.0F, 1e-4F);
+    EXPECT_EQ(eskf.zero_rate_fused(), 0U);
+
+    // Now apply zero rate updates: the z bias is observed and learned.
+    constexpr float update_dt = 0.2F;
+    constexpr float update_var = (1.1e-3F * 1.1e-3F) / update_dt;
+    for (int i = 0; i < 40; ++i) {
+        eskf.predict(true_bias, update_dt);
+        ASSERT_TRUE(eskf.fuse_zero_rate(true_bias, update_var));
+    }
+
+    // 1e-3F absorbs Kalman filter convergence residual.
+    EXPECT_NEAR(eskf.gyro_bias().z, true_bias.z, 1e-3F);
+    EXPECT_EQ(eskf.zero_rate_fused(), 40U);
+}
+
+TEST(AttitudeEskf, ZeroRateUpdateOutsideGateRejected)
+{
+    AttitudeEskf eskf;
+    eskf.reset(Quaternion::identity(), {});
+
+    const Quaternion q_before = eskf.attitude();
+    const Vector3 bias_before = eskf.gyro_bias();
+    const Matrix6 p_before = eskf.covariance();
+
+    // 5 rad/s outlier when estimated bias is 0: innovation norm ~8.66 rad/s, gate 5 SD ~ 0.012 rad/s.
+    const Vector3 outlier{5.0F, -5.0F, 5.0F};
+    EXPECT_FALSE(eskf.fuse_zero_rate(outlier, 1e-5F));
+    EXPECT_EQ(eskf.zero_rate_rejected(), 1U);
+    EXPECT_EQ(eskf.zero_rate_fused(), 0U);
+
+    EXPECT_FLOAT_EQ(eskf.attitude().w, q_before.w);
+    EXPECT_FLOAT_EQ(eskf.attitude().x, q_before.x);
+    EXPECT_FLOAT_EQ(eskf.attitude().y, q_before.y);
+    EXPECT_FLOAT_EQ(eskf.attitude().z, q_before.z);
+    EXPECT_FLOAT_EQ(eskf.gyro_bias().x, bias_before.x);
+    EXPECT_FLOAT_EQ(eskf.gyro_bias().y, bias_before.y);
+    EXPECT_FLOAT_EQ(eskf.gyro_bias().z, bias_before.z);
+    for (std::size_t r = 0; r < 6; ++r) {
+        for (std::size_t c = 0; c < 6; ++c) {
+            EXPECT_FLOAT_EQ(eskf.covariance()(r, c), p_before(r, c));
+        }
+    }
+}
+
+TEST(AttitudeEskf, ResetFromSetsExplicitYawVariance)
+{
+    AttitudeEskf eskf;
+    const Vector3 level_accel = AccelerometerModel::predict(Quaternion::identity());
+
+    // Without explicit yaw variance: defaults to initial_attitude_variance (0.5).
+    eskf.reset_from(level_accel, {}, 0.0F);
+    EXPECT_FLOAT_EQ(eskf.attitude_variance().z, eskf.config().initial_attitude_variance);
+
+    // With explicit yaw variance: sets P(2,2) to given value (e.g. 1e-6).
+    eskf.reset_from(level_accel, {}, 0.0F, 1e-6F);
+    EXPECT_FLOAT_EQ(eskf.attitude_variance().z, 1e-6F);
+    // Roll and pitch variances remain initial_attitude_variance.
+    EXPECT_FLOAT_EQ(eskf.attitude_variance().x, eskf.config().initial_attitude_variance);
+    EXPECT_FLOAT_EQ(eskf.attitude_variance().y, eskf.config().initial_attitude_variance);
+}
+
 }  // namespace

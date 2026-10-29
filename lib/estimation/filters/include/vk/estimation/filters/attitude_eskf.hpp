@@ -35,15 +35,16 @@
 namespace vk::estimation {
 
 struct AttitudeEskfConfig {
-    float gyro_noise = 0.015F;                // [rad/s] continuous-time gyro rate noise
-    float gyro_bias_noise = 0.001F;           // [rad/s^2] continuous-time gyro bias random walk
-    float accel_noise = 0.5F;                 // [m/s^2] accelerometer gravity noise
+    float gyro_noise = 1.1e-3F;               // [rad/s/sqrt(Hz)] continuous-time gyro rate noise density
+    float gyro_bias_noise = 7.0e-5F;          // [rad/s^2/sqrt(Hz)] continuous-time gyro bias random walk density
+    float accel_noise = 2.0F;                 // [m/s^2] accelerometer gravity noise
     float accel_rejection = 0.1F;             // skip gravity when | |a| - g | exceeds this fraction of g
     float accel_gate = 5.0F;                  // [SD] innovation gate for gravity
     float mag_noise = 0.1F;                   // [rad] magnetometer heading noise
     float mag_gate = 3.0F;                    // [SD] innovation gate for heading
     float mag_declination = 0.0F;             // [rad] magnetic declination
     float mag_rejection = 0.2F;               // skip mag when | |m| - ref | exceeds this fraction of ref
+    float zero_rate_gate = 5.0F;              // [SD] innovation gate for zero rate update
     float initial_attitude_variance = 0.5F;   // [rad^2] initial attitude error variance per axis
     float initial_bias_variance = 1e-3F;      // [rad^2/s^2] initial gyro bias error variance per axis
     float gravity = standard_gravity;         // [m/s^2]
@@ -82,11 +83,16 @@ public:
     }
 
     // Starts levelled by a specific force measured at rest, with the given gyro bias and yaw [rad].
-    void reset_from(const Vector3& specific_force, const Vector3& gyro_bias = {}, float yaw = 0.0F)
+    // If yaw_variance is provided, sets P(2,2); otherwise leaves P(2,2) at initial_attitude_variance.
+    void reset_from(const Vector3& specific_force, const Vector3& gyro_bias = {}, float yaw = 0.0F,
+                    std::optional<float> yaw_variance = std::nullopt)
     {
         Euler e = AccelerometerModel::level_from(specific_force);
         e.yaw = yaw;
         reset(Quaternion::from_euler(e), gyro_bias);
+        if (yaw_variance.has_value()) {
+            p_(2, 2) = *yaw_variance;
+        }
     }
 
     // Propagates the nominal state and the 6x6 error covariance over `dt` seconds [s] with body rate `gyro` [rad/s].
@@ -222,6 +228,20 @@ public:
         return true;
     }
 
+    // Fuses an averaged gyro reading while at rest as a direct measurement of the gyro bias.
+    bool fuse_zero_rate(const Vector3& mean_gyro, float variance)
+    {
+        Matrix<3, 6> jacobian{};
+        jacobian.set_block(0, 3, Matrix<3, 3>::identity());
+        const Vector3 innovation = mean_gyro - bias_;
+        if (!update(innovation, jacobian, variance, config_.zero_rate_gate)) {
+            ++zero_rate_rejected_;
+            return false;
+        }
+        ++zero_rate_fused_;
+        return true;
+    }
+
     void set_config(const Config& config) { config_ = config; }
 
     [[nodiscard]] const Config& config() const { return config_; }
@@ -239,6 +259,8 @@ public:
     [[nodiscard]] std::uint32_t accel_fused() const { return accel_fused_; }
     [[nodiscard]] std::uint32_t mag_rejected() const { return mag_rejected_; }
     [[nodiscard]] std::uint32_t mag_fused() const { return mag_fused_; }
+    [[nodiscard]] std::uint32_t zero_rate_rejected() const { return zero_rate_rejected_; }
+    [[nodiscard]] std::uint32_t zero_rate_fused() const { return zero_rate_fused_; }
 
 private:
     Config config_;
@@ -253,6 +275,8 @@ private:
     std::uint32_t accel_fused_ = 0;
     std::uint32_t mag_rejected_ = 0;
     std::uint32_t mag_fused_ = 0;
+    std::uint32_t zero_rate_rejected_ = 0;
+    std::uint32_t zero_rate_fused_ = 0;
 };
 
 }  // namespace vk::estimation
