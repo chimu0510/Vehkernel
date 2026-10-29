@@ -70,6 +70,20 @@ def wrap(angle: float) -> float:
     return math.remainder(angle, 2 * math.pi)
 
 
+def error_rotation_vector(
+    truth_q: tuple[float, float, float, float], est_q: tuple[float, float, float, float]
+) -> tuple[float, float, float]:
+    """NED error rotation vector [rad] about North, East, Down (indices 0, 1, 2) (spec 0012)."""
+    q_err = multiply(truth_q, conjugate(est_q))
+    if q_err[0] < 0:
+        q_err = (-q_err[0], -q_err[1], -q_err[2], -q_err[3])
+    angle = 2.0 * math.atan2(math.sqrt(q_err[1] ** 2 + q_err[2] ** 2 + q_err[3] ** 2), abs(q_err[0]))
+    if angle < 1e-9:
+        return (2.0 * q_err[1], 2.0 * q_err[2], 2.0 * q_err[3])
+    scale = angle / math.sin(angle / 2.0)
+    return (scale * q_err[1], scale * q_err[2], scale * q_err[3])
+
+
 def slerp(q0: tuple[float, float, float, float], q1: tuple[float, float, float, float], f: float) -> tuple[float, float, float, float]:
     dot = sum(a * b for a, b in zip(q0, q1))
     if dot < 0.0:
@@ -151,6 +165,29 @@ def extract_log(path: str | Path) -> dict[str, list[dict[str, Any]]]:
             data[name].append(decoded)
 
     return data
+
+
+def extract_log_streams(path: str | Path) -> dict[tuple[str, int], list[dict[str, Any]]]:
+    """Extract messages grouped by (message_name, multi_id) (spec 0012)."""
+    reader = vkulog.ULogReader(path)
+    streams: dict[tuple[str, int], list[dict[str, Any]]] = {}
+
+    for r in reader.records:
+        if isinstance(r, DataMessage):
+            sub = reader.subscriptions.get(r.msg_id)
+            if sub is None:
+                continue
+            name = sub.message_name
+            fmt = reader.formats.get(name)
+            if fmt is None:
+                continue
+            decoded = fmt.decode(r.data)
+            key = (name, sub.multi_id)
+            if key not in streams:
+                streams[key] = []
+            streams[key].append(decoded)
+
+    return streams
 
 
 def compare_field(
@@ -235,6 +272,8 @@ def compare_logs(
 ) -> bool:
     rec_data = extract_log(recorded_path)
     rep_data = extract_log(replayed_path)
+    rec_streams = extract_log_streams(recorded_path)
+    rep_streams = extract_log_streams(replayed_path)
 
     truth_att_gt: list[dict[str, Any]] = []
     truth_odom_gt: list[dict[str, Any]] = []
@@ -264,8 +303,9 @@ def compare_logs(
 
     all_rec_ts = [
         s["timestamp_sample"]
-        for tname in ("vehicle_attitude", "vehicle_local_odometry")
-        for s in rec_data.get(tname, [])
+        for key, s_list in rec_streams.items()
+        if key[0] in ("vehicle_attitude", "vehicle_local_odometry", "estimator_attitude")
+        for s in s_list
         if "timestamp_sample" in s
     ]
     min_ts = min(all_rec_ts) if all_rec_ts else 0
@@ -282,36 +322,31 @@ def compare_logs(
 
     print(f"Left out of faithfulness check: {', '.join(sorted(LEFT_OUT_FIELDS))} (publication time; matched by timestamp_sample)")
 
-    # Filter to compared window
-    rec_att = {
-        s["timestamp_sample"]: s
-        for s in rec_data.get("vehicle_attitude", [])
-        if s.get("timestamp_sample", 0) >= start_ts
-    }
-    rep_att = {
-        s["timestamp_sample"]: s
-        for s in rep_data.get("vehicle_attitude", [])
-        if s.get("timestamp_sample", 0) >= start_ts
-    }
-
-    rec_odom = {
-        s["timestamp_sample"]: s
-        for s in rec_data.get("vehicle_local_odometry", [])
-        if s.get("timestamp_sample", 0) >= start_ts
-    }
-    rep_odom = {
-        s["timestamp_sample"]: s
-        for s in rep_data.get("vehicle_local_odometry", [])
-        if s.get("timestamp_sample", 0) >= start_ts
-    }
+    # Compare every topic stream present in both logs (vehicle_attitude, vehicle_local_odometry,
+    # and each instance of estimator_attitude, spec 0012).
+    common_keys = [
+        k for k in sorted(set(rec_streams.keys()) & set(rep_streams.keys()))
+        if k[0] in ("vehicle_attitude", "vehicle_local_odometry", "estimator_attitude")
+    ]
 
     failures: list[str] = []
     max_diffs: dict[str, float] = {}
+    total_matched = 0
 
-    matched_att = compare_topic_samples("vehicle_attitude", rec_att, rep_att, tolerance, max_diffs, failures)
-    matched_odom = compare_topic_samples("vehicle_local_odometry", rec_odom, rep_odom, tolerance, max_diffs, failures)
+    for name, inst in common_keys:
+        topic_label = name if (inst == 0 and name != "estimator_attitude") else f"{name}:{inst}"
+        rec_s = {
+            s["timestamp_sample"]: s
+            for s in rec_streams.get((name, inst), [])
+            if s.get("timestamp_sample", 0) >= start_ts
+        }
+        rep_s = {
+            s["timestamp_sample"]: s
+            for s in rep_streams.get((name, inst), [])
+            if s.get("timestamp_sample", 0) >= start_ts
+        }
+        total_matched += compare_topic_samples(topic_label, rec_s, rep_s, tolerance, max_diffs, failures)
 
-    total_matched = matched_att + matched_odom
     if total_matched == 0:
         print("Faithfulness: FAILED (no matching samples in compared window)")
         return False
@@ -340,8 +375,33 @@ def compare_logs(
 
     # Estimation metrics against ground truth
     # Align truth to estimate's frame at start of window (ADR-0014, check_odometry.py)
-    if (truth_att_gt or truth_odom_gt) and (rep_att or rep_odom):
-        first_rep_ts = min([ts for ts in (list(rep_att.keys()) + list(rep_odom.keys())) if ts >= start_ts], default=start_ts)
+    rep_att = {
+        s["timestamp_sample"]: s
+        for s in rep_streams.get(("vehicle_attitude", 0), [])
+        if s.get("timestamp_sample", 0) >= start_ts
+    }
+    rep_odom = {
+        s["timestamp_sample"]: s
+        for s in rep_streams.get(("vehicle_local_odometry", 0), [])
+        if s.get("timestamp_sample", 0) >= start_ts
+    }
+    rep_est_atts = {
+        inst: {
+            s["timestamp_sample"]: s
+            for s in s_list
+            if s.get("timestamp_sample", 0) >= start_ts
+        }
+        for (tname, inst), s_list in rep_streams.items()
+        if tname == "estimator_attitude"
+    }
+
+    if (truth_att_gt or truth_odom_gt) and (rep_att or rep_odom or rep_est_atts):
+        all_candidate_ts = (
+            list(rep_att.keys())
+            + list(rep_odom.keys())
+            + [ts for d in rep_est_atts.values() for ts in d.keys()]
+        )
+        first_rep_ts = min([ts for ts in all_candidate_ts if ts >= start_ts], default=start_ts)
 
         # Baseline truth orientation and position at restart
         truth_pos_start = (0.0, 0.0, 0.0)
@@ -354,23 +414,54 @@ def compare_logs(
             truth_yaw_start = yaw_of(truth_q_start)
 
         if truth_att_gt:
-            att_errors: list[float] = []
             q_align_yaw = (
                 math.cos(-truth_yaw_start / 2.0),
                 0.0,
                 0.0,
                 math.sin(-truth_yaw_start / 2.0),
             )
-            for ts, sample in sorted(rep_att.items()):
-                q_truth_world = interpolate_truth_attitude(truth_att_gt, ts)
-                # Rotate truth world attitude by -truth_yaw_start about Z so initial yaw aligns with 0
-                q_truth_aligned = multiply(q_align_yaw, q_truth_world)
-                att_errors.append(angle_between(sample["q"], q_truth_aligned))
-            if att_errors:
-                mean_att = sum(att_errors) / len(att_errors)
-                max_att = max(att_errors)
-                end_att = att_errors[-1]
-                print(f"Metrics: attitude error mean={mean_att:.4f} deg, max={max_att:.4f} deg, end={end_att:.4f} deg")
+            if rep_att:
+                att_errors: list[float] = []
+                yaw_errors: list[float] = []
+                for ts, sample in sorted(rep_att.items()):
+                    q_truth_world = interpolate_truth_attitude(truth_att_gt, ts)
+                    # Rotate truth world attitude by -truth_yaw_start about Z so initial yaw aligns with 0
+                    q_truth_aligned = multiply(q_align_yaw, q_truth_world)
+                    att_errors.append(angle_between(sample["q"], q_truth_aligned))
+                    dtheta = error_rotation_vector(q_truth_aligned, sample["q"])
+                    yaw_errors.append(math.degrees(abs(dtheta[2])))
+                if att_errors:
+                    mean_att = sum(att_errors) / len(att_errors)
+                    max_att = max(att_errors)
+                    end_att = att_errors[-1]
+                    mean_yaw = sum(yaw_errors) / len(yaw_errors)
+                    max_yaw = max(yaw_errors)
+                    end_yaw = yaw_errors[-1]
+                    print(
+                        f"Metrics: attitude error mean={mean_att:.4f} deg, max={max_att:.4f} deg, end={end_att:.4f} deg, "
+                        f"yaw error mean={mean_yaw:.4f} deg, max={max_yaw:.4f} deg, end={end_yaw:.4f} deg"
+                    )
+
+            for inst, est_att_samples in sorted(rep_est_atts.items()):
+                est_att_errors: list[float] = []
+                est_yaw_errors: list[float] = []
+                for ts, sample in sorted(est_att_samples.items()):
+                    q_truth_world = interpolate_truth_attitude(truth_att_gt, ts)
+                    q_truth_aligned = multiply(q_align_yaw, q_truth_world)
+                    est_att_errors.append(angle_between(sample["q"], q_truth_aligned))
+                    dtheta = error_rotation_vector(q_truth_aligned, sample["q"])
+                    est_yaw_errors.append(math.degrees(abs(dtheta[2])))
+                if est_att_errors:
+                    mean_att = sum(est_att_errors) / len(est_att_errors)
+                    max_att = max(est_att_errors)
+                    end_att = est_att_errors[-1]
+                    mean_yaw = sum(est_yaw_errors) / len(est_yaw_errors)
+                    max_yaw = max(est_yaw_errors)
+                    end_yaw = est_yaw_errors[-1]
+                    print(
+                        f"Metrics: estimator_attitude:{inst} attitude error mean={mean_att:.4f} deg, max={max_att:.4f} deg, end={end_att:.4f} deg, "
+                        f"yaw error mean={mean_yaw:.4f} deg, max={max_yaw:.4f} deg, end={end_yaw:.4f} deg"
+                    )
 
         if truth_odom_gt and rep_odom:
             last_ts = max(rep_odom.keys())

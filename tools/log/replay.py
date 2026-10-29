@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Feeds vehkernel-replay from a log, and writes its output as a log (spec 0011, ADR-0018 L2)."""
+"""Feeds vehkernel-replay from a log, and writes its output as a log (spec 0011, spec 0012, ADR-0018 L2).
+
+When records share the same timestamp, inputs are sent to vehkernel-replay in this order:
+  Priority 0: Parameter change ('P')
+  Priority 1: estimator_restart ('D')
+  Priority 2: magnetometer_sample (instance 0) ('D')
+  Priority 3: imu_sample (instance 0) ('D')
+  Priority 4: body_velocity_measurement (instance 0) ('D')
+"""
 
 from __future__ import annotations
 
@@ -68,23 +76,19 @@ def read_exact(stream, n: int) -> bytes:
     return bytes(data)
 
 
-def replay(
-    in_path: str | Path,
-    out_path: str | Path,
-    executable: str | Path | None = None,
-    allow_unknown_parameters: bool = False,
-) -> None:
-    exe = find_replay_executable(executable)
-    reader = vkulog.ULogReader(in_path)
+def ordered_in_flight_records(reader: vkulog.ULogReader) -> list[tuple[int, int, str, Any]]:
+    """Gathers in-flight records in timestamp and priority order (spec 0011, spec 0012).
 
+    When records share the same timestamp, inputs are ordered:
+      Priority 0: Parameter change ('P')
+      Priority 1: estimator_restart ('D')
+      Priority 2: magnetometer_sample (instance 0) ('D')
+      Priority 3: imu_sample (instance 0) ('D')
+      Priority 4: body_velocity_measurement (instance 0) ('D')
+    """
     topics_by_msg_id = {sub.msg_id: sub.message_name for sub in reader.subscriptions.values()}
     instances_by_msg_id = {sub.msg_id: sub.multi_id for sub in reader.subscriptions.values()}
 
-    # Gather in-flight records in timestamp and priority order:
-    # Priority 0: Parameter change
-    # Priority 1: estimator_restart
-    # Priority 2: imu_sample
-    # Priority 3: body_velocity_measurement
     in_flight: list[tuple[int, int, str, Any]] = []
 
     for r in reader.records:
@@ -95,12 +99,28 @@ def replay(
             inst = instances_by_msg_id.get(r.msg_id, 0)
             if name == "estimator_restart":
                 in_flight.append((r.timestamp_us, 1, "D", (name, inst, r.data)))
-            elif name == "imu_sample" and inst == 0:
+            elif name == "magnetometer_sample" and inst == 0:
                 in_flight.append((r.timestamp_us, 2, "D", (name, inst, r.data)))
-            elif name == "body_velocity_measurement" and inst == 0:
+            elif name == "imu_sample" and inst == 0:
                 in_flight.append((r.timestamp_us, 3, "D", (name, inst, r.data)))
+            elif name == "body_velocity_measurement" and inst == 0:
+                in_flight.append((r.timestamp_us, 4, "D", (name, inst, r.data)))
 
     in_flight.sort(key=lambda item: (item[0], item[1]))
+    return in_flight
+
+
+def replay(
+    in_path: str | Path,
+    out_path: str | Path,
+    executable: str | Path | None = None,
+    allow_unknown_parameters: bool = False,
+    params: dict[str, Any] | None = None,
+) -> None:
+    exe = find_replay_executable(executable)
+    reader = vkulog.ULogReader(in_path)
+
+    in_flight = ordered_in_flight_records(reader)
 
     proc = subprocess.Popen(
         [str(exe)],
@@ -135,8 +155,15 @@ def replay(
     reader_thread.start()
 
     assert proc.stdin is not None
+    initial_params = dict(reader.parameters)
+    for name, val in (params or {}).items():
+        # An override takes the type of the logged parameter of that name, so "2" sets a FLOAT as 2.0.
+        if isinstance(initial_params.get(name), float):
+            val = float(val)
+        initial_params[name] = val
+
     # 1. Feed initial parameters with timestamp = 0
-    for name, val in reader.parameters.items():
+    for name, val in initial_params.items():
         name_bytes = name.encode("ascii")
         if isinstance(val, float):
             ptype = 2
@@ -209,18 +236,27 @@ def replay(
         # Formats
         writer.write_format(vkulog.FORMATS["vehicle_attitude"])
         writer.write_format(vkulog.FORMATS["vehicle_local_odometry"])
+        writer.write_format(vkulog.FORMATS["estimator_attitude"])
 
         # Info messages
         for key, val in reader.info.items():
             writer.write_info(key, val)
 
         # Initial parameters
-        for name, val in reader.parameters.items():
+        for name, val in initial_params.items():
             writer.write_parameter(name, val)
 
         # Add logged messages
+        msg_id_map = {
+            ("vehicle_attitude", 0): 1,
+            ("vehicle_local_odometry", 0): 2,
+            ("estimator_attitude", 0): 3,
+            ("estimator_attitude", 1): 4,
+        }
         writer.write_add_logged(msg_id=1, message_name="vehicle_attitude", multi_id=0)
         writer.write_add_logged(msg_id=2, message_name="vehicle_local_odometry", multi_id=0)
+        writer.write_add_logged(msg_id=3, message_name="estimator_attitude", multi_id=0)
+        writer.write_add_logged(msg_id=4, message_name="estimator_attitude", multi_id=1)
 
         # Merge output data and in-flight parameter changes in timestamp order.
         # Parameter changes in ULog have their timestamp inferred from the preceding
@@ -231,8 +267,9 @@ def replay(
 
         for name, inst, payload in output_records:
             (ts,) = struct.unpack("<Q", payload[:8])
-            msg_id = 1 if name == "vehicle_attitude" else 2
-            merged_events.append((ts, 1, (msg_id, payload)))
+            msg_id = msg_id_map.get((name, inst))
+            if msg_id is not None:
+                merged_events.append((ts, 1, (msg_id, payload)))
 
         merged_events.sort(key=lambda ev: (ev[0], ev[1]))
 
@@ -255,7 +292,27 @@ def main() -> int:
         action="store_true",
         help="allow parameters not known to vehkernel-replay",
     )
+    parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        help="override parameter as NAME=VALUE (can be repeated)",
+    )
     args = parser.parse_args()
+
+    param_overrides: dict[str, int | float] = {}
+    for item in args.param:
+        if "=" not in item:
+            parser.error(f"--param must be NAME=VALUE, got '{item}'")
+        k, _, v = item.partition("=")
+        try:
+            val: int | float = int(v)
+        except ValueError:
+            try:
+                val = float(v)
+            except ValueError:
+                parser.error(f"parameter value '{v}' for '{k}' must be int or float")
+        param_overrides[k] = val
 
     try:
         replay(
@@ -263,6 +320,7 @@ def main() -> int:
             args.out_log,
             args.executable,
             allow_unknown_parameters=args.allow_unknown_parameters,
+            params=param_overrides,
         )
     except RuntimeError as err:
         print(f"ERROR: {err}", file=sys.stderr)

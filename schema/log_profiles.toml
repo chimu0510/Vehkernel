@@ -14,7 +14,9 @@ description = "Inputs and outputs for replaying estimators on recorded logs (spe
 entries = [
     { topic = "imu_sample", instance = 0, rate = "every_sample" },
     { topic = "body_velocity_measurement", instance = 0, rate = "every_sample" },
+    { topic = "magnetometer_sample", instance = 0, rate = "every_sample" },
     { topic = "vehicle_attitude", rate = 50 },
+    { topic = "estimator_attitude", rate = 50 },
     { topic = "vehicle_local_odometry", rate = 50 },
     { topic = "actuator_outputs", rate = 50 },
     { topic = "vehicle_status", rate = "as_published" },

@@ -800,11 +800,11 @@ TEST_F(LinkTest, ProfileStreamsRunUnscaledWhileTopicMapIsScaled)
 {
     TopicStreamOf<vk::msg::AllocationStatus> stream(vk::link::MaxRate{500.0F});
     const std::array<TopicStream*, 1> map{&stream};
-    // At baud = 576000, capacity = 57600 * 0.8 = 46080 B/s.
+    // At baud = 800000, capacity = 80000 * 0.8 = 64000 B/s.
     // AllocationStatus alone (500 Hz * ~34 bytes = 17000 B/s) fits easily, rate is 500 Hz.
-    // When estimator_replay starts (~39754 B/s on SITL), capacity remaining is ~6326 B/s.
+    // When estimator_replay starts (54109 B/s on SITL), capacity remaining is 9891 B/s.
     // AllocationStatus is not in the profile, so it must scale down.
-    transport.baud = 576000;
+    transport.baud = 800000;
     Link link("link_test", transport, map, {}, queue);
     link.start();
     connect();

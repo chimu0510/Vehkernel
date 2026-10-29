@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Replay program (ADR-0018 L2, spec 0011): builds AttitudeEstimator and
-// LocalOdometry unchanged on a WorkQueue with a replay clock.
+// Replay program (ADR-0018 L2, spec 0011, spec 0012): builds attitude estimators
+// (AttitudeEstimator, EkfAttitudeEstimator) and LocalOdometry unchanged on a WorkQueue
+// with a replay clock.
 //
 // Work item order on wq:ctrl:
-// 1. IMU driver (ICM20948): publishes imu_sample, which wakes attitude_estimator.
-// 2. Attitude estimator (AttitudeEstimator): estimates attitude and gyro bias,
-//    publishes vehicle_attitude.
+// 1. IMU driver (ICM20948): publishes imu_sample and magnetometer_sample at the same run timestamp.
+// 2. Attitude estimators (AttitudeEstimator, EkfAttitudeEstimator): woken by imu_sample,
+//    drain magnetometer_sample, publish vehicle_attitude and estimator_attitude.
 // 3. Vehicle model (VelocityMeasurementTask): computes body velocity measurement
 //    from wheel encoders, publishes body_velocity_measurement, which wakes local_odometry.
 // 4. Local odometry (LocalOdometry): dead-reckons along the attitude's heading,
 //    publishes vehicle_local_odometry.
 //
 // When records share the same timestamp, inputs are published in this order:
-// parameter changes -> estimator_restart -> imu_sample -> body_velocity_measurement.
+// parameter changes -> estimator_restart -> magnetometer_sample (instance 0) -> imu_sample -> body_velocity_measurement.
 //
 // Stdin/stdout simple framing:
 // - Record 'P' (0x50): Parameter
@@ -27,14 +28,22 @@
 //   instance (uint8)
 //   payload_len (uint16, LE)
 //   payload (payload_len bytes)
+#include <vk/config.h>
 #include <vk/core/bus.hpp>
 #include <vk/core/parameters.hpp>
 #include <vk/core/work_queue.hpp>
+#ifdef CONFIG_ESTIMATOR_MAHONY
 #include <vk/estimation/attitude_estimator.hpp>
+#endif
+#ifdef CONFIG_ESTIMATOR_EKF
+#include <vk/estimation/ekf_attitude_estimator.hpp>
+#endif
 #include <vk/estimation/local_odometry.hpp>
 #include <vk/msg/body_velocity_measurement.hpp>
+#include <vk/msg/estimator_attitude.hpp>
 #include <vk/msg/estimator_restart.hpp>
 #include <vk/msg/imu_sample.hpp>
+#include <vk/msg/magnetometer_sample.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
 #include <vk/msg/vehicle_local_odometry.hpp>
 #include <vk/params/params.hpp>
@@ -44,6 +53,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -103,23 +113,47 @@ int main()
 {
     vk::core::Parameters params(vk::params::table(), &replay_clock);
 
-    // Initial parameter setup before work items are started
+    // Initial parameter setup before work items are started.
     // Stdin loop will first receive initial parameters with timestamp 0.
+    // Work items are constructed after initial parameters are applied,
+    // so they read logged EST_PRIMARY, EKF_MAG_TYPE, etc. (spec 0012).
     vk::core::WorkQueue queue("wq:ctrl", 1, &replay_clock);
 
-    vk::estimation::AttitudeEstimator::Config att_config{.imu_instance = 0, .primary = true};
-    vk::estimation::AttitudeEstimator attitude_estimator(att_config, queue);
-    attitude_estimator.start();
+#ifdef CONFIG_ESTIMATOR_MAHONY
+    std::optional<vk::estimation::AttitudeEstimator> attitude_estimator;
+#endif
+#ifdef CONFIG_ESTIMATOR_EKF
+    std::optional<vk::estimation::EkfAttitudeEstimator> ekf_attitude_estimator;
+#endif
+    std::optional<vk::estimation::LocalOdometry> local_odometry;
 
-    vk::estimation::LocalOdometry::Config odom_config{.measurement = 0};
-    vk::estimation::LocalOdometry local_odometry(odom_config, queue);
-    local_odometry.start();
+    bool estimators_started = false;
+    auto ensure_estimators_started = [&]() {
+        if (estimators_started) {
+            return;
+        }
+        estimators_started = true;
+#ifdef CONFIG_ESTIMATOR_MAHONY
+        attitude_estimator.emplace(vk::estimation::AttitudeEstimator::Config{.imu_instance = 0}, queue);
+        attitude_estimator->start();
+#endif
+#ifdef CONFIG_ESTIMATOR_EKF
+        ekf_attitude_estimator.emplace(vk::estimation::EkfAttitudeEstimator::Config{.imu_instance = 0, .mag_instance = 0},
+                                       queue);
+        ekf_attitude_estimator->start();
+#endif
+        local_odometry.emplace(vk::estimation::LocalOdometry::Config{.measurement = 0}, queue);
+        local_odometry->start();
+    };
 
     vk::core::Publication<vk::msg::ImuSample> imu_pub{0};
+    vk::core::Publication<vk::msg::MagnetometerSample> mag_pub{0};
     vk::core::Publication<vk::msg::BodyVelocityMeasurement> vel_pub{0};
     vk::core::Publication<vk::msg::EstimatorRestart> restart_pub{0};
 
     vk::core::Subscription<vk::msg::VehicleAttitude> attitude_sub{0};
+    vk::core::Subscription<vk::msg::EstimatorAttitude> est_attitude_sub0{0};
+    vk::core::Subscription<vk::msg::EstimatorAttitude> est_attitude_sub1{1};
     vk::core::Subscription<vk::msg::VehicleLocalOdometry> odometry_sub{0};
 
     std::array<std::array<char, 64>, 64> unknown_names{};
@@ -132,6 +166,24 @@ int main()
             const std::size_t enc_len = att.encode(out_buf);
             if (enc_len > 0) {
                 write_stdout_record("vehicle_attitude", 0, std::span(out_buf.data(), enc_len));
+            }
+        }
+
+        vk::msg::EstimatorAttitude est_att0{};
+        while (est_attitude_sub0.copy(est_att0)) {
+            std::array<std::uint8_t, vk::msg::EstimatorAttitude::encoded_size> out_buf{};
+            const std::size_t enc_len = est_att0.encode(out_buf);
+            if (enc_len > 0) {
+                write_stdout_record("estimator_attitude", 0, std::span(out_buf.data(), enc_len));
+            }
+        }
+
+        vk::msg::EstimatorAttitude est_att1{};
+        while (est_attitude_sub1.copy(est_att1)) {
+            std::array<std::uint8_t, vk::msg::EstimatorAttitude::encoded_size> out_buf{};
+            const std::size_t enc_len = est_att1.encode(out_buf);
+            if (enc_len > 0) {
+                write_stdout_record("estimator_attitude", 1, std::span(out_buf.data(), enc_len));
             }
         }
 
@@ -169,6 +221,7 @@ int main()
             }
 
             if (ts > 0) {
+                ensure_estimators_started();
                 current_time_us = ts;
             }
             const std::string_view name_view(name.data(), nlen);
@@ -201,6 +254,7 @@ int main()
                 }
             }
         } else if (magic == 'D') {
+            ensure_estimators_started();
             std::uint8_t nlen = 0;
             if (!read_exact(&nlen, 1)) {
                 return 1;
@@ -222,7 +276,13 @@ int main()
 
             const std::string_view topic_name(name.data(), nlen);
 
-            if (topic_name == "imu_sample" && instance == 0) {
+            if (topic_name == "magnetometer_sample" && instance == 0) {
+                vk::msg::MagnetometerSample sample{};
+                if (vk::msg::MagnetometerSample::decode(std::span(payload.data(), plen), sample)) {
+                    current_time_us = sample.timestamp;
+                    mag_pub.publish(sample);
+                }
+            } else if (topic_name == "imu_sample" && instance == 0) {
                 vk::msg::ImuSample sample{};
                 if (vk::msg::ImuSample::decode(std::span(payload.data(), plen), sample)) {
                     current_time_us = sample.timestamp;

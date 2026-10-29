@@ -12,8 +12,19 @@ REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO / "tools" / "log"))
 
 from compare import compare_logs  # noqa: E402
-from replay import replay  # noqa: E402
+from replay import ordered_in_flight_records, replay  # noqa: E402
 import vkulog  # noqa: E402
+
+
+def make_magnetometer_data(
+    ts: int,
+    device_instance: int = 0,
+    field: tuple[float, float, float] = (30.0, 0.0, 30.0),
+    overflows: int = 0,
+    failures: int = 0,
+) -> bytes:
+    # magnetometer_sample: uint64 timestamp, uint8 device_instance, float[3] field, uint32 overflows, uint32 failures
+    return struct.pack("<QB3fII", ts, device_instance, *field, overflows, failures)
 
 
 def make_imu_sample_data(
@@ -80,6 +91,93 @@ def test_input_order_between_topics(tmp_path: Path):
     topic_names = {sub.message_name for sub in reader.subscriptions.values()}
     assert "vehicle_attitude" in topic_names
     assert "vehicle_local_odometry" in topic_names
+
+
+def test_input_order_with_magnetometer_and_parameters(tmp_path: Path):
+    """At the same timestamp, order is parameter change -> estimator_restart ->
+    magnetometer_sample (instance 0) -> imu_sample -> body_velocity_measurement;
+    a magnetometer_sample alone between two IMU samples preserves timestamp order (spec 0012)."""
+    log_path = tmp_path / "order_test.ulg"
+
+    t1 = 1_000_000
+    t_mid = 1_002_500
+    t2 = 1_005_000
+
+    with vkulog.ULogWriter(log_path, start_timestamp_us=t1) as w:
+        w.write_format(vkulog.FORMATS["imu_sample"])
+        w.write_format(vkulog.FORMATS["magnetometer_sample"])
+        w.write_format(vkulog.FORMATS["body_velocity_measurement"])
+        w.write_parameter("ATT_KP", 1.0)
+        w.write_add_logged(1, "imu_sample", 0)
+        w.write_add_logged(2, "magnetometer_sample", 0)
+        w.write_add_logged(3, "body_velocity_measurement", 0)
+
+        # Write in arbitrary/scrambled order to verify sorting:
+        # At t1: imu_sample, magnetometer_sample, body_velocity_measurement, parameter change
+        w.write_data(3, make_velocity_data(t1, t1))
+        w.write_data(1, make_imu_sample_data(t1))
+        w.write_data(2, make_magnetometer_data(t1))
+        w.write_parameter("ATT_KP", 2.0)
+
+        # Between t1 and t2: magnetometer_sample alone
+        w.write_data(2, make_magnetometer_data(t_mid))
+
+        # At t2: imu_sample
+        w.write_data(1, make_imu_sample_data(t2))
+
+    reader = vkulog.ULogReader(log_path)
+    records = ordered_in_flight_records(reader)
+
+    # Expected order:
+    # 1. Parameter change at t1 ('P', "ATT_KP", priority 0)
+    # 2. magnetometer_sample at t1 ('D', "magnetometer_sample", priority 2)
+    # 3. imu_sample at t1 ('D', "imu_sample", priority 3)
+    # 4. body_velocity_measurement at t1 ('D', "body_velocity_measurement", priority 4)
+    # 5. magnetometer_sample alone at t_mid ('D', "magnetometer_sample", priority 2)
+    # 6. imu_sample at t2 ('D', "imu_sample", priority 3)
+
+    assert len(records) == 6
+
+    # 1. Parameter change at t1
+    assert records[0][0] == t1
+    assert records[0][1] == 0
+    assert records[0][2] == "P"
+    assert records[0][3] == ("ATT_KP", 2.0)
+
+    # 2. magnetometer_sample at t1
+    assert records[1][0] == t1
+    assert records[1][1] == 2
+    assert records[1][2] == "D"
+    assert records[1][3][0] == "magnetometer_sample"
+    assert records[1][3][1] == 0
+
+    # 3. imu_sample at t1
+    assert records[2][0] == t1
+    assert records[2][1] == 3
+    assert records[2][2] == "D"
+    assert records[2][3][0] == "imu_sample"
+    assert records[2][3][1] == 0
+
+    # 4. body_velocity_measurement at t1
+    assert records[3][0] == t1
+    assert records[3][1] == 4
+    assert records[3][2] == "D"
+    assert records[3][3][0] == "body_velocity_measurement"
+    assert records[3][3][1] == 0
+
+    # 5. magnetometer_sample alone at t_mid
+    assert records[4][0] == t_mid
+    assert records[4][1] == 2
+    assert records[4][2] == "D"
+    assert records[4][3][0] == "magnetometer_sample"
+    assert records[4][3][1] == 0
+
+    # 6. imu_sample at t2
+    assert records[5][0] == t2
+    assert records[5][1] == 3
+    assert records[5][2] == "D"
+    assert records[5][3][0] == "imu_sample"
+    assert records[5][3][1] == 0
 
 
 def test_parameter_change_applied_at_its_time(tmp_path: Path):

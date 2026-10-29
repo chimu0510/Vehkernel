@@ -45,7 +45,9 @@ The `estimator_replay` profile records estimator inputs and outputs:
 |---|---|---|
 | `imu_sample:0` | `every_sample` (200 Hz) | Gyro and accelerometer inputs |
 | `body_velocity_measurement:0` | `every_sample` (200 Hz) | Wheel encoder velocity inputs |
-| `vehicle_attitude` | 50 Hz | Mahony filter attitude estimate |
+| `magnetometer_sample:0` | `every_sample` (100 Hz) | AK09916 magnetometer sample, calibrated |
+| `vehicle_attitude` | 50 Hz | Primary attitude estimator output (EKF or Mahony, selected by `EST_PRIMARY`) |
+| `estimator_attitude` | 50 Hz | Secondary attitude estimator output (instances 0 Mahony, 1 EKF) |
 | `vehicle_local_odometry` | 50 Hz | Local dead-reckoning estimate |
 | `actuator_outputs` | 50 Hz | The duty applied to each output and its speed target |
 | `vehicle_status` | 5 Hz (`as_published`) | The mode, arming and the vehicle's health |
@@ -56,7 +58,7 @@ The `estimator_replay` profile records estimator inputs and outputs:
 | `vehicle_attitude_groundtruth` | 50 Hz (SITL only) | True attitude in simulation |
 | `vehicle_local_odometry_groundtruth` | 50 Hz (SITL only) | True pose in simulation |
 
-On the C50C the profile takes about 33.9 KB/s with the Link's framing, about 45 % of SERIAL1 at 921600 baud together with the normal topic map; SITL's ground truth topics bring it to about 39.8 KB/s.
+On the C50C the profile takes about 48.2 KB/s with the Link's framing, staying well under the 80 % budget on SERIAL1 at 921600 baud (about 52 % of the port together with the normal topic map); SITL's ground truth topics bring it to about 54.1 KB/s.
 
 ## Stillness after starting
 
@@ -111,10 +113,22 @@ ulog2csv log.ulg
 
 ## Estimator replay and comparison
 
-The replay toolchain (spec 0011, ADR-0018 L2) executes the firmware's estimator algorithms on recorded data on the development host:
-- `test/replay/main.cpp` (`vehkernel-replay`) links `AttitudeEstimator` and `LocalOdometry` unchanged on a work queue running against a simulated replay clock.
-- `tools/log/replay.py` feeds initial parameters and logged sensor inputs (`imu_sample`, `body_velocity_measurement`, `parameter_update`, `estimator_restart`) from a recorded log into the replay binary and writes its output to a new `.ulg` file.
+The replay toolchain (spec 0011, spec 0012, ADR-0018 L2) executes the firmware's estimator algorithms on recorded data on the development host:
+- `test/replay/main.cpp` (`vehkernel-replay`) links both attitude estimators (`AttitudeEstimator` and `EkfAttitudeEstimator`, as built by Kconfig) and `LocalOdometry` unchanged on a work queue running against a simulated replay clock. Work items are constructed after initial parameters are applied, so each estimator reads logged parameters such as `EST_PRIMARY`, `EKF_MAG_TYPE`, and `VEHICLE_TYPE`.
+- `tools/log/replay.py` feeds initial parameters and logged sensor inputs (`magnetometer_sample`, `imu_sample`, `body_velocity_measurement`, `parameter_update`, `estimator_restart`) from a recorded log into the replay binary in `wq:ctrl` order and writes its outputs (`vehicle_attitude`, `estimator_attitude`, `vehicle_local_odometry`) to a new `.ulg` file.
 - `tools/log/compare.py` compares the recorded and replayed files.
+
+### Picking the primary estimator
+
+The replay binary constructs the attitude estimators after applying the initial timestamp-0 parameters (`P` records) from the log. Each estimator checks `EST_PRIMARY` (defaulting to EKF if built, or Mahony as fallback); the selected estimator publishes `vehicle_attitude`, while the secondary publishes `estimator_attitude` (instance 0 for Mahony, instance 1 for EKF).
+
+### Parameter overrides
+
+For logs recorded before a parameter existed (for example, the spec 0011 board log recorded before `EST_PRIMARY` was introduced), or to test an alternative estimator configuration without changing the log file, `replay.py` accepts `--param NAME=VALUE` overrides (or `params={"NAME": value}` in Python). Overrides are applied as timestamp-0 parameters after the log's own:
+
+```bash
+tools/log/replay.py log.ulg replayed.ulg --param EST_PRIMARY=1
+```
 
 ### Running replay
 
@@ -145,9 +159,9 @@ On a board log, `replay.py` sets aside the parameters a board's definition adds 
 ### Pass criteria
 
 1. **Faithfulness**:
-   - For every `vehicle_attitude` and `vehicle_local_odometry` sample in the evaluation window (from `estimator_restart` onward), the replayed sample with the same `timestamp_sample` must match the recorded sample field-for-field.
+   - For every topic present in both logs (`vehicle_attitude`, `vehicle_local_odometry`, and each instance of `estimator_attitude`) in the evaluation window (from `estimator_restart` onward), the replayed sample with the same `timestamp_sample` must match the recorded sample field-for-field.
    - For SITL logs, where the replay binary and SITL executable share the same host toolchain, the match is exact (`--tolerance 0.0`).
    - For board logs, differences due to hardware FPU fused multiply-add and newlib `libm` are accepted within a tight measured tolerance: 1e-4 per field in `replay_board_log`, against a largest difference of 1.4e-5 (position, in metres) over a 70 s drive on the C50C V1.1.
 2. **Estimation metrics**:
-   - `compare.py` aligns the logged ground truth into the local odometry frame at the restart point and computes the mean and maximum attitude error, final position error, and final heading error.
-   - CI runs `sitl_replay` (`test/sitl/check_replay.py`), which records a SITL square drive over UDP, replays it, checks exact faithfulness, verifies zero dropouts, and verifies that the odometry error is within `check_odometry.py`'s bounds against ground truth.
+   - `compare.py` aligns the logged ground truth into the local odometry frame at the restart point, computes the whole attitude error, and reports the yaw error against the truth (the down component of the attitude error) separately as its own metric for `vehicle_attitude` and for each `estimator_attitude` instance, beside the final position error and heading error.
+   - CI runs `sitl_replay` (`test/sitl/check_replay.py`), which records a SITL square drive over UDP with the EKF primary and heading fusion on, replays it, checks exact faithfulness, verifies zero dropouts, checks `vehicle_attitude` (estimator ID 2) and `estimator_attitude:0` (estimator ID 1) with non-zero magnetometer fusion, and verifies that the odometry error is within `check_odometry.py`'s bounds against ground truth.

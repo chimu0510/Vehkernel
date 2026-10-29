@@ -47,9 +47,9 @@ TEST(LogProfiles, EntryCountForBuildPlatform)
     const auto* profile = find_log_profile(LogProfileId::EstimatorReplay);
     ASSERT_NE(profile, nullptr);
 #ifdef CONFIG_PLATFORM_SITL
-    EXPECT_EQ(profile->entries.size(), 28U);
+    EXPECT_EQ(profile->entries.size(), 31U);
 #else
-    EXPECT_EQ(profile->entries.size(), 26U);
+    EXPECT_EQ(profile->entries.size(), 29U);
 #endif
 }
 
@@ -69,65 +69,78 @@ TEST(LogProfiles, EntriesNameExpectedTopics)
     EXPECT_EQ(entries[1].instance, 0);
     EXPECT_EQ(entries[1].rate_kind, LogRateKind::EverySample);
 
-    // Entry 2: vehicle_attitude, instance 0, 50 Hz
-    EXPECT_EQ(entries[2].topic_id, vk::msg::VehicleAttitude::topic_id);
+    // Entry 2: magnetometer_sample, instance 0, every_sample
+    EXPECT_EQ(entries[2].topic_id, vk::msg::MagnetometerSample::topic_id);
     EXPECT_EQ(entries[2].instance, 0);
-    EXPECT_EQ(entries[2].rate_kind, LogRateKind::RateHz);
-    EXPECT_FLOAT_EQ(entries[2].rate_hz, 50.0F);
+    EXPECT_EQ(entries[2].rate_kind, LogRateKind::EverySample);
 
-    // Entry 3: vehicle_local_odometry, instance 0, 50 Hz
-    EXPECT_EQ(entries[3].topic_id, vk::msg::VehicleLocalOdometry::topic_id);
+    // Entry 3: vehicle_attitude, instance 0, 50 Hz
+    EXPECT_EQ(entries[3].topic_id, vk::msg::VehicleAttitude::topic_id);
     EXPECT_EQ(entries[3].instance, 0);
     EXPECT_EQ(entries[3].rate_kind, LogRateKind::RateHz);
     EXPECT_FLOAT_EQ(entries[3].rate_hz, 50.0F);
 
-    // Entry 4: actuator_outputs, instance 0, 50 Hz
-    EXPECT_EQ(entries[4].topic_id, vk::msg::ActuatorOutputs::topic_id);
-    EXPECT_EQ(entries[4].instance, 0);
-    EXPECT_EQ(entries[4].rate_kind, LogRateKind::RateHz);
-    EXPECT_FLOAT_EQ(entries[4].rate_hz, 50.0F);
-
-    // Entry 5: vehicle_status, instance 0, as_published
-    EXPECT_EQ(entries[5].topic_id, vk::msg::VehicleStatus::topic_id);
-    EXPECT_EQ(entries[5].instance, 0);
-    EXPECT_EQ(entries[5].rate_kind, LogRateKind::AsPublished);
-
-    // Entries 6..21: work_item_status, instances 0..15, as_published
-    for (std::uint8_t inst = 0; inst < 16; ++inst) {
-        EXPECT_EQ(entries[6 + inst].topic_id, vk::msg::WorkItemStatus::topic_id);
-        EXPECT_EQ(entries[6 + inst].instance, inst);
-        EXPECT_EQ(entries[6 + inst].rate_kind, LogRateKind::AsPublished);
-    }
-
-    // Entries 22..23: link_status, instances 0..1, as_published
+    // Entries 4..5: estimator_attitude, instances 0..1, 50 Hz
     for (std::uint8_t inst = 0; inst < 2; ++inst) {
-        EXPECT_EQ(entries[22 + inst].topic_id, vk::msg::LinkStatus::topic_id);
-        EXPECT_EQ(entries[22 + inst].instance, inst);
-        EXPECT_EQ(entries[22 + inst].rate_kind, LogRateKind::AsPublished);
+        EXPECT_EQ(entries[4 + inst].topic_id, vk::msg::EstimatorAttitude::topic_id);
+        EXPECT_EQ(entries[4 + inst].instance, inst);
+        EXPECT_EQ(entries[4 + inst].rate_kind, LogRateKind::RateHz);
+        EXPECT_FLOAT_EQ(entries[4 + inst].rate_hz, 50.0F);
     }
 
-    // Entry 24: parameter_update, instance 0, as_published
-    EXPECT_EQ(entries[24].topic_id, vk::msg::ParameterUpdate::topic_id);
-    EXPECT_EQ(entries[24].instance, 0);
-    EXPECT_EQ(entries[24].rate_kind, LogRateKind::AsPublished);
+    // Entry 6: vehicle_local_odometry, instance 0, 50 Hz
+    EXPECT_EQ(entries[6].topic_id, vk::msg::VehicleLocalOdometry::topic_id);
+    EXPECT_EQ(entries[6].instance, 0);
+    EXPECT_EQ(entries[6].rate_kind, LogRateKind::RateHz);
+    EXPECT_FLOAT_EQ(entries[6].rate_hz, 50.0F);
 
-    // Entry 25: estimator_restart, instance 0, as_published
-    EXPECT_EQ(entries[25].topic_id, vk::msg::EstimatorRestart::topic_id);
-    EXPECT_EQ(entries[25].instance, 0);
-    EXPECT_EQ(entries[25].rate_kind, LogRateKind::AsPublished);
+    // Entry 7: actuator_outputs, instance 0, 50 Hz
+    EXPECT_EQ(entries[7].topic_id, vk::msg::ActuatorOutputs::topic_id);
+    EXPECT_EQ(entries[7].instance, 0);
+    EXPECT_EQ(entries[7].rate_kind, LogRateKind::RateHz);
+    EXPECT_FLOAT_EQ(entries[7].rate_hz, 50.0F);
+
+    // Entry 8: vehicle_status, instance 0, as_published
+    EXPECT_EQ(entries[8].topic_id, vk::msg::VehicleStatus::topic_id);
+    EXPECT_EQ(entries[8].instance, 0);
+    EXPECT_EQ(entries[8].rate_kind, LogRateKind::AsPublished);
+
+    // Entries 9..24: work_item_status, instances 0..15, as_published
+    for (std::uint8_t inst = 0; inst < 16; ++inst) {
+        EXPECT_EQ(entries[9 + inst].topic_id, vk::msg::WorkItemStatus::topic_id);
+        EXPECT_EQ(entries[9 + inst].instance, inst);
+        EXPECT_EQ(entries[9 + inst].rate_kind, LogRateKind::AsPublished);
+    }
+
+    // Entries 25..26: link_status, instances 0..1, as_published
+    for (std::uint8_t inst = 0; inst < 2; ++inst) {
+        EXPECT_EQ(entries[25 + inst].topic_id, vk::msg::LinkStatus::topic_id);
+        EXPECT_EQ(entries[25 + inst].instance, inst);
+        EXPECT_EQ(entries[25 + inst].rate_kind, LogRateKind::AsPublished);
+    }
+
+    // Entry 27: parameter_update, instance 0, as_published
+    EXPECT_EQ(entries[27].topic_id, vk::msg::ParameterUpdate::topic_id);
+    EXPECT_EQ(entries[27].instance, 0);
+    EXPECT_EQ(entries[27].rate_kind, LogRateKind::AsPublished);
+
+    // Entry 28: estimator_restart, instance 0, as_published
+    EXPECT_EQ(entries[28].topic_id, vk::msg::EstimatorRestart::topic_id);
+    EXPECT_EQ(entries[28].instance, 0);
+    EXPECT_EQ(entries[28].rate_kind, LogRateKind::AsPublished);
 
 #ifdef CONFIG_PLATFORM_SITL
-    // Entry 26: vehicle_attitude_groundtruth, instance 0, 50 Hz
-    EXPECT_EQ(entries[26].topic_id, vk::msg::VehicleAttitudeGroundtruth::topic_id);
-    EXPECT_EQ(entries[26].instance, 0);
-    EXPECT_EQ(entries[26].rate_kind, LogRateKind::RateHz);
-    EXPECT_FLOAT_EQ(entries[26].rate_hz, 50.0F);
+    // Entry 29: vehicle_attitude_groundtruth, instance 0, 50 Hz
+    EXPECT_EQ(entries[29].topic_id, vk::msg::VehicleAttitudeGroundtruth::topic_id);
+    EXPECT_EQ(entries[29].instance, 0);
+    EXPECT_EQ(entries[29].rate_kind, LogRateKind::RateHz);
+    EXPECT_FLOAT_EQ(entries[29].rate_hz, 50.0F);
 
-    // Entry 27: vehicle_local_odometry_groundtruth, instance 0, 50 Hz
-    EXPECT_EQ(entries[27].topic_id, vk::msg::VehicleLocalOdometryGroundtruth::topic_id);
-    EXPECT_EQ(entries[27].instance, 0);
-    EXPECT_EQ(entries[27].rate_kind, LogRateKind::RateHz);
-    EXPECT_FLOAT_EQ(entries[27].rate_hz, 50.0F);
+    // Entry 30: vehicle_local_odometry_groundtruth, instance 0, 50 Hz
+    EXPECT_EQ(entries[30].topic_id, vk::msg::VehicleLocalOdometryGroundtruth::topic_id);
+    EXPECT_EQ(entries[30].instance, 0);
+    EXPECT_EQ(entries[30].rate_kind, LogRateKind::RateHz);
+    EXPECT_FLOAT_EQ(entries[30].rate_hz, 50.0F);
 #endif
 }
 

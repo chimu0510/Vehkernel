@@ -4,6 +4,7 @@
 # the nominal rate is 100 Hz (spec 0012).
 @queue 4
 @instances 2
+@rate 100
 uint64 timestamp                 # time the sample was taken
 uint8 device_instance            # which magnetometer, 0 for the first
 float32[3] field  @unit uT       # magnetic field in the body frame, x forward, y right, z down

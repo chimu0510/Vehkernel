@@ -28,8 +28,8 @@ def repo_schema():
 
 
 def test_estimator_replay_bandwidth(repo_schema):
-    """The generated bandwidth of estimator_replay is within 5 % of a hand count
-    written in the test, for the C50C's table and for SITL's (spec 0011)."""
+    """The generated bandwidth of estimator_replay matches a hand count and fits
+    under 80 % of 921600 baud (spec 0011, spec 0012)."""
     diag = Diagnostics(str(SCHEMA_DIR / "log_profiles.toml"))
     profiles = load_profiles(SCHEMA_DIR / "log_profiles.toml", repo_schema, diag)
     assert not diag.errors
@@ -39,31 +39,43 @@ def test_estimator_replay_bandwidth(repo_schema):
     assert "estimator_replay" in profile_map
     replay = profile_map["estimator_replay"]
 
-    # Hand count for C50C (bytes/second):
-    # - imu_sample: 200 Hz * 48 B * 1 inst = 9600 B/s
-    # - body_velocity_measurement: 200 Hz * 56 B * 1 inst = 11200 B/s
-    # - vehicle_attitude: 50 Hz * 84 B * 1 inst = 4200 B/s
-    # - vehicle_local_odometry: 50 Hz * 100 B * 1 inst = 5000 B/s
-    # - actuator_outputs: 50 Hz * 51 B * 1 inst = 2550 B/s
-    # - vehicle_status: 5 Hz * 46 B * 1 inst = 230 B/s
-    # - work_item_status: 1 Hz * 60 B * 16 insts = 960 B/s
-    # - link_status: 1 Hz * 57 B * 2 insts = 114 B/s
-    # - parameter_update: 0 Hz = 0 B/s
-    # - estimator_restart: 0 Hz = 0 B/s
-    # Sum: 9600 + 11200 + 4200 + 5000 + 2550 + 230 + 960 + 114 = 33854 B/s (~33 KB/s)
-    hand_count_c50c = 33854.0
+    # Hand count table for C50C (bytes/second):
+    # Framing per record: wire_bytes(encoded_size) = frame + (frame // 254) + 2, where frame = 9 + encoded_size
+    #
+    # | Topic                     | Encoded | Wire  | Rate (Hz)      | Insts | Bandwidth (B/s)       |
+    # |---------------------------|---------|-------|----------------|-------|-----------------------|
+    # | imu_sample                | 37 B    | 48 B  | 200 Hz         | 1     | 200 * 48 * 1  = 9600  |
+    # | body_velocity_measurement | 45 B    | 56 B  | 200 Hz         | 1     | 200 * 56 * 1  = 11200 |
+    # | magnetometer_sample       | 29 B    | 40 B  | 100 Hz         | 1     | 100 * 40 * 1  = 4000  |
+    # | vehicle_attitude          | 86 B    | 97 B  | 50 Hz          | 1     | 50 * 97 * 1   = 4850  |
+    # | estimator_attitude        | 86 B    | 97 B  | 50 Hz          | 2     | 50 * 97 * 2   = 9700  |
+    # | vehicle_local_odometry    | 89 B    | 100 B | 50 Hz          | 1     | 50 * 100 * 1  = 5000  |
+    # | actuator_outputs          | 40 B    | 51 B  | 50 Hz          | 1     | 50 * 51 * 1   = 2550  |
+    # | vehicle_status            | 36 B    | 47 B  | 5 Hz           | 1     | 5 * 47 * 1    = 235   |
+    # | work_item_status          | 49 B    | 60 B  | 1 Hz           | 16    | 1 * 60 * 16   = 960   |
+    # | link_status               | 46 B    | 57 B  | 1 Hz           | 2     | 1 * 57 * 2    = 114   |
+    # | parameter_update          | 16 B    | 27 B  | 0 Hz           | 1     | 0 * 27 * 1    = 0     |
+    # | estimator_restart         | 8 B     | 19 B  | 0 Hz           | 1     | 0 * 19 * 1    = 0     |
+    # Sum: 9600 + 11200 + 4000 + 4850 + 9700 + 5000 + 2550 + 235 + 960 + 114 = 48209 B/s (~48.2 KB/s)
+    hand_count_c50c = 48209.0
 
-    # Hand count for SITL adds:
-    # - vehicle_attitude_groundtruth: 50 Hz * 47 B * 1 inst = 2350 B/s
-    # - vehicle_local_odometry_groundtruth: 50 Hz * 71 B * 1 inst = 3550 B/s
-    # Sum: 33854 + 5900 = 39754 B/s
-    hand_count_sitl = 39754.0
+    # Hand count for SITL adds (PLATFORM_SITL):
+    # | vehicle_attitude_groundtruth       | 36 B | 47 B | 50 Hz | 1 | 50 * 47 * 1 = 2350 |
+    # | vehicle_local_odometry_groundtruth | 60 B | 71 B | 50 Hz | 1 | 50 * 71 * 1 = 3550 |
+    # Sum: 48209 + 2350 + 3550 = 54109 B/s (~54.1 KB/s)
+    hand_count_sitl = 54109.0
 
     bw_c50c = replay.bandwidth_c50c(repo_schema)
     bw_sitl = replay.bandwidth_sitl(repo_schema)
 
-    assert abs(bw_c50c - hand_count_c50c) / hand_count_c50c < 0.05
-    assert abs(bw_sitl - hand_count_sitl) / hand_count_sitl < 0.05
+    assert bw_c50c == hand_count_c50c
+    assert bw_sitl == hand_count_sitl
+
+    # Budget check on SERIAL1 at 921600 baud with 8N1 framing (10 bits per byte)
+    baud_rate = 921600
+    bits_per_byte = 10
+    budget_80_pct = 0.80 * (baud_rate / bits_per_byte)  # 73728.0 B/s
+    assert bw_c50c < budget_80_pct
 
 
 def test_build_fails_on_unknown_topic(repo_schema, tmp_path: Path):
@@ -205,9 +217,11 @@ def test_log_profile_streams_header(repo_schema):
 
     header = log_profile_streams_header(profiles, repo_schema)
     assert "class EstimatorReplayStreams" in header
-    assert "estimator_replay_stream_count = 28;" in header
-    assert "estimator_replay_stream_count = 26;" in header
+    assert "estimator_replay_stream_count = 31;" in header
+    assert "estimator_replay_stream_count = 29;" in header
     assert "TopicStreamOf<msg::ImuSample>" in header
     assert "TopicStreamOf<msg::BodyVelocityMeasurement>" in header
+    assert "TopicStreamOf<msg::MagnetometerSample>" in header
     assert "TopicStreamOf<msg::VehicleAttitude>" in header
+    assert "TopicStreamOf<msg::EstimatorAttitude>" in header
     assert "CONFIG_PLATFORM_SITL" in header

@@ -15,7 +15,7 @@ sys.path.insert(0, str(REPO / "tools/log"))
 sys.path.insert(0, str(REPO / "tools/link"))
 sys.path.insert(0, str(REPO / "test/sitl"))
 
-from compare import compare_logs, compute_odometry_metrics  # noqa: E402
+from compare import compare_logs, compute_odometry_metrics, extract_log_streams  # noqa: E402
 from replay import find_replay_executable, replay  # noqa: E402
 import vkulog  # noqa: E402
 from vklink.recorder import ULogRecorder  # noqa: E402
@@ -49,9 +49,15 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp_dir:
         param_file = str(Path(tmp_dir) / "params.bin")
 
-        # Ticket #153: vehkernel-replay builds only the Mahony estimator. Until #153 adds the EKF
-        # to replay, set EST_PRIMARY to MAHONY (1) via the Link so the recording runs Mahony primary.
-        err = configure_persistent_params(args, param_file, [("EST_PRIMARY", ParamType.INT32, 1)])
+        # Configure EKF as primary attitude estimator with heading fusion on (spec 0012).
+        err = configure_persistent_params(
+            args,
+            param_file,
+            [
+                ("EST_PRIMARY", ParamType.INT32, 2),
+                ("EKF_MAG_TYPE", ParamType.INT32, 2),
+            ],
+        )
         if err is not None:
             failures.append(err)
             return 1
@@ -146,7 +152,27 @@ def main() -> int:
             if not faithful:
                 failures.append("replayed log is not faithful (mismatches detected with tolerance 0.0)")
 
-            # 4. Check replayed odometry bounds against logged ground truth
+            # 4. Check estimator topics in replayed log (spec 0012)
+            rep_streams = extract_log_streams(replayed_path)
+            veh_att_samples = rep_streams.get(("vehicle_attitude", 0), [])
+            est_att0_samples = rep_streams.get(("estimator_attitude", 0), [])
+
+            if not veh_att_samples:
+                failures.append("replayed log contains no vehicle_attitude samples")
+            elif any(s["estimator_id"] != 2 for s in veh_att_samples):
+                bad_ids = {s["estimator_id"] for s in veh_att_samples if s["estimator_id"] != 2}
+                failures.append(f"vehicle_attitude has unexpected estimator_id: {bad_ids}, expected 2 (EKF)")
+
+            if not est_att0_samples:
+                failures.append("replayed log contains no estimator_attitude:0 samples")
+            elif any(s["estimator_id"] != 1 for s in est_att0_samples):
+                bad_ids = {s["estimator_id"] for s in est_att0_samples if s["estimator_id"] != 1}
+                failures.append(f"estimator_attitude:0 has unexpected estimator_id: {bad_ids}, expected 1 (Mahony)")
+
+            if veh_att_samples and not any(s.get("mag_fused", 0) > 0 for s in veh_att_samples):
+                failures.append("vehicle_attitude (EKF output) has zero mag_fused; expected magnetometer fusion")
+
+            # 5. Check replayed odometry bounds against logged ground truth
             pos_error, heading_error_deg, driven = compute_odometry_metrics(recorded_path, replayed_path)
             max_pos_error = driven * POSITION_TOLERANCE + POSITION_FLOOR
             print(f"Odometry vs truth: driven {driven:.3f} m, position error {pos_error:.4f} m (bound {max_pos_error:.4f} m), "

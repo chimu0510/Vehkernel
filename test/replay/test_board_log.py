@@ -29,5 +29,7 @@ TOLERANCE = 1e-4
 
 def test_replay_board_log(tmp_path: Path):
     replayed = tmp_path / "replayed.ulg"
-    replay(BOARD_LOG, replayed)
+    # The spec 0011 board log was recorded before EST_PRIMARY existed, so override
+    # EST_PRIMARY=1 (MAHONY) to replay with the Mahony estimator that generated the logged estimates.
+    replay(BOARD_LOG, replayed, params={"EST_PRIMARY": 1})
     assert compare_logs(BOARD_LOG, replayed, tolerance=TOLERANCE)

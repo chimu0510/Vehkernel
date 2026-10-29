@@ -300,4 +300,60 @@ def test_metrics_match_hand_computed_values_with_nonzero_start_pose(tmp_path: Pa
     compare_logs(replayed_file, replayed_file, tolerance=0.0, truth_path=truth_file)
     out = capsys.readouterr().out
     assert "Metrics: attitude error mean=2.5000 deg, max=5.0000 deg, end=5.0000 deg" in out
+    assert "yaw error mean=2.5000 deg, max=5.0000 deg, end=5.0000 deg" in out
     assert "Metrics: position error at end=0.0500 m, heading error at end=3.0000 deg" in out
+
+
+def test_estimator_attitude_metrics_and_comparison(tmp_path: Path, capsys):
+    """estimator_attitude is compared on each instance and reports yaw error against truth (spec 0012)."""
+    truth_file = tmp_path / "truth_est.ulg"
+    replayed_file = tmp_path / "replayed_est.ulg"
+
+    t0 = 1_000_000
+    t1 = 1_100_000
+
+    q_identity = (1.0, 0.0, 0.0, 0.0)
+    # At t1, vehicle turned 90 deg right (yaw = pi/2)
+    q_truth_t1 = (math.cos(math.pi / 4), 0.0, 0.0, math.sin(math.pi / 4))
+
+    with vkulog.ULogWriter(truth_file, start_timestamp_us=t0) as w:
+        w.write_format(vkulog.FORMATS["vehicle_attitude_groundtruth"])
+        w.write_add_logged(1, "vehicle_attitude_groundtruth", 0)
+        w.write_data(1, struct.pack("<Q4f3f", t0, *q_identity, 0.0, 0.0, 0.0))
+        w.write_data(1, struct.pack("<Q4f3f", t1, *q_truth_t1, 0.0, 0.0, 0.0))
+
+    # Replayed estimator_attitude instance 0 has 2 deg yaw error at t1
+    rad_inst0_yaw = math.pi / 2 + math.radians(2.0)
+    q_inst0 = (math.cos(rad_inst0_yaw / 2), 0.0, 0.0, math.sin(rad_inst0_yaw / 2))
+
+    # Replayed estimator_attitude instance 1 has 4 deg yaw error at t1
+    rad_inst1_yaw = math.pi / 2 + math.radians(4.0)
+    q_inst1 = (math.cos(rad_inst1_yaw / 2), 0.0, 0.0, math.sin(rad_inst1_yaw / 2))
+
+    with vkulog.ULogWriter(replayed_file, start_timestamp_us=t0) as w:
+        w.write_format(vkulog.FORMATS["vehicle_attitude"])
+        w.write_format(vkulog.FORMATS["estimator_attitude"])
+        w.write_add_logged(1, "vehicle_attitude", 0)
+        w.write_add_logged(2, "estimator_attitude", 0)
+        w.write_add_logged(3, "estimator_attitude", 1)
+
+        # t0
+        w.write_data(1, make_attitude_payload(t0, t0, q=q_identity))
+        w.write_data(2, make_attitude_payload(t0, t0, estimator_id=1, q=q_identity))
+        w.write_data(3, make_attitude_payload(t0, t0, estimator_id=2, q=q_identity))
+
+        # t1
+        w.write_data(1, make_attitude_payload(t1, t1, q=q_truth_t1))
+        w.write_data(2, make_attitude_payload(t1, t1, estimator_id=1, q=q_inst0))
+        w.write_data(3, make_attitude_payload(t1, t1, estimator_id=2, q=q_inst1))
+
+    ok = compare_logs(replayed_file, replayed_file, tolerance=0.0, truth_path=truth_file)
+    out = capsys.readouterr().out
+    assert ok is True
+    assert "Faithfulness: exact" in out
+    # Instance 0 metrics
+    assert "Metrics: estimator_attitude:0 attitude error mean=1.0000 deg, max=2.0000 deg, end=2.0000 deg" in out
+    assert "yaw error mean=1.0000 deg, max=2.0000 deg, end=2.0000 deg" in out
+    # Instance 1 metrics
+    assert "Metrics: estimator_attitude:1 attitude error mean=2.0000 deg, max=4.0000 deg, end=4.0000 deg" in out
+    assert "yaw error mean=2.0000 deg, max=4.0000 deg, end=4.0000 deg" in out
