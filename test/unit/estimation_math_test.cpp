@@ -1,21 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The estimation math library and its first models (ADR-0014), against
 // closed forms and known angles.
+#include <vk/estimation/math/matrix.hpp>
 #include <vk/estimation/math/quaternion.hpp>
 #include <vk/estimation/math/vector3.hpp>
 #include <vk/estimation/models/accelerometer_model.hpp>
+#include <vk/estimation/models/magnetometer_model.hpp>
 #include <vk/estimation/models/quaternion_kinematics.hpp>
 
 #include <gtest/gtest.h>
 
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <numbers>
 
 namespace {
 
 using vk::estimation::AccelerometerModel;
 using vk::estimation::Euler;
+using vk::estimation::MagnetometerModel;
+using vk::estimation::Matrix;
+using vk::estimation::Matrix3;
+using vk::estimation::Matrix6;
 using vk::estimation::Quaternion;
 using vk::estimation::QuaternionKinematics;
 using vk::estimation::standard_gravity;
@@ -150,6 +157,150 @@ TEST(AccelerometerModel, LevelsFromAMeasurementAtRest)
         EXPECT_NEAR(level.roll, e.roll, 1e-4F);
         EXPECT_NEAR(level.pitch, e.pitch, 1e-4F);
     }
+}
+
+TEST(Matrix, ArithmeticTransposeSymmetricAndBlocks)
+{
+    const auto a = Matrix<2, 3>::from_rows({{{{1.0F, 2.0F, -1.0F}}, {{0.5F, -3.0F, 4.0F}}}});
+    const auto b = Matrix<2, 3>::from_rows({{{{-2.0F, 1.0F, 3.0F}}, {{1.5F, 2.0F, -1.0F}}}});
+    const Matrix<2, 3> sum = a + b;
+    EXPECT_FLOAT_EQ(sum(0, 0), -1.0F);
+    EXPECT_FLOAT_EQ(sum(0, 2), 2.0F);
+    EXPECT_FLOAT_EQ(sum(1, 1), -1.0F);
+
+    const Matrix<2, 3> diff = a - b;
+    EXPECT_FLOAT_EQ(diff(0, 0), 3.0F);
+    EXPECT_FLOAT_EQ(diff(1, 2), 5.0F);
+
+    const Matrix<2, 3> scaled = 2.0F * a;
+    EXPECT_FLOAT_EQ(scaled(0, 1), 4.0F);
+    EXPECT_FLOAT_EQ((a * -2.0F)(0, 1), (-2.0F * a)(0, 1));
+    EXPECT_FLOAT_EQ((-a)(1, 2), -4.0F);
+
+    const Matrix<3, 2> bt = b.transposed();
+    const Matrix<2, 2> prod = a * bt;
+    // Row 0 of a dot row 0 of b: 1*(-2) + 2*1 + (-1)*3 = -3.
+    EXPECT_FLOAT_EQ(prod(0, 0), -3.0F);
+    // Row 1 of a dot row 1 of b: 0.5*1.5 + (-3)*2 + 4*(-1) = -9.25.
+    EXPECT_FLOAT_EQ(prod(1, 1), -9.25F);
+
+    Matrix3 m = Matrix3::identity();
+    m(0, 2) = 4.0F;
+    m(2, 0) = 2.0F;
+    const Matrix3 sym = m.symmetric();
+    EXPECT_FLOAT_EQ(sym(0, 2), 3.0F);
+    EXPECT_FLOAT_EQ(sym(2, 0), 3.0F);
+    EXPECT_FLOAT_EQ(sym(1, 1), 1.0F);
+
+    Matrix6 big = Matrix6::zero();
+    big.set_block(0, 3, sym);
+    const Matrix3 extracted = big.block<3, 3>(0, 3);
+    EXPECT_FLOAT_EQ(extracted(0, 2), 3.0F);
+    EXPECT_FLOAT_EQ(extracted(1, 1), 1.0F);
+}
+
+TEST(Matrix, SkewMatchesCrossProductAndInvertsUpTo3x3)
+{
+    const Vector3 u{1.5F, -2.0F, 0.75F};
+    const Vector3 v{-0.5F, 3.0F, 2.0F};
+    const Vector3 from_skew = (Matrix3::skew(u) * Matrix<3, 1>::from_vector(v)).vector();
+    expect_near(from_skew, u.cross(v));
+
+    const Quaternion q = Quaternion::from_euler({.roll = 0.3F, .pitch = -0.2F, .yaw = 1.1F});
+    const Matrix3 r_mat = Matrix3::rotation(q);
+    expect_near((r_mat * Matrix<3, 1>::from_vector(v)).vector(), q.rotate(v));
+    expect_near((r_mat.transposed() * Matrix<3, 1>::from_vector(v)).vector(), q.inverse_rotate(v));
+
+    // 1x1 inverse.
+    const auto inv1 = Matrix<1, 1>::from_rows({{{{4.0F}}}}).inverted();
+    ASSERT_TRUE(inv1.has_value());
+    EXPECT_FLOAT_EQ(inv1.value_or(Matrix<1, 1>{})(0, 0), 0.25F);
+    EXPECT_FALSE((Matrix<1, 1>::zero().inverted().has_value()));
+
+    // 2x2 inverse.
+    const auto m2 = Matrix<2, 2>::from_rows({{{{4.0F, 7.0F}}, {{2.0F, 6.0F}}}});
+    const auto inv2 = m2.inverted();
+    ASSERT_TRUE(inv2.has_value());
+    const Matrix<2, 2> id2 = m2 * inv2.value_or(Matrix<2, 2>{});
+    EXPECT_NEAR(id2(0, 0), 1.0F, 1e-6F);
+    EXPECT_NEAR(id2(0, 1), 0.0F, 1e-6F);
+    EXPECT_NEAR(id2(1, 0), 0.0F, 1e-6F);
+    EXPECT_NEAR(id2(1, 1), 1.0F, 1e-6F);
+    const auto singular2 = Matrix<2, 2>::from_rows({{{{1.0F, 2.0F}}, {{2.0F, 4.0F}}}});
+    EXPECT_FALSE(singular2.inverted().has_value());
+
+    // 3x3 inverse: A * A^-1 = I.
+    const auto m3 = Matrix3::from_rows({{{{2.0F, -1.0F, 0.5F}}, {{-1.0F, 3.0F, 1.0F}}, {{0.5F, 1.0F, 4.0F}}}});
+    const auto inv3 = m3.inverted();
+    ASSERT_TRUE(inv3.has_value());
+    const Matrix3 id3 = m3 * inv3.value_or(Matrix3{});
+    for (std::size_t r = 0; r < 3; ++r) {
+        for (std::size_t c = 0; c < 3; ++c) {
+            EXPECT_NEAR(id3(r, c), r == c ? 1.0F : 0.0F, 1e-5F);
+        }
+    }
+    const auto singular3 = Matrix3::from_rows({{{{1.0F, 2.0F, 3.0F}}, {{2.0F, 4.0F, 6.0F}}, {{0.0F, 1.0F, 1.0F}}}});
+    EXPECT_FALSE(singular3.inverted().has_value());
+}
+
+TEST(AccelerometerModel, GravityMeasurementAndRejection)
+{
+    const Quaternion q = Quaternion::from_euler({.roll = deg(15), .pitch = deg(-10), .yaw = deg(40)});
+    const Vector3 at_rest = AccelerometerModel::predict(q);
+    const auto exact = AccelerometerModel::gravity_measurement(q, at_rest, 0.5F);
+    expect_near(exact.innovation, {});
+    EXPECT_NEAR(exact.variance, (0.5F / standard_gravity) * (0.5F / standard_gravity), 1e-7F);
+
+    // Small attitude perturbation delta_theta in the NED frame gives innovation ~ H * [delta_theta; 0].
+    const Vector3 delta_theta{0.01F, -0.015F, 0.02F};
+    const Quaternion q_true = Quaternion::from_rotation_vector(delta_theta) * q;
+    const auto perturbed = AccelerometerModel::gravity_measurement(q, AccelerometerModel::predict(q_true), 0.5F);
+    Matrix<6, 1> dx{};
+    dx.set_block(0, 0, Matrix<3, 1>::from_vector(delta_theta));
+    const Vector3 linear = (perturbed.jacobian * dx).vector();
+    expect_near(perturbed.innovation, linear, 5e-4F);
+
+    // Magnitude far from g is rejected before the gate.
+    EXPECT_TRUE(AccelerometerModel::measure_gravity(q, at_rest, 0.5F, 0.1F).has_value());
+    EXPECT_FALSE(AccelerometerModel::measure_gravity(q, at_rest * 1.2F, 0.5F, 0.1F).has_value());
+}
+
+TEST(MagnetometerModel, LevelsFieldAppliesDeclinationAndWrapsAcrossPi)
+{
+    const Vector3 earth_ned{30.0F, 0.0F, 30.0F};
+    const Quaternion tilted = Quaternion::from_euler({.roll = deg(25), .pitch = deg(-20), .yaw = deg(65)});
+    const Vector3 body_field = MagnetometerModel::predict(tilted, earth_ned);
+
+    // Heading recovered despite roll, pitch and a strong vertical field component.
+    EXPECT_NEAR(MagnetometerModel::heading_from(tilted, body_field), deg(65), 1e-4F);
+    EXPECT_NEAR(MagnetometerModel::heading_from(tilted, body_field, deg(10)), deg(75), 1e-4F);
+
+    // Jacobian touches the yaw error (state 2) only; roll, pitch and bias entries are zero.
+    const auto m = MagnetometerModel::heading_measurement(tilted, body_field, 0.1F);
+    EXPECT_NEAR(m.innovation, 0.0F, 1e-5F);
+    EXPECT_FLOAT_EQ(m.jacobian(0, 0), 0.0F);
+    EXPECT_FLOAT_EQ(m.jacobian(0, 1), 0.0F);
+    EXPECT_FLOAT_EQ(m.jacobian(0, 2), 1.0F);
+    EXPECT_FLOAT_EQ(m.jacobian(0, 3), 0.0F);
+    EXPECT_FLOAT_EQ(m.jacobian(0, 4), 0.0F);
+    EXPECT_FLOAT_EQ(m.jacobian(0, 5), 0.0F);
+    EXPECT_FLOAT_EQ(m.variance, 0.01F);
+
+    // Wrapping across +-pi: true yaw -170 deg vs estimate +170 deg is +20 deg, and the reverse is -20 deg.
+    const Quaternion est_pos = Quaternion::from_euler({.yaw = deg(170)});
+    const Quaternion true_neg = Quaternion::from_euler({.yaw = deg(-170)});
+    const auto wrap_pos =
+        MagnetometerModel::heading_measurement(est_pos, MagnetometerModel::predict(true_neg, earth_ned), 0.1F);
+    EXPECT_NEAR(wrap_pos.innovation, deg(20), 1e-4F);
+
+    const auto wrap_neg =
+        MagnetometerModel::heading_measurement(true_neg, MagnetometerModel::predict(est_pos, earth_ned), 0.1F);
+    EXPECT_NEAR(wrap_neg.innovation, deg(-20), 1e-4F);
+
+    // Field strength rejection.
+    const float ref = earth_ned.norm();
+    EXPECT_TRUE(MagnetometerModel::measure_heading(tilted, body_field, 0.1F, 0.0F, ref, 0.2F).has_value());
+    EXPECT_FALSE(MagnetometerModel::measure_heading(tilted, body_field * 1.3F, 0.1F, 0.0F, ref, 0.2F).has_value());
 }
 
 }  // namespace
