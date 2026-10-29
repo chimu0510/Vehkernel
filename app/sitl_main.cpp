@@ -3,6 +3,7 @@
 //
 // Usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]
 //                       [--motion vehicle|still|tilt|rotate|shake] [--slip <fraction>]
+//                       [--mag-offset <x>,<y>,<z>] [--mag-scale <x>,<y>,<z>] [--mag-off]
 //                       [--param-file <path>]
 //                       [--actuator-power-off] [--reversed-motor <output>]
 //                       [--display <path>] [--reset-cause <cause>[:<fault>]]
@@ -22,6 +23,9 @@
 // scripted profile, the IMU follows that instead and the vehicle is not
 // simulated. Either way the true attitude is published on
 // vehicle_attitude_groundtruth.
+// The simulated magnetometer can be given a hard-iron offset with --mag-offset
+// (in µT in the body frame), a soft-iron scale per body axis with --mag-scale,
+// or simulated missing with --mag-off.
 // Parameters are stored in a simulated NOR Flash: blank at every start, so
 // runs are reproducible, or kept in the file given with --param-file.
 // The simulated board senses actuator power, on unless --actuator-power-off
@@ -141,6 +145,9 @@ struct Options {
     std::uint16_t udp_port = 15600;
     std::optional<vk::sim::MotionProfile> motion;  // none: the ground vehicle
     float slip = 0.0F;
+    std::array<float, 3> mag_offset{0.0F, 0.0F, 0.0F};
+    std::array<float, 3> mag_scale{1.0F, 1.0F, 1.0F};
+    bool mag_off = false;
     const char* param_file = nullptr;  // nullptr: blank Flash in memory
     bool actuator_power = true;
     std::array<bool, vk::platform::actuator_count> reversed_motors{};
@@ -206,12 +213,37 @@ bool parse_address(const char* argument, Options& options)
     return true;
 }
 
+bool parse_vector3(const char* argument, std::array<float, 3>& out)
+{
+    char* end = nullptr;
+    const float x = std::strtof(argument, &end);
+    if (end == argument || *end != ',') {
+        return false;
+    }
+    const char* p2 = end + 1;
+    const float y = std::strtof(p2, &end);
+    if (end == p2 || *end != ',') {
+        return false;
+    }
+    const char* p3 = end + 1;
+    const float z = std::strtof(p3, &end);
+    if (end == p3 || *end != '\0') {
+        return false;
+    }
+    out = {x, y, z};
+    return true;
+}
+
 bool parse_options(std::span<char*> args, Options& options)
 {
     for (std::size_t i = 1; i < args.size(); ++i) {
         const std::string_view arg = args[i];
         if (arg == "--actuator-power-off") {
             options.actuator_power = false;
+            continue;
+        }
+        if (arg == "--mag-off") {
+            options.mag_off = true;
             continue;
         }
         if (i + 1 >= args.size()) {
@@ -243,6 +275,14 @@ bool parse_options(std::span<char*> args, Options& options)
             char* end = nullptr;
             options.slip = std::strtof(value, &end);
             if (*end != '\0' || !(options.slip >= 0.0F && options.slip < 1.0F)) {
+                return false;
+            }
+        } else if (arg == "--mag-offset") {
+            if (!parse_vector3(value, options.mag_offset)) {
+                return false;
+            }
+        } else if (arg == "--mag-scale") {
+            if (!parse_vector3(value, options.mag_scale)) {
                 return false;
             }
         } else if (arg == "--udp") {
@@ -536,6 +576,10 @@ void print_report(double duration_s)
                     queue.data(), stats.runs, stats.overruns, stats.run_time_last_us, stats.run_time_max_us,
                     stats.run_time_mean_us, stats.jitter_max_us);
     }
+    for (const auto& read : vk::platform::simulated_imu().read_transfers()) {
+        std::printf("i2c_read device=icm20948 register=0x%02x length=%zu count=%llu\n",
+                    read.reg, read.length, static_cast<unsigned long long>(read.count));
+    }
 }
 
 #ifdef CONFIG_ESTIMATOR_MAHONY
@@ -558,6 +602,7 @@ int main(int argc, char** argv)
     if (!parse_options(std::span(argv, static_cast<std::size_t>(argc)), options)) {
         std::fputs("usage: vehkernel-sitl [--duration <seconds>] [--link udp|pty] [--udp <address>:<port>]\n"
                    "                      [--motion vehicle|still|tilt|rotate|shake] [--slip <fraction>]\n"
+                   "                      [--mag-offset <x>,<y>,<z>] [--mag-scale <x>,<y>,<z>] [--mag-off]\n"
                    "                      [--param-file <path>]\n"
                    "                      [--actuator-power-off] [--reversed-motor <output>]\n"
                    "                      [--display <path>] [--reset-cause <cause>[:<fault>]]\n"
@@ -566,6 +611,10 @@ int main(int argc, char** argv)
         return 2;
     }
     vk::platform::init(options.motion.value_or(vk::sim::MotionProfile::Still));
+    vk::platform::set_mag_config({.offset = options.mag_offset, .scale = options.mag_scale});
+    if (options.mag_off) {
+        vk::platform::simulated_imu().set_mag_responding(false);
+    }
     vk::platform::set_reset_report(options.reset);
     vk::platform::raise_fault_when_driven(options.fault);
     vk::platform::set_actuator_power(options.actuator_power);

@@ -17,6 +17,7 @@
 #include <vk/estimation/math/vector3.hpp>
 #include <vk/estimation/models/wheel_kinematics.hpp>
 #include <vk/sim/icm20948.hpp>
+#include <vk/sim/motion.hpp>
 
 #include <array>
 #include <cstddef>
@@ -67,11 +68,14 @@ private:
 // Drives a simulated ICM20948 from a ground vehicle: the gyro reads the
 // vehicle's yaw rate plus a constant bias, the accelerometer the specific
 // force of a level body plus its linear acceleration, both in the sensor
-// frame (x forward, y left, z up).
+// frame (x forward, y left, z up). The magnetometer field is the NED Earth
+// field rotated by the true attitude into the body frame, scaled, offset, and
+// rotated into the sensor frame.
 class VehicleImu final : public Icm20948::OutputSource {
 public:
-    VehicleImu(GroundVehicle& vehicle, const estimation::Vector3& gyro_bias)
-        : vehicle_(vehicle), gyro_bias_(gyro_bias)
+    VehicleImu(GroundVehicle& vehicle, const estimation::Vector3& gyro_bias,
+               const MagConfig& mag = {})
+        : vehicle_(vehicle), gyro_bias_(gyro_bias), mag_(mag)
     {
     }
 
@@ -82,10 +86,14 @@ public:
     ~VehicleImu() = default;
 
     void update(Icm20948& imu) override;
+    std::optional<std::array<float, 3>> field_at(std::uint64_t time_us) override;
+
+    void set_mag_config(const MagConfig& mag) { mag_ = mag; }
 
 private:
     GroundVehicle& vehicle_;
     estimation::Vector3 gyro_bias_;
+    MagConfig mag_{};
 };
 
 }  // namespace vk::sim

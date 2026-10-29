@@ -27,6 +27,12 @@ inline constexpr std::uint32_t imu_rate_hz = 200;
 // The simulated I2C bus the IMU is attached to.
 sim::I2cBus& imu_bus();
 
+// The simulated ICM20948 IMU.
+sim::Icm20948& simulated_imu();
+
+// Sets the magnetic field configuration for the simulated IMU's motion source.
+void set_mag_config(const sim::MagConfig& config);
+
 // SITL's display (ADR-0022): a simulated SSD1306, which is its own display bus.
 sim::Ssd1306& display();
 

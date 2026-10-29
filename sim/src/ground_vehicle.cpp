@@ -67,4 +67,16 @@ void VehicleImu::update(Icm20948& imu)
     imu.set_accel({accel.x, -accel.y, -accel.z});
 }
 
+std::optional<std::array<float, 3>> VehicleImu::field_at(std::uint64_t /*time_us*/)
+{
+    const GroundVehicle::State& truth = vehicle_.state();
+    const Vector3 body_field = truth.attitude().inverse_rotate(mag_.earth_field);
+    const Vector3 distorted{
+        body_field.x * mag_.scale[0] + mag_.offset[0],
+        body_field.y * mag_.scale[1] + mag_.offset[1],
+        body_field.z * mag_.scale[2] + mag_.offset[2]
+    };
+    return std::array<float, 3>{distorted.x, -distorted.y, -distorted.z};
+}
+
 }  // namespace vk::sim

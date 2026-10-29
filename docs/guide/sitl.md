@@ -17,6 +17,9 @@ build/sitl/app/vehkernel-sitl --duration 5
 | `--udp <address>:<port>` | The UDP address, `127.0.0.1:15600` by default; port 0 picks a free one |
 | `--motion <profile>` | What moves the simulated IMU: `vehicle`, the default ([Ground vehicle](#ground-vehicle)), or a scripted profile ([Motion profiles](#motion-profiles)) |
 | `--slip <fraction>` | The fraction of its wheels' motion the ground vehicle loses, 0 by default ([Ground vehicle](#ground-vehicle)) |
+| `--mag-offset <x>,<y>,<z>` | Hard-iron offset in µT in the body frame, added to the field |
+| `--mag-scale <x>,<y>,<z>` | Soft-iron scale per body axis, multiplying the field before the offset |
+| `--mag-off` | Missing AK09916 magnetometer (the simulated device does not respond) |
 | `--param-file <path>` | Keeps the simulated parameter Flash in a file ([Parameters](link-monitor.md#parameters)) |
 | `--display <path>` | Writes the simulated display to a PBM image ([Local display](local-display.md)) |
 | `--actuator-power-off`, `--reversed-motor <output>` | Simulated actuator faults ([Driving the wheels](driving.md)) |
@@ -42,9 +45,10 @@ work_item name=commander queue=wq:ctrl runs=1000 overruns=0 run_time_last_us=15 
 work_item name=local_display queue=wq:slow runs=100 overruns=0 run_time_last_us=24 run_time_max_us=53 run_time_mean_us=20 jitter_max_us=1125
 work_item name=link0 queue=wq:io runs=1000 overruns=0 run_time_last_us=9 run_time_max_us=26 run_time_mean_us=9 jitter_max_us=2900
 work_item name=timing_monitor queue=wq:slow runs=5 overruns=0 run_time_last_us=35 run_time_max_us=47 run_time_mean_us=36 jitter_max_us=949
+i2c_read device=icm20948 register=0x2d length=14 count=1000
 ```
 
-`rate_hz` is the average since the topic's first publication. `test/sitl/check_report.py` runs SITL and checks the report; CI runs it through `ctest` (the `sitl_smoke` test), failing when `imu_sample` is not published at 200 Hz within 5 %, or any work item overruns or never runs. With the UDP Link, overruns count over a check window after start-up, and an interval in which most work items overran at once is a host stall of the whole SITL process, not counted. SITL tests run serially under `ctest -j`, since they judge timing on the shared host.
+`rate_hz` is the average since the topic's first publication, and `i2c_read` records read transfer counts by starting register and length. `test/sitl/check_report.py` runs SITL and checks the report; CI runs it through `ctest` (the `sitl_smoke` test), failing when `imu_sample` is not published at 200 Hz within 5 %, or any work item overruns or never runs. With the UDP Link, overruns count over a check window after start-up, and an interval in which most work items overran at once is a host stall of the whole SITL process, not counted. SITL tests run serially under `ctest -j`, since they judge timing on the shared host.
 
 ## Faults and reset cause
 

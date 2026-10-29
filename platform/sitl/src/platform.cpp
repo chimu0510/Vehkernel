@@ -108,6 +108,7 @@ std::array<hal::MotorChannel, actuator_count> channels{};
 sim::I2cBus bus;
 sim::Icm20948 imu(&hal::SystemClock::now_us);
 sim::Ssd1306 oled;
+sim::MagConfig mag_config{};
 // A small gyroscope bias in the body frame.
 constexpr estimation::Vector3 gyro_bias{0.002F, 0.001F, -0.0005F};
 core::StaticInstance<sim::MotionImu> motion;
@@ -271,16 +272,33 @@ void init(sim::MotionProfile profile)
     }
 
     // The scripted motion, with sensor noise and a small gyroscope bias.
-    motion.emplace(profile, gyro_bias, &hal::SystemClock::now_us);
+    motion.emplace(profile, gyro_bias, &hal::SystemClock::now_us, mag_config);
     imu.set_output_source(&*motion);
     imu.set_temperature(30.0F);
     imu.set_noise(0.05F, 0.005F);
+    imu.set_field_noise(0.3F);
     bus.attach(imu_address, imu);
 }
 
 sim::I2cBus& imu_bus()
 {
     return bus;
+}
+
+sim::Icm20948& simulated_imu()
+{
+    return imu;
+}
+
+void set_mag_config(const sim::MagConfig& config)
+{
+    mag_config = config;
+    if (motion.has_value()) {
+        motion->set_mag_config(config);
+    }
+    if (vehicle_imu.has_value()) {
+        vehicle_imu->set_mag_config(config);
+    }
 }
 
 sim::Ssd1306& display()
@@ -320,7 +338,7 @@ void start_vehicle(const estimation::WheelKinematics& kinematics,
 {
     vehicle.emplace(sim::GroundVehicle::Config{.kinematics = kinematics, .outputs = outputs, .slip = slip},
                     &hal::SystemClock::now_us, &wheel_speed);
-    vehicle_imu.emplace(*vehicle, gyro_bias);
+    vehicle_imu.emplace(*vehicle, gyro_bias, mag_config);
     imu.set_output_source(&*vehicle_imu);
 }
 

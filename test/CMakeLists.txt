@@ -63,6 +63,14 @@ if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_LINK_UDP)
   endforeach()
 endif()
 
+# L3 SITL magnetometer test (spec 0012): magnetometer sample rate, heading against
+# truth, I2C read transfer sizes, no overruns, and --mag-off.
+if(CONFIG_DRIVER_ICM20948_MAG AND CONFIG_LINK_UDP)
+  add_test(NAME sitl_magnetometer
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/sitl/check_magnetometer.py
+      $<TARGET_FILE:vehkernel-sitl> --msg-dir ${VK_MSG_PYTHON_DIR})
+endif()
+
 # L3 SITL parameter test (spec 0005): list, read, set and refusals through the
 # Link monitor's param command, and a gain changed while the estimator runs.
 if(CONFIG_ESTIMATOR_MAHONY AND CONFIG_LINK_UDP)
