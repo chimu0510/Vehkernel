@@ -8,14 +8,21 @@
 // at construction, and publishes it on imu_sample. Before the
 // first sample it checks WHO_AM_I, resets and configures the device. Read
 // failures are counted and retried; a device that keeps failing is probed
-// and configured again, so a loose cable never stops the firmware. The
-// magnetometer is not used.
+// and configured again, so a loose cable never stops the firmware. When
+// DRIVER_ICM20948_MAG is enabled, it also enables the ICM20948's I2C master,
+// probes and configures the internal AK09916 magnetometer via non-blocking
+// slave 4 transfers, and reads samples through the FIFO (spec 0012).
 #pragma once
 
+#include <vk/config.h>
 #include <vk/core/work_queue.hpp>
 #include <vk/hal/i2c.hpp>
 #include <vk/hal/rotation.hpp>
 #include <vk/msg/imu_sample.hpp>
+
+#if defined(CONFIG_DRIVER_ICM20948_MAG)
+#include <vk/msg/magnetometer_sample.hpp>
+#endif
 
 #include <cstdint>
 
@@ -42,6 +49,12 @@ public:
         std::uint32_t read_failures;   // sample reads that failed
         std::uint32_t probe_failures;  // probes without the expected WHO_AM_I
         std::uint8_t last_who_am_i;    // last value read, 0 if the read failed
+#if defined(CONFIG_DRIVER_ICM20948_MAG)
+        std::uint32_t mag_samples = 0;
+        std::uint32_t mag_failures = 0;
+        std::uint32_t mag_overflows = 0;
+        bool mag_configured = false;
+#endif
     };
 
     static constexpr std::uint8_t who_am_i_value = 0xEA;
@@ -62,10 +75,34 @@ private:
     void read_sample(std::uint64_t now);
     bool select_bank(std::uint8_t bank);
 
+#if defined(CONFIG_DRIVER_ICM20948_MAG)
+    enum class MagState : std::uint8_t {
+        Probing,        // waiting for probe interval to start setup
+        WaitingWhoAmI,  // slave 4 WHO_AM_I read started, waiting for completion
+        WaitingCntl2,   // slave 4 CNTL2 write started, waiting for completion
+        Running,        // slave 0 & FIFO enabled, reading FIFO records
+    };
+
+    void service_magnetometer(std::uint64_t now);
+    void read_mag_fifo(std::uint64_t now);
+    void reset_mag_fifo();
+    void reset_mag_setup(std::uint64_t now);
+#endif
+
     hal::I2cDevice device_;
     Config config_;
     hal::RotationMatrix to_body_;  // sensor frame to body frame
     core::Publication<msg::ImuSample> publication_;
+#if defined(CONFIG_DRIVER_ICM20948_MAG)
+    core::Publication<msg::MagnetometerSample> mag_publication_;
+    MagState mag_state_ = MagState::Probing;
+    std::uint64_t next_mag_probe_us_ = 0;
+    std::uint64_t mag_step_started_us_ = 0;
+    std::uint64_t last_mag_sample_us_ = 0;
+    std::uint32_t mag_samples_ = 0;
+    std::uint32_t mag_failures_ = 0;
+    std::uint32_t mag_overflows_ = 0;
+#endif
 
     State state_ = State::Probing;
     std::uint64_t next_probe_us_ = 0;

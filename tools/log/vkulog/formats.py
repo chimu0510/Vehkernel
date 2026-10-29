@@ -21,6 +21,7 @@ FORMATS = {
     'imu_sample': 'imu_sample:uint64_t timestamp;uint8_t device_instance;float[3] accel;float[3] gyro;float temperature;',
     'link_status': 'link_status:uint64_t timestamp;uint32_t frames_sent;uint32_t bytes_sent;uint32_t frames_received;uint32_t bytes_received;uint32_t drops;uint32_t crc_errors;uint32_t malformed;uint32_t lost;uint8_t handshake_state;uint8_t rate_scale;uint32_t inbound_undeclared;',
     'local_menu': 'local_menu:uint64_t timestamp;uint8_t state;uint16_t item;uint8_t last_result;uint16_t last_parameter;bool reboot_required;',
+    'magnetometer_sample': 'magnetometer_sample:uint64_t timestamp;uint8_t device_instance;float[3] field;uint32_t overflows;uint32_t failures;',
     'manual_control_input': 'manual_control_input:uint64_t timestamp;uint8_t source;bool connected;float[4] sticks;float[2] triggers;uint16_t buttons;',
     'parameter_status': 'parameter_status:uint64_t timestamp;uint16_t parameter_count;uint8_t active_sector;uint32_t bytes_used;uint32_t sector_size;uint16_t unsaved;uint16_t pending_reboot;uint16_t skipped_unknown;uint16_t skipped_wrong_type;uint16_t skipped_out_of_range;uint16_t skipped_corrupt;bool failed;',
     'parameter_update': 'parameter_update:uint64_t timestamp;uint32_t name_hash;uint32_t change_count;',

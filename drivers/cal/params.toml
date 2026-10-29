@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Magnetometer calibration parameters applied by the driver in the body frame (ADR-0012, ADR-0014).
+prefix = "CAL"
+
+[[param]]
+name = "CAL_MAG_XOFF"
+type = "FLOAT"
+default = 0.0
+min = -1000.0
+max = 1000.0
+unit = "uT"
+description = "Magnetometer hard-iron X offset in the body frame."
+
+[[param]]
+name = "CAL_MAG_YOFF"
+type = "FLOAT"
+default = 0.0
+min = -1000.0
+max = 1000.0
+unit = "uT"
+description = "Magnetometer hard-iron Y offset in the body frame."
+
+[[param]]
+name = "CAL_MAG_ZOFF"
+type = "FLOAT"
+default = 0.0
+min = -1000.0
+max = 1000.0
+unit = "uT"
+description = "Magnetometer hard-iron Z offset in the body frame."
+
+[[param]]
+name = "CAL_MAG_XSCALE"
+type = "FLOAT"
+default = 1.0
+min = 0.5
+max = 2.0
+description = "Magnetometer soft-iron X scale factor in the body frame."
+
+[[param]]
+name = "CAL_MAG_YSCALE"
+type = "FLOAT"
+default = 1.0
+min = 0.5
+max = 2.0
+description = "Magnetometer soft-iron Y scale factor in the body frame."
+
+[[param]]
+name = "CAL_MAG_ZSCALE"
+type = "FLOAT"
+default = 1.0
+min = 0.5
+max = 2.0
+description = "Magnetometer soft-iron Z scale factor in the body frame."

@@ -62,6 +62,7 @@ public:
 protected:
     virtual void write_register(std::uint8_t reg, std::uint8_t value) = 0;
     virtual std::uint8_t read_register(std::uint8_t reg) = 0;
+    [[nodiscard]] std::uint8_t pointer() const { return pointer_; }
 
 private:
     std::uint8_t pointer_ = 0;

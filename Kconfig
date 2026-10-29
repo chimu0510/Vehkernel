@@ -184,7 +184,16 @@ config DRIVER_ICM20948
 	default y
 	help
 	  TDK InvenSense ICM20948 accelerometer and gyroscope on I2C; the
-	  magnetometer inside it is not used yet.
+	  magnetometer inside it is read through its I2C master when
+	  DRIVER_ICM20948_MAG is set (spec 0012).
+
+config DRIVER_ICM20948_MAG
+	bool "ICM20948 magnetometer (AK09916)"
+	depends on DRIVER_ICM20948
+	default y
+	help
+	  Read the AK09916 magnetometer inside the ICM20948 through its I2C
+	  master and publish magnetometer_sample (spec 0012).
 
 config DRIVER_SSD1306
 	bool "SSD1306 display"

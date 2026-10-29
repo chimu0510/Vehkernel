@@ -106,7 +106,7 @@ std::array<MotorOutput, actuator_count> motor_outputs;
 std::array<hal::MotorChannel, actuator_count> channels{};
 
 sim::I2cBus bus;
-sim::Icm20948 imu;
+sim::Icm20948 imu(&hal::SystemClock::now_us);
 sim::Ssd1306 oled;
 // A small gyroscope bias in the body frame.
 constexpr estimation::Vector3 gyro_bias{0.002F, 0.001F, -0.0005F};
