@@ -1,6 +1,6 @@
 # Spec 0012: the EKF attitude estimator and the magnetometer
 
-**Status**: in progress. Issue: [#149](https://github.com/chimu0510/Vehkernel/issues/149); tickets #150 to #155, with the hardware check in #155.
+**Status**: deferred. Issue: [#149](https://github.com/chimu0510/Vehkernel/issues/149); tickets #150 to #155, with the hardware check in #155. Deferred by the maintainer on 2026-10-30, before the hardware check, to make the host tools work on the vehicle's arm64 companion computer first (spec 0014); #150 to #154 are done, the hardware check #155 is left.
 
 Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
 
