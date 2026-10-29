@@ -18,9 +18,7 @@ constexpr std::uint8_t temp_out_l = 0x3A;
 constexpr std::uint8_t ext_slv_sens_data_00 = 0x3B;
 constexpr std::uint8_t ext_slv_sens_data_08 = 0x43;
 constexpr std::uint8_t fifo_en_1 = 0x66;
-constexpr std::uint8_t fifo_en_2 = 0x67;
 constexpr std::uint8_t fifo_rst = 0x68;
-constexpr std::uint8_t fifo_mode = 0x69;
 constexpr std::uint8_t fifo_counth = 0x70;
 constexpr std::uint8_t fifo_countl = 0x71;
 constexpr std::uint8_t fifo_r_w = 0x72;
@@ -31,9 +29,7 @@ constexpr std::uint8_t gyro_smplrt_div = 0x00;
 constexpr std::uint8_t gyro_config_1 = 0x01;
 constexpr std::uint8_t accel_config = 0x14;
 // Bank 3.
-constexpr std::uint8_t i2c_mst_ctrl = 0x01;
 constexpr std::uint8_t i2c_slv0_addr = 0x03;
-constexpr std::uint8_t i2c_slv0_reg = 0x04;
 constexpr std::uint8_t i2c_slv0_ctrl = 0x05;
 constexpr std::uint8_t i2c_slv4_addr = 0x13;
 constexpr std::uint8_t i2c_slv4_reg = 0x14;
@@ -42,7 +38,6 @@ constexpr std::uint8_t i2c_slv4_do = 0x16;
 constexpr std::uint8_t i2c_slv4_di = 0x17;
 
 constexpr std::uint8_t ak09916_address = 0x0C;
-constexpr std::uint8_t ak09916_who_am_i_reg = 0x01;
 constexpr std::uint8_t ak09916_who_am_i_value = 0x09;
 constexpr std::uint8_t ak09916_cntl2_reg = 0x31;
 constexpr std::uint8_t ak09916_cntl3_reg = 0x32;
