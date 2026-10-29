@@ -47,6 +47,7 @@ def build():
     """原始碼比函式庫新時重新編譯。"""
     if LIB.exists() and all(LIB.stat().st_mtime >= s.stat().st_mtime for s in SOURCES):
         return
+    BUILD.mkdir(parents=True, exist_ok=True)
     PROTO_INC = HERE.parent.parent / "protocol" / "include"
     cmd = ["gcc", "-O2", "-shared", "-fPIC", "-std=gnu11", "-ffp-contract=off", f"-I{COMMON}", f"-I{PROTO_INC}",
            "-o", str(LIB), str(HERE / "native" / "shim.c"), "-lm"]
