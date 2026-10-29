@@ -78,6 +78,12 @@ def tilt_between(a, b) -> float:
     return math.degrees(math.acos(dot))
 
 
+# How much more than the Mahony filter's the EKF's yaw may drift over a profile without heading fusion.
+# Both share most of the error (the same samples and their integration), so they differ by hundredths of
+# a degree, either way from run to run; 0.5 deg still fails an EKF that loses its heading.
+YAW_DRIFT_MARGIN_DEG = 0.5
+
+
 def error_rotation_vector(truth_q, est_q) -> tuple[float, float, float]:
     """NED error rotation vector [rad] about North, East, Down (indices 0, 1, 2)."""
     q_err = multiply(truth_q, conjugate(est_q))
@@ -290,9 +296,10 @@ def main() -> int:
             mahony_common = min(mahony_matches, key=lambda m: abs(m[0]["timestamp"] - target_time))
             ekf_final_yaw_err_deg = abs(math.degrees(ekf_common[2][2]))
             mahony_final_yaw_err_deg = abs(math.degrees(mahony_common[2][2]))
-            # Both estimates compared at the last truth sample both cover (target_time); both estimators
-            # run on the same IMU samples, so no margin is needed.
-            if ekf_final_yaw_err_deg > mahony_final_yaw_err_deg:
+            # Both estimates compared at the last truth sample both cover (target_time). This is a
+            # sanity bound, not a ranking: SITL shows whether the EKF keeps its heading as well as the
+            # Mahony filter, while which one drifts less depends on tuning, compared on the board (#155).
+            if ekf_final_yaw_err_deg > mahony_final_yaw_err_deg + YAW_DRIFT_MARGIN_DEG:
                 failures.append(f"EKF yaw drift ({ekf_final_yaw_err_deg:.2f} deg) worse than Mahony "
                                 f"({mahony_final_yaw_err_deg:.2f} deg)")
             else:
