@@ -175,6 +175,7 @@ agy_sandboxed "$AGY_DELEGATE" --yolo --timeout 60m -d "$PWD" - \
 - The redirections are made by the shell outside the sandbox, so the prompt, report and log live in `../vk-<ticket>.agy/`, which agy cannot read or change.
 - `--yolo` lets agy edit files and run commands without asking; the sandbox is what limits it.
 - The `conversation_id` in the `AGY_USAGE` line of the log identifies the conversation. The next round on the same ticket adds `--conversation <id>`.
+- The `duration_seconds` in the same line is the time since the conversation's first round started, idle time between rounds included, not the length of this round (seen with agy 1.4.9 on 2026-10-29: a 12-minute second round reported 9,081 s). A round's own length is the time from its log's creation to its report's last write, `stat -c '%W %Y' agy-<n>.log report-<n>.md`.
 - The exit code says how it ended: 0 done, 2 agy failed, 10 quota, 11 not logged in, 12 timed out.
 - An agent runs this as a background command, so that a long round is not cut off by a tool call time limit.
 
