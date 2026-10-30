@@ -27,6 +27,16 @@ jobs:
             ctest --preset test
           '
 
+      # Upload the board presets' host tools bundles (spec 0014, ADR-0026).
+      - name: Keep host tools bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundles
+          path: |
+            build/c50c-v1_1/vehkernel-c50c-v1_1-*.tar.gz
+            build/c50c-v1_1-bringup/vehkernel-c50c-v1_1-bringup-*.tar.gz
+          if-no-files-found: error
+
       # Each Link fuzz target for 60 s, three at a time (docs/guide/testing.md).
       - name: Fuzz the Link decoders
         run: |
@@ -39,3 +49,58 @@ jobs:
           name: fuzz-artifacts
           path: build/fuzz/test/fuzz/artifacts/
           if-no-files-found: ignore
+
+  # Tests bundled host tools on Python 3.10 outside the devcontainer (spec 0014 Seam B, ADR-0026).
+  host-tools-py310:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download bundles
+        uses: actions/download-artifact@v4
+        with:
+          name: bundles
+          path: bundles
+
+      # Check out repository to extract a test-only copy of the unit tests (spec 0014).
+      - name: Check out test-only copy of host tool tests
+        uses: actions/checkout@v4
+        with:
+          path: repo-checkout
+
+      - name: Unpack bundle and place tests
+        run: |
+          set -euo pipefail
+          c50c_tarball=$(find bundles -name "vehkernel-c50c-v1_1-*.tar.gz" ! -name "*bringup*" | head -n 1)
+          if [ -z "$c50c_tarball" ]; then
+            echo "Error: c50c-v1_1 bundle tarball not found" >&2
+            exit 1
+          fi
+          mkdir -p bundle
+          tar -xzf "$c50c_tarball" -C bundle --strip-components=1
+          cp -r repo-checkout/tools/link/tests bundle/tools/link/tests
+          cp -r repo-checkout/tools/log/tests bundle/tools/log/tests
+          cp -r repo-checkout/tools/flash/tests bundle/tools/flash/tests
+          cp repo-checkout/tools/bundle/tests/requirements-py310.txt .
+          rm -rf repo-checkout
+
+      # Pinned Python 3.10 runtime (ADR-0016, spec 0014).
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10.22'
+
+      # Install runtime and test dependencies pinned to exact versions (ADR-0016).
+      - name: Install dependencies
+        run: pip install --no-deps -r requirements-py310.txt
+
+      # Run unit tests on Python 3.10 from the unpacked bundle (spec 0014 Seam B, ADR-0026).
+      - name: Run host tool unit tests on Python 3.10
+        working-directory: bundle
+        env:
+          PYTHONPATH: ${{ github.workspace }}/bundle/tools/link:${{ github.workspace }}/bundle/tools/log:${{ github.workspace }}/bundle/generated/schema/python
+          VK_MSG_PYTHON_DIR: ${{ github.workspace }}/bundle/generated/schema/python
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m pytest -q -p no:cacheprovider \
+            --ignore=tools/log/tests/test_replay.py \
+            tools/link/tests tools/log/tests tools/flash/tests
