@@ -25,7 +25,7 @@ import tty
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
-from typing import Callable, Protocol
+from typing import Callable, Mapping, Protocol
 
 from .enums import GamepadButton, HandshakeState, MenuState
 from .frame import Frame, FrameReader, FrameType, LogDropout, LogInfo
@@ -155,6 +155,77 @@ def load_messages(directory: str | Path) -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _display_path(path: Path) -> Path:
+    """Relative to the current directory when under it, else absolute."""
+    try:
+        return path.resolve().relative_to(Path.cwd().resolve())
+    except ValueError:
+        return path.resolve()
+
+
+def format_build_tree_hint(msg_dir: Path) -> str:
+    """Formats the hint naming the matching build tree and its message directory."""
+    build_tree = msg_dir.parents[2]
+    tree_text = _display_path(build_tree)
+    dir_text = _display_path(msg_dir)
+    return f"hint: the MCU matches the build tree in {tree_text}; pass --msg-dir {dir_text}"
+
+
+def find_matching_build_trees(
+    repo_root: Path | str,
+    mismatched_topics: Mapping[str, int],
+    current_msg_dir: Path | str | None = None,
+) -> list[Path]:
+    """Finds message directories under build/*/generated/schema/python/ matching the MCU's hashes.
+
+    A tree matches only when every mismatched topic exists in it with the MCU's hash.
+    Skips the message directory already in use, trees without vkmsg.py, and trees whose
+    vkmsg.py cannot be loaded. Returns matching message directories in a stable order.
+    """
+    if not mismatched_topics:
+        return []
+
+    build_dir = Path(repo_root) / "build"
+    if not build_dir.is_dir():
+        return []
+
+    current_resolved: Path | None = None
+    if current_msg_dir is not None:
+        try:
+            current_resolved = Path(current_msg_dir).resolve()
+        except OSError:
+            pass
+
+    try:
+        entries = sorted(build_dir.iterdir(), key=lambda p: p.name)
+    except OSError:
+        return []
+
+    candidates: list[Path] = []
+    for entry in entries:
+        if not entry.is_dir():
+            continue
+        msg_dir = entry / "generated" / "schema" / "python"
+        if not (msg_dir / "vkmsg.py").is_file():
+            continue
+        if current_resolved is not None and msg_dir.resolve() == current_resolved:
+            continue
+        candidates.append(msg_dir)
+
+    matching: list[Path] = []
+    for msg_dir in candidates:
+        try:
+            messages = load_messages(msg_dir)
+            hashes = {cls.NAME: cls.SCHEMA_HASH for cls in messages.TOPICS.values()}
+        except Exception:
+            # A stale build tree may have half-generated, corrupt or incompatible messages.
+            continue
+        if all(hashes.get(topic) == expected_hash for topic, expected_hash in mismatched_topics.items()):
+            matching.append(msg_dir)
+
+    return matching
 
 
 # Flags of param_value: vk::core::param_state.

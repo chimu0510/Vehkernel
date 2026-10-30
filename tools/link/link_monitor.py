@@ -85,6 +85,8 @@ from vklink.enums import BringupResult, GamepadButton  # noqa: E402
 from vklink.monitor import (  # noqa: E402
     LinkMonitor,
     WorkItemOverruns,
+    find_matching_build_trees,
+    format_build_tree_hint,
     gamepad_line,
     local_menu_line,
     speeds_text,
@@ -556,6 +558,14 @@ def main() -> int:
         if not live:
             for mismatch in monitor.mismatches:
                 print(f"warning: topic {mismatch.name} has a different schema hash on the MCU", file=sys.stderr)
+            if monitor.mismatches:
+                matching = find_matching_build_trees(
+                    REPO_ROOT,
+                    {m.name: m.mcu_hash for m in monitor.mismatches},
+                    current_msg_dir=args.msg_dir,
+                )
+                for msg_dir in matching:
+                    print(format_build_tree_hint(msg_dir), file=sys.stderr)
         while True:
             monitor.run(REFRESH_S if live else 1.0)
             if live:
