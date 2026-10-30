@@ -20,11 +20,7 @@ There are two ways into the container.
 docker build -t vehkernel-dev -f .devcontainer/Dockerfile .
 ```
 
-The image needs a linux/amd64 host: its Arm toolchain is the x86_64 build, and on any other architecture the image build stops at its first step ([ADR-0016](../adr/0016-dependency-policy.md)). On an arm64 host, such as Apple Silicon or an aarch64 Linux machine, build and run it under emulation, which is much slower:
-
-```bash
-docker build --platform linux/amd64 -t vehkernel-dev -f .devcontainer/Dockerfile .
-```
+The image builds natively on linux/amd64 and linux/arm64 hosts (Raspberry Pi 5, Jetson, Apple Silicon through Docker Desktop's Linux VM), selecting the matching Arm toolchain archive ([ADR-0016](../adr/0016-dependency-policy.md)). On any other architecture, the build stops at its first step.
 
 Then run each command through `docker run`. A shell function keeps that short:
 
