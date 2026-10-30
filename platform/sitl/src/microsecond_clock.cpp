@@ -17,6 +17,9 @@ std::chrono::steady_clock::time_point boot_time()
 
 std::uint64_t vk::hal::SystemClock::now_us() noexcept
 {
-    const auto elapsed = std::chrono::steady_clock::now() - boot_time();
+    // Boot first: the operands of '-' have no evaluation order, and on the first
+    // call a later boot than now would make elapsed negative and wrap.
+    const auto boot = boot_time();
+    const auto elapsed = std::chrono::steady_clock::now() - boot;
     return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count());
 }
