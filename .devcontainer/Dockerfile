@@ -24,6 +24,8 @@ ARG GTEST_SHA256=65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27
 # build installs the same versions; move the timestamp to update them. The
 # snapshot is served over HTTPS only, so ca-certificates comes first from the
 # release pocket, which never changes, and is then updated from the snapshot.
+# apt maps archive.ubuntu.com and security.ubuntu.com to the snapshot service
+# but not ports.ubuntu.com, where arm64 comes from, so that mapping is added.
 ARG UBUNTU_SNAPSHOT=20261027T000000Z
 RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && case "$arch" in \
@@ -38,7 +40,9 @@ RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm /etc/apt/sources.list.d/release.list \
     && mv /tmp/ubuntu.sources /etc/apt/sources.list.d/ \
-    && echo "APT::Snapshot \"${UBUNTU_SNAPSHOT}\";" > /etc/apt/apt.conf.d/50vk-snapshot \
+    && { echo "APT::Snapshot \"${UBUNTU_SNAPSHOT}\";"; \
+         echo 'Acquire::Snapshots::URI::Host::ports.ubuntu.com "https://snapshot.ubuntu.com/@PATH@/@SNAPSHOTID@/";'; \
+       } > /etc/apt/apt.conf.d/50vk-snapshot \
     && rm -rf /var/lib/apt/lists/*
 
 # Host compiler for the sitl and test presets: GCC 13, named, not the g++
