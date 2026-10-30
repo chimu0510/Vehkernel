@@ -20,6 +20,9 @@ jobs:
       - name: Build presets, run L0 checks and host tests
         run: |
           docker run --rm -v "$PWD:/work" -w /work vehkernel-dev bash -euo pipefail -c '
+            # The container runs as root on a checkout owned by the runner user; without
+            # this, git refuses it and the bundles and images get no commit.
+            git config --global --add safe.directory /work
             for preset in c50c-v1_1 c50c-v1_1-bringup sitl test fuzz; do
               cmake --preset "$preset"
               cmake --build --preset "$preset"
