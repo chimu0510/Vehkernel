@@ -25,7 +25,8 @@ ARG GTEST_SHA256=65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27
 # snapshot is served over HTTPS only, so ca-certificates comes first from the
 # release pocket, which never changes, and is then updated from the snapshot.
 # apt maps archive.ubuntu.com and security.ubuntu.com to the snapshot service
-# but not ports.ubuntu.com, where arm64 comes from, so that mapping is added.
+# but not ports.ubuntu.com, where arm64 comes from. The service keeps every
+# architecture under /ubuntu/ (it has no ubuntu-ports path), so ports maps there.
 ARG UBUNTU_SNAPSHOT=20261027T000000Z
 RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && case "$arch" in \
@@ -41,7 +42,7 @@ RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && rm /etc/apt/sources.list.d/release.list \
     && mv /tmp/ubuntu.sources /etc/apt/sources.list.d/ \
     && { echo "APT::Snapshot \"${UBUNTU_SNAPSHOT}\";"; \
-         echo 'Acquire::Snapshots::URI::Host::ports.ubuntu.com "https://snapshot.ubuntu.com/@PATH@/@SNAPSHOTID@/";'; \
+         echo 'Acquire::Snapshots::URI::Host::ports.ubuntu.com "https://snapshot.ubuntu.com/ubuntu/@SNAPSHOTID@/";'; \
        } > /etc/apt/apt.conf.d/50vk-snapshot \
     && rm -rf /var/lib/apt/lists/*
 
