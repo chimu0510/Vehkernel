@@ -109,7 +109,7 @@ Deliver the twelfth milestone: **an EKF attitude estimator, the primary by defau
   - `replay_board_log` keeps passing with `EST_PRIMARY` `MAHONY`.
 - **Seam E: hardware (L4, manual).** On the C50C V1.1, with the vehicle of #126 and the pad:
   - The read time with the magnetometer (the burst and the FIFO reads), and the `wq:ctrl` load, with no overruns.
-  - `magnetometer_sample` at about 100 Hz; the field's direction agrees with a phone compass at four headings, which confirms the axis signs.
+  - `magnetometer_sample` at about 100 Hz (at least 90 Hz with `failures` not increasing while the vehicle stands still: the AK09916 skips a measurement that ends while the master reads ST1 to ST2, about 6 % of them at the 281.25 Hz master rate, so the C50C shows about 94 Hz, #179); the field's direction agrees with a phone compass at four headings, which confirms the axis signs.
   - Calibrate by turning in place with `mag_cal.py`; record the fit, the coverage and the residual.
   - With heading fusion on, the heading against a phone compass at four headings, and how close to the motors the field strength rejection starts to act while driving.
   - Drive a taped square of known size with heading fusion off and on: the heading error and the odometry's position error on returning to the start (deferred from spec 0010).
