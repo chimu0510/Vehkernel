@@ -9,8 +9,8 @@
 // full-scale range. It also models the I2C master (slaves 0 and 4), the FIFO
 // and the internal Asahi Kasei AK09916 magnetometer: WHO_AM_I, continuous
 // mode 4, ST1, ST2 and overflow. The FIFO takes slave 0's data at the output
-// data rate; the master reads its slaves in the same cycle, or on its own
-// duty-cycled clock while LP_CONFIG's I2C_MST_CYCLE is set, as after reset.
+// data rate; the master reads its slaves on its own duty-cycled clock, and only
+// while LP_CONFIG's I2C_MST_CYCLE is set, as after reset.
 #pragma once
 
 #include <vk/sim/i2c_bus.hpp>

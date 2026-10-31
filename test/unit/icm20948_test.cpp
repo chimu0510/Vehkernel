@@ -132,9 +132,15 @@ TEST_F(Icm20948Test, ResetsAndConfiguresTheDevice)
     EXPECT_EQ(model.register_value(0, 0x07), 0x00);  // PWR_MGMT_2: every axis on
     EXPECT_EQ(model.register_value(2, 0x01), 0x1F);  // GYRO_CONFIG_1: +-2000 dps, DLPF 3
     EXPECT_EQ(model.register_value(2, 0x14), 0x1F);  // ACCEL_CONFIG: +-16 g, DLPF 3
+#if defined(CONFIG_DRIVER_ICM20948_MAG)
+    // 1125 Hz / (1 + 3) = 281.25 Hz, the I2C master's lowest rate, 1125 Hz / 2^n, at or above 200 Hz.
+    EXPECT_EQ(model.register_value(2, 0x00), 3);
+    EXPECT_EQ(model.register_value(2, 0x11), 3);
+#else
     // 1125 Hz / (1 + 4) = 225 Hz, the lowest output data rate at or above 200 Hz.
     EXPECT_EQ(model.register_value(2, 0x00), 4);
     EXPECT_EQ(model.register_value(2, 0x11), 4);
+#endif
     EXPECT_EQ(model.register_value(0, 0x7F), 0x00);  // back in bank 0
 }
 
@@ -255,7 +261,8 @@ TEST_F(Icm20948Test, SetupSequenceCheckedStepByStepWithoutBlocking)
     ASSERT_LT(steps, 50);
     EXPECT_EQ(imu.status().state, State::Running);
     EXPECT_FALSE(imu.status().mag_configured);
-    EXPECT_EQ(model.register_value(0, 0x05), 0x00);  // LP_CONFIG: I2C master not duty-cycled
+    EXPECT_EQ(model.register_value(0, 0x05), 0x40);  // LP_CONFIG: I2C_MST_CYCLE, or the master stops
+    EXPECT_EQ(model.register_value(3, 0x00), 2);     // I2C_MST_ODR_CONFIG: 1125 / 2^2 = 281.25 Hz
     EXPECT_EQ(model.register_value(0, 0x03), 0x20);  // USER_CTRL: I2C_MST_EN
     EXPECT_EQ(model.register_value(3, 0x01), 0x07);  // I2C_MST_CTRL: 400 kHz clock
     EXPECT_EQ(model.register_value(3, 0x13), 0x8C);  // Slave 4 addr: AK09916 read
@@ -280,7 +287,8 @@ TEST_F(Icm20948Test, SetupSequenceCheckedStepByStepWithoutBlocking)
     EXPECT_EQ(model.register_value(0, 0x7F), 0x00);  // Left in Bank 0
 }
 
-// Every sample is published once at 200 Hz read rate and 225 Hz master cycle rate.
+// Every sample is published once at 200 Hz read rate, with the master and the
+// gyroscope at 281.25 Hz.
 TEST_F(Icm20948Test, EverySamplePublishedExactlyOnceOverOneSecond)
 {
     Icm20948 imu(vk::hal::I2cDevice(bus, 0x68), {.rate_hz = rate_hz}, queue);
@@ -315,19 +323,25 @@ TEST_F(Icm20948Test, EverySamplePublishedExactlyOnceOverOneSecond)
 
     // IMU runs at 200 Hz (200 samples in 1 s).
     EXPECT_EQ(imu_count, 200);
-    // AK09916 produces exactly 100 samples in 1 s at 100 Hz.
-    EXPECT_EQ(received_x.size(), 100U);
+    // AK09916 produces 100 samples in 1 s at 100 Hz; one taken just before the
+    // window may reach the driver in it, a master period later.
+    EXPECT_GE(received_x.size(), 100U);
+    EXPECT_LE(received_x.size(), 101U);
 
-    // Verify every sample is unique and strictly increasing (no duplicates, no missed samples).
+    // Every sample is new and none is missed: the field rises 0.6 uT per 10 ms
+    // sample, after the first, which may still hold the field from before.
     for (std::size_t i = 1; i < received_x.size(); ++i) {
         EXPECT_GT(received_x[i], received_x[i - 1]);
+        if (i >= 2) {
+            EXPECT_LT(received_x[i] - received_x[i - 1], 0.9F);
+        }
     }
 }
 
-// With LP_CONFIG's I2C_MST_CYCLE set, as after reset, the master reads the
-// AK09916 at 1.1 kHz while the FIFO records one read per gyroscope sample: the
-// unrecorded reads clear data ready, and most samples are lost (#179).
-TEST_F(Icm20948Test, DutyCycledMasterLosesMostSamples)
+// With I2C_MST_ODR_CONFIG at its reset value the master reads the AK09916 at
+// 1.1 kHz while the FIFO records one read per gyroscope sample: the unrecorded
+// reads clear data ready, and most samples are lost (#179).
+TEST_F(Icm20948Test, MasterFasterThanTheFifoLosesMostSamples)
 {
     Icm20948 imu(vk::hal::I2cDevice(bus, 0x68), {.rate_hz = rate_hz}, queue);
     imu.start();
@@ -336,8 +350,11 @@ TEST_F(Icm20948Test, DutyCycledMasterLosesMostSamples)
     ASSERT_TRUE(imu.status().mag_configured);
     ASSERT_EQ(model.register_value(0, 0x7F), 0x00);  // the driver left Bank 0
 
-    const std::array<std::uint8_t, 2> set_cycle{0x05, 0x40};  // LP_CONFIG: I2C_MST_CYCLE
-    ASSERT_TRUE(bus.write(vk::sim::Icm20948::default_address, set_cycle));
+    for (const std::array<std::uint8_t, 2> write : {std::array<std::uint8_t, 2>{0x7F, 0x30},  // Bank 3
+                                                    std::array<std::uint8_t, 2>{0x00, 0x00},  // 1125 Hz
+                                                    std::array<std::uint8_t, 2>{0x7F, 0x00}}) {
+        ASSERT_TRUE(bus.write(vk::sim::Icm20948::default_address, write));
+    }
     vk::msg::MagnetometerSample mag_sample{};
     drain_mag(mag_sub, mag_sample);
 
@@ -425,8 +442,12 @@ TEST_F(Icm20948Test, MagnetometerSamplePublishedOnlyOnDataReady)
     drain(imu_sub, imu_sample);
     drain_mag(mag_sub, mag_sample);
 
-    // Pause magnetometer sampling: IMU continues while mag publishes nothing.
+    // Pause magnetometer sampling: IMU continues while mag publishes nothing. A
+    // sample read just before the pause reaches the FIFO up to a master period later.
     model.set_mag_paused(true);
+    run_for(period_us);
+    drain(imu_sub, imu_sample);
+    drain_mag(mag_sub, mag_sample);
     int imu_count = 0;
     int mag_count = 0;
     for (int i = 0; i < 10; ++i) {
@@ -470,6 +491,8 @@ TEST_F(Icm20948Test, MagnetometerOverflowCountedAndSampleDropped)
     drain_mag(mag_sub, mag_sample);
 
     model.set_mag_overflow(true);
+    run_for(period_us);  // a sample read just before reaches the FIFO a master period later
+    drain_mag(mag_sub, mag_sample);
     run_for(50'000);
     EXPECT_FALSE(mag_sub.updated());
     EXPECT_GE(imu.status().mag_overflows, 5U);

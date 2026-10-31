@@ -205,10 +205,11 @@ std::uint64_t Icm20948::now_us() const
     return clock_();
 }
 
-// The FIFO takes slave 0's data once per gyroscope sample. With I2C_MST_CYCLE
-// clear the master reads its slaves in the same cycle; with it set (the reset
-// value) the master reads them on its own clock, at 1125 / 2^I2C_MST_ODR_CONFIG Hz,
-// and only the read just before each FIFO write is recorded.
+// The FIFO takes slave 0's data once per gyroscope sample. The master reads its
+// slaves only with I2C_MST_CYCLE set (the reset value; with it clear the C50C's
+// ICM20948 ran no slave transaction, #179), on its own clock at
+// 1125 / 2^I2C_MST_ODR_CONFIG Hz, and only the read just before each FIFO write is
+// recorded; a read falling on a FIFO write's tick comes first.
 void Icm20948::advance_master_to(std::uint64_t now)
 {
     if (last_master_cycle_us_ == 0) {
@@ -240,11 +241,6 @@ void Icm20948::advance_master_to(std::uint64_t now)
         }
         master_sub_us_ = (master_sub_us_ + odr_num) % internal_rate_hz;
         last_master_cycle_us_ = next_odr_us;
-        if (!cycled) {
-            last_poll_us_ = next_odr_us;
-            poll_sub_us_ = 0;
-            run_slave_transactions(next_odr_us);
-        }
         write_slave0_to_fifo();
     }
 }

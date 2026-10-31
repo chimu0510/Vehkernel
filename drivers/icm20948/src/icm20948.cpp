@@ -35,6 +35,7 @@ constexpr std::uint8_t accel_smplrt_div_1 = 0x10;
 constexpr std::uint8_t accel_smplrt_div_2 = 0x11;
 constexpr std::uint8_t accel_config = 0x14;
 // Bank 3:
+constexpr std::uint8_t i2c_mst_odr_config = 0x00;
 constexpr std::uint8_t i2c_mst_ctrl = 0x01;
 constexpr std::uint8_t i2c_slv0_addr = 0x03;
 constexpr std::uint8_t i2c_slv0_reg = 0x04;
@@ -75,10 +76,13 @@ constexpr std::uint8_t i2c_slv4_done = 0x40;
 constexpr std::uint8_t i2c_slv4_nack = 0x10;
 constexpr std::uint8_t slv_0_fifo_en = 0x01;
 constexpr std::uint8_t i2c_mst_clk_400khz = 0x07;
-// LP_CONFIG resets to I2C_MST_CYCLE set: the master then reads its slaves at the
-// I2C_MST_ODR_CONFIG rate (1.1 kHz) instead of once per gyroscope sample, and the
-// reads between two FIFO writes clear the AK09916's DRDY unrecorded (#179).
-constexpr std::uint8_t lp_config_continuous = 0x00;
+// The master runs only while LP_CONFIG's I2C_MST_CYCLE is set, its reset value; it
+// then reads its slaves at 1125 / 2^I2C_MST_ODR_CONFIG Hz, a division of the clock the
+// gyroscope's sample rate divider divides too. A read between two FIFO writes clears
+// the AK09916's DRDY unrecorded, so the master runs at the gyroscope's output data
+// rate: with equal periods one read falls between two FIFO writes, whatever their
+// phase (#179).
+constexpr std::uint8_t lp_config_i2c_mst_cycle = 0x40;
 constexpr std::uint8_t i2c_slv0_en = 0x80;
 constexpr std::uint8_t i2c_slv4_en = 0x80;
 constexpr std::uint8_t ak09916_address = 0x0C;
@@ -113,6 +117,7 @@ std::int16_t le_word_at(std::span<const std::uint8_t> raw, std::size_t index)
 }
 #endif
 
+#if !defined(CONFIG_DRIVER_ICM20948_MAG)
 // Divider giving the lowest output data rate that is still at or above `rate_hz`.
 std::uint8_t sample_rate_divider(std::uint32_t rate_hz)
 {
@@ -121,6 +126,19 @@ std::uint8_t sample_rate_divider(std::uint32_t rate_hz)
     }
     return static_cast<std::uint8_t>(internal_rate_hz / rate_hz - 1);
 }
+#else
+// I2C_MST_ODR_CONFIG giving the lowest master rate, 1125 / 2^n Hz, still at or above
+// `rate_hz`; the gyroscope's divider is then 2^n - 1, so both run at that rate.
+std::uint8_t master_odr_exponent(std::uint32_t rate_hz)
+{
+    constexpr std::uint8_t max_exponent = 8;  // 2^8 - 1 is the largest 8-bit divider
+    std::uint8_t n = 0;
+    while (rate_hz > 0 && n < max_exponent && (internal_rate_hz >> (n + 1U)) >= rate_hz) {
+        ++n;
+    }
+    return n;
+}
+#endif
 
 }  // namespace
 
@@ -270,12 +288,13 @@ void Icm20948::service_magnetometer(std::uint64_t now)
     switch (mag_state_) {
     case MagState::Probing:
         if (now >= next_mag_probe_us_) {
-            if (!select_bank(0) || !device_.write_register(lp_config, lp_config_continuous) ||
+            if (!select_bank(0) || !device_.write_register(lp_config, lp_config_i2c_mst_cycle) ||
                 !device_.write_register(user_ctrl, user_ctrl_i2c_mst_en)) {
                 reset_mag_setup(now, MagFailure::Bus);
                 return;
             }
             if (!select_bank(3) ||
+                !device_.write_register(i2c_mst_odr_config, master_odr_exponent(config_.rate_hz)) ||
                 !device_.write_register(i2c_mst_ctrl, i2c_mst_clk_400khz) ||
                 !device_.write_register(i2c_slv4_addr, ak09916_address | 0x80U) ||
                 !device_.write_register(i2c_slv4_reg, ak09916_who_am_i_reg) ||
@@ -426,7 +445,12 @@ void Icm20948::configure(std::uint64_t now)
     if (now - reset_at_us_ < reset_time_us) {
         return;
     }
+#if defined(CONFIG_DRIVER_ICM20948_MAG)
+    // The I2C master's rate, so the FIFO records every magnetometer read.
+    const auto divider = static_cast<std::uint8_t>((1U << master_odr_exponent(config_.rate_hz)) - 1U);
+#else
     const std::uint8_t divider = sample_rate_divider(config_.rate_hz);
+#endif
     std::array<std::uint8_t, 1> gyro_readback{};
     std::array<std::uint8_t, 1> accel_readback{};
     const bool ok = select_bank(0) && device_.write_register(pwr_mgmt_1, clock_auto) &&
