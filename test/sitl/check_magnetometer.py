@@ -152,7 +152,7 @@ def main() -> int:
     truth_times: list[int] = []
     truths: list[tuple] = []
     mag_samples: list[tuple[int, tuple[float, float, float]]] = []
-    overruns = WorkItemOverruns()
+    overruns = WorkItemOverruns(late_starts_are_stalls=True)
 
     def record(name: str, instance: int, message) -> None:
         if name == "work_item_status":

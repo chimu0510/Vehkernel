@@ -118,7 +118,7 @@ def check_gain(args) -> list[str]:
     estimates: list[tuple[int, tuple]] = []
     # Only overruns during the check count, and not a host stall's: SITL shares
     # the host, and stalls say nothing about parameters.
-    overruns = WorkItemOverruns()
+    overruns = WorkItemOverruns(late_starts_are_stalls=True)
 
     def record(name: str, instance: int, message) -> None:
         if name == "work_item_status":

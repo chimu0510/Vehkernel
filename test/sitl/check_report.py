@@ -65,7 +65,7 @@ def window_overruns(port: int, msg_dir: str, duration_s: float) -> tuple[dict[st
 
     connection = UdpConnection("127.0.0.1", port)
     monitor = LinkMonitor(connection, load_messages(msg_dir))
-    tracker = WorkItemOverruns()
+    tracker = WorkItemOverruns(late_starts_are_stalls=True)
     try:
         if not monitor.handshake(MARGIN_S):
             return {}, 0, ["no handshake with SITL"]

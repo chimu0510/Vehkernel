@@ -460,27 +460,35 @@ class WorkItemOverruns:
     interval, since a slower one may not have been due in it. Overruns of one work
     item, or a few, while the others keep time count. Overruns before the
     first report are start-up's and do not count either.
+
+    With `late_starts_are_stalls`, for SITL, an overrun of a work item whose
+    longest run is still shorter than its period is a stall too: it can only
+    have started late, and a host that pauses SITL just under a period pushes
+    one work item over and leaves the others inside theirs (#180). On a board
+    a late start is another work queue taking the CPU, which counts.
     """
 
-    def __init__(self) -> None:
-        self._reports: dict[int, dict[str, tuple[int, int]]] = {}
+    def __init__(self, late_starts_are_stalls: bool = False) -> None:
+        self._reports: dict[int, dict[str, tuple[int, int, int]]] = {}
         self._periodic: dict[str, bool] = {}
+        self._late_starts_are_stalls = late_starts_are_stalls
 
     def record(self, status: object) -> None:
         """Adds one work_item_status message."""
         name = work_item_name(status)
-        self._reports.setdefault(status.timestamp, {})[name] = (status.overruns, getattr(status, "runs", 0))
+        self._reports.setdefault(status.timestamp, {})[name] = (
+            status.overruns, getattr(status, "runs", 0), getattr(status, "run_time_max_us", 0))
         self._periodic[name] = bool(getattr(status, "periodic", True))
 
     def judge(self) -> tuple[dict[str, int], int] | None:
         """Real overruns by work item and the number of stalls; None with fewer than two whole reports."""
         names = set().union(*self._reports.values())
-        whole = [report for _, report in sorted(self._reports.items()) if report.keys() == names]
+        whole = [(time, report) for time, report in sorted(self._reports.items()) if report.keys() == names]
         if len(whole) < 2:
             return None
         overruns = dict.fromkeys(names, 0)
         stalls = 0
-        for before, after in zip(whole, whole[1:]):
+        for (start, before), (end, after) in zip(whole, whole[1:]):
             counts = {name: after[name][0] - before[name][0] for name in names}
             runs = {name: after[name][1] - before[name][1] for name in names}
             busiest = max(runs.values())
@@ -488,6 +496,12 @@ class WorkItemOverruns:
             if 2 * sum(1 for name in base_rate if counts[name] > 0) >= len(base_rate):
                 stalls += 1
                 continue
+            if self._late_starts_are_stalls:
+                late = {name for name in names if counts[name] > 0 and self._periodic.get(name, True)
+                        and runs[name] > 0 and after[name][2] < (end - start) / runs[name]}
+                if late:
+                    stalls += 1
+                    counts = {name: count for name, count in counts.items() if name not in late}
             for name, count in counts.items():
                 overruns[name] += count
         return overruns, stalls

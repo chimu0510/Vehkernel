@@ -227,17 +227,19 @@ def test_only_losses_and_drops_after_the_handshake_count():
 
 
 
-def work_item_reports(*reports, rates=None, triggered=None):
+def work_item_reports(*reports, rates=None, triggered=None, run_time_max=None, late_starts_are_stalls=False):
     """WorkItemOverruns fed one report a second, each a {name: overruns} map;
     `rates` gives each work item's runs a second (none: every one 200), and
     `triggered` names the work items a topic triggers (reported not periodic);
-    with neither, the reports carry no periodic field, as a log before #170."""
-    tracker = WorkItemOverruns()
+    with neither, the reports carry no periodic field, as a log before #170.
+    `run_time_max` gives a work item's longest run in µs (none: 50)."""
+    tracker = WorkItemOverruns(late_starts_are_stalls=late_starts_are_stalls)
     for second, report in enumerate(reports):
         for index, (name, overruns) in enumerate(report.items()):
             runs = second * (rates or {}).get(name, 200)
             status = types.SimpleNamespace(timestamp=second * 1_000_000, work_item=index,
-                                           name=tuple(name.encode().ljust(16, b"\0")), overruns=overruns, runs=runs)
+                                           name=tuple(name.encode().ljust(16, b"\0")), overruns=overruns, runs=runs,
+                                           run_time_max_us=(run_time_max or {}).get(name, 50))
             if triggered is not None:
                 status.periodic = name not in triggered
             tracker.record(status)
@@ -292,6 +294,24 @@ def test_work_item_overruns_count_a_few_work_items_overrunning_alone():
                                 {"imu": 0, "ctrl": 2, "act": 1, "link": 0, "est": 0, "timing": 0},
                                 {"imu": 0, "ctrl": 2, "act": 1, "link": 0, "est": 0, "timing": 0})
     assert tracker.judge() == ({"imu": 0, "ctrl": 2, "act": 1, "link": 0, "est": 0, "timing": 0}, 0)
+
+
+def test_work_item_overruns_take_a_late_start_on_sitl_for_a_stall():
+    # As in CI run 41212025115: a host stall just under one 5 ms period pushed
+    # link0 over, while the other periodic items ended just inside theirs.
+    reports = ({"imu": 0, "ctrl": 0, "act": 0, "cmd": 0, "link0": 0},
+               {"imu": 0, "ctrl": 0, "act": 0, "cmd": 0, "link0": 1})
+    tracker = work_item_reports(*reports, run_time_max={"link0": 375}, late_starts_are_stalls=True)
+    assert tracker.judge() == (dict.fromkeys(["imu", "ctrl", "act", "cmd", "link0"], 0), 1)
+    # On a board a late start is another work queue taking the CPU: it counts.
+    assert work_item_reports(*reports, run_time_max={"link0": 375}).judge()[0]["link0"] == 1
+
+
+def test_work_item_overruns_count_a_run_longer_than_its_period_on_sitl():
+    tracker = work_item_reports({"imu": 0, "ctrl": 0, "act": 0, "cmd": 0, "link0": 0},
+                                {"imu": 0, "ctrl": 0, "act": 0, "cmd": 0, "link0": 1},
+                                run_time_max={"link0": 5_510}, late_starts_are_stalls=True)
+    assert tracker.judge() == ({"imu": 0, "ctrl": 0, "act": 0, "cmd": 0, "link0": 1}, 0)
 
 
 def test_work_item_overruns_line_gives_the_stalls_and_the_real_overruns():

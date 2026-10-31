@@ -144,7 +144,7 @@ def main() -> int:
     primary_estimates: list[dict] = []
     secondary_estimates: list[dict] = []
     # Overruns during the check, without the host's stalls of the whole process.
-    overruns = WorkItemOverruns()
+    overruns = WorkItemOverruns(late_starts_are_stalls=True)
 
     def record(name: str, instance: int, message) -> None:
         if name == "work_item_status":
