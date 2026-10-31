@@ -1,6 +1,6 @@
 # Spec 0012: the EKF attitude estimator and the magnetometer
 
-**Status**: in progress. Issue: [#149](https://github.com/chimu0510/Vehkernel/issues/149); tickets #150 to #155, with the hardware check in #155. Resumed by the maintainer on 2026-10-31, after spec 0014; #150 to #154 are done, the hardware check #155 is left.
+**Status**: in progress. Issue: [#149](https://github.com/chimu0510/Vehkernel/issues/149); tickets #150 to #155, with the hardware check in #155. Resumed by the maintainer on 2026-10-31, after spec 0014; #150 to #154 are done, the hardware check #155 is left. On 2026-11-01 its bench part was done (timing, magnetometer rate and axes, calibration, heading at four headings) and the maintainer deferred the rest, which needs a large site: the squares, the driving drift run and the replay of a square.
 
 Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
 
