@@ -16,6 +16,7 @@ namespace {
 // Registers (datasheet DS-000189, section 7). Bank 0:
 constexpr std::uint8_t who_am_i = 0x00;
 constexpr std::uint8_t user_ctrl = 0x03;
+constexpr std::uint8_t lp_config = 0x05;
 constexpr std::uint8_t pwr_mgmt_1 = 0x06;
 constexpr std::uint8_t pwr_mgmt_2 = 0x07;
 constexpr std::uint8_t i2c_mst_status = 0x17;
@@ -74,6 +75,10 @@ constexpr std::uint8_t i2c_slv4_done = 0x40;
 constexpr std::uint8_t i2c_slv4_nack = 0x10;
 constexpr std::uint8_t slv_0_fifo_en = 0x01;
 constexpr std::uint8_t i2c_mst_clk_400khz = 0x07;
+// LP_CONFIG resets to I2C_MST_CYCLE set: the master then reads its slaves at the
+// I2C_MST_ODR_CONFIG rate (1.1 kHz) instead of once per gyroscope sample, and the
+// reads between two FIFO writes clear the AK09916's DRDY unrecorded (#179).
+constexpr std::uint8_t lp_config_continuous = 0x00;
 constexpr std::uint8_t i2c_slv0_en = 0x80;
 constexpr std::uint8_t i2c_slv4_en = 0x80;
 constexpr std::uint8_t ak09916_address = 0x0C;
@@ -257,7 +262,8 @@ void Icm20948::service_magnetometer(std::uint64_t now)
     switch (mag_state_) {
     case MagState::Probing:
         if (now >= next_mag_probe_us_) {
-            if (!select_bank(0) || !device_.write_register(user_ctrl, user_ctrl_i2c_mst_en)) {
+            if (!select_bank(0) || !device_.write_register(lp_config, lp_config_continuous) ||
+                !device_.write_register(user_ctrl, user_ctrl_i2c_mst_en)) {
                 reset_mag_setup(now);
                 return;
             }

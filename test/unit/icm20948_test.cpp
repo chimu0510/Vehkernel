@@ -254,6 +254,7 @@ TEST_F(Icm20948Test, SetupSequenceCheckedStepByStepWithoutBlocking)
     ASSERT_LT(steps, 50);
     EXPECT_EQ(imu.status().state, State::Running);
     EXPECT_FALSE(imu.status().mag_configured);
+    EXPECT_EQ(model.register_value(0, 0x05), 0x00);  // LP_CONFIG: I2C master not duty-cycled
     EXPECT_EQ(model.register_value(0, 0x03), 0x20);  // USER_CTRL: I2C_MST_EN
     EXPECT_EQ(model.register_value(3, 0x01), 0x07);  // I2C_MST_CTRL: 400 kHz clock
     EXPECT_EQ(model.register_value(3, 0x13), 0x8C);  // Slave 4 addr: AK09916 read
