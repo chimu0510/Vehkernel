@@ -380,10 +380,14 @@ TEST_F(Icm20948Test, BadFifoCountResetsFifoAndRecovers)
     drain_mag(mag_sub, mag_sample);
 
     const auto failures_before = imu.status().mag_failures;
-    // Inject stray bytes so FIFO count is not a multiple of 9.
+    // Inject a stray byte so the FIFO count is not a multiple of 9. The first
+    // such count may be a record being written, so it is read again on the next
+    // run before it counts as a failure.
     model.push_fifo_byte(0xAA);
     run_for(period_us);
+    EXPECT_EQ(imu.status().mag_failures, failures_before);
 
+    run_for(period_us);
     EXPECT_EQ(imu.status().mag_failures, failures_before + 1);
 
     // Run for 30 ms so fresh records enter the FIFO and valid samples resume.

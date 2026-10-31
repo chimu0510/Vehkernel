@@ -221,11 +221,19 @@ void Icm20948::read_mag_fifo(std::uint64_t now)
     if (count == 0) {
         return;
     }
-    // A count that is not a multiple of 9, or more than 4 records (36 bytes),
-    // resets the FIFO and counts a magnetometer failure.
-    if ((count % ak09916_read_len) != 0 || count > max_mag_fifo_bytes) {
+    // A count that is not a multiple of 9 can be read while a record is being
+    // written, so the FIFO is read again on the next run. A count that is still
+    // not a multiple of 9 then, or more than 4 records (36 bytes), resets the
+    // FIFO and counts a magnetometer failure.
+    const bool partial = (count % ak09916_read_len) != 0;
+    if ((partial && mag_fifo_partial_) || count > max_mag_fifo_bytes) {
+        mag_fifo_partial_ = false;
         reset_mag_fifo();
         count_mag_failure(MagFailure::BadFifoCount);
+        return;
+    }
+    mag_fifo_partial_ = partial;
+    if (partial) {
         return;
     }
 
@@ -379,6 +387,7 @@ void Icm20948::service_magnetometer(std::uint64_t now)
             }
             last_mag_sample_us_ = now;
             ++mag_setups_;
+            mag_fifo_partial_ = false;
             mag_state_ = MagState::Running;
         } else if (now - mag_step_started_us_ >= mag_step_timeout_us) {
             reset_mag_setup(now, MagFailure::Timeout);

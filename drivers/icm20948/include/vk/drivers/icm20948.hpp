@@ -110,6 +110,7 @@ private:
     std::uint8_t mag_mst_status_ = 0;
     std::uint8_t mag_who_am_i_ = 0;
     std::uint16_t mag_fifo_count_ = 0;
+    bool mag_fifo_partial_ = false;
 #endif
 
     State state_ = State::Probing;
