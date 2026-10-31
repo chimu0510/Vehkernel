@@ -11,6 +11,7 @@ namespace {
 // Bank 0.
 constexpr std::uint8_t who_am_i = 0x00;
 constexpr std::uint8_t user_ctrl = 0x03;
+constexpr std::uint8_t lp_config = 0x05;
 constexpr std::uint8_t pwr_mgmt_1 = 0x06;
 constexpr std::uint8_t i2c_mst_status = 0x17;
 constexpr std::uint8_t accel_xout_h = 0x2D;
@@ -29,6 +30,7 @@ constexpr std::uint8_t gyro_smplrt_div = 0x00;
 constexpr std::uint8_t gyro_config_1 = 0x01;
 constexpr std::uint8_t accel_config = 0x14;
 // Bank 3.
+constexpr std::uint8_t i2c_mst_odr_config = 0x00;
 constexpr std::uint8_t i2c_slv0_addr = 0x03;
 constexpr std::uint8_t i2c_slv0_ctrl = 0x05;
 constexpr std::uint8_t i2c_slv4_addr = 0x13;
@@ -44,6 +46,10 @@ constexpr std::uint8_t ak09916_cntl3_reg = 0x32;
 constexpr std::uint8_t ak09916_mode_cont_4 = 0x08;
 constexpr std::uint64_t mag_interval_us = 10'000;  // 10 ms (100 Hz)
 constexpr float mag_lsb = 0.15F;  // 0.15 µT per LSB
+
+constexpr std::uint8_t i2c_mst_cycle = 0x40;  // LP_CONFIG: duty-cycled I2C master
+// The internal rate that the sample rate divider and I2C_MST_ODR_CONFIG divide.
+constexpr std::uint64_t internal_rate_hz = 1125;
 
 constexpr std::uint8_t device_reset = 0x80;
 constexpr std::uint8_t sleep = 0x40;
@@ -72,6 +78,7 @@ void Icm20948::reset()
     }
     banks_[0][who_am_i] = 0xEA;
     banks_[0][pwr_mgmt_1] = 0x41;  // Asleep, clock auto-selected.
+    banks_[0][lp_config] = i2c_mst_cycle;
     banks_[2][gyro_config_1] = 0x01;
     banks_[2][accel_config] = 0x01;
     bank_sel_ = 0;
@@ -83,6 +90,9 @@ void Icm20948::reset()
     fifo_.clear();
     last_master_cycle_us_ = 0;
     master_sub_us_ = 0;
+    last_poll_us_ = 0;
+    poll_sub_us_ = 0;
+    slv0_read_ = false;
     i2c_mst_status_ = 0;
     slv4_pending_ = false;
     mag_paused_ = false;
@@ -195,32 +205,51 @@ std::uint64_t Icm20948::now_us() const
     return clock_();
 }
 
+// The FIFO takes slave 0's data once per gyroscope sample. With I2C_MST_CYCLE
+// clear the master reads its slaves in the same cycle; with it set (the reset
+// value) the master reads them on its own clock, at 1125 / 2^I2C_MST_ODR_CONFIG Hz,
+// and only the read just before each FIFO write is recorded.
 void Icm20948::advance_master_to(std::uint64_t now)
 {
     if (last_master_cycle_us_ == 0) {
         last_master_cycle_us_ = now;
-        return;
-    }
-    if (now <= last_master_cycle_us_) {
+        last_poll_us_ = now;
         return;
     }
     const std::uint8_t div = banks_[2][gyro_smplrt_div];
-    const std::uint64_t period_num = static_cast<std::uint64_t>(1U + div) * 1'000'000ULL;
-    constexpr std::uint64_t period_den = 1125ULL;
+    const std::uint64_t odr_num = static_cast<std::uint64_t>(1U + div) * 1'000'000ULL;
 
     while (true) {
-        const std::uint64_t step_us = (master_sub_us_ + period_num) / period_den;
-        const std::uint64_t next_cycle_us = last_master_cycle_us_ + step_us;
-        if (next_cycle_us > now) {
+        const std::uint64_t next_odr_us = last_master_cycle_us_ + (master_sub_us_ + odr_num) / internal_rate_hz;
+        const bool cycled = (banks_[0][lp_config] & i2c_mst_cycle) != 0;
+        if (cycled) {
+            const std::uint64_t poll_num = 1'000'000ULL << (banks_[3][i2c_mst_odr_config] & 0x0FU);
+            const std::uint64_t next_poll_us = last_poll_us_ + (poll_sub_us_ + poll_num) / internal_rate_hz;
+            if (next_poll_us <= next_odr_us) {
+                if (next_poll_us > now) {
+                    break;
+                }
+                poll_sub_us_ = (poll_sub_us_ + poll_num) % internal_rate_hz;
+                last_poll_us_ = next_poll_us;
+                run_slave_transactions(next_poll_us);
+                continue;
+            }
+        }
+        if (next_odr_us > now) {
             break;
         }
-        master_sub_us_ = (master_sub_us_ + period_num) % period_den;
-        last_master_cycle_us_ = next_cycle_us;
-        run_master_cycle(next_cycle_us);
+        master_sub_us_ = (master_sub_us_ + odr_num) % internal_rate_hz;
+        last_master_cycle_us_ = next_odr_us;
+        if (!cycled) {
+            last_poll_us_ = next_odr_us;
+            poll_sub_us_ = 0;
+            run_slave_transactions(next_odr_us);
+        }
+        write_slave0_to_fifo();
     }
 }
 
-void Icm20948::run_master_cycle(std::uint64_t cycle_time)
+void Icm20948::run_slave_transactions(std::uint64_t cycle_time)
 {
     const bool i2c_mst_en = (banks_[0][user_ctrl] & 0x20U) != 0;
     if (!i2c_mst_en) {
@@ -347,14 +376,21 @@ void Icm20948::run_master_cycle(std::uint64_t cycle_time)
             mag_bytes_[i] = record[i];
             banks_[0][ext_slv_sens_data_00 + i] = record[i];
         }
+        slv0_read_ = true;
+    }
+}
 
-        const bool fifo_en = (banks_[0][user_ctrl] & 0x40U) != 0;
-        const bool slv0_fifo_en = (banks_[0][fifo_en_1] & 0x01U) != 0;
-        if (fifo_en && slv0_fifo_en) {
-            for (std::size_t i = 0; i < 9; ++i) {
-                push_fifo_byte(record[i]);
-            }
-        }
+void Icm20948::write_slave0_to_fifo()
+{
+    const bool i2c_mst_en = (banks_[0][user_ctrl] & 0x20U) != 0;
+    const bool fifo_en = (banks_[0][user_ctrl] & 0x40U) != 0;
+    const bool slv0_fifo_en = (banks_[0][fifo_en_1] & 0x01U) != 0;
+    const bool slv0_en = (banks_[3][i2c_slv0_ctrl] & 0x80U) != 0;
+    if (!i2c_mst_en || !fifo_en || !slv0_fifo_en || !slv0_en || !slv0_read_) {
+        return;
+    }
+    for (std::size_t i = 0; i < 9; ++i) {
+        push_fifo_byte(banks_[0][ext_slv_sens_data_00 + i]);
     }
 }
 

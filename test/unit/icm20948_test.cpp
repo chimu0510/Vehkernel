@@ -323,6 +323,32 @@ TEST_F(Icm20948Test, EverySamplePublishedExactlyOnceOverOneSecond)
     }
 }
 
+// With LP_CONFIG's I2C_MST_CYCLE set, as after reset, the master reads the
+// AK09916 at 1.1 kHz while the FIFO records one read per gyroscope sample: the
+// unrecorded reads clear data ready, and most samples are lost (#179).
+TEST_F(Icm20948Test, DutyCycledMasterLosesMostSamples)
+{
+    Icm20948 imu(vk::hal::I2cDevice(bus, 0x68), {.rate_hz = rate_hz}, queue);
+    imu.start();
+    vk::core::Subscription<vk::msg::MagnetometerSample> mag_sub(0);
+    run_for(300'000);
+    ASSERT_TRUE(imu.status().mag_configured);
+    ASSERT_EQ(model.register_value(0, 0x7F), 0x00);  // the driver left Bank 0
+
+    const std::array<std::uint8_t, 2> set_cycle{0x05, 0x40};  // LP_CONFIG: I2C_MST_CYCLE
+    ASSERT_TRUE(bus.write(vk::sim::Icm20948::default_address, set_cycle));
+    vk::msg::MagnetometerSample mag_sample{};
+    drain_mag(mag_sub, mag_sample);
+
+    int received = 0;
+    for (int i = 0; i < 200; ++i) {
+        run_for(period_us);
+        received += drain_mag(mag_sub, mag_sample);
+    }
+    // 100 samples are produced in 1 s; well under half reach the driver.
+    EXPECT_LT(received, 50);
+}
+
 // A bad FIFO count triggers a reset of the FIFO and increments the failure counter.
 TEST_F(Icm20948Test, BadFifoCountResetsFifoAndRecovers)
 {

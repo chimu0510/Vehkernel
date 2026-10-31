@@ -8,7 +8,9 @@
 // outputs, which follow the values set on the model scaled by the configured
 // full-scale range. It also models the I2C master (slaves 0 and 4), the FIFO
 // and the internal Asahi Kasei AK09916 magnetometer: WHO_AM_I, continuous
-// mode 4, ST1, ST2 and overflow, with master cycles at the output data rate.
+// mode 4, ST1, ST2 and overflow. The FIFO takes slave 0's data at the output
+// data rate; the master reads its slaves in the same cycle, or on its own
+// duty-cycled clock while LP_CONFIG's I2C_MST_CYCLE is set, as after reset.
 #pragma once
 
 #include <vk/sim/i2c_bus.hpp>
@@ -122,7 +124,8 @@ private:
     float noise(float amplitude);
     [[nodiscard]] std::uint64_t now_us() const;
     void advance_master_to(std::uint64_t now);
-    void run_master_cycle(std::uint64_t cycle_time);
+    void run_slave_transactions(std::uint64_t cycle_time);
+    void write_slave0_to_fifo();
 
     std::array<std::array<std::uint8_t, 128>, 4> banks_{};
     std::uint8_t bank_sel_ = 0;
@@ -151,6 +154,9 @@ private:
 
     std::uint64_t last_master_cycle_us_ = 0;
     std::uint64_t master_sub_us_ = 0;
+    std::uint64_t last_poll_us_ = 0;   // last slave read while I2C_MST_CYCLE is set
+    std::uint64_t poll_sub_us_ = 0;
+    bool slv0_read_ = false;           // slave 0 has been read since its setup
     std::uint8_t i2c_mst_status_ = 0;
     bool slv4_pending_ = false;
     std::deque<std::uint8_t> fifo_{};
