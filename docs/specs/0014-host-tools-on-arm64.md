@@ -1,8 +1,8 @@
 # Spec 0014: the host tools on an arm64 companion computer
 
-**Status**: in progress. Issue: [#171](https://github.com/chimu0510/Vehkernel/issues/171); tickets #172 to #176, with the hardware check in #176.
+**Status**: done. Issue: [#171](https://github.com/chimu0510/Vehkernel/issues/171); tickets #172 to #176. The hardware check in [#176](https://github.com/chimu0510/Vehkernel/issues/176) confirmed it on 2026-10-31 on the maintainer's Raspberry Pi 5 with the C50C V1.1, from the CI bundle of 897c324; the one `link1` overrun per host connection it found moved to #178.
 
-Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
+This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 
 ## Problem Statement
 
