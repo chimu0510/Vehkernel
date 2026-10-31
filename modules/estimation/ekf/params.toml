@@ -98,7 +98,7 @@ default = 0.0
 min = -180.0
 max = 180.0
 unit = "deg"
-description = "Magnetic declination: angle between magnetic north and true north."
+description = "Magnetic declination: angle from true north to magnetic north, east positive."
 menu = true
 menu_step = 1.0
 

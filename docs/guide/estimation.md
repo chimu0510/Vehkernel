@@ -43,7 +43,7 @@ When set to `AUTO`, the firmware enables heading fusion depending on vehicle ope
 
 ### Declination (`EKF_MAG_DECL`)
 
-Magnetic north differs from true geographic north by the local magnetic declination angle. Because the MCU has no GPS receiver or global World Magnetic Model (WMM) lookup table on board (ADR-0001), the local declination angle in degrees is supplied via the `EKF_MAG_DECL` parameter:
+Magnetic north differs from true geographic north by the local magnetic declination angle. Because the MCU has no GPS receiver or global World Magnetic Model (WMM) lookup table on board (ADR-0001), the local declination angle in degrees is supplied via the `EKF_MAG_DECL` parameter, east positive and west negative, as the NOAA magnetic field calculator gives it (true heading = magnetic heading + declination; 10° W is `-10`):
 
 ```bash
 tools/link/link_monitor.py --serial /dev/ttyACM0 param set EKF_MAG_DECL 12.4
@@ -165,7 +165,7 @@ Parameters are declared in `modules/estimation/params.toml` (`ATT_*`), `modules/
 |---|---|---|---|---|
 | `EST_PRIMARY` | `INT32` | `2` (`EKF`) | - | Primary attitude estimator (`1` Mahony, `2` EKF). Reboot required. |
 | `EKF_MAG_TYPE` | `INT32` | `0` (`AUTO`) | - | Heading fusion mode (`0` AUTO, `1` OFF, `2` HEADING). Reboot required. |
-| `EKF_MAG_DECL` | `FLOAT` | `0.0` | deg | Local magnetic declination angle from true north. |
+| `EKF_MAG_DECL` | `FLOAT` | `0.0` | deg | Local magnetic declination angle from true north, east positive. |
 | `EKF_MAG_REJ` | `FLOAT` | `0.20` | - | Fraction of magnetic field magnitude change triggering rejection. |
 | `EKF_MAG_NOISE` | `FLOAT` | `0.10` | rad | Magnetometer heading innovation noise standard deviation. |
 | `EKF_MAG_GATE` | `FLOAT` | `3.0` | SD | Chi-squared innovation gate for magnetometer heading updates. |
