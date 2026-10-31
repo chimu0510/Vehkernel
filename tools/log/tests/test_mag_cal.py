@@ -250,6 +250,22 @@ def test_refuse_insufficient_coverage(tmp_path: Path):
     assert 178.0 < coverage < 180.0
 
 
+def test_coverage_is_the_span_of_headings_swept(tmp_path: Path):
+    """Two turns one way and two back cover 720 deg of heading, not the net turn of 0 deg."""
+    samples = []
+    for i in range(1200):
+        # Up to 4 pi and back to 0 again.
+        th = 4.0 * math.pi * (i / 600.0 if i < 600 else (1200 - i) / 600.0)
+        samples.append((30.0 * math.cos(th), 30.0 * math.sin(th), 20.0))
+
+    log_file = tmp_path / "turn_and_back.ulg"
+    write_test_log(log_file, samples)
+
+    read_samps, read_cal = read_log_samples(log_file)
+    result = calibrate_magnetometer(read_samps, read_cal, is_3d=False)
+    assert 719.0 < result.coverage_deg <= 720.0
+
+
 def test_refuse_high_residual_outlier_cloud(tmp_path: Path):
     """A field corrupted by an outlier cloud is refused due to high RMS residual."""
     samples = []

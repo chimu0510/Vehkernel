@@ -215,7 +215,8 @@ def fit_ellipsoid_3d(
 
 
 def compute_coverage(calibrated_xy: Sequence[tuple[float, float]]) -> float:
-    """Computes total heading coverage in degrees by unwrapping atan2(y, x) from first to last sample."""
+    """Computes heading coverage in degrees: the span of the unwrapped atan2(y, x), so turning one way
+    and back again covers the headings once, not the net turn."""
     if not calibrated_xy:
         return 0.0
 
@@ -225,8 +226,7 @@ def compute_coverage(calibrated_xy: Sequence[tuple[float, float]]) -> float:
         diff = (t - unwrapped[-1] + math.pi) % (2.0 * math.pi) - math.pi
         unwrapped.append(unwrapped[-1] + diff)
 
-    total_turn_rad = abs(unwrapped[-1] - unwrapped[0])
-    return math.degrees(total_turn_rad)
+    return math.degrees(max(unwrapped) - min(unwrapped))
 
 
 def compute_residual_2d(calibrated_xy: Sequence[tuple[float, float]], r: float) -> tuple[float, float]:

@@ -116,7 +116,7 @@ Calibration is performed entirely on the development host using recorded ULog da
    ```bash
    tools/log/mag_cal.py mag_cal.ulg
    ```
-   The tool reads the recorded samples, undoes the logged `CAL_MAG_*` parameters, fits an axis-aligned ellipse to the horizontal plane, checks heading coverage (>= 360°) and residual, and prints the fit summary:
+   The tool reads the recorded samples, undoes the logged `CAL_MAG_*` parameters, fits an axis-aligned ellipse to the horizontal plane, checks heading coverage (the span of headings swept, at least 360°; turning back again does not count twice) and residual, and prints the fit summary:
    ```text
    Fit (2D horizontal ellipse):
      offsets:   x = 12.350 µT, y = -7.820 µT
