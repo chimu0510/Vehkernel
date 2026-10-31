@@ -94,6 +94,7 @@ constexpr float mag_lsb_uT = 0.15F;  // 0.15 µT per LSB
 
 constexpr std::uint64_t mag_step_timeout_us = 20'000;   // 20 ms for slave 4 steps
 constexpr std::uint64_t mag_stale_timeout_us = 100'000; // 100 ms without data ready
+constexpr std::uint64_t mag_status_period_us = 1'000'000; // magnetometer_status once a second
 // FIFO records read in one run; more than this resets the FIFO.
 constexpr std::size_t max_mag_fifo_bytes = std::size_t{4} * ak09916_read_len;
 #endif
@@ -127,7 +128,7 @@ Icm20948::Icm20948(const hal::I2cDevice& device, const Config& config, core::Wor
     : core::WorkItem("icm20948", queue), device_(device), config_(config),
       to_body_(hal::compose(config.rotation, config.board_orientation)), publication_(config.instance)
 #if defined(CONFIG_DRIVER_ICM20948_MAG)
-      , mag_publication_(config.instance)
+      , mag_publication_(config.instance), mag_status_publication_(config.instance)
 #endif
 {
 }
@@ -176,10 +177,16 @@ void Icm20948::reset_mag_fifo()
     static_cast<void>(device_.write_register(fifo_rst, 0x00U));
 }
 
-void Icm20948::reset_mag_setup(std::uint64_t now)
+void Icm20948::count_mag_failure(MagFailure reason)
+{
+    ++mag_failures_;
+    mag_last_failure_ = reason;
+}
+
+void Icm20948::reset_mag_setup(std::uint64_t now, MagFailure reason)
 {
     select_bank(0);
-    ++mag_failures_;
+    count_mag_failure(reason);
     next_mag_probe_us_ = now + probe_retry_us;
     mag_state_ = MagState::Probing;
 }
@@ -188,10 +195,11 @@ void Icm20948::read_mag_fifo(std::uint64_t now)
 {
     std::array<std::uint8_t, 2> count_raw{};
     if (!device_.read_register(fifo_counth, count_raw)) {
-        ++mag_failures_;
+        count_mag_failure(MagFailure::Bus);
         return;
     }
     const std::uint16_t count = (static_cast<std::uint16_t>(count_raw[0]) << 8U) | count_raw[1];
+    mag_fifo_count_ = count;
     if (count == 0) {
         return;
     }
@@ -199,14 +207,14 @@ void Icm20948::read_mag_fifo(std::uint64_t now)
     // resets the FIFO and counts a magnetometer failure.
     if ((count % ak09916_read_len) != 0 || count > max_mag_fifo_bytes) {
         reset_mag_fifo();
-        ++mag_failures_;
+        count_mag_failure(MagFailure::BadFifoCount);
         return;
     }
 
     std::array<std::uint8_t, max_mag_fifo_bytes> fifo_buf{};
     auto record_span = std::span{fifo_buf}.first(count);
     if (!device_.read_register(fifo_r_w, record_span)) {
-        ++mag_failures_;
+        count_mag_failure(MagFailure::Bus);
         return;
     }
 
@@ -264,7 +272,7 @@ void Icm20948::service_magnetometer(std::uint64_t now)
         if (now >= next_mag_probe_us_) {
             if (!select_bank(0) || !device_.write_register(lp_config, lp_config_continuous) ||
                 !device_.write_register(user_ctrl, user_ctrl_i2c_mst_en)) {
-                reset_mag_setup(now);
+                reset_mag_setup(now, MagFailure::Bus);
                 return;
             }
             if (!select_bank(3) ||
@@ -272,7 +280,7 @@ void Icm20948::service_magnetometer(std::uint64_t now)
                 !device_.write_register(i2c_slv4_addr, ak09916_address | 0x80U) ||
                 !device_.write_register(i2c_slv4_reg, ak09916_who_am_i_reg) ||
                 !device_.write_register(i2c_slv4_ctrl, i2c_slv4_en)) {
-                reset_mag_setup(now);
+                reset_mag_setup(now, MagFailure::Bus);
                 return;
             }
             select_bank(0);
@@ -284,32 +292,38 @@ void Icm20948::service_magnetometer(std::uint64_t now)
     case MagState::WaitingWhoAmI: {
         std::array<std::uint8_t, 1> status_raw{};
         if (!device_.read_register(i2c_mst_status, status_raw)) {
-            reset_mag_setup(now);
+            reset_mag_setup(now, MagFailure::Bus);
             return;
         }
         const std::uint8_t mst_status = status_raw[0];
+        mag_mst_status_ = mst_status;
         if ((mst_status & i2c_slv4_nack) != 0) {
-            reset_mag_setup(now);
+            reset_mag_setup(now, MagFailure::Nack);
             return;
         }
         if ((mst_status & i2c_slv4_done) != 0) {
             std::array<std::uint8_t, 1> wia{};
-            if (!select_bank(3) || !device_.read_register(i2c_slv4_di, wia) || wia[0] != ak09916_who_am_i_value) {
-                reset_mag_setup(now);
+            if (!select_bank(3) || !device_.read_register(i2c_slv4_di, wia)) {
+                reset_mag_setup(now, MagFailure::Bus);
+                return;
+            }
+            mag_who_am_i_ = wia[0];
+            if (wia[0] != ak09916_who_am_i_value) {
+                reset_mag_setup(now, MagFailure::WrongWhoAmI);
                 return;
             }
             if (!device_.write_register(i2c_slv4_addr, ak09916_address) ||
                 !device_.write_register(i2c_slv4_reg, ak09916_cntl2_reg) ||
                 !device_.write_register(i2c_slv4_do, ak09916_mode_cont_4) ||
                 !device_.write_register(i2c_slv4_ctrl, i2c_slv4_en)) {
-                reset_mag_setup(now);
+                reset_mag_setup(now, MagFailure::Bus);
                 return;
             }
             select_bank(0);
             mag_step_started_us_ = now;
             mag_state_ = MagState::WaitingCntl2;
         } else if (now - mag_step_started_us_ >= mag_step_timeout_us) {
-            reset_mag_setup(now);
+            reset_mag_setup(now, MagFailure::Timeout);
         }
         break;
     }
@@ -317,12 +331,13 @@ void Icm20948::service_magnetometer(std::uint64_t now)
     case MagState::WaitingCntl2: {
         std::array<std::uint8_t, 1> status_raw{};
         if (!device_.read_register(i2c_mst_status, status_raw)) {
-            reset_mag_setup(now);
+            reset_mag_setup(now, MagFailure::Bus);
             return;
         }
         const std::uint8_t mst_status = status_raw[0];
+        mag_mst_status_ = mst_status;
         if ((mst_status & i2c_slv4_nack) != 0) {
-            reset_mag_setup(now);
+            reset_mag_setup(now, MagFailure::Nack);
             return;
         }
         if ((mst_status & i2c_slv4_done) != 0) {
@@ -330,7 +345,7 @@ void Icm20948::service_magnetometer(std::uint64_t now)
                 !device_.write_register(i2c_slv0_addr, ak09916_address | 0x80U) ||
                 !device_.write_register(i2c_slv0_reg, ak09916_st1_reg) ||
                 !device_.write_register(i2c_slv0_ctrl, i2c_slv0_en | ak09916_read_len)) {
-                reset_mag_setup(now);
+                reset_mag_setup(now, MagFailure::Bus);
                 return;
             }
             if (!select_bank(0) ||
@@ -340,13 +355,14 @@ void Icm20948::service_magnetometer(std::uint64_t now)
                 !device_.write_register(fifo_en_2, 0x00U) ||
                 !device_.write_register(fifo_mode, 0x00U) ||
                 !device_.write_register(user_ctrl, user_ctrl_fifo_en | user_ctrl_i2c_mst_en)) {
-                reset_mag_setup(now);
+                reset_mag_setup(now, MagFailure::Bus);
                 return;
             }
             last_mag_sample_us_ = now;
+            ++mag_setups_;
             mag_state_ = MagState::Running;
         } else if (now - mag_step_started_us_ >= mag_step_timeout_us) {
-            reset_mag_setup(now);
+            reset_mag_setup(now, MagFailure::Timeout);
         }
         break;
     }
@@ -354,10 +370,31 @@ void Icm20948::service_magnetometer(std::uint64_t now)
     case MagState::Running:
         read_mag_fifo(now);
         if (now - last_mag_sample_us_ >= mag_stale_timeout_us) {
-            reset_mag_setup(now);
+            reset_mag_setup(now, MagFailure::Stale);
         }
         break;
     }
+}
+
+void Icm20948::publish_mag_status(std::uint64_t now)
+{
+    if (now < next_mag_status_us_) {
+        return;
+    }
+    next_mag_status_us_ = now + mag_status_period_us;
+    msg::MagnetometerStatus status{};
+    status.timestamp = now;
+    status.device_instance = config_.instance;
+    status.state = static_cast<std::uint8_t>(mag_state_);
+    status.last_failure = static_cast<std::uint8_t>(mag_last_failure_);
+    status.i2c_mst_status = mag_mst_status_;
+    status.who_am_i = mag_who_am_i_;
+    status.fifo_count = mag_fifo_count_;
+    status.samples = mag_samples_;
+    status.failures = mag_failures_;
+    status.overflows = mag_overflows_;
+    status.setups = mag_setups_;
+    mag_status_publication_.publish(status);
 }
 #endif
 
@@ -455,6 +492,7 @@ void Icm20948::read_sample(std::uint64_t now)
 
 #if defined(CONFIG_DRIVER_ICM20948_MAG)
     service_magnetometer(now);
+    publish_mag_status(now);
 #endif
 }
 

@@ -21,7 +21,9 @@
 #include <vk/msg/imu_sample.hpp>
 
 #if defined(CONFIG_DRIVER_ICM20948_MAG)
+#include <vk/msg/enums.hpp>
 #include <vk/msg/magnetometer_sample.hpp>
+#include <vk/msg/magnetometer_status.hpp>
 #endif
 
 #include <cstdint>
@@ -76,17 +78,16 @@ private:
     bool select_bank(std::uint8_t bank);
 
 #if defined(CONFIG_DRIVER_ICM20948_MAG)
-    enum class MagState : std::uint8_t {
-        Probing,        // waiting for probe interval to start setup
-        WaitingWhoAmI,  // slave 4 WHO_AM_I read started, waiting for completion
-        WaitingCntl2,   // slave 4 CNTL2 write started, waiting for completion
-        Running,        // slave 0 & FIFO enabled, reading FIFO records
-    };
+    // schema/enum/magnetometer_state.enum and magnetometer_failure.enum.
+    using MagState = msg::MagnetometerState;
+    using MagFailure = msg::MagnetometerFailure;
 
     void service_magnetometer(std::uint64_t now);
     void read_mag_fifo(std::uint64_t now);
     void reset_mag_fifo();
-    void reset_mag_setup(std::uint64_t now);
+    void count_mag_failure(MagFailure reason);
+    void reset_mag_setup(std::uint64_t now, MagFailure reason);
+    void publish_mag_status(std::uint64_t now);
 #endif
 
     hal::I2cDevice device_;
@@ -95,6 +96,7 @@ private:
     core::Publication<msg::ImuSample> publication_;
 #if defined(CONFIG_DRIVER_ICM20948_MAG)
     core::Publication<msg::MagnetometerSample> mag_publication_;
+    core::Publication<msg::MagnetometerStatus> mag_status_publication_;
     MagState mag_state_ = MagState::Probing;
     std::uint64_t next_mag_probe_us_ = 0;
     std::uint64_t mag_step_started_us_ = 0;
@@ -102,6 +104,12 @@ private:
     std::uint32_t mag_samples_ = 0;
     std::uint32_t mag_failures_ = 0;
     std::uint32_t mag_overflows_ = 0;
+    std::uint32_t mag_setups_ = 0;
+    std::uint64_t next_mag_status_us_ = 0;
+    MagFailure mag_last_failure_ = MagFailure::None;
+    std::uint8_t mag_mst_status_ = 0;
+    std::uint8_t mag_who_am_i_ = 0;
+    std::uint16_t mag_fifo_count_ = 0;
 #endif
 
     State state_ = State::Probing;

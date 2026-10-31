@@ -27,7 +27,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Callable, Mapping, Protocol
 
-from .enums import GamepadButton, HandshakeState, MenuState
+from .enums import GamepadButton, HandshakeState, MagnetometerFailure, MagnetometerState, MenuState
 from .frame import Frame, FrameReader, FrameType, LogDropout, LogInfo
 from .session import (
     ACTUATOR_POWER_STATES,
@@ -267,6 +267,21 @@ def local_menu_line(menu) -> str:
     return (f"local_menu state={MENU_STATES.get(menu.state, menu.state)} item={item} "
             f"last_result={result.replace(' ', '_')} last_parameter={parameter} "
             f"reboot_required={int(menu.reboot_required)}")
+
+
+# The magnetometer setup states and failure reasons (magnetometer_status).
+MAGNETOMETER_STATES = value_texts(MagnetometerState)
+MAGNETOMETER_FAILURES = value_texts(MagnetometerFailure)
+
+
+def magnetometer_status_line(instance: int, status) -> str:
+    """magnetometer_status as a space-separated key=value line."""
+    state = MAGNETOMETER_STATES.get(status.state, str(status.state)).replace(" ", "_")
+    failure = MAGNETOMETER_FAILURES.get(status.last_failure, str(status.last_failure)).replace(" ", "_")
+    return (f"magnetometer_status instance={instance} state={state} last_failure={failure} "
+            f"i2c_mst_status=0x{status.i2c_mst_status:02X} who_am_i=0x{status.who_am_i:02X} "
+            f"fifo_count={status.fifo_count} samples={status.samples} failures={status.failures} "
+            f"overflows={status.overflows} setups={status.setups}")
 
 
 def speeds_text(values) -> str:
@@ -908,6 +923,8 @@ class LinkMonitor:
             lines.append(vehicle_status_line(status))
         for _, menu in self.latest("local_menu"):
             lines.append(local_menu_line(menu))
+        for instance, status in self.latest("magnetometer_status"):
+            lines.append(magnetometer_status_line(instance, status))
         for _, encoders in self.latest("wheel_encoders"):
             lines.append(wheel_encoders_line(encoders))
         for _, outputs in self.latest("actuator_outputs"):

@@ -11,6 +11,7 @@ from .monitor import (
     euler_degrees,
     gamepad_line,
     local_menu_line,
+    magnetometer_status_line,
     vehicle_local_odometry_line,
     vehicle_status_line,
     wheel_encoders_line,
@@ -20,7 +21,7 @@ from .monitor import (
 # Topics shown in their own lines or tables rather than by their raw values.
 STATUS_TOPICS = ("link_status", "work_item_status", "parameter_status", "vehicle_status", "wheel_encoders",
                  "actuator_outputs", "local_menu", "body_velocity_measurement", "vehicle_local_odometry",
-                 "manual_control_input")
+                 "manual_control_input", "magnetometer_status")
 
 
 def format_value(value: object) -> str:
@@ -78,6 +79,9 @@ def render(monitor: LinkMonitor, target: str, width: int = 120) -> list[str]:
         lines.append("vehicle        " + vehicle_status_line(status).removeprefix("vehicle_status "))
     for _, menu in monitor.latest("local_menu"):
         lines.append("menu           " + local_menu_line(menu).removeprefix("local_menu "))
+    for instance, status in monitor.latest("magnetometer_status"):
+        lines.append("magnetometer   " + magnetometer_status_line(instance, status)
+                     .removeprefix("magnetometer_status "))
     for _, encoders in monitor.latest("wheel_encoders"):
         lines.append("wheels         " + wheel_encoders_line(encoders).removeprefix("wheel_encoders "))
     for _, outputs in monitor.latest("actuator_outputs"):

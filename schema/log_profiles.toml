@@ -24,6 +24,7 @@ entries = [
     { topic = "link_status", rate = "as_published" },
     { topic = "parameter_update", rate = "as_published" },
     { topic = "estimator_restart", rate = "as_published" },
+    { topic = "magnetometer_status", instance = 0, rate = "as_published" },
     { topic = "vehicle_attitude_groundtruth", rate = 50, kconfig = "PLATFORM_SITL" },
     { topic = "vehicle_local_odometry_groundtruth", rate = 50, kconfig = "PLATFORM_SITL" },
 ]

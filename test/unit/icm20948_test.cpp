@@ -8,6 +8,7 @@
 #include <vk/hal/i2c.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/magnetometer_sample.hpp>
+#include <vk/msg/magnetometer_status.hpp>
 #include <vk/params/params.hpp>
 #include <vk/sim/i2c_bus.hpp>
 #include <vk/sim/icm20948.hpp>
@@ -589,6 +590,38 @@ TEST_F(Icm20948Test, MissingAk09916LeavesImuRunningAndIsRetried)
     vk::msg::MagnetometerSample mag_sample{};
     EXPECT_GT(drain_mag(mag_sub, mag_sample), 0);
     EXPECT_GT(mag_sample.failures, 0U);
+}
+
+// magnetometer_status shows, once a second, where the setup stops and why.
+TEST_F(Icm20948Test, MagnetometerStatusShowsWhereTheSetupStops)
+{
+    using vk::msg::MagnetometerFailure;
+    using vk::msg::MagnetometerState;
+    model.set_mag_responding(false);
+    Icm20948 imu(vk::hal::I2cDevice(bus, 0x68), {.rate_hz = rate_hz}, queue);
+    imu.start();
+    vk::core::Subscription<vk::msg::MagnetometerStatus> status_sub(0);
+
+    run_for(2'000'000);
+    vk::msg::MagnetometerStatus status{};
+    ASSERT_TRUE(status_sub.copy(status));
+    EXPECT_LE(fake_now - status.timestamp, 1'000'000U);  // published within the last second
+    EXPECT_NE(status.state, static_cast<std::uint8_t>(MagnetometerState::Running));
+    EXPECT_EQ(status.last_failure, static_cast<std::uint8_t>(MagnetometerFailure::Nack));
+    EXPECT_EQ(status.i2c_mst_status & 0x50U, 0x50U);  // I2C_SLV4_DONE | I2C_SLV4_NACK
+    EXPECT_EQ(status.samples, 0U);
+    EXPECT_EQ(status.setups, 0U);
+    EXPECT_GT(status.failures, 0U);
+    EXPECT_LE(status.failures, imu.status().mag_failures);
+
+    model.set_mag_responding(true);
+    run_for(1'500'000);
+    ASSERT_TRUE(status_sub.copy(status));
+    EXPECT_EQ(status.state, static_cast<std::uint8_t>(MagnetometerState::Running));
+    EXPECT_EQ(status.who_am_i, 0x09);
+    EXPECT_EQ(status.setups, 1U);
+    EXPECT_GT(status.samples, 0U);
+    EXPECT_EQ(status.fifo_count % 9, 0);
 }
 #endif
 

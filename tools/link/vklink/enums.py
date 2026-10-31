@@ -165,6 +165,27 @@ class HandshakeState(enum.IntEnum):
     PEER_SILENT = 2  # handshake done, peer not heard within the timeout
 
 
+class MagnetometerFailure(enum.IntEnum):
+    """Why an IMU driver last counted a magnetometer failure (spec 0012)."""
+
+    NONE = 0
+    BUS = 1  # a register read or write on the IMU failed
+    NACK = 2  # the magnetometer did not acknowledge slave 4
+    TIMEOUT = 3  # a slave 4 transfer did not finish in time
+    WRONG_WHO_AM_I = 4  # the magnetometer answered another WHO_AM_I
+    BAD_FIFO_COUNT = 5  # not whole records, or more than one read takes
+    STALE = 6  # no record with data ready for too long
+
+
+class MagnetometerState(enum.IntEnum):
+    """Where an IMU driver is in setting up the magnetometer behind its I2C master (spec 0012)."""
+
+    PROBING = 0  # waiting to start the setup
+    WAITING_WHO_AM_I = 1  # slave 4 WHO_AM_I read started
+    WAITING_CNTL2 = 2  # slave 4 mode write started
+    RUNNING = 3  # slave 0 and the FIFO enabled, reading records
+
+
 class ManualControlSource(enum.IntEnum):
     """What a manual_control_input comes from (spec 0010)."""
 

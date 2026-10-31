@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Where an IMU driver is in setting up the magnetometer behind its I2C master
+# (spec 0012).
+@type uint8
+PROBING = 0                                   # waiting to start the setup
+WAITING_WHO_AM_I = 1                          # slave 4 WHO_AM_I read started
+WAITING_CNTL2 = 2                             # slave 4 mode write started
+RUNNING = 3                                   # slave 0 and the FIFO enabled, reading records

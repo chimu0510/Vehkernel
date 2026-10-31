@@ -47,6 +47,7 @@ def test_estimator_replay_bandwidth(repo_schema):
     # | imu_sample                | 37 B    | 48 B  | 200 Hz         | 1     | 200 * 48 * 1  = 9600  |
     # | body_velocity_measurement | 45 B    | 56 B  | 200 Hz         | 1     | 200 * 56 * 1  = 11200 |
     # | magnetometer_sample       | 29 B    | 40 B  | 100 Hz         | 1     | 100 * 40 * 1  = 4000  |
+    # | magnetometer_status       | 31 B    | 42 B  | 1 Hz           | 1     | 1 * 42 * 1    = 42    |
     # | vehicle_attitude          | 86 B    | 97 B  | 50 Hz          | 1     | 50 * 97 * 1   = 4850  |
     # | estimator_attitude        | 86 B    | 97 B  | 50 Hz          | 2     | 50 * 97 * 2   = 9700  |
     # | vehicle_local_odometry    | 89 B    | 100 B | 50 Hz          | 1     | 50 * 100 * 1  = 5000  |
@@ -56,14 +57,14 @@ def test_estimator_replay_bandwidth(repo_schema):
     # | link_status               | 46 B    | 57 B  | 1 Hz           | 2     | 1 * 57 * 2    = 114   |
     # | parameter_update          | 16 B    | 27 B  | 0 Hz           | 1     | 0 * 27 * 1    = 0     |
     # | estimator_restart         | 8 B     | 19 B  | 0 Hz           | 1     | 0 * 19 * 1    = 0     |
-    # Sum: 9600 + 11200 + 4000 + 4850 + 9700 + 5000 + 2550 + 235 + 976 + 114 = 48225 B/s (~48.2 KB/s)
-    hand_count_c50c = 48225.0
+    # Sum: 9600 + 11200 + 4000 + 42 + 4850 + 9700 + 5000 + 2550 + 235 + 976 + 114 = 48267 B/s (~48.3 KB/s)
+    hand_count_c50c = 48267.0
 
     # Hand count for SITL adds (PLATFORM_SITL):
     # | vehicle_attitude_groundtruth       | 36 B | 47 B | 50 Hz | 1 | 50 * 47 * 1 = 2350 |
     # | vehicle_local_odometry_groundtruth | 60 B | 71 B | 50 Hz | 1 | 50 * 71 * 1 = 3550 |
-    # Sum: 48225 + 2350 + 3550 = 54125 B/s (~54.1 KB/s)
-    hand_count_sitl = 54125.0
+    # Sum: 48267 + 2350 + 3550 = 54167 B/s (~54.2 KB/s)
+    hand_count_sitl = 54167.0
 
     bw_c50c = replay.bandwidth_c50c(repo_schema)
     bw_sitl = replay.bandwidth_sitl(repo_schema)
@@ -217,8 +218,8 @@ def test_log_profile_streams_header(repo_schema):
 
     header = log_profile_streams_header(profiles, repo_schema)
     assert "class EstimatorReplayStreams" in header
-    assert "estimator_replay_stream_count = 31;" in header
-    assert "estimator_replay_stream_count = 29;" in header
+    assert "estimator_replay_stream_count = 32;" in header
+    assert "estimator_replay_stream_count = 30;" in header
     assert "TopicStreamOf<msg::ImuSample>" in header
     assert "TopicStreamOf<msg::BodyVelocityMeasurement>" in header
     assert "TopicStreamOf<msg::MagnetometerSample>" in header

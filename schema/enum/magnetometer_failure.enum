@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Why an IMU driver last counted a magnetometer failure (spec 0012).
+@type uint8
+NONE = 0
+BUS = 1                                       # a register read or write on the IMU failed
+NACK = 2                                      # the magnetometer did not acknowledge slave 4
+TIMEOUT = 3                                   # a slave 4 transfer did not finish in time
+WRONG_WHO_AM_I = 4                            # the magnetometer answered another WHO_AM_I
+BAD_FIFO_COUNT = 5                            # not whole records, or more than one read takes
+STALE = 6                                     # no record with data ready for too long

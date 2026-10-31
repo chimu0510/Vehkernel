@@ -305,3 +305,16 @@ def test_work_item_overruns_need_two_reports_with_every_work_item():
     assert WorkItemOverruns().judge() is None
     # The second report lacks a work item, so there is no interval to judge.
     assert work_item_reports({"imu": 0, "ctrl": 0}, {"imu": 1}).judge() is None
+
+
+def test_magnetometer_status_shows_the_setup_state_and_the_last_failure_by_name():
+    connection = types.SimpleNamespace(send=lambda data: None, receive=lambda timeout: b"", close=lambda: None)
+    monitor = LinkMonitor(connection, messages())
+    status = types.SimpleNamespace(timestamp=1, device_instance=0, state=1, last_failure=3, i2c_mst_status=0x00,
+                                   who_am_i=0x09, fifo_count=0, samples=0, failures=12, overflows=0, setups=0)
+    monitor.topics[("magnetometer_status", 0)] = TopicStats("magnetometer_status", 0)
+    monitor.topics[("magnetometer_status", 0)].add(status)
+    assert ("magnetometer_status instance=0 state=waiting_who_am_i last_failure=timeout i2c_mst_status=0x00 "
+            "who_am_i=0x09 fifo_count=0 samples=0 failures=12 overflows=0 setups=0") in monitor.summary()
+    view = render(monitor, "udp", width=200)
+    assert any(line.startswith("magnetometer   instance=0 state=waiting_who_am_i") for line in view)

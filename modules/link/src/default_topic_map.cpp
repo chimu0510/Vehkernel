@@ -13,6 +13,7 @@
 #include <vk/msg/link_status.hpp>
 #include <vk/msg/local_menu.hpp>
 #include <vk/msg/magnetometer_sample.hpp>
+#include <vk/msg/magnetometer_status.hpp>
 #include <vk/msg/manual_control_input.hpp>
 #include <vk/msg/parameter_status.hpp>
 #include <vk/msg/vehicle_attitude.hpp>
@@ -61,6 +62,7 @@ struct DefaultStreams {
 
     TopicStreamOf<msg::ImuSample> imu;
     TopicStreamOf<msg::MagnetometerSample> mag{MaxRate{50.0F}, 0};
+    TopicStreamOf<msg::MagnetometerStatus> mag_status{status_rate, 0};
     TopicStreamOf<msg::VehicleAttitude> attitude{MaxRate{50.0F}, 0};
     TopicStreamOf<msg::EstimatorAttitude> estimator_attitude_0{MaxRate{50.0F}, 0};
     TopicStreamOf<msg::EstimatorAttitude> estimator_attitude_1{MaxRate{50.0F}, 1};
@@ -80,8 +82,9 @@ struct DefaultStreams {
     std::array<TopicStreamOf<msg::WorkItemStatus>, msg::WorkItemStatus::instances> work_items =
         make_status_streams<msg::WorkItemStatus>();
     std::array<TopicStreamOf<msg::LinkStatus>, msg::LinkStatus::instances> links = make_status_streams<msg::LinkStatus>();
-    std::array<TopicStream*, 18> first{&imu,
+    std::array<TopicStream*, 19> first{&imu,
                                        &mag,
+                                       &mag_status,
                                        &attitude,
                                        &estimator_attitude_0,
                                        &estimator_attitude_1,
@@ -98,8 +101,8 @@ struct DefaultStreams {
                                        &setpoint,
                                        &body_setpoint,
                                        &menu};
-    std::array<TopicStream*, 18 + msg::WorkItemStatus::instances + msg::LinkStatus::instances> map =
-        make_map(first, std::make_index_sequence<18>{}, work_items,
+    std::array<TopicStream*, 19 + msg::WorkItemStatus::instances + msg::LinkStatus::instances> map =
+        make_map(first, std::make_index_sequence<19>{}, work_items,
                  std::make_index_sequence<msg::WorkItemStatus::instances>{}, links,
                  std::make_index_sequence<msg::LinkStatus::instances>{});
 };

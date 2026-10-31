@@ -55,10 +55,11 @@ The `estimator_replay` profile records estimator inputs and outputs:
 | `link_status` | 1 Hz (`as_published`) | Link transmission statistics |
 | `parameter_update` | `as_published` | Notifies when a parameter changes |
 | `estimator_restart` | `as_published` | Published once when estimators restart |
+| `magnetometer_status:0` | 1 Hz (`as_published`) | Where the magnetometer setup is and why it last failed |
 | `vehicle_attitude_groundtruth` | 50 Hz (SITL only) | True attitude in simulation |
 | `vehicle_local_odometry_groundtruth` | 50 Hz (SITL only) | True pose in simulation |
 
-On the C50C the profile takes about 48.2 KB/s with the Link's framing, staying well under the 80 % budget on SERIAL1 at 921600 baud (about 52 % of the port together with the normal topic map); SITL's ground truth topics bring it to about 54.1 KB/s.
+On the C50C the profile takes about 48.3 KB/s with the Link's framing, staying well under the 80 % budget on SERIAL1 at 921600 baud (about 52 % of the port together with the normal topic map); SITL's ground truth topics bring it to about 54.2 KB/s.
 
 ## Stillness after starting
 
