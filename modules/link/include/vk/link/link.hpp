@@ -29,9 +29,11 @@
 #include <vk/msg/arming_state.hpp>
 #include <vk/msg/link_status.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string_view>
 
 namespace vk::link {
@@ -53,6 +55,20 @@ struct LinkStats {
     std::uint8_t rate_scale;        // percent of the topic map's rates, scaled to fit the baud rate
     std::uint32_t inbound_undeclared;  // topic data for a topic the map does not declare inbound
 };
+
+// The most bytes of topic data one run of a Link may write: what the port
+// carries in two intervals, and at least one whole frame. A burst, when every
+// status topic falls due at once or the streams resume after a handshake, then
+// goes out over several runs instead of one long run (#178). Unbounded for a
+// transport with no baud rate.
+[[nodiscard]] constexpr std::size_t topic_bytes_per_run(std::uint32_t baud, std::uint32_t interval_us)
+{
+    if (baud == 0) {
+        return std::numeric_limits<std::size_t>::max();
+    }
+    const std::uint64_t port_bytes = std::uint64_t{baud} / 10U * interval_us / 1'000'000U;
+    return std::max(static_cast<std::size_t>(2U * port_bytes), max_wire_size);
+}
 
 class Link final : public core::WorkItem {
 public:
@@ -137,6 +153,8 @@ private:
     HandshakeState handshake_state_ = HandshakeState::Waiting;
     std::uint64_t next_status_us_ = 0;
     std::uint8_t rate_scale_ = 100;
+    std::size_t topic_bytes_per_run_ = std::numeric_limits<std::size_t>::max();
+    std::size_t next_stream_ = 0;  // where the topic map's streams resume after a run ran out of bytes
     std::uint32_t inbound_undeclared_ = 0;
     core::Subscription<msg::BringupStatus> bringup_status_{0};
     core::Subscription<msg::ArmingState> arming_{0};

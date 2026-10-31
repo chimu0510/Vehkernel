@@ -29,6 +29,8 @@
 #include <limits>
 #include <span>
 #include <string_view>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -565,6 +567,65 @@ TEST(TopicMapScaling, EachLinkHasItsOwnDefaultMap)
     EXPECT_LT(vk::link::scale_to_baud(second, 57'600), 100);
     EXPECT_EQ(vk::link::topic_map_load(first), first_load);
     EXPECT_LT(vk::link::topic_map_load(second), 57'600.0F / 10.0F * vk::link::max_port_load * 1.001F);
+}
+
+// Twenty latest-value streams at 1 Hz, Sample<40> to Sample<59>, each with its publication.
+template <std::size_t... I>
+struct BurstStreams {
+    std::tuple<TopicStreamOf<Sample<40 + I, 1>>...> streams{((void)I, vk::link::MaxRate{1.0F})...};
+    std::tuple<vk::core::Publication<Sample<40 + I, 1>>...> publications;
+
+    [[nodiscard]] std::array<TopicStream*, sizeof...(I)> map() { return {&std::get<I>(streams)...}; }
+    void publish_all(std::uint64_t now) { (std::get<I>(publications).publish({.timestamp = now, .value = I}), ...); }
+};
+
+template <std::size_t... I>
+BurstStreams<I...> make_burst_streams(std::index_sequence<I...> /*unused*/);
+
+TEST_F(LinkTest, ABurstGoesOutOverSeveralRunsWithinTheBytesPerRun)
+{
+    // Every stream falls due in the same run, as every status topic does once a
+    // second, and as every stream does when the topics resume after a handshake.
+    decltype(make_burst_streams(std::make_index_sequence<20>{})) burst;
+    const auto map = burst.map();
+    transport.baud = 115'200;
+    Link link("link_test", transport, map, {}, queue);
+    link.start();
+    connect();
+    host.receive();
+
+    const std::size_t budget = vk::link::topic_bytes_per_run(115'200, Link::default_interval_us);
+    burst.publish_all(fake_now);
+    std::vector<std::uint16_t> received;
+    int runs_with_data = 0;
+    for (int run = 0; run < 10; ++run) {
+        step();
+        // One frame may cross the budget: a run stops taking messages once it is spent.
+        EXPECT_LE(transport.written.size(), budget + vk::link::max_wire_size) << run;
+        bool any = false;
+        for (const auto& frame : host.receive()) {
+            if (frame.type == FrameType::TopicData) {
+                vk::link::BodyReader body(frame.body);
+                received.push_back(body.u16());
+                any = true;
+            }
+        }
+        runs_with_data += any ? 1 : 0;
+    }
+    EXPECT_GT(runs_with_data, 1);
+    std::ranges::sort(received);
+    std::vector<std::uint16_t> expected(map.size());
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        expected[i] = static_cast<std::uint16_t>(140 + i);
+    }
+    EXPECT_EQ(received, expected);
+}
+
+TEST(TopicBytesPerRun, TwoIntervalsOfThePortAndAtLeastOneFrame)
+{
+    EXPECT_EQ(vk::link::topic_bytes_per_run(921'600, 5'000), 2U * 460U);
+    EXPECT_EQ(vk::link::topic_bytes_per_run(57'600, 5'000), vk::link::max_wire_size);
+    EXPECT_EQ(vk::link::topic_bytes_per_run(0, 5'000), std::numeric_limits<std::size_t>::max());
 }
 
 TEST_F(LinkTest, ASerialLinkScaledToItsBaudRateDropsNoFrame)

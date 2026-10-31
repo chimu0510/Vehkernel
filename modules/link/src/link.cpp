@@ -55,6 +55,7 @@ Link::~Link()
 void Link::start()
 {
     rate_scale_ = scale_to_baud(map_, transport_->baud_rate());
+    topic_bytes_per_run_ = topic_bytes_per_run(transport_->baud_rate(), config_.interval_us);
     schedule_periodic(config_.interval_us);
 }
 
@@ -302,12 +303,19 @@ void Link::send_topics(std::uint64_t now_us)
     if (handshake_state_ != HandshakeState::Connected || session_.describing()) {
         return;
     }
+    const std::uint32_t bytes_before = sink_.bytes;
+    // A message is taken from its stream only while the run has bytes left,
+    // so what does not fit stays queued, or the newest value waits, for the next run.
+    const auto bytes_left = [&] { return sink_.bytes - bytes_before < topic_bytes_per_run_; };
     std::array<std::uint8_t, max_message_size> message{};
     if (logging_ && active_profile_ != nullptr) {
         for (std::size_t i = 0; i < profile_streams_.size() && i < last_missed_.size(); ++i) {
             TopicStream* stream = profile_streams_[i];
-            for (std::size_t size = stream->next(now_us, message); size != 0;
-                 size = stream->next(now_us, message)) {
+            while (bytes_left()) {
+                const std::size_t size = stream->next(now_us, message);
+                if (size == 0) {
+                    break;
+                }
                 if (!session_.send_topic(stream->topic_id(), stream->instance(), std::span(message).first(size),
                                          now_us, sink_)) {
                     ++unsent_dropouts_[i];
@@ -326,15 +334,27 @@ void Link::send_topics(std::uint64_t now_us)
             }
         }
     }
-    for (TopicStream* stream : map_) {
+    // The streams take turns from where the last run stopped, so a burst
+    // cannot keep the last streams of the map waiting.
+    for (std::size_t n = 0; n < map_.size(); ++n) {
+        const std::size_t index = (next_stream_ + n) % map_.size();
+        TopicStream* stream = map_[index];
         if (logging_ && is_profile_topic(stream->topic_id(), stream->instance())) {
             while (stream->next(now_us, message) != 0) {
             }
             continue;
         }
-        for (std::size_t size = stream->next(now_us, message); size != 0; size = stream->next(now_us, message)) {
+        while (bytes_left()) {
+            const std::size_t size = stream->next(now_us, message);
+            if (size == 0) {
+                break;
+            }
             session_.send_topic(stream->topic_id(), stream->instance(), std::span(message).first(size), now_us,
                                 sink_);
+        }
+        if (!bytes_left()) {
+            next_stream_ = index;
+            return;
         }
     }
 }

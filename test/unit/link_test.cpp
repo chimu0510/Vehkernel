@@ -136,6 +136,32 @@ TEST(Crc16, HandlesEmptyInput)
     EXPECT_EQ(crc16({}), 0xFFFFU);
 }
 
+TEST(Crc16, TableMatchesTheBitwiseDefinition)
+{
+    // The bit-by-bit CRC-16/CCITT-FALSE, which the table replaced (#178).
+    const auto bitwise = [](std::span<const std::uint8_t> data) {
+        std::uint16_t crc = 0xFFFF;
+        for (const std::uint8_t byte : data) {
+            crc = static_cast<std::uint16_t>(crc ^ (byte << 8U));
+            for (int bit = 0; bit < 8; ++bit) {
+                crc = (crc & 0x8000U) != 0 ? static_cast<std::uint16_t>((crc << 1U) ^ 0x1021U)
+                                           : static_cast<std::uint16_t>(crc << 1U);
+            }
+        }
+        return crc;
+    };
+    std::array<std::uint8_t, 600> data{};
+    std::uint32_t state = 12345;
+    for (auto& byte : data) {
+        state = state * 1103515245U + 12345U;
+        byte = static_cast<std::uint8_t>(state >> 16U);
+    }
+    for (std::size_t size = 0; size <= data.size(); size += 37) {
+        const auto part = std::span<const std::uint8_t>(data).first(size);
+        EXPECT_EQ(crc16(part), bitwise(part)) << size;
+    }
+}
+
 // --- Frame Writer and Reader tests ---
 
 TEST(Frame, WriterProducesWireFrameWithDelimiter)
