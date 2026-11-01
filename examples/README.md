@@ -19,7 +19,7 @@ The examples are numbered in dependency order:
 | [03-oled](c50c-v1_1/03-oled/README.md) | Draws a title and a counter on the OLED through software SPI and the SSD1306 driver | Yes |
 | [04-work-queues](c50c-v1_1/04-work-queues/README.md) | Counts at 10 Hz and 2 Hz in two work items on one work queue and shows both on the OLED | Yes |
 | [05-bus](c50c-v1_1/05-bus/README.md) | One work item publishes a counter that another, woken by it, draws on the OLED | Yes |
-| `06-imu` *(pending)* | Software I2C ICM20948 IMU driver (`IMU0`) publishing `imu_sample` | Yes |
+| [06-imu](c50c-v1_1/06-imu/README.md) | ICM20948 IMU driver publishing imu_sample over software I2C; OLED shows specific force, rate and down axis | Yes |
 | `07-magnetometer` *(pending)* | AK09916 magnetometer via ICM20948 FIFO and `magnetometer_sample` | Yes |
 | `08-serial-link` *(pending)* | Custom protocol Link over serial ports `SERIAL1` and `SERIAL2` | Yes |
 | `09-parameters` *(pending)* | Parameter system and persistent storage in internal Flash `PARAMS` | Yes |

@@ -18,6 +18,12 @@ For 05-bus:
 - Verifies that every received value matches the published ones, each once and in order (allowing 1-2 unreceived at stop).
 - Verifies display_on=1 reported from the simulated SSD1306.
 - Verifies whole frames: line 0 the title, line 2 the last received count, line 4 the total received count.
+For 06-imu:
+- Verifies reported sample rate against 200 Hz within tolerance.
+- Verifies that the reported down axis is +Z on the level ground vehicle at rest.
+- Verifies reported specific force components (ax ~ 0, ay ~ 0, az ~ -9.81 m/s^2).
+- Verifies display_on=1 reported from the simulated SSD1306.
+- Verifies whole frames: line 0 title, lines 2-4 specific force, line 5 sample rate, line 6 down axis.
 """
 
 from __future__ import annotations
@@ -332,6 +338,108 @@ def check_05_bus(
     return failures
 
 
+def check_06_imu(
+    stdout: str,
+    stdout_lines: list[tuple[str, float]],
+    display_file: Path,
+    tolerance: float,
+) -> list[str]:
+    failures: list[str] = []
+
+    # 1. Check sample rate reported once per second
+    rates = [float(m.group(1)) for m in re.finditer(r"^rate=([0-9.]+)", stdout, re.MULTILINE)]
+    if not rates:
+        failures.append("no rate reported in stdout")
+    else:
+        expected_rate = 200.0
+        for r in rates:
+            if abs(r - expected_rate) > expected_rate * tolerance:
+                failures.append(
+                    f"sample rate {r:.2f} Hz outside expected {expected_rate:.2f} Hz "
+                    f"(tolerance {tolerance:.0%})"
+                )
+                break
+
+    # 2. Check down axis reported at display rate
+    downs = [m.group(1) for m in re.finditer(r"^down=([^\s]+)", stdout, re.MULTILINE)]
+    if not downs:
+        failures.append("no down axis reported in stdout")
+    else:
+        expected_down = "+Z"
+        for d in downs:
+            if d != expected_down:
+                failures.append(f"expected down axis {expected_down!r}, got {d!r}")
+                break
+
+    # 3. Check specific force components reported at display rate
+    ax_reports = [float(m.group(1)) for m in re.finditer(r"^ax=([+-]?[0-9.]+)", stdout, re.MULTILINE)]
+    ay_reports = [float(m.group(1)) for m in re.finditer(r"^ay=([+-]?[0-9.]+)", stdout, re.MULTILINE)]
+    az_reports = [float(m.group(1)) for m in re.finditer(r"^az=([+-]?[0-9.]+)", stdout, re.MULTILINE)]
+
+    if not ax_reports or not ay_reports or not az_reports:
+        failures.append("specific force not reported in stdout")
+    else:
+        last_ax = ax_reports[-1]
+        last_ay = ay_reports[-1]
+        last_az = az_reports[-1]
+        if abs(last_ax) > 1.0:
+            failures.append(f"ax {last_ax:.3f} m/s^2 unexpectedly far from 0")
+        if abs(last_ay) > 1.0:
+            failures.append(f"ay {last_ay:.3f} m/s^2 unexpectedly far from 0")
+        if abs(last_az - (-9.81)) > 1.0:
+            failures.append(f"az {last_az:.3f} m/s^2 unexpectedly far from -9.81 m/s^2")
+
+    # 4. Check display_on=1 reported from simulated SSD1306's displaying()
+    display_on_match = re.search(r"^display_on=(\d+)", stdout, re.MULTILINE)
+    if not display_on_match:
+        failures.append("display_on not reported in stdout")
+    elif int(display_on_match.group(1)) != 1:
+        failures.append(f"expected display_on=1, got display_on={display_on_match.group(1)}")
+
+    # 5. Judge whole frames from captured display image:
+    # line 0 the title, lines 2-4 specific force, line 5 rate, line 6 down, lines 1 and 7 blank
+    if not display_file.exists():
+        failures.append("SITL wrote no display image")
+    else:
+        try:
+            lines = screen_text(display_file)
+            print("display:")
+            for idx, line in enumerate(lines):
+                print(f"  [{idx}] |{line}|")
+
+            if not rates or not downs or not ax_reports or not ay_reports or not az_reports:
+                failures.append("cannot verify display content without reported values")
+            else:
+                last_rate = int(round(rates[-1]))
+                last_down = downs[-1]
+
+                def format_fixed(val: float) -> str:
+                    hundredths = round(val * 100)
+                    mag = abs(hundredths)
+                    sign = "-" if hundredths < 0 else "+"
+                    return f"{sign}{mag // 100}.{mag % 100:02d}"
+
+                expected_lines = {
+                    0: "VEHKERNEL 06-IMU",
+                    1: "",
+                    2: f"AX: {format_fixed(last_ax)} M/S2",
+                    3: f"AY: {format_fixed(last_ay)} M/S2",
+                    4: f"AZ: {format_fixed(last_az)} M/S2",
+                    5: f"RATE: {last_rate} HZ",
+                    6: f"DOWN: {last_down}",
+                    7: "",
+                }
+                for line_idx, expected_text in expected_lines.items():
+                    if lines[line_idx] != expected_text:
+                        failures.append(
+                            f"display line {line_idx}: expected {expected_text!r}, got {lines[line_idx]!r}"
+                        )
+        except Exception as e:
+            failures.append(f"failed to read display image: {e}")
+
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("executable", help="the example executable to run (e.g. example-03-oled)")
@@ -383,6 +491,8 @@ def main() -> int:
             failures = check_04_work_queues(full_stdout, stdout_lines, display_file, args.tolerance)
         elif ex_name == "05-bus":
             failures = check_05_bus(full_stdout, stdout_lines, display_file, args.tolerance)
+        elif ex_name == "06-imu":
+            failures = check_06_imu(full_stdout, stdout_lines, display_file, args.tolerance)
         else:
             failures = [f"unknown SITL example {ex_name}"]
 

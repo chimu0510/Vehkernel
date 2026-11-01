@@ -32,7 +32,6 @@ actuator_control = "Actuator task driving motor outputs with the output watchdog
 "flash:EVENTLOG" = "event log region; no event log sink yet (ADR-0019, ADR-0020)"
 
 [pending]
-"device:IMU0" = "06-imu"
 "serial:SERIAL1" = "08-serial-link"
 "serial:SERIAL2" = "08-serial-link"
 "flash:PARAMS" = "09-parameters"
@@ -81,4 +80,11 @@ name = "05-bus"
 summary = "One work item publishes a counter that another, woken by it, draws on the OLED"
 introduces = ["bus"]
 uses = ["work_queue", "device:DISPLAY0", "flash:FIRMWARE"]
+sitl = true
+
+[[example]]
+name = "06-imu"
+summary = "ICM20948 IMU driver publishing imu_sample over software I2C; OLED shows specific force, rate and down axis"
+introduces = ["device:IMU0"]
+uses = ["bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE"]
 sitl = true

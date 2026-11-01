@@ -5,6 +5,7 @@
 #include <vk/local_display/pages.hpp>
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -36,6 +37,28 @@ public:
             add(std::string_view(&digits.at(--count), 1));
         }
         return *this;
+    }
+
+    // Fixed-point float formatter: a sign (+/-), integer part, and two decimal places (e.g. "+0.00", "-9.81").
+    Line& add_fixed(float value)
+    {
+        if (!std::isfinite(value)) {
+            return add("---");
+        }
+        const long hundredths = std::lround(static_cast<double>(value) * 100.0);
+        const unsigned long magnitude =
+            hundredths < 0 ? static_cast<unsigned long>(-hundredths) : static_cast<unsigned long>(hundredths);
+        if (hundredths < 0) {
+            add("-");
+        } else {
+            add("+");
+        }
+        add(static_cast<std::uint32_t>(magnitude / 100)).add(".");
+        const auto decimals = static_cast<std::uint32_t>(magnitude % 100);
+        if (decimals < 10) {
+            add("0");
+        }
+        return add(decimals);
     }
 
     [[nodiscard]] std::string_view view() const { return {text_.data(), size_}; }

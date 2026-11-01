@@ -5,8 +5,11 @@
 #include <line.hpp>
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
+#include <vk/core/work_queue.hpp>
+#include <vk/drivers/icm20948.hpp>
 #include <vk/drivers/ssd1306.hpp>
 #include <vk/hal/clock.hpp>
+#include <vk/hal/i2c.hpp>
 #include <vk/platform/platform.hpp>
 #include <vk/sim/ssd1306.hpp>
 
@@ -22,6 +25,7 @@ namespace example {
 namespace detail {
 
 inline vk::core::StaticInstance<vk::drivers::Ssd1306> display_driver;
+inline vk::core::StaticInstance<vk::drivers::Icm20948> imu_driver;
 inline std::uint64_t stop_duration_us = 0;
 inline bool has_stopped = false;
 
@@ -110,6 +114,21 @@ inline vk::drivers::Ssd1306& display()
         detail::display_driver.emplace(vk::hal::DisplayDevice(vk::platform::display()));
     }
     return *detail::display_driver;
+}
+
+// Returns the simulated ICM20948 IMU driver on the simulated I2C bus, running on wq:ctrl.
+inline vk::drivers::Icm20948& imu()
+{
+    if (!detail::imu_driver.has_value()) {
+        detail::imu_driver.emplace(
+            vk::hal::I2cDevice(vk::platform::imu_bus(), vk::platform::imu_address),
+            vk::drivers::Icm20948::Config{
+                .instance = 0,
+                .board_orientation = vk::hal::Rotation::None,
+                .rate_hz = vk::platform::imu_rate_hz},
+            vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    }
+    return *detail::imu_driver;
 }
 
 }  // namespace example

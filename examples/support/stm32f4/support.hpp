@@ -6,10 +6,14 @@
 #include <line.hpp>
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
+#include <vk/core/work_queue.hpp>
+#include <vk/drivers/icm20948.hpp>
 #include <vk/drivers/ssd1306.hpp>
 #include <vk/hal/clock.hpp>
 #include <vk/hal/display_bus.hpp>
+#include <vk/hal/i2c.hpp>
 #include <vk/platform/platform.hpp>
+#include <vk/platform/soft_i2c.hpp>
 #include <vk/platform/soft_spi.hpp>
 
 #include <cstdint>
@@ -28,6 +32,13 @@ static_assert(vk::hal::DisplayBus<DisplayBus>);
 
 inline DisplayBus display_bus;
 inline vk::core::StaticInstance<vk::drivers::Ssd1306> display_driver;
+
+using Imu = vk::board::devices::IMU0;
+static_assert(Imu::type == "ICM20948" && Imu::bus == "SOFT_I2C",
+              "the C50C's IMU is an ICM20948 on software I2C");
+
+inline vk::platform::SoftI2cOn<Imu::pins> imu_bus;
+inline vk::core::StaticInstance<vk::drivers::Icm20948> imu_driver;
 
 }  // namespace detail
 
@@ -75,6 +86,23 @@ inline vk::drivers::Ssd1306& display()
         detail::display_driver.emplace(vk::hal::DisplayDevice(detail::display_bus));
     }
     return *detail::display_driver;
+}
+
+// Returns the board's ICM20948 IMU driver on software I2C, running on wq:ctrl.
+inline vk::drivers::Icm20948& imu()
+{
+    if (!detail::imu_driver.has_value()) {
+        detail::imu_bus.init();
+        detail::imu_driver.emplace(
+            vk::hal::I2cDevice(detail::imu_bus, detail::Imu::address),
+            vk::drivers::Icm20948::Config{
+                .instance = 0,
+                .rotation = detail::Imu::rotation,
+                .board_orientation = vk::hal::Rotation::None,
+                .rate_hz = vk::board::timing::base_rate_hz},
+            vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+    }
+    return *detail::imu_driver;
 }
 
 }  // namespace example
