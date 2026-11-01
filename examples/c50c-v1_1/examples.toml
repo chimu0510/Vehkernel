@@ -31,10 +31,6 @@ actuator_control = "Actuator task driving motor outputs with the output watchdog
 "flash:BOOT" = "bootloader region; flashed once with the bootloader (ADR-0023)"
 "flash:EVENTLOG" = "event log region; no event log sink yet (ADR-0019, ADR-0020)"
 
-[pending]
-"pin:USB_DM" = "12-usb-gamepad"
-"pin:USB_DP" = "12-usb-gamepad"
-
 [[example]]
 name = "01-led"
 summary = "Blinks the on-board RGB LED with GPIO outputs and the system clock"
@@ -112,3 +108,9 @@ introduces = ["encoder:1", "encoder:2", "encoder:3", "encoder:4"]
 uses = ["output:1", "output:2", "output:3", "output:4", "actuator_control", "bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE", "parameters"]
 sitl = true
 
+[[example]]
+name = "12-usb-gamepad"
+summary = "USB host on CN8 and XInput gamepad publishing manual_control_input"
+introduces = ["pin:USB_DM", "pin:USB_DP"]
+uses = ["bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE"]
+sitl = false

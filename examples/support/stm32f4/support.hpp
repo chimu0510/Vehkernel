@@ -254,6 +254,12 @@ inline void start_actuators()
     }
 }
 
+// Starts the USB host on CN8 and the work item that publishes manual_control_input on wq:io (spec 0010).
+inline void start_usb_gamepad()
+{
+    vk::platform::start_usb_gamepad(vk::core::work_queue(vk::core::WorkQueueTier::Io));
+}
+
 // Senses whether the actuator power circuit is closed (PE4 on C50C, ADR-0005).
 inline bool actuator_power()
 {
