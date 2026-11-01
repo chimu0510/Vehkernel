@@ -43,6 +43,15 @@
       }
     },
     {
+      "name": "sitl-examples",
+      "displayName": "SITL board examples",
+      "inherits": "sitl",
+      "cacheVariables": {
+        "VK_DEBUG_OVERLAY": "${sourceDir}/examples/examples.config",
+        "VK_EXAMPLES_BOARD": "c50c-v1_1"
+      }
+    },
+    {
       "name": "test",
       "displayName": "Host tests",
       "inherits": "base",
@@ -72,10 +81,16 @@
     { "name": "c50c-v1_1-bringup", "configurePreset": "c50c-v1_1-bringup" },
     { "name": "c50c-v1_1-examples", "configurePreset": "c50c-v1_1-examples" },
     { "name": "sitl", "configurePreset": "sitl" },
+    { "name": "sitl-examples", "configurePreset": "sitl-examples" },
     { "name": "test", "configurePreset": "test" },
     { "name": "fuzz", "configurePreset": "fuzz", "targets": ["vk_fuzzers"] }
   ],
   "testPresets": [
+    {
+      "name": "sitl-examples",
+      "configurePreset": "sitl-examples",
+      "output": { "outputOnFailure": true }
+    },
     {
       "name": "test",
       "configurePreset": "test",

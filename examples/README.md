@@ -16,7 +16,7 @@ The examples are numbered in dependency order:
 |---|---|---|
 | [01-led](c50c-v1_1/01-led/README.md) | Blinks the on-board RGB LED with GPIO outputs and the system clock | No |
 | [02-user-key](c50c-v1_1/02-user-key/README.md) | GPIO input with internal pull-up; S3 changes LED colour | No |
-| `03-oled` *(pending)* | Software SPI SSD1306 OLED display driver (`DISPLAY0`) | Yes |
+| [03-oled](c50c-v1_1/03-oled/README.md) | Draws a title and a counter on the OLED through software SPI and the SSD1306 driver | Yes |
 | `04-work-queues` *(pending)* | FreeRTOS rate-tiered work queues and timed work items | Yes |
 | `05-bus` *(pending)* | Publish/subscribe bus topics, publications and subscriptions | Yes |
 | `06-imu` *(pending)* | Software I2C ICM20948 IMU driver (`IMU0`) publishing `imu_sample` | Yes |

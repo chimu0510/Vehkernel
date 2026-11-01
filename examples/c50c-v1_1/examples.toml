@@ -32,7 +32,6 @@ actuator_control = "Actuator task driving motor outputs with the output watchdog
 "flash:EVENTLOG" = "event log region; no event log sink yet (ADR-0019, ADR-0020)"
 
 [pending]
-"device:DISPLAY0" = "03-oled"
 "device:IMU0" = "06-imu"
 "serial:SERIAL1" = "08-serial-link"
 "serial:SERIAL2" = "08-serial-link"
@@ -62,3 +61,10 @@ summary = "GPIO input with internal pull-up; S3 changes LED colour"
 introduces = ["user_key"]
 uses = ["pin:LIGHT_R", "pin:LIGHT_G", "pin:LIGHT_B", "flash:FIRMWARE"]
 sitl = false
+
+[[example]]
+name = "03-oled"
+summary = "Draws a title and a counter on the OLED through software SPI and the SSD1306 driver"
+introduces = ["device:DISPLAY0"]
+uses = ["flash:FIRMWARE"]
+sitl = true

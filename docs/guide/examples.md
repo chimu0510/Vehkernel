@@ -45,7 +45,24 @@ Because examples share the board's Flash layout and Kconfig parameters, flashing
 
 ## Running in SITL
 
-Examples that declare `sitl = true` will also build for SITL with the `sitl-examples` preset; none does yet.
+Examples that declare `sitl = true` in `examples.toml` build for the development host with the `sitl-examples` preset:
+
+```bash
+cmake --preset sitl-examples
+cmake --build --preset sitl-examples
+```
+
+The build compiles the SITL examples with clang-tidy into host executables under `build/sitl-examples/app/examples/`. Run an example directly, with options to specify duration and capture the display:
+
+```bash
+build/sitl-examples/app/examples/example-03-oled --duration 3 --display /tmp/display.pbm
+```
+
+To run the automated L3 scenario checks for every SITL example:
+
+```bash
+ctest --preset sitl-examples
+```
 
 ## Returning to the firmware
 

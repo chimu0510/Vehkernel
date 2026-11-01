@@ -27,11 +27,12 @@ jobs:
             # The container runs as root on a checkout owned by the runner user; without
             # this, git refuses it and the bundles and images get no commit.
             git config --global --add safe.directory /work
-            for preset in c50c-v1_1 c50c-v1_1-bringup c50c-v1_1-examples sitl test fuzz; do
+            for preset in c50c-v1_1 c50c-v1_1-bringup c50c-v1_1-examples sitl sitl-examples test fuzz; do
               cmake --preset "$preset"
               cmake --build --preset "$preset"
             done
             ctest --preset test
+            ctest --preset sitl-examples
           '
 
       # Upload the board presets' host tools bundles (spec 0014, ADR-0026).

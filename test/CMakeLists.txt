@@ -285,12 +285,14 @@ add_test(NAME check_examples
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/examples/tests)
 set_tests_properties(check_examples PROPERTIES ENVIRONMENT
   "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/examples:${CMAKE_SOURCE_DIR}/tools/generators;PYTHONDONTWRITEBYTECODE=1")
+include(${CMAKE_SOURCE_DIR}/examples/c50c-v1_1/sitl_targets.cmake)
 add_test(NAME check_examples_c50c
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/examples/check_examples.py
     --examples-toml ${CMAKE_SOURCE_DIR}/examples/c50c-v1_1/examples.toml
     --board-toml ${CMAKE_SOURCE_DIR}/boards/c50c-v1_1/board.toml
     --examples-dir ${CMAKE_SOURCE_DIR}/examples/c50c-v1_1
-    --soc-root ${CMAKE_SOURCE_DIR}/soc)
+    --soc-root ${CMAKE_SOURCE_DIR}/soc
+    --sitl-targets ${VK_SITL_EXAMPLES})
 set_tests_properties(check_examples_c50c PROPERTIES ENVIRONMENT
   "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/generators;PYTHONDONTWRITEBYTECODE=1")
 add_test(NAME bringup_runner

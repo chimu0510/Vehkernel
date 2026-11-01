@@ -75,6 +75,7 @@ There is one CMake preset per build target:
 | `c50c-v1_1-bringup` | The C50C V1.1 bring-up image ([Testing](testing.md#bring-up-image)) |
 | `c50c-v1_1-examples` | The C50C V1.1 board examples ([Examples](examples.md)). In `examples/`: `example-NN-name.elf`, `.bin`, `.hex`, `.apj` |
 | `sitl` | SITL executable for the development host ([SITL](sitl.md)) |
+| `sitl-examples` | The SITL-compatible board examples ([Examples](examples.md)). In `examples/`: `example-NN-name` |
 | `test` | Host tests, run with `ctest --preset test` ([Testing](testing.md)), and `vehkernel-replay` in `test/`, the replay executable that `tools/log/replay.py` runs ([Logging](logging.md#estimator-replay-and-comparison)) |
 | `fuzz` | The Link fuzz targets, built with Clang, libFuzzer and the sanitizers, run with `ctest --preset fuzz` ([Testing](testing.md#fuzzing-the-link-decoders)) |
 

@@ -1,12 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Entry points: the firmware image for STM32 boards, or the SITL executable.
-if(VK_PLATFORM STREQUAL "stm32f4")
-  if(CONFIG_EXAMPLES)
-    # The examples build replaces the application (ADR-0025, spec 0013).
-    add_subdirectory(${CMAKE_SOURCE_DIR}/examples/${VK_BOARD} examples)
-    return()
+if(CONFIG_EXAMPLES)
+  # The examples build replaces the application (ADR-0025, spec 0013).
+  set(board "${VK_BOARD}")
+  if(VK_EXAMPLES_BOARD)
+    set(board "${VK_EXAMPLES_BOARD}")
   endif()
+  add_subdirectory(${CMAKE_SOURCE_DIR}/examples/${board} examples)
+  return()
+endif()
 
+if(VK_PLATFORM STREQUAL "stm32f4")
   if(CONFIG_BRINGUP_TESTS)
     # The bring-up test build replaces the application (ADR-0018).
     add_executable(vehkernel ${CMAKE_SOURCE_DIR}/test/hardware/bringup_main.cpp)
