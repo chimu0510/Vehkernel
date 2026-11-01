@@ -3,4 +3,5 @@
 set(VK_SITL_EXAMPLES
   03-oled
   04-work-queues
+  05-bus
 )

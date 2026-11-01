@@ -75,3 +75,10 @@ summary = "Counts at 10 Hz and 2 Hz in two work items on one work queue and show
 introduces = ["work_queue"]
 uses = ["device:DISPLAY0", "flash:FIRMWARE"]
 sitl = true
+
+[[example]]
+name = "05-bus"
+summary = "One work item publishes a counter that another, woken by it, draws on the OLED"
+introduces = ["bus"]
+uses = ["work_queue", "device:DISPLAY0", "flash:FIRMWARE"]
+sitl = true
