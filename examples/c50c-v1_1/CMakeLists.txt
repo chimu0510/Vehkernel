@@ -20,3 +20,4 @@ function(add_board_example name)
 endfunction()
 
 add_board_example(example-01-led 01-led/main.cpp)
+add_board_example(example-02-user-key 02-user-key/main.cpp)

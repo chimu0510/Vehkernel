@@ -32,7 +32,6 @@ actuator_control = "Actuator task driving motor outputs with the output watchdog
 "flash:EVENTLOG" = "event log region; no event log sink yet (ADR-0019, ADR-0020)"
 
 [pending]
-"user_key" = "02-user-key"
 "device:DISPLAY0" = "03-oled"
 "device:IMU0" = "06-imu"
 "serial:SERIAL1" = "08-serial-link"
@@ -55,4 +54,11 @@ name = "01-led"
 summary = "Blinks the on-board RGB LED with GPIO outputs and the system clock"
 introduces = ["pin:LIGHT_R", "pin:LIGHT_G", "pin:LIGHT_B", "flash:FIRMWARE"]
 uses = []
+sitl = false
+
+[[example]]
+name = "02-user-key"
+summary = "GPIO input with internal pull-up; S3 changes LED colour"
+introduces = ["user_key"]
+uses = ["pin:LIGHT_R", "pin:LIGHT_G", "pin:LIGHT_B", "flash:FIRMWARE"]
 sitl = false
