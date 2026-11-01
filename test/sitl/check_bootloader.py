@@ -15,6 +15,9 @@ build builds them (tools/firmware/finalize_image.py):
    the upload.
 4. RTC_BOOT_HOLD keeps a valid image from starting; RTC_BOOT_FAST starts it
    at once; with no request it starts after the boot window.
+5. tools/flash/flash_serial.py's hold, as for an image with no Link, catches
+   the boot window of a valid image and keeps it from starting, and uploader.py
+   then flashes it (#145).
 
     check_bootloader.py build/test/bootloader/vehkernel-sitl-bootloader
 """
@@ -22,6 +25,7 @@ build builds them (tools/firmware/finalize_image.py):
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import select
 import subprocess
@@ -36,6 +40,7 @@ REPO = Path(__file__).resolve().parents[2]
 UPLOADER = REPO / "tools" / "bootloader" / "external" / "uploader.py"
 # uploader.py runs through the flasher's launcher, as tools/flash/flash_serial.py runs it (#92).
 RUN_UPLOADER = REPO / "tools" / "flash" / "run_uploader.py"
+FLASH_SERIAL = REPO / "tools" / "flash" / "flash_serial.py"
 sys.path.insert(0, str(REPO / "tools" / "firmware"))
 
 import finalize_image  # noqa: E402
@@ -252,6 +257,22 @@ def main() -> int:
         failures.append("with no request a valid image did not start")
     elif time.monotonic() - started < 0.9:
         failures.append("the image started before the boot window ended")
+    bl.stop()
+
+    print("5. flash_serial.py holds the bootloader within the boot window, and uploader.py flashes")
+    spec = importlib.util.spec_from_file_location("flash_serial", FLASH_SERIAL)
+    flasher = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(flasher)
+    flasher.pulse_reset = lambda fd, port, circuit: None  # a pty has no modem lines, and the run has just begun
+    bl = Bootloader(args.bootloader, str(flash))
+    if not flasher.hold_bootloader(bl.pty, "DTR_RTS", timeout_s=0.9):
+        failures.append("flash_serial.py did not hold the bootloader within the boot window")
+    elif bl.read_until("start size=", 2.0):
+        failures.append("the held bootloader started the image after the boot window")
+    else:
+        code, output = upload(bl.pty, good)
+        if code != 0:
+            failures.append(f"uploader.py did not flash the held bootloader:\n{output}")
     bl.stop()
 
     for failure in failures:

@@ -2,15 +2,21 @@
 """Serial flasher tests, through its command line, with fakes for stm32flash,
 uploader.py and the Link monitor that record their calls, and a build
 directory holding only what the tool reads. The update tests run the tool in
-this process, so the download circuit's restart is recorded rather than
-driven on a port."""
+this process, so holding the bootloader is recorded rather than driven on a
+port. hold_bootloader itself runs on a pty against a fake bootloader with a
+boot window; check_bootloader.py runs it against the SITL bootloader."""
 
 import importlib.util
 import json
 import os
+import pty
+import select
 import stat
 import subprocess
 import sys
+import threading
+import time
+import tty
 from pathlib import Path
 
 import pytest
@@ -150,7 +156,7 @@ else:
 
 def fake_uploader(tmp_path: Path, outcome: str) -> Path:
     """Waits for the bootloader as uploader.py does. flash: finds it and writes
-    the image; after-restart: finds it only once the board was restarted;
+    the image; after-restart: finds it only once the bootloader is held;
     refuse: is refused for another board and keeps waiting; fail: exits 1."""
     script = tmp_path / "uploader.py"
     restarted = tmp_path / "restarted"
@@ -176,18 +182,26 @@ print('Verify : [====================] 100.0%')
 
 
 @pytest.fixture()
-def flasher(monkeypatch):
-    """The tool as a module, with the download circuit's restart recorded."""
+def tool():
+    """The tool as a module."""
     spec = importlib.util.spec_from_file_location("flash_serial", TOOL)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture()
+def flasher(tool, monkeypatch):
+    """The tool as a module, with holding the bootloader recorded."""
+    module = tool
     restarts = []
 
-    def reset(port, circuit):
+    def hold_bootloader(port, circuit, timeout_s):
         restarts.append((port, circuit))
         (Path(os.environ["VK_TEST_DIR"]) / "restarted").touch()
+        return True
 
-    monkeypatch.setattr(module, "reset", reset)
+    monkeypatch.setattr(module, "hold_bootloader", hold_bootloader)
     module.restarts = restarts
     return module
 
@@ -219,7 +233,7 @@ def test_update_falls_back_to_the_download_circuit_when_no_link_answers(flasher,
     code, logs, _build = update(flasher, tmp_path, monkeypatch, link="silent", uploader="after-restart")
     assert code == 0, capsys.readouterr().err
     assert len(logs["link"]) == 1
-    # The restart comes once uploader.py waits, so the boot window catches it.
+    # The bootloader is held before uploader.py starts, so it never races the boot window.
     assert flasher.restarts == [("/dev/fake", "DTR_RTS")]
     assert len(logs["uploader"]) == 1 and "vehkernel.apj" in logs["uploader"][0]
     assert "No Link answered" in capsys.readouterr().out
@@ -246,11 +260,108 @@ def test_update_reports_a_failed_upload(flasher, tmp_path, monkeypatch, capsys):
 
 
 def test_update_gives_up_when_no_bootloader_answers(flasher, tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(flasher, "hold_bootloader", lambda port, circuit, timeout_s: False)
+    code, logs, _build = update(flasher, tmp_path, monkeypatch, link="silent", uploader="flash")
+    assert code == 1
+    assert "no bootloader answered within" in capsys.readouterr().err
+    assert logs["uploader"] == []
+
+
+def test_update_gives_up_when_uploader_does_not_finish(flasher, tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(flasher, "UPLOAD_TIMEOUT_S", 0.5)
-    monkeypatch.setattr(flasher, "reset", lambda port, circuit: None)  # the board never comes back
+    monkeypatch.setattr(flasher, "hold_bootloader", lambda port, circuit, timeout_s: True)
     code, _logs, _build = update(flasher, tmp_path, monkeypatch, link="silent", uploader="after-restart")
     assert code == 1
     assert "did not finish within" in capsys.readouterr().err
+
+
+class FakeBootloader:
+    """The bootloader on the far end of a pty: once opened it listens for
+    `window_s`, as the boot window does, and stays if it gets GET_SYNC and
+    GET_DEVICE for the revision, board ID and firmware size in that time."""
+
+    def __init__(self, window_s: float = 1.0):
+        self.master, slave = pty.openpty()
+        tty.setraw(self.master)
+        self.port = os.ttyname(slave)
+        self.slave = slave  # kept open, so that the far end's close is no hangup
+        self.window_s = window_s
+        self.opened = threading.Event()
+        self.held = False
+        self.done = threading.Event()
+        self.thread = threading.Thread(target=self.run, daemon=True)
+        self.thread.start()
+
+    def run(self) -> None:
+        self.opened.wait()
+        deadline = time.monotonic() + self.window_s
+        data = b""
+        seen = set()
+        while time.monotonic() < deadline and not self.done.is_set():
+            if not select.select([self.master], [], [], 0.01)[0]:
+                continue
+            data += os.read(self.master, 64)
+            while len(data) >= 2:
+                if data[0] == 0x21 and data[1] == 0x20:
+                    seen.add("sync")
+                    data = data[2:]
+                    os.write(self.master, bytes((0x12, 0x10)))
+                elif data[0] == 0x22 and len(data) >= 3:
+                    seen.add(data[1])
+                    data = data[3:]
+                    os.write(self.master, bytes(4) + bytes((0x12, 0x10)))
+                else:
+                    break
+            if seen >= {"sync", 1, 2, 4}:
+                self.held = True
+                return
+
+    def close(self) -> None:
+        self.done.set()
+        self.thread.join(timeout=2)
+        os.close(self.master)
+        os.close(self.slave)
+
+
+def test_hold_bootloader_holds_it_within_the_boot_window(tool, monkeypatch):
+    bootloader = FakeBootloader()
+    # A pty has no modem lines: the restart only opens the fake's window.
+    monkeypatch.setattr(tool, "pulse_reset", lambda fd, port, circuit: bootloader.opened.set())
+    try:
+        assert tool.hold_bootloader(bootloader.port, "DTR_RTS", timeout_s=5.0)
+        assert bootloader.held
+    finally:
+        bootloader.close()
+
+
+def test_hold_bootloader_catches_a_power_cycle_later_on(tool, monkeypatch, capsys):
+    bootloader = FakeBootloader()
+    monkeypatch.setattr(tool, "RESTART_GRACE_S", 0.1)
+    monkeypatch.setattr(tool, "pulse_reset", lambda fd, port, circuit: None)  # reaches no circuit
+    timer = threading.Timer(0.5, bootloader.opened.set)
+    timer.start()
+    try:
+        assert tool.hold_bootloader(bootloader.port, "DTR_RTS", timeout_s=5.0)
+        assert "power-cycle the board now" in capsys.readouterr().out
+    finally:
+        timer.cancel()
+        bootloader.opened.set()
+        bootloader.close()
+
+
+def test_hold_bootloader_gives_up_when_nothing_answers(tool, monkeypatch):
+    master, slave = pty.openpty()
+    monkeypatch.setattr(tool, "pulse_reset", lambda fd, port, circuit: None)
+    try:
+        assert not tool.hold_bootloader(os.ttyname(slave), "DTR_RTS", timeout_s=0.3)
+    finally:
+        os.close(master)
+        os.close(slave)
+
+
+def test_hold_bootloader_reports_a_missing_port(tool):
+    with pytest.raises(tool.FlashError):
+        tool.hold_bootloader("/dev/does-not-exist", "DTR_RTS", timeout_s=0.3)
 
 
 def test_update_needs_the_apj(flasher, tmp_path, monkeypatch, capsys):

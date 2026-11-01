@@ -15,8 +15,8 @@ the STM32 system bootloader is entered and left without touching the board.
   the system bootloader with stm32flash.
 - update asks the firmware over its Link to reboot into the Vehkernel
   bootloader (link_monitor.py reboot --bootloader). When no Link answers, it
-  restarts the board through the download circuit instead, once uploader.py
-  is waiting, so the bootloader's boot window catches it. Either way the
+  restarts the board through the download circuit instead and talks to the
+  bootloader within its boot window, which holds it there. Either way the
   pinned ArduPilot uploader.py then writes vehkernel.apj, which the
   bootloader checks and writes to the FIRMWARE region only: stored
   parameters survive.
@@ -38,12 +38,14 @@ import fcntl
 import json
 import os
 import queue
+import select
 import struct
 import subprocess
 import sys
 import termios
 import threading
 import time
+import tty
 from datetime import datetime
 from pathlib import Path
 
@@ -64,10 +66,23 @@ LINK_TIMEOUT_S = 20.0
 UPLOAD_TIMEOUT_S = 180.0
 # What link_monitor.py prints when the firmware refuses the request.
 REBOOT_REFUSED = "reboot refused"
-# uploader.py prints this once it has loaded the .apj and starts looking for the bootloader.
-UPLOADER_WAITING = "waiting for the bootloader"
 # uploader.py does not exit when the bootloader's board ID is not the image's: it waits for another board.
 UPLOADER_REFUSED = "Firmware not suitable for this board"
+
+# The bootloader protocol (bootloader/include/vk/bootloader/bootloader.hpp), as
+# much of it as holds the bootloader: GET_SYNC, and GET_DEVICE for its revision,
+# board ID and firmware size, make it stay until it is flashed or reset.
+BOOTLOADER_BAUD = termios.B115200
+GET_SYNC = bytes((0x21, 0x20))
+GET_DEVICE_INFO = tuple(bytes((0x22, info, 0x20)) for info in (1, 2, 4))
+DEVICE_WORD_SIZE = 4
+IN_SYNC_OK = bytes((0x12, 0x10))
+# Short, so that several tries fit in the 1 s boot window. uploader.py's own 2 s
+# timeout does not: its first try falls in the restart and the window ends
+# before its second (#145).
+REPLY_TIMEOUT_S = 0.05
+# After this long without a bootloader, the restart did not reach this port.
+RESTART_GRACE_S = 2.0
 
 # stm32flash -i sequences by download circuit. DTR_RTS: enter the bootloader
 # with NRST held low and BOOT0 high, then release NRST, then BOOT0; leave it
@@ -157,13 +172,9 @@ class Stm32Flash:
         self.run("-o")
 
 
-def reset(port: str, circuit: str) -> None:
+def pulse_reset(fd: int, port: str, circuit: str) -> None:
     """Restarts the board: NRST held low with BOOT0 high, then both released."""
     assert circuit == "DTR_RTS", circuit
-    try:
-        fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-    except OSError as error:
-        raise FlashError(f"{port}: {error.strerror}") from None
     try:
         def lines(bits: int) -> None:
             fcntl.ioctl(fd, termios.TIOCMSET, struct.pack("I", bits))
@@ -173,8 +184,90 @@ def reset(port: str, circuit: str) -> None:
         lines(0)
     except OSError as error:
         raise FlashError(f"{port}: cannot drive DTR and RTS ({error.strerror})") from None
+
+
+def open_port(port: str) -> int:
+    return os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+
+
+def reset(port: str, circuit: str) -> None:
+    """Restarts the board through the download circuit."""
+    try:
+        fd = open_port(port)
+    except OSError as error:
+        raise FlashError(f"{port}: {error.strerror}") from None
+    try:
+        pulse_reset(fd, port, circuit)
     finally:
         os.close(fd)
+
+
+def release_modem_lines(fd: int) -> None:
+    """Releases DTR and RTS together, which opening the port asserts: RTS holds
+    BOOT0 high, so a power cycle would otherwise start the system bootloader (#92).
+    A port without modem lines is left as it is."""
+    try:
+        fcntl.ioctl(fd, termios.TIOCMBIC, struct.pack("I", termios.TIOCM_DTR | termios.TIOCM_RTS))
+    except OSError:
+        pass
+
+
+def bootloader_answers(fd: int, request: bytes, reply_size: int = 0) -> bool:
+    """Sends a command to the bootloader; whether it answered in sync in time."""
+    termios.tcflush(fd, termios.TCIFLUSH)
+    os.write(fd, request)
+    size = reply_size + len(IN_SYNC_OK)
+    reply = b""
+    deadline = time.monotonic() + REPLY_TIMEOUT_S
+    while len(reply) < size:
+        left = deadline - time.monotonic()
+        if left <= 0 or not select.select([fd], [], [], left)[0]:
+            return False
+        chunk = os.read(fd, size - len(reply))
+        if not chunk:
+            raise OSError("the port closed")
+        reply += chunk
+    return reply.endswith(IN_SYNC_OK)
+
+
+def hold_bootloader(port: str, circuit: str, timeout_s: float) -> bool:
+    """Restarts the board through the download circuit, then asks for its
+    bootloader until it answers, which holds it past the boot window for
+    uploader.py; whether it did within `timeout_s`. A port whose lines reach no
+    circuit, such as SERIAL1, needs a power cycle instead, and asking over and
+    over catches its boot window too."""
+    start = time.monotonic()
+    restarted = told = False
+    while time.monotonic() - start < timeout_s:
+        try:
+            fd = open_port(port)
+        except OSError as error:
+            if not restarted:
+                raise FlashError(f"{port}: {error.strerror}") from None
+            time.sleep(REPLY_TIMEOUT_S)  # a power cycle took the USB adapter away too
+            continue
+        try:
+            tty.setraw(fd)
+            attributes = termios.tcgetattr(fd)
+            attributes[2] |= termios.CLOCAL | termios.CREAD
+            attributes[4] = attributes[5] = BOOTLOADER_BAUD
+            termios.tcsetattr(fd, termios.TCSANOW, attributes)
+            release_modem_lines(fd)
+            if not restarted:
+                pulse_reset(fd, port, circuit)
+                restarted = True
+            while time.monotonic() - start < timeout_s:
+                if bootloader_answers(fd, GET_SYNC) and all(
+                        bootloader_answers(fd, request, DEVICE_WORD_SIZE) for request in GET_DEVICE_INFO):
+                    return True
+                if not told and time.monotonic() - start > RESTART_GRACE_S:
+                    told = True
+                    print("No bootloader answered; power-cycle the board now", flush=True)
+        except OSError:
+            time.sleep(REPLY_TIMEOUT_S)  # the USB adapter went away
+        finally:
+            os.close(fd)
+    return False
 
 
 def default_backup_name(board: str) -> Path:
@@ -198,9 +291,8 @@ def ask_link(args: argparse.Namespace, build: Build) -> bool:
     return result.returncode == 0
 
 
-def run_uploader(args: argparse.Namespace, build: Build, apj: Path, restart: bool) -> None:
-    """Runs uploader.py with the .apj until it exits; with `restart`, restarts
-    the board through the download circuit once uploader.py waits for it."""
+def run_uploader(args: argparse.Namespace, apj: Path) -> None:
+    """Runs uploader.py with the .apj until it exits."""
     command = [sys.executable, "-u", str(RUN_UPLOADER), str(args.uploader), "--port", args.port, "--no-extf",
                str(apj)]
     print("$ " + " ".join(command[3:]), flush=True)
@@ -226,10 +318,6 @@ def run_uploader(args: argparse.Namespace, build: Build, apj: Path, restart: boo
             if line is None:
                 break
             print(line, end="", flush=True)
-            if restart and UPLOADER_WAITING in line:
-                restart = False
-                print(f"Restarting the board through the {build.circuit} circuit", flush=True)
-                reset(args.port, build.circuit)
             if UPLOADER_REFUSED in line:
                 refused = True
                 break
@@ -240,8 +328,7 @@ def run_uploader(args: argparse.Namespace, build: Build, apj: Path, restart: boo
     if refused:
         raise TransferError(f"the bootloader refused {apj}: it is for another board")
     if timed_out:
-        raise TransferError(f"uploader.py did not finish within {UPLOAD_TIMEOUT_S:.0f} s; if no bootloader "
-                            "answered, power-cycle the board while update waits for it")
+        raise TransferError(f"uploader.py did not finish within {UPLOAD_TIMEOUT_S:.0f} s")
     if returncode != 0:
         raise TransferError(f"uploader.py failed with exit code {returncode}")
 
@@ -255,11 +342,13 @@ def cmd_update(args: argparse.Namespace, build: Build) -> None:
         apj = build.apj
     if not args.uploader.is_file():
         raise FlashError(f"{args.uploader} is missing")
-    asked = ask_link(args, build)
-    if not asked:
-        print("No Link answered; the board is restarted into its bootloader's boot window instead", flush=True)
+    if not ask_link(args, build):
+        print(f"No Link answered; restarting the board through the {build.circuit} circuit "
+              "to hold its bootloader", flush=True)
+        if not hold_bootloader(args.port, build.circuit, UPLOAD_TIMEOUT_S):
+            raise TransferError(f"no bootloader answered within {UPLOAD_TIMEOUT_S:.0f} s")
     print(f"Writing {apj} through the bootloader; parameters are kept", flush=True)
-    run_uploader(args, build, apj, restart=not asked)
+    run_uploader(args, apj)
 
 
 def cmd_new_board(args: argparse.Namespace, build: Build, flasher: Stm32Flash) -> None:
