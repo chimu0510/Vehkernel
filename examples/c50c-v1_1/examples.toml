@@ -68,3 +68,10 @@ summary = "Draws a title and a counter on the OLED through software SPI and the 
 introduces = ["device:DISPLAY0"]
 uses = ["flash:FIRMWARE"]
 sitl = true
+
+[[example]]
+name = "04-work-queues"
+summary = "Counts at 10 Hz and 2 Hz in two work items on one work queue and shows both on the OLED"
+introduces = ["work_queue"]
+uses = ["device:DISPLAY0", "flash:FIRMWARE"]
+sitl = true

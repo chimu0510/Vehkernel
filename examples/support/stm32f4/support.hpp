@@ -3,6 +3,8 @@
 #pragma once
 
 #include <board.hpp>
+#include <line.hpp>
+#include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/drivers/ssd1306.hpp>
 #include <vk/hal/clock.hpp>
@@ -35,6 +37,12 @@ inline vk::core::StaticInstance<vk::drivers::Ssd1306> display_driver;
 inline void init(int /*argc*/ = 0, char** /*argv*/ = nullptr)
 {
     vk::platform::init();
+}
+
+// Starts the FreeRTOS scheduler (ADR-0004). Never returns.
+inline void start_scheduler()
+{
+    vk::core::start_scheduler();
 }
 
 // Emits a key=value line in SITL for L3 testing (spec 0013); does nothing on

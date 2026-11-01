@@ -33,7 +33,7 @@ Flash the compiled example (`.apj`) over the one-key download port using the ser
 tools/flash/flash_serial.py --port /dev/ttyACM0 --build build/c50c-v1_1-examples update --image build/c50c-v1_1-examples/app/examples/example-01-led.apj
 ```
 
-Global options (`--port`, `--build`) go before the `update` subcommand. An example runs no Link, so `update` finds no Link to ask and restarts the board through `SERIAL2`'s download circuit instead; on `SERIAL1` the user must power-cycle the board while `update` waits (see [C50C V1.1](../../docs/boards/c50c-v1_1.md#serial-ports)).
+Global options (`--port`, `--build`) go before the `update` subcommand. An example runs no Link, so `update` finds no Link to ask and restarts the board through `SERIAL2`'s download circuit instead; on `SERIAL1` the user must power-cycle the board while `update` waits (see [C50C V1.1](../../../docs/boards/c50c-v1_1.md#serial-ports)).
 
 When finished with this example, return the board to the standard firmware using the default build:
 
@@ -71,9 +71,9 @@ The complete source code is in `main.cpp`:
 
 ## Read further
 
-- [ADR-0009: Layered HAL](../../docs/adr/0009-layered-hal.md)
-- [ADR-0011: TOML board definitions](../../docs/adr/0011-toml-board-definition-toolchain.md)
-- [ADR-0025: Board examples](../../docs/adr/0025-board-examples.md)
-- [Building guide](../../docs/guide/building.md)
-- [Flashing guide](../../docs/guide/flashing.md)
-- [C50C V1.1 board page](../../docs/boards/c50c-v1_1.md)
+- [ADR-0009: Layered HAL](../../../docs/adr/0009-layered-hal.md)
+- [ADR-0011: TOML board definitions](../../../docs/adr/0011-toml-board-definition-toolchain.md)
+- [ADR-0025: Board examples](../../../docs/adr/0025-board-examples.md)
+- [Building guide](../../../docs/guide/building.md)
+- [Flashing guide](../../../docs/guide/flashing.md)
+- [C50C V1.1 board page](../../../docs/boards/c50c-v1_1.md)

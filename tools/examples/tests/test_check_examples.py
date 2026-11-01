@@ -43,7 +43,6 @@ def test_check_examples_c50c_passes():
         board_toml=C50C_BOARD_TOML,
         examples_dir=C50C_EXAMPLES_DIR,
         soc_root=SOC_ROOT,
-        sitl_targets=["03-oled"],
     )
     assert errors == [], f"Unexpected errors on C50C V1.1: {errors}"
 
@@ -332,7 +331,5 @@ def test_cli_invocation():
         str(C50C_EXAMPLES_DIR),
         "--soc-root",
         str(SOC_ROOT),
-        "--sitl-targets",
-        "03-oled",
     ])
     assert rc == 0

@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Fixed-size line formatting without heap allocation (ADR-0007, ADR-0025).
+#pragma once
+
+#include <vk/local_display/pages.hpp>
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <string_view>
+
+namespace example {
+
+// Formats text and numbers into a fixed-size line buffer without heap allocation (ADR-0007).
+class Line {
+public:
+    Line& add(std::string_view text)
+    {
+        for (const char c : text) {
+            if (size_ < text_.size()) {
+                text_.at(size_++) = c;
+            }
+        }
+        return *this;
+    }
+
+    Line& add(std::uint32_t value)
+    {
+        std::array<char, 10> digits{};
+        std::size_t count = 0;
+        do {
+            digits.at(count++) = static_cast<char>('0' + (value % 10));
+            value /= 10;
+        } while (value != 0);
+        while (count > 0) {
+            add(std::string_view(&digits.at(--count), 1));
+        }
+        return *this;
+    }
+
+    [[nodiscard]] std::string_view view() const { return {text_.data(), size_}; }
+
+private:
+    std::array<char, vk::local_display::TextScreen::columns> text_{};
+    std::size_t size_ = 0;
+};
+
+}  // namespace example

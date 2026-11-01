@@ -2,6 +2,8 @@
 // Support code for SITL board examples (spec 0013, ADR-0025).
 #pragma once
 
+#include <line.hpp>
+#include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/drivers/ssd1306.hpp>
 #include <vk/hal/clock.hpp>
@@ -59,6 +61,19 @@ inline void init(int argc = 0, char** argv = nullptr)
             vk::platform::display().write_image_to(argv[++i]);
         }
     }
+}
+
+// Starts the FreeRTOS scheduler (ADR-0004, ADR-0018). In SITL, arranges
+// stop after duration, runs the scheduler until stopped, reports display_on,
+// and exits 0.
+inline void start_scheduler()
+{
+    if (detail::stop_duration_us > 0) {
+        vk::platform::stop_after(detail::stop_duration_us);
+    }
+    vk::core::start_scheduler();
+    report("display_on", vk::platform::display().displaying() ? 1 : 0);
+    std::exit(0);
 }
 
 // Returns whether the example loop should continue running. When the duration

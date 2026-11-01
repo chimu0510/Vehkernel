@@ -7,6 +7,11 @@ For 03-oled:
 - Verifies the counter rate in the report (10 Hz within tolerance).
 - Verifies display_on=1 reported from the simulated SSD1306.
 - Verifies whole frames: line 0 the title, line 2 the last reported counter, every other line blank.
+For 04-work-queues:
+- Verifies fast (10 Hz) and slow (2 Hz) counter rates over the span between first and last report.
+- Verifies no gaps in either counter's sequence.
+- Verifies display_on=1 reported from the simulated SSD1306.
+- Verifies whole frames: line 0 the title, line 2 the last fast counter, line 4 the last slow counter.
 """
 
 from __future__ import annotations
@@ -14,9 +19,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import re
+import select
 import subprocess
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -86,6 +93,121 @@ def check_03_oled(stdout: str, display_file: Path, duration_s: float, tolerance:
     return failures
 
 
+def check_04_work_queues(
+    stdout: str,
+    stdout_lines: list[tuple[str, float]],
+    display_file: Path,
+    tolerance: float,
+) -> list[str]:
+    failures: list[str] = []
+
+    # 1. Parse counters and arrival timestamps
+    fast_reports: list[tuple[int, float]] = []
+    slow_reports: list[tuple[int, float]] = []
+
+    for line, t in stdout_lines:
+        m_fast = re.match(r"^fast=(\d+)", line)
+        if m_fast:
+            fast_reports.append((int(m_fast.group(1)), t))
+        m_slow = re.match(r"^slow=(\d+)", line)
+        if m_slow:
+            slow_reports.append((int(m_slow.group(1)), t))
+
+    # 2. Check fast counter: no gaps and rate
+    if not fast_reports:
+        failures.append("no fast counter reported in stdout")
+    else:
+        for i in range(len(fast_reports) - 1):
+            if fast_reports[i + 1][0] != fast_reports[i][0] + 1:
+                failures.append(
+                    f"fast counter gap: {fast_reports[i][0]} followed by {fast_reports[i + 1][0]}"
+                )
+                break
+
+        if len(fast_reports) < 2:
+            failures.append("too few fast reports to compute rate")
+        else:
+            span = fast_reports[-1][1] - fast_reports[0][1]
+            if span <= 0:
+                failures.append(f"invalid fast time span: {span:.3f} s")
+            else:
+                measured_rate = (len(fast_reports) - 1) / span
+                expected_rate = 10.0
+                if abs(measured_rate - expected_rate) > expected_rate * tolerance:
+                    failures.append(
+                        f"fast rate {measured_rate:.2f} Hz outside expected {expected_rate:.2f} Hz "
+                        f"(tolerance {tolerance:.0%})"
+                    )
+
+    # 3. Check slow counter: no gaps and rate
+    if not slow_reports:
+        failures.append("no slow counter reported in stdout")
+    else:
+        for i in range(len(slow_reports) - 1):
+            if slow_reports[i + 1][0] != slow_reports[i][0] + 1:
+                failures.append(
+                    f"slow counter gap: {slow_reports[i][0]} followed by {slow_reports[i + 1][0]}"
+                )
+                break
+
+        if len(slow_reports) < 2:
+            failures.append("too few slow reports to compute rate")
+        else:
+            span = slow_reports[-1][1] - slow_reports[0][1]
+            if span <= 0:
+                failures.append(f"invalid slow time span: {span:.3f} s")
+            else:
+                measured_rate = (len(slow_reports) - 1) / span
+                expected_rate = 2.0
+                if abs(measured_rate - expected_rate) > expected_rate * tolerance:
+                    failures.append(
+                        f"slow rate {measured_rate:.2f} Hz outside expected {expected_rate:.2f} Hz "
+                        f"(tolerance {tolerance:.0%})"
+                    )
+
+    # 4. Check display_on=1 reported from simulated SSD1306's displaying()
+    display_on_match = re.search(r"^display_on=(\d+)", stdout, re.MULTILINE)
+    if not display_on_match:
+        failures.append("display_on not reported in stdout")
+    elif int(display_on_match.group(1)) != 1:
+        failures.append(f"expected display_on=1, got display_on={display_on_match.group(1)}")
+
+    # 5. Judge whole frames from captured display image:
+    # line 0 the title, line 2 the last reported fast counter, line 4 the last reported slow counter,
+    # every other line blank
+    if not display_file.exists():
+        failures.append("SITL wrote no display image")
+    else:
+        try:
+            lines = screen_text(display_file)
+            print("display:")
+            for idx, line in enumerate(lines):
+                print(f"  [{idx}] |{line}|")
+
+            if not fast_reports or not slow_reports:
+                failures.append("cannot verify display content without reported counters")
+            else:
+                expected_lines = {
+                    0: "VEHKERNEL 04-WQ",
+                    1: "",
+                    2: f"FAST: {fast_reports[-1][0]}",
+                    3: "",
+                    4: f"SLOW: {slow_reports[-1][0]}",
+                    5: "",
+                    6: "",
+                    7: "",
+                }
+                for line_idx, expected_text in expected_lines.items():
+                    if lines[line_idx] != expected_text:
+                        failures.append(
+                            f"display line {line_idx}: expected {expected_text!r}, got {lines[line_idx]!r}"
+                        )
+        except Exception as e:
+            failures.append(f"failed to read display image: {e}")
+
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("executable", help="the example executable to run (e.g. example-03-oled)")
@@ -103,16 +225,38 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         display_file = Path(tmp) / "display.pbm"
         cmd = [str(target), "--duration", str(args.duration), "--display", str(display_file)]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=args.duration + 30, check=False)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout_lines: list[tuple[str, float]] = []
+        deadline = time.monotonic() + args.duration + 30
+        assert proc.stdout is not None
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                proc.kill()
+                raise subprocess.TimeoutExpired(cmd, args.duration + 30)
+            rlist, _, _ = select.select([proc.stdout], [], [], remaining)
+            if not rlist:
+                proc.kill()
+                raise subprocess.TimeoutExpired(cmd, args.duration + 30)
+            line = proc.stdout.readline()
+            if not line:
+                break
+            t = time.monotonic()
+            stdout_lines.append((line, t))
+            print(line, end="")
 
-        print(result.stdout, end="")
-        if result.returncode != 0:
-            print(result.stderr, file=sys.stderr)
-            print(f"FAIL: {name} exited with {result.returncode}", file=sys.stderr)
+        _, stderr = proc.communicate(timeout=30)
+        if proc.returncode != 0:
+            print(stderr, file=sys.stderr)
+            print(f"FAIL: {name} exited with {proc.returncode}", file=sys.stderr)
             return 1
 
+        full_stdout = "".join(line for line, _ in stdout_lines)
+
         if ex_name == "03-oled":
-            failures = check_03_oled(result.stdout, display_file, args.duration, args.tolerance)
+            failures = check_03_oled(full_stdout, display_file, args.duration, args.tolerance)
+        elif ex_name == "04-work-queues":
+            failures = check_04_work_queues(full_stdout, stdout_lines, display_file, args.tolerance)
         else:
             failures = [f"unknown SITL example {ex_name}"]
 
