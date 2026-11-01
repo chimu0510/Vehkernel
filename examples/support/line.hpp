@@ -61,6 +61,26 @@ public:
         return add(decimals);
     }
 
+    // Fixed-point float formatter without positive sign: an optional minus sign, integer part, and two decimal places (e.g. "0.00", "2.50").
+    Line& add_float(float value)
+    {
+        if (!std::isfinite(value)) {
+            return add("---");
+        }
+        const long hundredths = std::lround(static_cast<double>(value) * 100.0);
+        const unsigned long magnitude =
+            hundredths < 0 ? static_cast<unsigned long>(-hundredths) : static_cast<unsigned long>(hundredths);
+        if (hundredths < 0) {
+            add("-");
+        }
+        add(static_cast<std::uint32_t>(magnitude / 100)).add(".");
+        const auto decimals = static_cast<std::uint32_t>(magnitude % 100);
+        if (decimals < 10) {
+            add("0");
+        }
+        return add(decimals);
+    }
+
     [[nodiscard]] std::string_view view() const { return {text_.data(), size_}; }
 
 private:

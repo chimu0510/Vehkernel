@@ -5,21 +5,25 @@
 #include <line.hpp>
 #include <vk/core/bus.hpp>
 #include <vk/core/critical_section.hpp>
+#include <vk/core/parameter_storage.hpp>
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
 #include <vk/drivers/icm20948.hpp>
 #include <vk/drivers/ssd1306.hpp>
 #include <vk/hal/clock.hpp>
+#include <vk/hal/flash.hpp>
 #include <vk/hal/i2c.hpp>
 #include <vk/hal/transport.hpp>
 #include <vk/link/link.hpp>
 #include <vk/link/topic_map.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_attitude_groundtruth.hpp>
+#include <vk/params/params.hpp>
 #include <vk/platform/platform.hpp>
 #include <vk/platform/udp_transport.hpp>
 #include <vk/sim/icm20948.hpp>
+#include <vk/sim/nor_flash.hpp>
 #include <vk/sim/ssd1306.hpp>
 
 #include <array>
@@ -55,6 +59,11 @@ inline std::array<char, 64> udp_address{"127.0.0.1"};
 inline std::uint16_t udp_port = 15600;
 inline vk::platform::UdpTransport udp_transport;
 inline vk::core::StaticInstance<vk::link::Link> host_link;
+
+inline vk::sim::NorFlash param_flash;
+inline std::array<vk::core::ParameterStorage::Slot, vk::params::count> param_slots{};
+inline vk::core::StaticInstance<vk::core::ParameterStorage> param_storage;
+inline const char* param_file = nullptr;
 
 inline bool parse_address(const char* argument)
 {
@@ -266,6 +275,8 @@ inline void init(int argc = 0, char** argv = nullptr)
             }
         } else if (arg == "--udp" && i + 1 < argc) {
             detail::parse_address(argv[++i]);
+        } else if (arg == "--param-file" && i + 1 < argc) {
+            detail::param_file = argv[++i];
         }
     }
 }
@@ -341,6 +352,22 @@ inline vk::drivers::Icm20948& imu()
     return *detail::imu_driver;
 }
 
+// Loads the stored parameters, from --param-file if given or blank simulated Flash,
+// and starts storing changes.
+inline void start_parameters()
+{
+    if (!detail::param_storage.has_value()) {
+        if (detail::param_file != nullptr && !detail::param_flash.attach_file(detail::param_file)) {
+            std::fprintf(stderr, "param-file: cannot open %s\n", detail::param_file);
+        }
+        detail::param_storage.emplace(
+            vk::params::parameters(), vk::hal::FlashSectors(detail::param_flash), detail::param_slots,
+            vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+        detail::param_storage->load();
+        detail::param_storage->start();
+    }
+}
+
 // Starts a Link over UDP (default 127.0.0.1:15600, or --udp <address>:<port>),
 // printing the bound port line for host test tools.
 template <typename MapFn>
@@ -354,9 +381,18 @@ inline void start_links(MapFn&& map_fn)
         std::fflush(stdout);
 
         auto map = detail::get_topic_map(map_fn, static_cast<float>(vk::platform::imu_rate_hz), 0);
-        detail::host_link.emplace("link0", detail::udp_transport, map,
-                                  vk::link::Link::Config{.instance = 0},
-                                  vk::core::work_queue(vk::core::WorkQueueTier::Io));
+        detail::host_link.emplace(
+            "link0", detail::udp_transport, map,
+            vk::link::Link::Config{
+                .instance = 0,
+                // Parameter access only once start_parameters() has loaded the stored set (09-parameters).
+                .parameters = detail::param_storage.has_value()
+                        ? vk::link::ParameterAccess{.parameters = &vk::params::parameters(),
+                                                    .set_hash = vk::params::set_hash,
+                                                    .storage = &*detail::param_storage}
+                        : vk::link::ParameterAccess{},
+            },
+            vk::core::work_queue(vk::core::WorkQueueTier::Io));
         detail::host_link->start();
     }
 }

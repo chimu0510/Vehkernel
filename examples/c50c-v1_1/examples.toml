@@ -32,7 +32,6 @@ actuator_control = "Actuator task driving motor outputs with the output watchdog
 "flash:EVENTLOG" = "event log region; no event log sink yet (ADR-0019, ADR-0020)"
 
 [pending]
-"flash:PARAMS" = "09-parameters"
 "output:1" = "10-motor-outputs"
 "output:2" = "10-motor-outputs"
 "output:3" = "10-motor-outputs"
@@ -99,5 +98,12 @@ name = "08-serial-link"
 summary = "Custom protocol Link over serial ports SERIAL1 and SERIAL2 carrying IMU topics"
 introduces = ["serial:SERIAL1", "serial:SERIAL2", "link"]
 uses = ["device:IMU0", "bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE"]
+sitl = true
+
+[[example]]
+name = "09-parameters"
+summary = "Parameter system and storage in non-volatile Flash; value set over Link shown on OLED and kept across reset"
+introduces = ["flash:PARAMS", "parameters"]
+uses = ["link", "serial:SERIAL1", "serial:SERIAL2", "bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE"]
 sitl = true
 

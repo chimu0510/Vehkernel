@@ -36,6 +36,15 @@ For 08-serial-link:
 - Verifies reported imu_sample rate matches 200 Hz within tolerance (20 %).
 - Verifies display_on=1 reported from the simulated SSD1306.
 - Verifies whole frames: line 0 title, line 2 STATE: CONNECTED, line 3 TX FRAMES, line 4 RX FRAMES, line 5 DROPS: 0, line 6 SCALE: 100 %.
+For 09-parameters:
+- Starts SITL on a simulated NOR Flash file with UDP transport.
+- Connects over UDP and verifies handshake succeeds.
+- Sets ATT_KP to a non-default value (2.5) over the Link.
+- Waits with wait_until_saved() for parameter_status showing changes stored (unsaved == 0).
+- Verifies stdout report and OLED display lines (title, PARAM: ATT_KP, VALUE: 2.50, SAVED: YES, BYTES USED, SECTOR).
+- Restarts SITL on the same parameter file.
+- Reads ATT_KP back over the Link, verifying persistence across restart.
+- Verifies OLED display shows persisted value 2.50, SAVED: YES, and parameter_status reports 0 skipped entries.
 """
 
 from __future__ import annotations
@@ -57,6 +66,9 @@ if str(REPO_ROOT / "tools" / "link") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "tools" / "link"))
 
 from display_text import screen_text  # noqa: E402
+from sitl_support import free_udp_port, wait_until_saved  # noqa: E402
+from vklink.monitor import LinkMonitor, UdpConnection, load_messages  # noqa: E402
+from vklink.session import ParamType, ParamValue  # noqa: E402
 
 
 def fixed_line_matches(line: str, prefix: str, value: float, suffix: str) -> bool:
@@ -708,6 +720,184 @@ def check_08_serial_link(
     return failures
 
 
+# Each 09-parameters run: long enough to connect, set and see the change stored, then ends by itself.
+RUN_S = 8.0
+
+
+def check_09_parameters(target: Path, msg_dir: str) -> list[str]:
+    failures: list[str] = []
+
+    with tempfile.TemporaryDirectory() as tmp:
+        param_file = Path(tmp) / "params.bin"
+        display1 = Path(tmp) / "display1.pbm"
+        display2 = Path(tmp) / "display2.pbm"
+
+        # 1. First run: Start on a fresh parameter file, set ATT_KP to 2.5 over the Link
+        port1 = free_udp_port()
+        cmd1 = [
+            str(target),
+            "--duration", str(RUN_S),
+            "--display", str(display1),
+            "--udp", f"127.0.0.1:{port1}",
+            "--param-file", str(param_file),
+        ]
+        proc1 = subprocess.Popen(cmd1, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        assert proc1.stdout is not None
+        first_line1 = proc1.stdout.readline()
+        print(first_line1, end="")
+        m1 = re.search(r"address=127\.0\.0\.1:(\d+)", first_line1)
+        if not m1:
+            proc1.kill()
+            _, err1 = proc1.communicate(timeout=10)
+            return [f"could not parse bound UDP port from SITL output: {err1}"]
+
+        conn1 = UdpConnection("127.0.0.1", port1)
+        monitor1 = LinkMonitor(conn1, load_messages(msg_dir))
+        try:
+            if not monitor1.handshake(timeout_s=4.0):
+                failures.append("Run 1: no handshake with SITL Link")
+            else:
+                reply = monitor1.set_param("ATT_KP", ParamType.FLOAT, 2.5, timeout_s=3.0)
+                if not isinstance(reply, ParamValue) or abs(reply.value - 2.5) > 1e-4:
+                    failures.append(f"Run 1: failed to set ATT_KP to 2.5: {reply}")
+                else:
+                    saved_status = wait_until_saved(monitor1, timeout_s=6.0)
+                    if saved_status is None:
+                        failures.append("Run 1: parameter changes were not stored (wait_until_saved timed out)")
+                    else:
+                        print(f"stored: bytes_used={saved_status.bytes_used} sector={saved_status.active_sector}")
+                    # Allow display work item (at 4 Hz) to update the display with the new saved state
+                    monitor1.run(0.5)
+        finally:
+            conn1.close()
+            # Let the run end by itself, so it prints its last report lines.
+            out1, err1 = proc1.communicate(timeout=RUN_S + 30)
+
+        display_on1 = re.search(r"^display_on=(\d+)", out1, re.MULTILINE)
+        if not display_on1 or int(display_on1.group(1)) != 1:
+            failures.append("Run 1: display_on=1 not reported")
+
+        if "param=ATT_KP" not in out1:
+            failures.append("Run 1: stdout report does not contain param=ATT_KP")
+        if not re.search(r"value=2\.500", out1):
+            failures.append("Run 1: stdout report does not contain value=2.500")
+
+        if not display1.exists():
+            failures.append("Run 1: SITL wrote no display image")
+        else:
+            try:
+                lines1 = screen_text(display1)
+                print("Run 1 display:")
+                for idx, line in enumerate(lines1):
+                    print(f"  [{idx}] |{line}|")
+
+                expected_lines1 = {
+                    0: "VEHKERNEL 09-PARAMS",
+                    1: "",
+                    2: "PARAM: ATT_KP",
+                    4: "SAVED: YES",
+                    7: "",
+                }
+                for line_idx, expected in expected_lines1.items():
+                    if lines1[line_idx] != expected:
+                        failures.append(
+                            f"Run 1 display line {line_idx}: expected {expected!r}, got {lines1[line_idx]!r}"
+                        )
+                if not fixed_line_matches(lines1[3], "VALUE: ", 2.5, ""):
+                    failures.append(f"Run 1 display line 3: expected 'VALUE: 2.50', got {lines1[3]!r}")
+                if not lines1[5].startswith("BYTES USED: "):
+                    failures.append(f"Run 1 display line 5: expected prefix 'BYTES USED: ', got {lines1[5]!r}")
+                if not lines1[6].startswith("SECTOR: "):
+                    failures.append(f"Run 1 display line 6: expected prefix 'SECTOR: ', got {lines1[6]!r}")
+            except Exception as e:
+                failures.append(f"Run 1: failed to read display image: {e}")
+
+        # 2. Second run: Restart on the same parameter file and read value back
+        port2 = free_udp_port()
+        cmd2 = [
+            str(target),
+            "--duration", str(RUN_S),
+            "--display", str(display2),
+            "--udp", f"127.0.0.1:{port2}",
+            "--param-file", str(param_file),
+        ]
+        proc2 = subprocess.Popen(cmd2, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        assert proc2.stdout is not None
+        first_line2 = proc2.stdout.readline()
+        print(first_line2, end="")
+        m2 = re.search(r"address=127\.0\.0\.1:(\d+)", first_line2)
+        if not m2:
+            proc2.kill()
+            _, err2 = proc2.communicate(timeout=10)
+            return failures + [f"Run 2: could not parse bound UDP port: {err2}"]
+
+        conn2 = UdpConnection("127.0.0.1", port2)
+        monitor2 = LinkMonitor(conn2, load_messages(msg_dir))
+        try:
+            if not monitor2.handshake(timeout_s=4.0):
+                failures.append("Run 2: no handshake with SITL Link after restart")
+            else:
+                reply2 = monitor2.get_param("ATT_KP", timeout_s=3.0)
+                if not isinstance(reply2, ParamValue) or abs(reply2.value - 2.5) > 1e-4:
+                    failures.append(
+                        f"Run 2: ATT_KP after restart is {getattr(reply2, 'value', reply2)}, expected 2.5"
+                    )
+                else:
+                    print(f"Run 2: ATT_KP read back successfully as {reply2.value}")
+
+                monitor2.run(1.5)
+                stats = monitor2.topics.get(("parameter_status", 0))
+                if stats and stats.latest is not None:
+                    status2 = stats.latest
+                    skipped = (status2.skipped_unknown + status2.skipped_wrong_type +
+                               status2.skipped_out_of_range + status2.skipped_corrupt)
+                    print(f"Run 2 status: bytes_used={status2.bytes_used} sector={status2.active_sector} "
+                          f"unsaved={status2.unsaved} skipped={skipped}")
+                    if skipped != 0 or status2.unsaved != 0 or status2.failed:
+                        failures.append(f"Run 2: parameter_status after restart showed errors: {status2}")
+                else:
+                    failures.append("Run 2: no parameter_status received after restart")
+        finally:
+            conn2.close()
+            out2, err2 = proc2.communicate(timeout=RUN_S + 30)
+
+        display_on2 = re.search(r"^display_on=(\d+)", out2, re.MULTILINE)
+        if not display_on2 or int(display_on2.group(1)) != 1:
+            failures.append("Run 2: display_on=1 not reported")
+
+        if not display2.exists():
+            failures.append("Run 2: SITL wrote no display image")
+        else:
+            try:
+                lines2 = screen_text(display2)
+                print("Run 2 display:")
+                for idx, line in enumerate(lines2):
+                    print(f"  [{idx}] |{line}|")
+
+                expected_lines2 = {
+                    0: "VEHKERNEL 09-PARAMS",
+                    1: "",
+                    2: "PARAM: ATT_KP",
+                    4: "SAVED: YES",
+                    7: "",
+                }
+                for line_idx, expected in expected_lines2.items():
+                    if lines2[line_idx] != expected:
+                        failures.append(
+                            f"Run 2 display line {line_idx}: expected {expected!r}, got {lines2[line_idx]!r}"
+                        )
+                if not fixed_line_matches(lines2[3], "VALUE: ", 2.5, ""):
+                    failures.append(f"Run 2 display line 3: expected 'VALUE: 2.50', got {lines2[3]!r}")
+                if not lines2[5].startswith("BYTES USED: "):
+                    failures.append(f"Run 2 display line 5: expected prefix 'BYTES USED: ', got {lines2[5]!r}")
+                if not lines2[6].startswith("SECTOR: "):
+                    failures.append(f"Run 2 display line 6: expected prefix 'SECTOR: ', got {lines2[6]!r}")
+            except Exception as e:
+                failures.append(f"Run 2: failed to read display image: {e}")
+
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("executable", help="the example executable to run (e.g. example-03-oled)")
@@ -722,6 +912,18 @@ def main() -> int:
         ex_name = name.removeprefix("example-")
     else:
         ex_name = name
+
+    if ex_name == "09-parameters":
+        if not args.msg_dir:
+            print("FAIL: 09-parameters needs --msg-dir, the build's generated schema Python", file=sys.stderr)
+            return 1
+        failures = check_09_parameters(target, args.msg_dir)
+        if failures:
+            for f in failures:
+                print(f"FAIL: {f}", file=sys.stderr)
+            return 1
+        print(f"PASS: {name} completed successfully")
+        return 0
 
     with tempfile.TemporaryDirectory() as tmp:
         display_file = Path(tmp) / "display.pbm"

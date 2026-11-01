@@ -5,6 +5,7 @@
 #include <board.hpp>
 #include <line.hpp>
 #include <vk/core/critical_section.hpp>
+#include <vk/core/parameter_storage.hpp>
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
@@ -12,11 +13,14 @@
 #include <vk/drivers/ssd1306.hpp>
 #include <vk/hal/clock.hpp>
 #include <vk/hal/display_bus.hpp>
+#include <vk/hal/flash.hpp>
 #include <vk/hal/i2c.hpp>
 #include <vk/hal/uart.hpp>
 #include <vk/link/link.hpp>
 #include <vk/link/topic_map.hpp>
+#include <vk/params/params.hpp>
 #include <vk/platform/dma_uart.hpp>
+#include <vk/platform/internal_flash.hpp>
 #include <vk/platform/platform.hpp>
 #include <vk/platform/soft_i2c.hpp>
 #include <vk/platform/soft_spi.hpp>
@@ -46,6 +50,13 @@ static_assert(Imu::type == "ICM20948" && Imu::bus == "SOFT_I2C",
 inline vk::platform::SoftI2cOn<Imu::pins> imu_bus;
 inline vk::core::StaticInstance<vk::drivers::Icm20948> imu_driver;
 
+using ParamFlash = vk::platform::InternalFlash<vk::board::flash::PARAMS>;
+static_assert(vk::hal::ParamFlash<ParamFlash>);
+
+inline ParamFlash param_flash;
+inline std::array<vk::core::ParameterStorage::Slot, vk::params::count> param_slots{};
+inline vk::core::StaticInstance<vk::core::ParameterStorage> param_storage;
+
 template <class Port>
 struct SerialLink {
     using Uart = vk::platform::DmaUart<Port, vk::link::serial_transmit_buffer_size>;
@@ -63,7 +74,15 @@ struct SerialLink {
         }
         transport.emplace(uart, baud_u32);
         link.emplace(name, *transport, map,
-                     vk::link::Link::Config{.instance = instance},
+                     vk::link::Link::Config{
+                         .instance = instance,
+                         // Parameter access only once start_parameters() has loaded the stored set (09-parameters).
+                         .parameters = param_storage.has_value()
+                                 ? vk::link::ParameterAccess{.parameters = &vk::params::parameters(),
+                                                             .set_hash = vk::params::set_hash,
+                                                             .storage = &*param_storage}
+                                 : vk::link::ParameterAccess{},
+                     },
                      vk::core::work_queue(vk::core::WorkQueueTier::Io));
         link->start();
     }
@@ -147,6 +166,18 @@ inline vk::drivers::Icm20948& imu()
             vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     }
     return *detail::imu_driver;
+}
+
+// Loads the stored parameters from the PARAMS region at boot and starts storing changes.
+inline void start_parameters()
+{
+    if (!detail::param_storage.has_value()) {
+        detail::param_storage.emplace(
+            vk::params::parameters(), vk::hal::FlashSectors(detail::param_flash), detail::param_slots,
+            vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+        detail::param_storage->load();
+        detail::param_storage->start();
+    }
 }
 
 // Starts a Link on each board serial port configured for Link (SERIAL1, SERIAL2),

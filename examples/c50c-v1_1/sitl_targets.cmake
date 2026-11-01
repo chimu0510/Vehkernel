@@ -7,4 +7,5 @@ set(VK_SITL_EXAMPLES
   06-imu
   07-magnetometer
   08-serial-link
+  09-parameters
 )
