@@ -198,11 +198,11 @@ def ask_link(args: argparse.Namespace, build: Build) -> bool:
     return result.returncode == 0
 
 
-def run_uploader(args: argparse.Namespace, build: Build, restart: bool) -> None:
+def run_uploader(args: argparse.Namespace, build: Build, apj: Path, restart: bool) -> None:
     """Runs uploader.py with the .apj until it exits; with `restart`, restarts
     the board through the download circuit once uploader.py waits for it."""
     command = [sys.executable, "-u", str(RUN_UPLOADER), str(args.uploader), "--port", args.port, "--no-extf",
-               str(build.apj)]
+               str(apj)]
     print("$ " + " ".join(command[3:]), flush=True)
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     lines: queue.Queue[str | None] = queue.Queue()
@@ -238,7 +238,7 @@ def run_uploader(args: argparse.Namespace, build: Build, restart: bool) -> None:
             process.kill()
         returncode = process.wait()
     if refused:
-        raise TransferError(f"the bootloader refused {build.apj}: it is for another board")
+        raise TransferError(f"the bootloader refused {apj}: it is for another board")
     if timed_out:
         raise TransferError(f"uploader.py did not finish within {UPLOAD_TIMEOUT_S:.0f} s; if no bootloader "
                             "answered, power-cycle the board while update waits for it")
@@ -247,14 +247,19 @@ def run_uploader(args: argparse.Namespace, build: Build, restart: bool) -> None:
 
 
 def cmd_update(args: argparse.Namespace, build: Build) -> None:
-    apj = build.apj
+    if args.image:
+        apj = args.image
+        if not apj.is_file():
+            raise FlashError(f"{apj} is missing")
+    else:
+        apj = build.apj
     if not args.uploader.is_file():
         raise FlashError(f"{args.uploader} is missing")
     asked = ask_link(args, build)
     if not asked:
         print("No Link answered; the board is restarted into its bootloader's boot window instead", flush=True)
     print(f"Writing {apj} through the bootloader; parameters are kept", flush=True)
-    run_uploader(args, build, restart=not asked)
+    run_uploader(args, build, apj, restart=not asked)
 
 
 def cmd_new_board(args: argparse.Namespace, build: Build, flasher: Stm32Flash) -> None:
@@ -298,7 +303,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--uploader", type=Path, default=UPLOADER, help="uploader.py (default: the pinned copy)")
     parser.add_argument("--link-monitor", type=Path, default=LINK_MONITOR, help="link_monitor.py (default: the repository's)")
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("update", help="write vehkernel.apj through the Vehkernel bootloader; parameters are kept")
+    update_cmd = commands.add_parser("update", help="write vehkernel.apj through the Vehkernel bootloader; parameters are kept")
+    update_cmd.add_argument("--image", type=Path, help="the .apj image to write instead of the build's vehkernel.apj")
     new_board = commands.add_parser("new-board", help="back up the whole chip, erase it and write the bootloader "
                                                       "and the firmware; parameters start empty")
     new_board.add_argument("--backup", type=Path, help="backup file (default <board>_flash_<time>.bin)")

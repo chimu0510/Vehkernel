@@ -260,3 +260,36 @@ def test_update_needs_the_apj(flasher, tmp_path, monkeypatch, capsys):
     code = flasher.main(["--build", str(build), "--port", "/dev/fake", "update"])
     assert code == 2
     assert "vehkernel.apj is missing" in capsys.readouterr().err
+
+
+def test_update_with_image_writes_that_file(flasher, tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("VK_TEST_DIR", str(tmp_path))
+    build = make_build(tmp_path)
+    custom_image = tmp_path / "custom.apj"
+    custom_image.write_text("{}\n")
+    code = flasher.main([
+        "--build", str(build), "--port", "/dev/fake",
+        "--link-monitor", str(fake_link(tmp_path, "accept")),
+        "--uploader", str(fake_uploader(tmp_path, "flash")),
+        "update", "--image", str(custom_image),
+    ])
+    assert code == 0, capsys.readouterr().err
+    uploader_log = (tmp_path / "uploader.log").read_text().splitlines()
+    assert uploader_log == [f"--port /dev/fake --no-extf {custom_image}"]
+    assert f"Writing {custom_image} through the bootloader" in capsys.readouterr().out
+
+
+def test_update_with_missing_image_fails_before_sending(flasher, tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("VK_TEST_DIR", str(tmp_path))
+    build = make_build(tmp_path)
+    missing_image = tmp_path / "nonexistent.apj"
+    code = flasher.main([
+        "--build", str(build), "--port", "/dev/fake",
+        "--link-monitor", str(fake_link(tmp_path, "accept")),
+        "--uploader", str(fake_uploader(tmp_path, "flash")),
+        "update", "--image", str(missing_image),
+    ])
+    assert code == 2
+    assert f"{missing_image} is missing" in capsys.readouterr().err
+    assert not (tmp_path / "link.log").exists()
+    assert not (tmp_path / "uploader.log").exists()

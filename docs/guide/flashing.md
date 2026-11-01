@@ -43,6 +43,12 @@ tools/flash/flash_serial.py update
 
 The tool fails with exit code 1 when `stm32flash` or `uploader.py` fails, the firmware refuses to reboot, the bootloader refuses an image built for another board, or no bootloader answers within 3 minutes, and with 2 when an image does not fit its region, the build, `stm32flash` or `uploader.py` is missing, or the backup file already exists. `uploader.py` needs pyserial on the host ([Building](building.md)).
 
+To flash a specific image instead of the build's default `vehkernel.apj`, such as a board example ([Examples](examples.md)), pass `--image` to `update`:
+
+```bash
+tools/flash/flash_serial.py --port /dev/ttyACM0 --build build/c50c-v1_1-examples update --image build/c50c-v1_1-examples/app/examples/example-01-led.apj
+```
+
 `update` also works on a port without a download circuit, such as the C50C's SERIAL1 (`--port` its Type-C adapter): over the Link, or, when no Link answers, by power-cycling the board while `update` waits. `uploader.py` may also be run directly:
 
 ```bash
