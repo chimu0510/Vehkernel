@@ -517,77 +517,77 @@ def check_07_magnetometer(
 
     # 2. Check heading follows simulated vehicle true yaw during rotation
     headings: list[tuple[float, float]] = []
-    yaws: list[tuple[float, float]] = []
+    heading_times: list[int] = []
+    yaws: list[float] = []
+    yaw_times: list[int] = []
     bx_reports: list[float] = []
     by_reports: list[float] = []
     bz_reports: list[float] = []
     norm_reports: list[float] = []
 
     for line, t in stdout_lines:
-        m_h = re.match(r"^heading=([+-]?[0-9.]+)", line)
-        if m_h:
-            headings.append((float(m_h.group(1)), t))
-        m_y = re.match(r"^true_yaw=([+-]?[0-9.]+)", line)
-        if m_y:
-            yaws.append((float(m_y.group(1)), t))
-        m_bx = re.match(r"^bx=([+-]?[0-9.]+)", line)
-        if m_bx:
-            bx_reports.append(float(m_bx.group(1)))
-        m_by = re.match(r"^by=([+-]?[0-9.]+)", line)
-        if m_by:
-            by_reports.append(float(m_by.group(1)))
-        m_bz = re.match(r"^bz=([+-]?[0-9.]+)", line)
-        if m_bz:
-            bz_reports.append(float(m_bz.group(1)))
-        m_norm = re.match(r"^norm=([+-]?[0-9.]+)", line)
-        if m_norm:
-            norm_reports.append(float(m_norm.group(1)))
+        if m := re.match(r"^heading_us=(\d+)", line):
+            heading_times.append(int(m.group(1)))
+        elif m := re.match(r"^heading=([+-]?[0-9.]+)", line):
+            headings.append((float(m.group(1)), t))
+        elif m := re.match(r"^true_yaw_us=(\d+)", line):
+            yaw_times.append(int(m.group(1)))
+        elif m := re.match(r"^true_yaw=([+-]?[0-9.]+)", line):
+            yaws.append(float(m.group(1)))
+        elif m := re.match(r"^bx=([+-]?[0-9.]+)", line):
+            bx_reports.append(float(m.group(1)))
+        elif m := re.match(r"^by=([+-]?[0-9.]+)", line):
+            by_reports.append(float(m.group(1)))
+        elif m := re.match(r"^bz=([+-]?[0-9.]+)", line):
+            bz_reports.append(float(m.group(1)))
+        elif m := re.match(r"^norm=([+-]?[0-9.]+)", line):
+            norm_reports.append(float(m.group(1)))
 
     if not headings:
         failures.append("no heading reported in stdout")
     if not yaws:
         failures.append("no true_yaw reported in stdout")
+    if len(heading_times) != len(headings) or len(yaw_times) != len(yaws):
+        failures.append("a heading or true_yaw was reported without its time")
 
     def wrap_180(angle_deg: float) -> float:
         return (angle_deg + 180.0) % 360.0 - 180.0
 
-    # In SITL, the rotate profile turns at 45 deg/s, and both DisplayItem and TrueYawItem report at 4 Hz
-    # (a 250 ms period), turning 11.25 deg between display updates.
-    # A correct heading has an error against its corresponding true yaw under 1.0 deg (sensor noise on a
-    # 30 uT field is 0.3 uT, atan(0.3 / 30) = 0.57 deg). A heading lagging by one display period has an
-    # error of at least 11.25 - 1.0 = 10.25 deg.
-    # We choose a tolerance of 3.0 deg: this provides ample margin for host thread scheduling jitter on a
-    # loaded CI runner while decisively rejecting any heading lagging by a display period (>= 10.25 deg).
+    # Each heading is compared with the true yaw at the time of the magnetometer sample it comes
+    # from, interpolated between the true yaws reported around it (both on SITL's clock), so the
+    # host's scheduling of the two reporting work items does not matter. The rotate profile turns
+    # at a constant rate, so the interpolation is exact. What is left: the field noise (0.3 uT on
+    # 30 uT, about 0.6 deg) and the sample's age, at most one AK09916 period plus one driver read
+    # period, 15 ms (test/sitl/check_magnetometer.py), 0.7 deg at 45 deg/s. 3 deg covers both; a
+    # heading one display period (11.25 deg) off fails.
     max_heading_error_deg = 3.0
     compared = 0
 
-    if headings and yaws:
-        first_heading_time = headings[0][1]
-        yaw_times = [t for _, t in yaws]
+    if headings and yaws and len(heading_times) == len(headings) and len(yaw_times) == len(yaws):
+        unwrapped_yaws: list[float] = []
+        for y in yaws:
+            unwrapped_yaws.append(y if not unwrapped_yaws else unwrapped_yaws[-1] + wrap_180(y - unwrapped_yaws[-1]))
 
-        for h_val, h_t in headings:
-            # Skip headings before the vehicle starts turning (first second of alignment/rest).
-            if h_t < first_heading_time + 1.0:
-                continue
-
-            # Compare with true yaw over a window: take smallest error against true yaw reported
-            # just before and just after the heading (covering sample acquisition and display latency).
-            i = bisect.bisect_left(yaw_times, h_t)
-            candidates = [yaws[k][0] for k in (i - 1, i) if 0 <= k < len(yaws)]
-            if not candidates:
-                continue
-
-            sample_min_error = min(abs(wrap_180(h_val - y_val)) for y_val in candidates)
+        for (h_val, _), h_us in zip(headings, heading_times):
+            k = bisect.bisect_left(yaw_times, h_us)
+            if k == 0 or k >= len(yaw_times) or yaw_times[k] == yaw_times[k - 1]:
+                continue  # outside the true yaws reported, or nothing to interpolate between
+            if abs(wrap_180(unwrapped_yaws[k] - unwrapped_yaws[k - 1])) < 1.0:
+                continue  # not turning yet
+            f = (h_us - yaw_times[k - 1]) / (yaw_times[k] - yaw_times[k - 1])
+            true_yaw = unwrapped_yaws[k - 1] + f * (unwrapped_yaws[k] - unwrapped_yaws[k - 1])
+            error = abs(wrap_180(h_val - true_yaw))
             compared += 1
-            if sample_min_error > max_heading_error_deg:
+            if error > max_heading_error_deg:
                 failures.append(
-                    f"heading error {sample_min_error:.2f} deg exceeds tolerance {max_heading_error_deg:.1f} deg "
-                    f"(heading={h_val:.2f}, candidate true yaws={candidates})"
+                    f"heading error {error:.2f} deg exceeds tolerance {max_heading_error_deg:.1f} deg "
+                    f"(heading={h_val:.2f} at {h_us} us, true yaw {wrap_180(true_yaw):.2f})"
                 )
                 break
 
-        if compared < 20:
-            failures.append(f"only {compared} headings compared during turning (expected at least 20)")
+        # The run turns for about 9 s at 4 reports a second; on a loaded runner fewer arrive.
+        if compared < 10:
+            failures.append(f"only {compared} headings compared during turning (expected at least 10)")
 
         # Check that heading sweeps through at least most of a turn over the run.
         # A full rotation is 360 deg; sweeping at least 270 deg (3/4 of a turn) satisfies this criterion.

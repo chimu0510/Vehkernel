@@ -221,6 +221,7 @@ protected:
             const float z = last_truth_.q[3];
             const float yaw_rad = std::atan2(2.0F * (w * z + x * y), 1.0F - 2.0F * (y * y + z * z));
             const float yaw_deg = yaw_rad * (180.0F / std::numbers::pi_v<float>);
+            report("true_yaw_us", last_truth_.timestamp);
             report("true_yaw", yaw_deg);
         }
     }

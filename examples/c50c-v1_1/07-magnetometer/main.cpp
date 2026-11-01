@@ -26,6 +26,7 @@ class MagSubscriberItem final : public vk::core::WorkItem {
 public:
     struct State {
         std::array<float, 3> field{};
+        std::uint64_t timestamp_us = 0;  // when the latest sample was read
         std::uint32_t samples = 0;
     };
 
@@ -52,6 +53,7 @@ protected:
         while (subscription_.copy(sample)) {
             const vk::core::CriticalSection lock;
             state_.field = sample.field;
+            state_.timestamp_us = sample.timestamp;
             ++state_.samples;
         }
     }
@@ -110,7 +112,9 @@ protected:
         const float heading_rad = std::atan2(-by, bx);
         const float heading_deg = heading_rad * (180.0F / std::numbers::pi_v<float>);
 
-        // Report heading and field components at the display rate.
+        // Report heading and field components at the display rate, with the time of
+        // the sample they come from.
+        example::report("heading_us", state.timestamp_us);
         example::report("heading", heading_deg);
         example::report("bx", bx);
         example::report("by", by);
