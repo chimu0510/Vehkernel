@@ -32,10 +32,6 @@ actuator_control = "Actuator task driving motor outputs with the output watchdog
 "flash:EVENTLOG" = "event log region; no event log sink yet (ADR-0019, ADR-0020)"
 
 [pending]
-"encoder:1" = "11-wheel-encoders"
-"encoder:2" = "11-wheel-encoders"
-"encoder:3" = "11-wheel-encoders"
-"encoder:4" = "11-wheel-encoders"
 "pin:USB_DM" = "12-usb-gamepad"
 "pin:USB_DP" = "12-usb-gamepad"
 
@@ -107,5 +103,12 @@ name = "10-motor-outputs"
 summary = "Actuator control outputs 1 to 4 with output watchdog and power sense"
 introduces = ["output:1", "output:2", "output:3", "output:4", "actuator_power", "actuator_control"]
 uses = ["user_key", "bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE", "parameters"]
+sitl = true
+
+[[example]]
+name = "11-wheel-encoders"
+summary = "Quadrature encoders for motor outputs 1 to 4 and wheel_encoders"
+introduces = ["encoder:1", "encoder:2", "encoder:3", "encoder:4"]
+uses = ["output:1", "output:2", "output:3", "output:4", "actuator_control", "bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE", "parameters"]
 sitl = true
 

@@ -53,6 +53,13 @@ For 10-motor-outputs:
 - Verifies that output 1 returns to 0 within the demand timeout bound once demand stops.
 - Verifies that every output reads 0 after actuator power is cut, within the reaction bound.
 - Verifies display_on=1 and OLED screen lines (title, STEP: 0, DEMAND: +0.00, OUTPUT 1: +0.00, POWER: OFF).
+For 11-wheel-encoders:
+- Runs example with --wheel-speeds 3,-6,9,-12 for 6.5 s.
+- Verifies that before 1.0 s speed is 0 and count is 0 for each wheel.
+- Verifies that between 2.5 s and 4.0 s the median reported speed has the demanded sign and is near the demanded size.
+- Verifies that the count grew in the demanded direction and matches expected counts within tolerance.
+- Verifies that after 5.5 s speed is 0 within tolerance (one count per control cycle) and count no longer changes.
+- Verifies display_on=1 and OLED frame content (title, wheel count and speed lines).
 """
 
 from __future__ import annotations
@@ -60,9 +67,11 @@ from __future__ import annotations
 import argparse
 import bisect
 from dataclasses import dataclass
+import math
 from pathlib import Path
 import re
 import select
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -1120,6 +1129,284 @@ def check_10_motor_outputs(
     return failures
 
 
+# Constants for 11-wheel-encoders check (spec 0013, ADR-0013, spec 0006).
+# Demanded wheel speeds for SITL scenario:
+# On outputs 1 to 4, MOT_OUT_MAX defaults to 0.3 (modules/actuators/params.toml),
+# and the motor model's full-scale speed at duty 1.0 is 50.0 rad/s (sim/include/vk/sim/motor.hpp).
+# Outputs saturate at MOT_OUT_MAX * 50.0 rad/s = 15.0 rad/s.
+# Demands are therefore chosen within [-15, 15] rad/s with different size and sign per wheel:
+DEMANDED_WHEEL_SPEEDS = {1: 3.0, 2: -6.0, 3: 9.0, 4: -12.0}
+
+# Scenario run duration: 6.5 s.
+SCENARIO_DURATION_11_WHEEL_ENCODERS = 6.5
+
+# Timing bounds from detail::ScenarioItem in examples/support/sitl/support.hpp:
+# - Scenario starts driving wheel speeds at 1.0 s (wheel_drive_start_us = 1'000'000).
+# - Scenario disarms and stops driving at 4.0 s (wheel_drive_stop_us = 4'000'000).
+DRIVE_START_TIME_11_WHEEL_ENCODERS = 1.0
+DRIVE_STOP_TIME_11_WHEEL_ENCODERS = 4.0
+DRIVE_DURATION_11_WHEEL_ENCODERS = (
+    DRIVE_STOP_TIME_11_WHEEL_ENCODERS - DRIVE_START_TIME_11_WHEEL_ENCODERS
+)  # 3.0 s
+
+# Steady-state evaluation window: from 2.5 s to 4.0 s.
+# Slew rate MOT_SLEWRATE default = 2.0 1/s (modules/actuators/params.toml) and
+# motor time constant tau = 0.1 s (sim/include/vk/sim/motor.hpp).
+# The speed PI loop settles within ~0.5 s, reaching steady-state well before 2.5 s.
+STEADY_STATE_START_11_WHEEL_ENCODERS = 2.5
+STEADY_STATE_END_11_WHEEL_ENCODERS = 4.0
+
+# Post-stop evaluation start: 5.5 s (1.5 s after disarming at 4.0 s).
+# After disarming at 4.0 s, wheel speed decays with the motor model's time constant tau = 0.1 s.
+# At 5.0 s (1.0 s = 10 tau), wheel 4 still has about 0.2 counts of residual travel left,
+# which can round and tick an extra count after 5.0 s.
+# At 5.5 s (1.5 s = 15 tau, e^-15 ~ 3e-7), remaining travel is far under one count (~0.001 counts),
+# ensuring that counts no longer tick.
+STOPPED_CHECK_START_11_WHEEL_ENCODERS = 5.5
+
+# Tolerances:
+# - SITL encoder counts per turn: 20000 (sim/include/vk/sim/motor.hpp Motor::Config::counts_per_turn).
+#   Counts per radian = 20000 / (2 * pi).
+SITL_CPR_11_WHEEL_ENCODERS = 20000.0
+SITL_COUNTS_PER_RAD_11_WHEEL_ENCODERS = SITL_CPR_11_WHEEL_ENCODERS / (2.0 * math.pi)
+
+# - Speed tolerance when stopped (< 1.0 s and >= 5.5 s): one count in one control cycle.
+#   2 * pi / SITL_CPR * 200 = 0.063 rad/s (at base control rate 200 Hz).
+#   The speed is quantized by the encoder, so a small factor (1.05) is included so that
+#   one count difference per cycle passes.
+SPEED_ZERO_TOL_ONE_COUNT_RAD_S = (
+    (2.0 * math.pi / SITL_CPR_11_WHEEL_ENCODERS) * 200.0 * 1.05
+)
+
+# - Speed relative tolerance during steady-state (2.5 s to 4.0 s): 5 %.
+#   Evaluated on the median of reported speeds. Measured over 6 runs at once on a loaded
+#   host: at most 1.3 % off, the encoder's quantization at the slowest wheel.
+SPEED_STEADY_REL_TOL_11_WHEEL_ENCODERS = 0.05
+
+# - Count relative tolerance at the end of the run: 10 %.
+#   Measured over the same runs: at most 2.3 % off, the ramp at 1.0 s and the coast-down
+#   after 4.0 s. The rest allows a host stall of 0.2 s to move the end of the drive.
+COUNT_REL_TOL_11_WHEEL_ENCODERS = 0.10
+
+
+def check_11_wheel_encoders(
+    stdout: str,
+    stdout_lines: list[tuple[str, float]],
+    display_file: Path,
+) -> list[str]:
+    """L3 check for 11-wheel-encoders (spec 0013, ADR-0013, spec 0006).
+
+    Checks:
+    - Before 1.0 s: speed is 0 and count is 0 for each wheel.
+    - Between 2.5 s and 4.0 s: median of reported speeds has demanded sign and near demanded size.
+    - Count grew in demanded direction and magnitude (~ demanded_speed * 3.0 s * 20000 / (2 pi)).
+    - After 5.5 s: speed is 0 within small bound and count no longer changes.
+    - display_on=1 and whole final OLED frame: title and for each wheel its count and speed line.
+    """
+    failures: list[str] = []
+
+    # 1. Parse report groups, each opened by encoders_us
+    @dataclass
+    class EncoderReportGroup:
+        timestamp_s: float
+        speeds: dict[int, float]
+        counts: dict[int, int]
+
+    report_groups: list[EncoderReportGroup] = []
+    current_group: EncoderReportGroup | None = None
+
+    for line, _ in stdout_lines:
+        line_str = line.strip()
+        m_ts = re.match(r"^encoders_us=(\d+)", line_str)
+        if m_ts:
+            if current_group is not None:
+                report_groups.append(current_group)
+            current_group = EncoderReportGroup(
+                timestamp_s=int(m_ts.group(1)) * 1e-6,
+                speeds={},
+                counts={},
+            )
+            continue
+
+        if current_group is not None:
+            m_spd = re.match(r"^speed([1-4])=([+-]?\d+(?:\.\d+)?)", line_str)
+            if m_spd:
+                current_group.speeds[int(m_spd.group(1))] = float(m_spd.group(2))
+                continue
+            m_cnt = re.match(r"^count([1-4])=([+-]?\d+)", line_str)
+            if m_cnt:
+                current_group.counts[int(m_cnt.group(1))] = int(m_cnt.group(2))
+                continue
+
+    if current_group is not None:
+        report_groups.append(current_group)
+
+    if not report_groups:
+        failures.append("no report groups captured from SITL output")
+        return failures
+
+    # Check any group with timestamp 0 (no message yet): not judged for time windows,
+    # but its speeds and counts must be 0.
+    for grp in report_groups:
+        if grp.timestamp_s == 0.0:
+            for w in range(1, 5):
+                spd = grp.speeds.get(w, 0.0)
+                if abs(spd) > SPEED_ZERO_TOL_ONE_COUNT_RAD_S:
+                    failures.append(
+                        f"initial group (timestamp 0): speed{w} was non-zero ({spd:.3f} rad/s)"
+                    )
+                cnt = grp.counts.get(w, 0)
+                if cnt != 0:
+                    failures.append(
+                        f"initial group (timestamp 0): count{w} was non-zero ({cnt})"
+                    )
+
+    # 2. Before drive window: timestamp > 0 and timestamp < 1.0 s: speed is 0 and count is 0
+    pre_drive_groups = [
+        grp for grp in report_groups
+        if 0.0 < grp.timestamp_s < DRIVE_START_TIME_11_WHEEL_ENCODERS
+    ]
+    for grp in pre_drive_groups:
+        for w in range(1, 5):
+            spd = grp.speeds.get(w, 0.0)
+            if abs(spd) > SPEED_ZERO_TOL_ONE_COUNT_RAD_S:
+                failures.append(
+                    f"before {DRIVE_START_TIME_11_WHEEL_ENCODERS:.1f} s: speed{w} was non-zero "
+                    f"({spd:.3f} rad/s) at t={grp.timestamp_s:.3f} s"
+                )
+            cnt = grp.counts.get(w, 0)
+            if cnt != 0:
+                failures.append(
+                    f"before {DRIVE_START_TIME_11_WHEEL_ENCODERS:.1f} s: count{w} was non-zero "
+                    f"({cnt}) at t={grp.timestamp_s:.3f} s"
+                )
+
+    # 3. Steady-state window: 2.5 s <= timestamp < 4.0 s
+    for w in range(1, 5):
+        demanded = DEMANDED_WHEEL_SPEEDS[w]
+        steady_samples = [
+            grp.speeds[w]
+            for grp in report_groups
+            if w in grp.speeds and STEADY_STATE_START_11_WHEEL_ENCODERS <= grp.timestamp_s < STEADY_STATE_END_11_WHEEL_ENCODERS
+        ]
+        if not steady_samples:
+            failures.append(
+                f"no speed{w} samples in steady-state window "
+                f"[{STEADY_STATE_START_11_WHEEL_ENCODERS:.1f}, {STEADY_STATE_END_11_WHEEL_ENCODERS:.1f}) s"
+            )
+        else:
+            med = statistics.median(steady_samples)
+            if med * demanded <= 0:
+                failures.append(
+                    f"speed{w} median speed {med:.3f} rad/s does not match demanded sign ({demanded:+.1f} rad/s)"
+                )
+            speed_tol = abs(demanded) * SPEED_STEADY_REL_TOL_11_WHEEL_ENCODERS
+            if abs(med - demanded) > speed_tol:
+                failures.append(
+                    f"speed{w} median speed {med:.3f} rad/s outside expected {demanded:.3f} rad/s "
+                    f"(tol {speed_tol:.3f} rad/s, {SPEED_STEADY_REL_TOL_11_WHEEL_ENCODERS:.0%})"
+                )
+
+    # 4. Count growth in demanded direction and magnitude by the end of the run
+    valid_groups = [grp for grp in report_groups if grp.counts]
+    if not valid_groups:
+        failures.append("no counts captured in report groups")
+    else:
+        last_group = valid_groups[-1]
+        for w in range(1, 5):
+            demanded = DEMANDED_WHEEL_SPEEDS[w]
+            if w not in last_group.counts:
+                failures.append(f"count{w} missing in final report group")
+                continue
+            last_count = last_group.counts[w]
+            expected_count = (
+                demanded
+                * DRIVE_DURATION_11_WHEEL_ENCODERS
+                * SITL_COUNTS_PER_RAD_11_WHEEL_ENCODERS
+            )
+            if last_count * demanded <= 0:
+                failures.append(
+                    f"count{w} final count {last_count} did not grow in demanded direction ({demanded:+.1f} rad/s)"
+                )
+            count_tol = abs(expected_count) * COUNT_REL_TOL_11_WHEEL_ENCODERS
+            if abs(last_count - expected_count) > count_tol:
+                failures.append(
+                    f"count{w} final count {last_count} outside expected ~{expected_count:.0f} "
+                    f"(tol {count_tol:.0f}, {COUNT_REL_TOL_11_WHEEL_ENCODERS:.0%})"
+                )
+
+    # 5. Stopped window: timestamp >= 5.5 s
+    stopped_groups = [
+        grp for grp in report_groups
+        if grp.timestamp_s >= STOPPED_CHECK_START_11_WHEEL_ENCODERS
+    ]
+    if not stopped_groups:
+        failures.append(
+            f"no report groups after stopped check start ({STOPPED_CHECK_START_11_WHEEL_ENCODERS:.1f} s)"
+        )
+    else:
+        for w in range(1, 5):
+            for grp in stopped_groups:
+                if w in grp.speeds:
+                    spd = grp.speeds[w]
+                    if abs(spd) > SPEED_ZERO_TOL_ONE_COUNT_RAD_S:
+                        failures.append(
+                            f"after {STOPPED_CHECK_START_11_WHEEL_ENCODERS:.1f} s: speed{w} was non-zero "
+                            f"({spd:.3f} rad/s) at t={grp.timestamp_s:.3f} s"
+                        )
+                        break
+
+            counts_in_window = [grp.counts[w] for grp in stopped_groups if w in grp.counts]
+            if not counts_in_window:
+                failures.append(f"no count{w} samples in stopped window")
+            elif min(counts_in_window) != max(counts_in_window):
+                failures.append(
+                    f"after {STOPPED_CHECK_START_11_WHEEL_ENCODERS:.1f} s: count{w} changed "
+                    f"({min(counts_in_window)} to {max(counts_in_window)})"
+                )
+
+    # 6. Check display_on=1 and OLED frame content
+    display_on_match = re.search(r"^display_on=(\d+)", stdout, re.MULTILINE)
+    if not display_on_match:
+        failures.append("display_on not reported in stdout")
+    elif int(display_on_match.group(1)) != 1:
+        failures.append(f"expected display_on=1, got display_on={display_on_match.group(1)}")
+
+    if not display_file.exists():
+        failures.append("SITL wrote no display image")
+    else:
+        try:
+            lines = screen_text(display_file)
+            print("display:")
+            for idx, line in enumerate(lines):
+                print(f"  [{idx}] |{line}|")
+
+            expected_lines: dict[int, str | list[str]] = {
+                0: "VEHKERNEL 11-ENCODERS",
+                1: "",
+                6: "",
+                7: "",
+            }
+            for w in range(1, 5):
+                post_counts = [
+                    grp.counts[w] for grp in stopped_groups if w in grp.counts
+                ]
+                final_cnt = post_counts[-1] if post_counts else last_group.counts.get(w, 0)
+                candidates = list({f"{w} {c:+d} +0.00" for c in (post_counts[-2:] if len(post_counts) >= 2 else [final_cnt])})
+                expected_lines[w + 1] = candidates[0] if len(candidates) == 1 else candidates
+
+            for line_idx, expected in expected_lines.items():
+                ok = line_matches(lines[line_idx], expected)
+                if not ok:
+                    failures.append(
+                        f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
+                    )
+        except Exception as e:
+            failures.append(f"failed to read display image: {e}")
+
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("executable", help="the example executable to run (e.g. example-03-oled)")
@@ -1153,7 +1440,8 @@ def main() -> int:
             10.0 if ex_name == "07-magnetometer"
             else (5.0 if ex_name == "08-serial-link"
                   else (SCENARIO_DURATION_10_MOTOR_OUTPUTS if ex_name == "10-motor-outputs"
-                        else args.duration))
+                        else (SCENARIO_DURATION_11_WHEEL_ENCODERS if ex_name == "11-wheel-encoders"
+                              else args.duration)))
         )
         cmd = [str(target), "--duration", str(duration), "--display", str(display_file)]
         if ex_name == "07-magnetometer":
@@ -1170,6 +1458,14 @@ def main() -> int:
                 "--key-presses", ",".join(key_times),
                 "--power-cut-at", f"{POWER_CUT_TIME_10_MOTOR_OUTPUTS:.1f}",
             ])
+        if ex_name == "11-wheel-encoders":
+            speeds_arg = ",".join(f"{s:g}" for s in [
+                DEMANDED_WHEEL_SPEEDS[1],
+                DEMANDED_WHEEL_SPEEDS[2],
+                DEMANDED_WHEEL_SPEEDS[3],
+                DEMANDED_WHEEL_SPEEDS[4],
+            ])
+            cmd.extend(["--wheel-speeds", speeds_arg])
 
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         stdout_lines: list[tuple[str, float]] = []
@@ -1253,6 +1549,8 @@ def main() -> int:
             failures = check_08_serial_link(full_stdout, display_file, monitor, args.tolerance)
         elif ex_name == "10-motor-outputs":
             failures = check_10_motor_outputs(full_stdout, stdout_lines, display_file)
+        elif ex_name == "11-wheel-encoders":
+            failures = check_11_wheel_encoders(full_stdout, stdout_lines, display_file)
         else:
             failures = [f"unknown SITL example {ex_name}"]
 

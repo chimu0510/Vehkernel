@@ -39,6 +39,20 @@ public:
         return *this;
     }
 
+    // Signed integer formatter with explicit sign: a sign (+/-) and integer magnitude (e.g. "+12345", "-10").
+    Line& add_signed(std::int32_t value)
+    {
+        if (value < 0) {
+            add("-");
+        } else {
+            add("+");
+        }
+        const auto magnitude = value < 0
+            ? static_cast<std::uint32_t>(-(value + 1)) + 1U
+            : static_cast<std::uint32_t>(value);
+        return add(magnitude);
+    }
+
     // Fixed-point float formatter: a sign (+/-), integer part, and two decimal places (e.g. "+0.00", "-9.81").
     Line& add_fixed(float value)
     {

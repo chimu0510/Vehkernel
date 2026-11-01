@@ -9,4 +9,5 @@ set(VK_SITL_EXAMPLES
   08-serial-link
   09-parameters
   10-motor-outputs
+  11-wheel-encoders
 )

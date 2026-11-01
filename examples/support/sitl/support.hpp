@@ -19,6 +19,8 @@
 #include <vk/hal/transport.hpp>
 #include <vk/link/link.hpp>
 #include <vk/link/topic_map.hpp>
+#include <vk/msg/actuator_demand.hpp>
+#include <vk/msg/arming_state.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_attitude_groundtruth.hpp>
 #include <vk/params/params.hpp>
@@ -75,6 +77,33 @@ inline std::size_t key_press_count = 0;
 inline std::size_t next_key_press_index = 0;
 inline std::uint64_t power_cut_us = 0;
 
+inline bool has_wheel_speeds = false;
+inline std::array<float, 4> wheel_speeds{};
+
+inline void parse_wheel_speeds(const char* argument)
+{
+    has_wheel_speeds = false;
+    wheel_speeds.fill(0.0F);
+    const char* p = argument;
+    std::size_t index = 0;
+    while (*p != '\0' && index < wheel_speeds.size()) {
+        char* end = nullptr;
+        const float val = std::strtof(p, &end);
+        if (end == p) {
+            break;
+        }
+        wheel_speeds[index++] = val;
+        if (*end == ',') {
+            p = end + 1;
+        } else {
+            break;
+        }
+    }
+    if (index == 4) {
+        has_wheel_speeds = true;
+    }
+}
+
 inline void parse_key_presses(const char* argument)
 {
     key_press_count = 0;
@@ -99,7 +128,9 @@ inline void parse_key_presses(const char* argument)
 
 class ScenarioItem final : public vk::core::WorkItem {
 public:
-    static constexpr std::uint32_t interval_us = 10'000;  // 10 ms (100 Hz)
+    static constexpr std::uint32_t interval_us = 10'000;              // 10 ms (100 Hz)
+    static constexpr std::uint64_t wheel_drive_start_us = 1'000'000;  // 1.0 s
+    static constexpr std::uint64_t wheel_drive_stop_us = 4'000'000;   // 4.0 s
 
     explicit ScenarioItem(vk::core::WorkQueue& queue)
         : WorkItem("scenario", queue)
@@ -123,10 +154,35 @@ protected:
             power_cut_done = true;
             vk::platform::set_actuator_power(false);
         }
+        if (has_wheel_speeds) {
+            if (now_us >= wheel_drive_start_us && now_us < wheel_drive_stop_us) {
+                if (!wheel_armed_) {
+                    wheel_armed_ = true;
+                    vk::msg::ArmingState arming{};
+                    arming.timestamp = now_us;
+                    arming.armed = true;
+                    arming_pub_.publish(arming);
+                }
+                vk::msg::ActuatorDemand demand{};
+                demand.timestamp = now_us;
+                demand.timestamp_setpoint = now_us;
+                demand.wheel_speed = wheel_speeds;
+                demand_pub_.publish(demand);
+            } else if (wheel_armed_) {
+                wheel_armed_ = false;
+                vk::msg::ArmingState arming{};
+                arming.timestamp = now_us;
+                arming.armed = false;
+                arming_pub_.publish(arming);
+            }
+        }
     }
 
 private:
     bool power_cut_done = false;
+    bool wheel_armed_ = false;
+    vk::core::Publication<vk::msg::ArmingState> arming_pub_{};
+    vk::core::Publication<vk::msg::ActuatorDemand> demand_pub_{};
 };
 
 inline vk::core::StaticInstance<ScenarioItem> scenario_item;
@@ -351,6 +407,8 @@ inline void init(int argc = 0, char** argv = nullptr)
             if (cut_s > 0.0) {
                 detail::power_cut_us = static_cast<std::uint64_t>(cut_s * 1e6);
             }
+        } else if (arg == "--wheel-speeds" && i + 1 < argc) {
+            detail::parse_wheel_speeds(argv[++i]);
         } else if (arg == "--actuator-power-off") {
             vk::platform::set_actuator_power(false);
         }
@@ -362,7 +420,7 @@ inline void init(int argc = 0, char** argv = nullptr)
 // and exits 0.
 inline void start_scheduler()
 {
-    if (detail::key_press_count > 0 || detail::power_cut_us > 0) {
+    if (detail::key_press_count > 0 || detail::power_cut_us > 0 || detail::has_wheel_speeds) {
         if (!detail::scenario_item.has_value()) {
             detail::scenario_item.emplace(vk::core::work_queue(vk::core::WorkQueueTier::Slow));
             detail::scenario_item->start();
@@ -499,7 +557,7 @@ inline void start_actuators()
         detail::actuator_control->start();
         vk::platform::start_output_watchdog(detail::control_interval_us);
 
-        if (detail::key_press_count > 0 || detail::power_cut_us > 0) {
+        if (detail::key_press_count > 0 || detail::power_cut_us > 0 || detail::has_wheel_speeds) {
             if (!detail::scenario_item.has_value()) {
                 detail::scenario_item.emplace(vk::core::work_queue(vk::core::WorkQueueTier::Slow));
                 detail::scenario_item->start();
