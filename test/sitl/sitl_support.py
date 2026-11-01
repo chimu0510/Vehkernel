@@ -56,6 +56,31 @@ class Sitl:
         return None
 
 
+def wait_until_saved(monitor: LinkMonitor, timeout_s: float = 6.0):
+    """The first parameter_status published after the changes that shows none unsaved, or None.
+
+    The Link answers a parameter request at once but sends topics in later runs, so the first
+    parameter_status to arrive after a reply may have been published before the change. It only
+    marks the time: a later one, with a newer timestamp, must show none unsaved.
+    """
+    stats = monitor.topics.get(("parameter_status", 0))
+    count = stats.messages if stats else 0
+    first_us = None
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        monitor.poll(0.05)
+        stats = monitor.topics.get(("parameter_status", 0))
+        if not stats or stats.messages <= count or stats.latest is None:
+            continue
+        count = stats.messages
+        status = stats.latest
+        if first_us is None:
+            first_us = status.timestamp
+        elif status.timestamp > first_us and status.unsaved == 0:
+            return status
+    return None
+
+
 def configure_persistent_params(
     args,
     param_file: str | Path,
@@ -70,11 +95,6 @@ def configure_persistent_params(
             reply = sitl_setup.monitor.set_param(name, ptype, val, timeout_s=timeout_s)
             if not isinstance(reply, ParamValue):
                 return f"could not set {name}: {reply}"
-        status = None
-        for _ in range(10):
-            status = sitl_setup.status()
-            if status is not None and status.unsaved == 0:
-                break
-        if status is None or status.unsaved != 0:
-            return f"parameter changes were not stored: {status}"
+        if wait_until_saved(sitl_setup.monitor) is None:
+            return "parameter changes were not stored"
     return None

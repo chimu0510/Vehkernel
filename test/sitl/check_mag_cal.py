@@ -21,7 +21,7 @@ sys.path.insert(0, str(REPO / "tools" / "link"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from mag_cal import calibrate_magnetometer, read_log_samples  # noqa: E402
-from sitl_support import configure_persistent_params, free_udp_port  # noqa: E402
+from sitl_support import configure_persistent_params, free_udp_port, wait_until_saved  # noqa: E402
 from vklink.recorder import ULogRecorder  # noqa: E402
 from vklink.session import ParamType  # noqa: E402
 
@@ -287,11 +287,10 @@ def main() -> int:
             # Wait for parameter changes to be flushed to Flash (unsaved == 0)
             from vklink.monitor import LinkMonitor, UdpConnection, load_messages
             mon = LinkMonitor(UdpConnection("127.0.0.1", port2), load_messages(args.msg_dir))
-            for _ in range(15):
-                mon.poll(0.2)
-                stats = mon.topics.get(("parameter_status", 0))
-                if stats and stats.latest is not None and stats.latest.unsaved == 0:
-                    break
+            if not mon.handshake(timeout_s=5.0):
+                failures.append("no handshake with SITL after the calibration")
+            elif wait_until_saved(mon) is None:
+                failures.append("the calibration was not stored")
             mon.connection.close()
         finally:
             sitl2.terminate()

@@ -29,7 +29,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools" / "link"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from sitl_support import Sitl, free_udp_port  # noqa: E402
+from sitl_support import Sitl, free_udp_port, wait_until_saved  # noqa: E402
 from check_attitude import from_rotation_vector, multiply, tilt_between  # noqa: E402
 from vklink.monitor import LinkMonitor, UdpConnection, WorkItemOverruns, load_messages, load_param_metadata  # noqa: E402
 from vklink.session import ParamType, ParamValue  # noqa: E402
@@ -207,13 +207,9 @@ def check_persistence(args) -> list[str]:
                 reply = sitl.monitor.set_param(name, ParamType.FLOAT, value, 3.0)
                 if not isinstance(reply, ParamValue):
                     failures.append(f"setting {name} failed: {reply}")
-            status = None
-            for _ in range(5):
-                status = sitl.status()
-                if status is not None and status.unsaved == 0:
-                    break
-            if status is None or status.unsaved != 0:
-                failures.append(f"the changes were not stored: {status}")
+            status = wait_until_saved(sitl.monitor)
+            if status is None:
+                failures.append("the changes were not stored")
             else:
                 print(f"stored: bytes_used={status.bytes_used} sector={status.active_sector}")
         with Sitl(args, "--param-file", param_file) as sitl:
