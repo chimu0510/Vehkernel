@@ -58,7 +58,7 @@ The on-board RGB LED (and any attached light strip) blinks continuously, cycling
 The complete source code is in `main.cpp`:
 
 - **Includes**: `<board.hpp>` provides the board's pin definitions, `<support.hpp>` provides platform initialization (`example::init()`), `<vk/hal/clock.hpp>` provides monotonic time, and `<vk/platform/gpio.hpp>` provides STM32F4 GPIO line templates.
-- **Pin adaptation**: In `boards/c50c-v1_1/board.toml`, pins `PB15`, `PE6` and `PB14` are assigned timer channels (`TIM12_CH2`, `TIM9_CH2`, `TIM12_CH1`) for future PWM colour blending. Because that driver is not yet available, we extract each pin's `port` and `number` from `vk::board::pins::LIGHT_*` to define concrete `vk::hal::GpioOutput` types, wrapping each with `vk::platform::PushPull`.
+- **Pin adaptation**: In `boards/c50c-v1_1/board.toml`, pins `PE6`, `PB15` and `PB14` (red, green and blue) are assigned timer channels (`TIM9_CH2`, `TIM12_CH2`, `TIM12_CH1`) for future PWM colour blending. Because that driver is not yet available, we extract each pin's `port` and `number` from `vk::board::pins::LIGHT_*` to define concrete `vk::hal::GpioOutput` types, wrapping each with `vk::platform::PushPull`.
 - **Delay function**: `delay_ms()` samples `vk::hal::SystemClock::now_us()` and busy-waits until the elapsed duration in microseconds is reached.
 - **Colour helper**: `set_color(r, g, b)` writes logical high or low levels to the three LED colour channels.
 - **Entry point `main()`**: `example::init()` configures the clock tree and DWT cycle counter. `init(false)` then configures each GPIO pin as a push-pull output with the initial state driving low (off). The main loop cycles through red, green, blue, and off with `delay_ms()` calls between transitions.

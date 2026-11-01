@@ -94,8 +94,8 @@ pins = [
 
   # RGB light strip drivers (AT8236) and the on-board RGB LED.
   { pin = "PB14", role = "LIGHT_B", func = "TIM12_CH1" },
-  { pin = "PB15", role = "LIGHT_R", func = "TIM12_CH2" },
-  { pin = "PE6",  role = "LIGHT_G", func = "TIM9_CH2" },
+  { pin = "PB15", role = "LIGHT_G", func = "TIM12_CH2" },
+  { pin = "PE6",  role = "LIGHT_R", func = "TIM9_CH2" },
 
   # OLED (U11 or J4) on V1.1 pins; V1.2 moved SDA, RST and DC to PD4, PE1 and
   # PE0 (vendor firmware oled.c).

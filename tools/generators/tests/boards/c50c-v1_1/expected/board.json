@@ -537,7 +537,7 @@
       "alt": []
     },
     {
-      "role": "LIGHT_R",
+      "role": "LIGHT_G",
       "pin": "PB15",
       "port": "B",
       "number": 15,
@@ -548,7 +548,7 @@
       "alt": []
     },
     {
-      "role": "LIGHT_G",
+      "role": "LIGHT_R",
       "pin": "PE6",
       "port": "E",
       "number": 6,
