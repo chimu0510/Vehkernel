@@ -19,6 +19,7 @@ FORMATS = {
     'bringup_status': 'bringup_status:uint64_t timestamp;uint16_t run;uint8_t bringup_case;uint8_t source;uint8_t state;uint8_t outputs;uint8_t[4] result;uint8_t[4] encoder;int8_t[4] sign;',
     'estimator_attitude': 'estimator_attitude:uint64_t timestamp;uint64_t timestamp_sample;uint8_t estimator_id;float[4] q;float[3] angular_velocity;float[3] gyro_bias;float[3] variance;uint32_t accel_rejected;uint32_t mag_rejected;uint32_t mag_fused;uint32_t zero_rate_fused;bool mag_missing;',
     'estimator_restart': 'estimator_restart:uint64_t timestamp;',
+    'example_counter': 'example_counter:uint64_t timestamp;uint32_t count;',
     'imu_sample': 'imu_sample:uint64_t timestamp;uint8_t device_instance;float[3] accel;float[3] gyro;float temperature;',
     'link_status': 'link_status:uint64_t timestamp;uint32_t frames_sent;uint32_t bytes_sent;uint32_t frames_received;uint32_t bytes_received;uint32_t drops;uint32_t crc_errors;uint32_t malformed;uint32_t lost;uint8_t handshake_state;uint8_t rate_scale;uint32_t inbound_undeclared;',
     'local_menu': 'local_menu:uint64_t timestamp;uint8_t state;uint16_t item;uint8_t last_result;uint16_t last_parameter;bool reboot_required;',
