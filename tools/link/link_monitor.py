@@ -438,6 +438,9 @@ def main() -> int:
     parser.add_argument("--handshake-timeout", type=float, default=5.0, help="seconds to wait for the MCU")
     parser.add_argument("--check", action="store_true", help="run for --duration, then judge the Link")
     parser.add_argument("--duration", type=float, default=5.0, help="seconds to run with --check")
+    parser.add_argument("--sitl", action="store_true",
+                        help="with --check, judge overruns as SITL's: a work item that started late but ran "
+                             "within its period overran in a host stall")
     parser.add_argument("--expect-rate", type=parse_expectation, action="append", default=[],
                         metavar="TOPIC:INSTANCE=HZ", help="required rate of a topic instance, with --check")
     parser.add_argument("--tolerance", type=float, default=0.05, help="allowed relative rate error")
@@ -544,7 +547,7 @@ def main() -> int:
         if args.command is not None:
             return run_control(monitor, args)
         if args.check:
-            overruns = WorkItemOverruns()
+            overruns = WorkItemOverruns(late_starts_are_stalls=args.sitl)
             monitor.listeners.append(
                 lambda name, _instance, message: overruns.record(message) if name == "work_item_status" else None)
             monitor.run(args.duration)

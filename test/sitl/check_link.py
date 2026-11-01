@@ -76,7 +76,7 @@ def main() -> int:
             return 1
         target = ["--serial", pty_path]
     monitor_args = [sys.executable, args.monitor, *target, "--msg-dir", args.msg_dir,
-                    "--handshake-timeout", str(MARGIN_S), "--check", "--duration", str(args.duration)]
+                    "--handshake-timeout", str(MARGIN_S), "--check", "--sitl", "--duration", str(args.duration)]
     for expectation in args.expect_rate:
         monitor_args += ["--expect-rate", expectation]
     monitor = subprocess.run(monitor_args, capture_output=True, text=True, timeout=args.duration + 30, check=False)
