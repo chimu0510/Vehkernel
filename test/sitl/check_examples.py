@@ -24,11 +24,18 @@ For 06-imu:
 - Verifies reported specific force components (ax ~ 0, ay ~ 0, az ~ -9.81 m/s^2).
 - Verifies display_on=1 reported from the simulated SSD1306.
 - Verifies whole frames: line 0 title, lines 2-4 specific force, line 5 sample rate, line 6 down axis.
+For 07-magnetometer:
+- Verifies reported sample rate against 100 Hz within tolerance.
+- Verifies that reported heading tracks simulated vehicle true yaw within tolerance (3.0 deg) over a rotating motion.
+- Verifies that heading sweeps through at least most of a turn (at least 270 deg).
+- Verifies display_on=1 reported from the simulated SSD1306.
+- Verifies whole frames: line 0 title, line 1 blank, lines 2-4 magnetic field components (BX, BY, BZ), line 5 norm, line 6 sample rate, line 7 heading.
 """
 
 from __future__ import annotations
 
 import argparse
+import bisect
 from pathlib import Path
 import re
 import select
@@ -40,6 +47,21 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from display_text import screen_text  # noqa: E402
+
+
+def fixed_line_matches(line: str, prefix: str, value: float, suffix: str) -> bool:
+    """Whether a display line shows `value` to two decimals between `prefix` and `suffix`.
+
+    The report prints the value to three decimals and the display rounds the full value to two,
+    so the two can differ by one in the last digit: at most 0.0005 + 0.005 apart.
+    """
+    if not (line.startswith(prefix) and line.endswith(suffix)):
+        return False
+    try:
+        shown = float(line[len(prefix):len(line) - len(suffix)])
+    except ValueError:
+        return False
+    return abs(shown - value) <= 0.006
 
 
 def check_03_oled(stdout: str, display_file: Path, duration_s: float, tolerance: float) -> list[str]:
@@ -94,10 +116,14 @@ def check_03_oled(stdout: str, display_file: Path, duration_s: float, tolerance:
                     6: "",
                     7: "",
                 }
-                for line_idx, expected_text in expected_lines.items():
-                    if lines[line_idx] != expected_text:
+                for line_idx, expected in expected_lines.items():
+                    if isinstance(expected, tuple):
+                        ok = fixed_line_matches(lines[line_idx], *expected)
+                    else:
+                        ok = lines[line_idx] == expected
+                    if not ok:
                         failures.append(
-                            f"display line {line_idx}: expected {expected_text!r}, got {lines[line_idx]!r}"
+                            f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
                         )
         except Exception as e:
             failures.append(f"failed to read display image: {e}")
@@ -209,10 +235,14 @@ def check_04_work_queues(
                     6: "",
                     7: "",
                 }
-                for line_idx, expected_text in expected_lines.items():
-                    if lines[line_idx] != expected_text:
+                for line_idx, expected in expected_lines.items():
+                    if isinstance(expected, tuple):
+                        ok = fixed_line_matches(lines[line_idx], *expected)
+                    else:
+                        ok = lines[line_idx] == expected
+                    if not ok:
                         failures.append(
-                            f"display line {line_idx}: expected {expected_text!r}, got {lines[line_idx]!r}"
+                            f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
                         )
         except Exception as e:
             failures.append(f"failed to read display image: {e}")
@@ -327,10 +357,14 @@ def check_05_bus(
                     6: "",
                     7: "",
                 }
-                for line_idx, expected_text in expected_lines.items():
-                    if lines[line_idx] != expected_text:
+                for line_idx, expected in expected_lines.items():
+                    if isinstance(expected, tuple):
+                        ok = fixed_line_matches(lines[line_idx], *expected)
+                    else:
+                        ok = lines[line_idx] == expected
+                    if not ok:
                         failures.append(
-                            f"display line {line_idx}: expected {expected_text!r}, got {lines[line_idx]!r}"
+                            f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
                         )
         except Exception as e:
             failures.append(f"failed to read display image: {e}")
@@ -413,26 +447,195 @@ def check_06_imu(
                 last_rate = int(round(rates[-1]))
                 last_down = downs[-1]
 
-                def format_fixed(val: float) -> str:
-                    hundredths = round(val * 100)
-                    mag = abs(hundredths)
-                    sign = "-" if hundredths < 0 else "+"
-                    return f"{sign}{mag // 100}.{mag % 100:02d}"
-
                 expected_lines = {
                     0: "VEHKERNEL 06-IMU",
                     1: "",
-                    2: f"AX: {format_fixed(last_ax)} M/S2",
-                    3: f"AY: {format_fixed(last_ay)} M/S2",
-                    4: f"AZ: {format_fixed(last_az)} M/S2",
+                    2: ("AX: ", last_ax, " M/S2"),
+                    3: ("AY: ", last_ay, " M/S2"),
+                    4: ("AZ: ", last_az, " M/S2"),
                     5: f"RATE: {last_rate} HZ",
                     6: f"DOWN: {last_down}",
                     7: "",
                 }
-                for line_idx, expected_text in expected_lines.items():
-                    if lines[line_idx] != expected_text:
+                for line_idx, expected in expected_lines.items():
+                    if isinstance(expected, tuple):
+                        ok = fixed_line_matches(lines[line_idx], *expected)
+                    else:
+                        ok = lines[line_idx] == expected
+                    if not ok:
                         failures.append(
-                            f"display line {line_idx}: expected {expected_text!r}, got {lines[line_idx]!r}"
+                            f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
+                        )
+        except Exception as e:
+            failures.append(f"failed to read display image: {e}")
+
+    return failures
+
+
+def check_07_magnetometer(
+    stdout: str,
+    stdout_lines: list[tuple[str, float]],
+    display_file: Path,
+    tolerance: float,
+) -> list[str]:
+    failures: list[str] = []
+
+    # 1. Check magnetometer sample rate reported once per second against 100 Hz within tolerance
+    rates = [float(m.group(1)) for m in re.finditer(r"^rate=([0-9.]+)", stdout, re.MULTILINE)]
+    if not rates:
+        failures.append("no rate reported in stdout")
+    else:
+        expected_rate = 100.0  # AK09916 magnetometer rate in SITL (spec 0012, sim/icm20948.cpp)
+        for r in rates:
+            if abs(r - expected_rate) > expected_rate * tolerance:
+                failures.append(
+                    f"sample rate {r:.2f} Hz outside expected {expected_rate:.2f} Hz "
+                    f"(tolerance {tolerance:.0%})"
+                )
+                break
+
+    # 2. Check heading follows simulated vehicle true yaw during rotation
+    headings: list[tuple[float, float]] = []
+    yaws: list[tuple[float, float]] = []
+    bx_reports: list[float] = []
+    by_reports: list[float] = []
+    bz_reports: list[float] = []
+    norm_reports: list[float] = []
+
+    for line, t in stdout_lines:
+        m_h = re.match(r"^heading=([+-]?[0-9.]+)", line)
+        if m_h:
+            headings.append((float(m_h.group(1)), t))
+        m_y = re.match(r"^true_yaw=([+-]?[0-9.]+)", line)
+        if m_y:
+            yaws.append((float(m_y.group(1)), t))
+        m_bx = re.match(r"^bx=([+-]?[0-9.]+)", line)
+        if m_bx:
+            bx_reports.append(float(m_bx.group(1)))
+        m_by = re.match(r"^by=([+-]?[0-9.]+)", line)
+        if m_by:
+            by_reports.append(float(m_by.group(1)))
+        m_bz = re.match(r"^bz=([+-]?[0-9.]+)", line)
+        if m_bz:
+            bz_reports.append(float(m_bz.group(1)))
+        m_norm = re.match(r"^norm=([+-]?[0-9.]+)", line)
+        if m_norm:
+            norm_reports.append(float(m_norm.group(1)))
+
+    if not headings:
+        failures.append("no heading reported in stdout")
+    if not yaws:
+        failures.append("no true_yaw reported in stdout")
+
+    def wrap_180(angle_deg: float) -> float:
+        return (angle_deg + 180.0) % 360.0 - 180.0
+
+    # In SITL, the rotate profile turns at 45 deg/s, and both DisplayItem and TrueYawItem report at 4 Hz
+    # (a 250 ms period), turning 11.25 deg between display updates.
+    # A correct heading has an error against its corresponding true yaw under 1.0 deg (sensor noise on a
+    # 30 uT field is 0.3 uT, atan(0.3 / 30) = 0.57 deg). A heading lagging by one display period has an
+    # error of at least 11.25 - 1.0 = 10.25 deg.
+    # We choose a tolerance of 3.0 deg: this provides ample margin for host thread scheduling jitter on a
+    # loaded CI runner while decisively rejecting any heading lagging by a display period (>= 10.25 deg).
+    max_heading_error_deg = 3.0
+    compared = 0
+
+    if headings and yaws:
+        first_heading_time = headings[0][1]
+        yaw_times = [t for _, t in yaws]
+
+        for h_val, h_t in headings:
+            # Skip headings before the vehicle starts turning (first second of alignment/rest).
+            if h_t < first_heading_time + 1.0:
+                continue
+
+            # Compare with true yaw over a window: take smallest error against true yaw reported
+            # just before and just after the heading (covering sample acquisition and display latency).
+            i = bisect.bisect_left(yaw_times, h_t)
+            candidates = [yaws[k][0] for k in (i - 1, i) if 0 <= k < len(yaws)]
+            if not candidates:
+                continue
+
+            sample_min_error = min(abs(wrap_180(h_val - y_val)) for y_val in candidates)
+            compared += 1
+            if sample_min_error > max_heading_error_deg:
+                failures.append(
+                    f"heading error {sample_min_error:.2f} deg exceeds tolerance {max_heading_error_deg:.1f} deg "
+                    f"(heading={h_val:.2f}, candidate true yaws={candidates})"
+                )
+                break
+
+        if compared < 20:
+            failures.append(f"only {compared} headings compared during turning (expected at least 20)")
+
+        # Check that heading sweeps through at least most of a turn over the run.
+        # A full rotation is 360 deg; sweeping at least 270 deg (3/4 of a turn) satisfies this criterion.
+        unwrapped: list[float] = []
+        for h_val, _ in headings:
+            if not unwrapped:
+                unwrapped.append(h_val)
+            else:
+                diff = wrap_180(h_val - unwrapped[-1])
+                unwrapped.append(unwrapped[-1] + diff)
+        sweep_span = max(unwrapped) - min(unwrapped)
+        if sweep_span < 270.0:
+            failures.append(
+                f"heading swept {sweep_span:.1f} deg, less than required turn sweep of at least 270 deg"
+            )
+
+    # 3. Check display_on=1 reported from simulated SSD1306's displaying()
+    display_on_match = re.search(r"^display_on=(\d+)", stdout, re.MULTILINE)
+    if not display_on_match:
+        failures.append("display_on not reported in stdout")
+    elif int(display_on_match.group(1)) != 1:
+        failures.append(f"expected display_on=1, got display_on={display_on_match.group(1)}")
+
+    # 4. Judge whole frames from captured display image:
+    # line 0 title, line 1 blank, lines 2-4 field components, line 5 norm, line 6 rate, line 7 heading
+    if not display_file.exists():
+        failures.append("SITL wrote no display image")
+    else:
+        try:
+            lines = screen_text(display_file)
+            print("display:")
+            for idx, line in enumerate(lines):
+                print(f"  [{idx}] |{line}|")
+
+            if (
+                not rates
+                or not headings
+                or not bx_reports
+                or not by_reports
+                or not bz_reports
+                or not norm_reports
+            ):
+                failures.append("cannot verify display content without reported values")
+            else:
+                last_rate = int(round(rates[-1]))
+                last_bx = bx_reports[-1]
+                last_by = by_reports[-1]
+                last_bz = bz_reports[-1]
+                last_norm = norm_reports[-1]
+                last_heading = headings[-1][0]
+
+                expected_lines = {
+                    0: "VEHKERNEL 07-MAG",
+                    1: "",
+                    2: ("BX: ", last_bx, " UT"),
+                    3: ("BY: ", last_by, " UT"),
+                    4: ("BZ: ", last_bz, " UT"),
+                    5: ("NORM: ", last_norm, " UT"),
+                    6: f"RATE: {last_rate} HZ",
+                    7: ("HEADING: ", last_heading, " DEG"),
+                }
+                for line_idx, expected in expected_lines.items():
+                    if isinstance(expected, tuple):
+                        ok = fixed_line_matches(lines[line_idx], *expected)
+                    else:
+                        ok = lines[line_idx] == expected
+                    if not ok:
+                        failures.append(
+                            f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
                         )
         except Exception as e:
             failures.append(f"failed to read display image: {e}")
@@ -456,20 +659,23 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory() as tmp:
         display_file = Path(tmp) / "display.pbm"
-        cmd = [str(target), "--duration", str(args.duration), "--display", str(display_file)]
+        duration = 10.0 if ex_name == "07-magnetometer" else args.duration
+        cmd = [str(target), "--duration", str(duration), "--display", str(display_file)]
+        if ex_name == "07-magnetometer":
+            cmd.extend(["--motion", "rotate"])
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         stdout_lines: list[tuple[str, float]] = []
-        deadline = time.monotonic() + args.duration + 30
+        deadline = time.monotonic() + duration + 30
         assert proc.stdout is not None
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 proc.kill()
-                raise subprocess.TimeoutExpired(cmd, args.duration + 30)
+                raise subprocess.TimeoutExpired(cmd, duration + 30)
             rlist, _, _ = select.select([proc.stdout], [], [], remaining)
             if not rlist:
                 proc.kill()
-                raise subprocess.TimeoutExpired(cmd, args.duration + 30)
+                raise subprocess.TimeoutExpired(cmd, duration + 30)
             line = proc.stdout.readline()
             if not line:
                 break
@@ -493,6 +699,8 @@ def main() -> int:
             failures = check_05_bus(full_stdout, stdout_lines, display_file, args.tolerance)
         elif ex_name == "06-imu":
             failures = check_06_imu(full_stdout, stdout_lines, display_file, args.tolerance)
+        elif ex_name == "07-magnetometer":
+            failures = check_07_magnetometer(full_stdout, stdout_lines, display_file, args.tolerance)
         else:
             failures = [f"unknown SITL example {ex_name}"]
 

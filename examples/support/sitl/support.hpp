@@ -3,6 +3,7 @@
 #pragma once
 
 #include <line.hpp>
+#include <vk/core/bus.hpp>
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
@@ -10,17 +11,26 @@
 #include <vk/drivers/ssd1306.hpp>
 #include <vk/hal/clock.hpp>
 #include <vk/hal/i2c.hpp>
+#include <vk/msg/imu_sample.hpp>
+#include <vk/msg/vehicle_attitude_groundtruth.hpp>
 #include <vk/platform/platform.hpp>
+#include <vk/sim/icm20948.hpp>
 #include <vk/sim/ssd1306.hpp>
 
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <numbers>
 #include <string_view>
 #include <type_traits>
 
 namespace example {
+
+template <typename T>
+void report(std::string_view key, const T& value);
 
 namespace detail {
 
@@ -28,6 +38,147 @@ inline vk::core::StaticInstance<vk::drivers::Ssd1306> display_driver;
 inline vk::core::StaticInstance<vk::drivers::Icm20948> imu_driver;
 inline std::uint64_t stop_duration_us = 0;
 inline bool has_stopped = false;
+
+enum class MotionMode : std::uint8_t {
+    Default,
+    Rotate,
+};
+
+inline MotionMode motion_mode = MotionMode::Default;
+
+// Rotating motion source for level rotation about the vertical (z) axis.
+// Sweeps a full 360 deg turn over 8 seconds (from 1.0 s to 9.0 s) at 45 deg/s,
+// while remaining level (roll = 0, pitch = 0).
+class RotatingMotionSource final : public vk::sim::Icm20948::OutputSource {
+public:
+    static constexpr float rotation_rate = 45.0F * (std::numbers::pi_v<float> / 180.0F);  // 45 deg/s
+    static constexpr std::uint64_t start_time_us = 1'000'000;                              // 1.0 s
+    static constexpr std::uint64_t rotation_duration_us = 8'000'000;                       // 8.0 s (360 deg)
+
+    struct State {
+        float yaw = 0.0F;
+        float rate_z = 0.0F;
+        std::array<float, 4> q{1.0F, 0.0F, 0.0F, 0.0F};  // [w, x, y, z]
+    };
+
+    static State state_at(std::uint64_t time_us)
+    {
+        State s{};
+        if (time_us <= start_time_us) {
+            s.yaw = 0.0F;
+            s.rate_z = 0.0F;
+        } else if (time_us < start_time_us + rotation_duration_us) {
+            const float dt = static_cast<float>(time_us - start_time_us) * 1e-6F;
+            s.yaw = rotation_rate * dt;
+            s.rate_z = rotation_rate;
+        } else {
+            s.yaw = rotation_rate * 8.0F;  // 2*pi (360 deg)
+            s.rate_z = 0.0F;
+        }
+        const float half_yaw = s.yaw * 0.5F;
+        s.q = {std::cos(half_yaw), 0.0F, 0.0F, std::sin(half_yaw)};
+        return s;
+    }
+
+    void update(vk::sim::Icm20948& imu) override
+    {
+        const auto s = state_at(vk::hal::SystemClock::now_us());
+        // Body (x forward, y right, z down) to sensor (x forward, y left, z up).
+        imu.set_gyro({0.0F, 0.0F, -s.rate_z});
+        // Specific force upward reaction to gravity in NED -z (sensor +z).
+        imu.set_accel({0.0F, 0.0F, 9.80665F});
+    }
+
+    std::optional<std::array<float, 3>> field_at(std::uint64_t time_us) override
+    {
+        const auto s = state_at(time_us);
+        // Earth field in NED: (30 uT north, 0 east, 30 uT down).
+        // Rotated by q^-1 into body frame:
+        const float bx = 30.0F * std::cos(s.yaw);
+        const float by = -30.0F * std::sin(s.yaw);
+        const float bz = 30.0F;
+        // Body to sensor frame: x, -y, -z
+        return std::array<float, 3>{bx, -by, -bz};
+    }
+};
+
+inline RotatingMotionSource rotating_source;
+
+// Work item on wq:ctrl publishing vehicle_attitude_groundtruth for each imu_sample.
+class GroundTruthItem final : public vk::core::WorkItem {
+public:
+    explicit GroundTruthItem(vk::core::WorkQueue& queue)
+        : WorkItem("ground_truth", queue)
+    {
+    }
+
+    void start()
+    {
+        trigger_on(vk::core::topic<vk::msg::ImuSample>(0));
+    }
+
+protected:
+    void run() override
+    {
+        vk::msg::ImuSample sample{};
+        while (imu_sub_.copy(sample)) {
+            const auto s = RotatingMotionSource::state_at(sample.timestamp);
+            vk::msg::VehicleAttitudeGroundtruth truth{};
+            truth.timestamp = sample.timestamp;
+            truth.q = s.q;
+            truth.angular_velocity = {0.0F, 0.0F, s.rate_z};
+            publication_.publish(truth);
+        }
+    }
+
+private:
+    vk::core::Subscription<vk::msg::ImuSample> imu_sub_{0};
+    vk::core::Publication<vk::msg::VehicleAttitudeGroundtruth> publication_;
+};
+
+// Work item on wq:slow reporting true_yaw at the display rate (4 Hz).
+class TrueYawItem final : public vk::core::WorkItem {
+public:
+    static constexpr std::uint32_t interval_us = 250'000;  // 4 Hz
+
+    explicit TrueYawItem(vk::core::WorkQueue& queue)
+        : WorkItem("true_yaw", queue)
+    {
+    }
+
+    void start()
+    {
+        schedule_periodic(interval_us);
+    }
+
+protected:
+    void run() override
+    {
+        vk::msg::VehicleAttitudeGroundtruth truth{};
+        while (subscription_.copy(truth)) {
+            last_truth_ = truth;
+            has_truth_ = true;
+        }
+        if (has_truth_) {
+            // Euler yaw from quaternion [w, x, y, z]:
+            const float w = last_truth_.q[0];
+            const float x = last_truth_.q[1];
+            const float y = last_truth_.q[2];
+            const float z = last_truth_.q[3];
+            const float yaw_rad = std::atan2(2.0F * (w * z + x * y), 1.0F - 2.0F * (y * y + z * z));
+            const float yaw_deg = yaw_rad * (180.0F / std::numbers::pi_v<float>);
+            report("true_yaw", yaw_deg);
+        }
+    }
+
+private:
+    vk::core::Subscription<vk::msg::VehicleAttitudeGroundtruth> subscription_{0};
+    vk::msg::VehicleAttitudeGroundtruth last_truth_{};
+    bool has_truth_ = false;
+};
+
+inline vk::core::StaticInstance<GroundTruthItem> ground_truth_item;
+inline vk::core::StaticInstance<TrueYawItem> true_yaw_item;
 
 }  // namespace detail
 
@@ -63,6 +214,11 @@ inline void init(int argc = 0, char** argv = nullptr)
             }
         } else if (arg == "--display" && i + 1 < argc) {
             vk::platform::display().write_image_to(argv[++i]);
+        } else if (arg == "--motion" && i + 1 < argc) {
+            const std::string_view motion_arg(argv[++i]);
+            if (motion_arg == "rotate") {
+                detail::motion_mode = detail::MotionMode::Rotate;
+            }
         }
     }
 }
@@ -120,6 +276,13 @@ inline vk::drivers::Ssd1306& display()
 inline vk::drivers::Icm20948& imu()
 {
     if (!detail::imu_driver.has_value()) {
+        if (detail::motion_mode == detail::MotionMode::Rotate) {
+            vk::platform::simulated_imu().set_output_source(&detail::rotating_source);
+            detail::ground_truth_item.emplace(vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+            detail::true_yaw_item.emplace(vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+            detail::ground_truth_item->start();
+            detail::true_yaw_item->start();
+        }
         detail::imu_driver.emplace(
             vk::hal::I2cDevice(vk::platform::imu_bus(), vk::platform::imu_address),
             vk::drivers::Icm20948::Config{

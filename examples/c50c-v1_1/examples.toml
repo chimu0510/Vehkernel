@@ -88,3 +88,11 @@ summary = "ICM20948 IMU driver publishing imu_sample over software I2C; OLED sho
 introduces = ["device:IMU0"]
 uses = ["bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE"]
 sitl = true
+
+[[example]]
+name = "07-magnetometer"
+summary = "AK09916 magnetometer read through ICM20948 FIFO; OLED shows magnetic field, magnitude and heading"
+introduces = []
+uses = ["device:IMU0", "bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE"]
+sitl = true
+
