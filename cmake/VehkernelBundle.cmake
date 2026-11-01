@@ -27,7 +27,7 @@ add_custom_target(bundle ALL
   COMMENT "Packaging the host tools bundle"
   VERBATIM
 )
-if(VK_PLATFORM STREQUAL "stm32f4")
+if(TARGET vehkernel)
   add_dependencies(bundle vehkernel)
 else()
   add_dependencies(bundle vk_msg_generate vk_params_generate)

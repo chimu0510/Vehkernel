@@ -281,6 +281,18 @@ add_test(NAME socdb
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/socdb/tests)
 add_test(NAME board_generator
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/generators/tests/test_board_generator.py)
+add_test(NAME check_examples
+  COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/examples/tests)
+set_tests_properties(check_examples PROPERTIES ENVIRONMENT
+  "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/examples:${CMAKE_SOURCE_DIR}/tools/generators;PYTHONDONTWRITEBYTECODE=1")
+add_test(NAME check_examples_c50c
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/examples/check_examples.py
+    --examples-toml ${CMAKE_SOURCE_DIR}/examples/c50c-v1_1/examples.toml
+    --board-toml ${CMAKE_SOURCE_DIR}/boards/c50c-v1_1/board.toml
+    --examples-dir ${CMAKE_SOURCE_DIR}/examples/c50c-v1_1
+    --soc-root ${CMAKE_SOURCE_DIR}/soc)
+set_tests_properties(check_examples_c50c PROPERTIES ENVIRONMENT
+  "PYTHONPATH=${CMAKE_SOURCE_DIR}/tools/generators;PYTHONDONTWRITEBYTECODE=1")
 add_test(NAME bringup_runner
   COMMAND ${Python3_EXECUTABLE} -m pytest -q -p no:cacheprovider ${CMAKE_SOURCE_DIR}/tools/bringup/tests)
 add_test(NAME serial_flasher

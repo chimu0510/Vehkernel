@@ -399,6 +399,14 @@ A mode in which the test runner on the development host is in control, accepting
 A mode in which the remote control is in control and drives the vehicle by body velocity; the remote control can enter it at any time, armed or not, which is how it takes over.
 _Avoid_: RC mode, joystick mode
 
+**Example**:
+A separate executable for one board that exercises one component, with its lesson.
+_Avoid_: sample, demo
+
+**Lesson**:
+The README of an example that teaches its component.
+_Avoid_: tutorial
+
 ### Software layers
 
 **Module Layer**:

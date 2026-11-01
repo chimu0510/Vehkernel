@@ -287,6 +287,12 @@ config BRINGUP_TESTS
 	  the results to a RAM block for the bring-up runner to read over SWD,
 	  then idles (ADR-0018). It never configures actuator outputs.
 
+config EXAMPLES
+	bool "Board examples (replaces the application)"
+	help
+	  Builds the board examples in place of the firmware entry point
+	  (spec 0013, ADR-0025).
+
 choice FAULT_TEST
 	prompt "Fault test (hardware check only)"
 	default FAULT_TEST_NONE

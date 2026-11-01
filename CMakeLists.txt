@@ -28,6 +28,7 @@ include(VehkernelBoard)
 include(VehkernelKconfig)
 include(VehkernelSchema)
 include(VehkernelParams)
+include(VehkernelFirmware)
 
 # Warnings are errors for all Vehkernel code (L0, ADR-0018).
 add_library(vk_warnings INTERFACE)

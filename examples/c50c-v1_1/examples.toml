@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# C50C V1.1 board examples in dependency order (spec 0013, ADR-0025).
+
+[firmware]
+work_queue = "Rate-tiered FreeRTOS work queues and work items (ADR-0004, ADR-0008)"
+bus = "Publish/subscribe bus backbone and schema-generated topics (ADR-0002, ADR-0006)"
+link = "Link communications with the custom protocol over serial or UDP (ADR-0002)"
+parameters = "Parameter system and storage in non-volatile Flash (ADR-0012, ADR-0020)"
+actuator_control = "Actuator task driving motor outputs with the output watchdog (ADR-0005, spec 0006)"
+
+[not_covered]
+"pin:REV_ID0" = "revision-ID pin; read at boot for board verification (ADR-0010)"
+"pin:REV_ID1" = "revision-ID pin; read at boot for board verification (ADR-0010)"
+"pin:REV_ID2" = "revision-ID pin; read at boot for board verification (ADR-0010)"
+"pin:IMU_INT" = "IMU data-ready interrupt pin; the 200 Hz timing preset triggers from a timer (ADR-0015)"
+"pin:SERVO_SENIOR" = "Ackermann steering servo pin; no servo driver yet"
+"pin:RC_CH1" = "RC receiver PWM input; no RC PWM input driver yet"
+"pin:RC_CH2" = "RC receiver PWM input; no RC PWM input driver yet"
+"pin:RC_CH3" = "RC receiver PWM input; no RC PWM input driver yet"
+"pin:RC_CH4" = "RC receiver PWM input; no RC PWM input driver yet"
+"pin:CAN1_RX" = "CAN bus transceiver pin; no CAN driver yet (ADR-0002)"
+"pin:CAN1_TX" = "CAN bus transceiver pin; no CAN driver yet (ADR-0002)"
+"pin:BATTERY_SENSE" = "battery voltage divider; no ADC driver yet"
+"pin:FRAME_SELECT" = "frame selection potentiometer; no ADC driver yet"
+"pin:SERVO_TRIM" = "steering trim potentiometer; no ADC driver yet"
+"pin:SERVO_FEEDBACK" = "steering angle feedback input; no ADC driver yet"
+"pin:SPARE_PB6" = "alt config 1 pin; alt configs are selected at boot for specific frames (ADR-0010)"
+"pin:SERVO_TOP" = "alt config 1 steering servo pin; alt configs are selected at boot for specific frames (ADR-0010)"
+"serial:SERIAL3" = "Bluetooth serial port; no Bluetooth Link driver yet"
+"serial:SERIAL4" = "SBUS receiver port; no RC receiver driver yet"
+"flash:BOOT" = "bootloader region; flashed once with the bootloader (ADR-0023)"
+"flash:EVENTLOG" = "event log region; no event log sink yet (ADR-0019, ADR-0020)"
+
+[pending]
+"user_key" = "02-user-key"
+"device:DISPLAY0" = "03-oled"
+"device:IMU0" = "06-imu"
+"serial:SERIAL1" = "08-serial-link"
+"serial:SERIAL2" = "08-serial-link"
+"flash:PARAMS" = "09-parameters"
+"output:1" = "10-motor-outputs"
+"output:2" = "10-motor-outputs"
+"output:3" = "10-motor-outputs"
+"output:4" = "10-motor-outputs"
+"actuator_power" = "10-motor-outputs"
+"encoder:1" = "11-wheel-encoders"
+"encoder:2" = "11-wheel-encoders"
+"encoder:3" = "11-wheel-encoders"
+"encoder:4" = "11-wheel-encoders"
+"pin:USB_DM" = "12-usb-gamepad"
+"pin:USB_DP" = "12-usb-gamepad"
+
+[[example]]
+name = "01-led"
+summary = "Blinks the on-board RGB LED with GPIO outputs and the system clock"
+introduces = ["pin:LIGHT_R", "pin:LIGHT_G", "pin:LIGHT_B", "flash:FIRMWARE"]
+uses = []
+sitl = false
