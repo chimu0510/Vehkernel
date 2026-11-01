@@ -32,8 +32,6 @@ actuator_control = "Actuator task driving motor outputs with the output watchdog
 "flash:EVENTLOG" = "event log region; no event log sink yet (ADR-0019, ADR-0020)"
 
 [pending]
-"serial:SERIAL1" = "08-serial-link"
-"serial:SERIAL2" = "08-serial-link"
 "flash:PARAMS" = "09-parameters"
 "output:1" = "10-motor-outputs"
 "output:2" = "10-motor-outputs"
@@ -93,6 +91,13 @@ sitl = true
 name = "07-magnetometer"
 summary = "AK09916 magnetometer read through ICM20948 FIFO; OLED shows magnetic field, magnitude and heading"
 introduces = []
+uses = ["device:IMU0", "bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE"]
+sitl = true
+
+[[example]]
+name = "08-serial-link"
+summary = "Custom protocol Link over serial ports SERIAL1 and SERIAL2 carrying IMU topics"
+introduces = ["serial:SERIAL1", "serial:SERIAL2", "link"]
 uses = ["device:IMU0", "bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE"]
 sitl = true
 

@@ -30,6 +30,12 @@ For 07-magnetometer:
 - Verifies that heading sweeps through at least most of a turn (at least 270 deg).
 - Verifies display_on=1 reported from the simulated SSD1306.
 - Verifies whole frames: line 0 title, line 1 blank, lines 2-4 magnetic field components (BX, BY, BZ), line 5 norm, line 6 sample rate, line 7 heading.
+For 08-serial-link:
+- Connects over UDP to the bound port.
+- Verifies handshake succeeds.
+- Verifies reported imu_sample rate matches 200 Hz within tolerance (20 %).
+- Verifies display_on=1 reported from the simulated SSD1306.
+- Verifies whole frames: line 0 title, line 2 STATE: CONNECTED, line 3 TX FRAMES, line 4 RX FRAMES, line 5 DROPS: 0, line 6 SCALE: 100 %.
 """
 
 from __future__ import annotations
@@ -45,6 +51,10 @@ import tempfile
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT / "tools" / "link") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "tools" / "link"))
 
 from display_text import screen_text  # noqa: E402
 
@@ -643,11 +653,78 @@ def check_07_magnetometer(
     return failures
 
 
+def check_08_serial_link(
+    stdout: str,
+    display_file: Path,
+    monitor,
+    tolerance: float,
+) -> list[str]:
+    failures: list[str] = []
+
+    # 1. Check handshake
+    if not monitor.connected:
+        failures.append("no handshake with SITL Link")
+
+    # 2. Check imu_sample instance 0 rate
+    imu_stats = monitor.topics.get(("imu_sample", 0))
+    if imu_stats is None or imu_stats.messages < 2:
+        failures.append("topic imu_sample:0 never arrived or arrived with too few samples")
+    else:
+        expected_rate = 200.0
+        measured_rate = imu_stats.rate_hz
+        if abs(measured_rate - expected_rate) > expected_rate * tolerance:
+            failures.append(
+                f"imu_sample:0 rate {measured_rate:.2f} Hz outside expected {expected_rate:.2f} Hz "
+                f"(tolerance {tolerance:.0%})"
+            )
+
+    # 3. Check display_on=1 reported from simulated SSD1306's displaying()
+    display_on_match = re.search(r"^display_on=(\d+)", stdout, re.MULTILINE)
+    if not display_on_match:
+        failures.append("display_on not reported in stdout")
+    elif int(display_on_match.group(1)) != 1:
+        failures.append(f"expected display_on=1, got display_on={display_on_match.group(1)}")
+
+    # 4. Judge whole frames from captured display image:
+    # line 0 title, line 2 state, line 3 tx frames, line 4 rx frames, line 5 drops, line 6 scale
+    if not display_file.exists():
+        failures.append("SITL wrote no display image")
+    else:
+        try:
+            lines = screen_text(display_file)
+            print("display:")
+            for idx, line in enumerate(lines):
+                print(f"  [{idx}] |{line}|")
+
+            expected_lines = {
+                0: "VEHKERNEL 08-LINK",
+                1: "",
+                2: "STATE: CONNECTED",
+                5: "DROPS: 0",
+                6: "SCALE: 100 %",
+                7: "",
+            }
+            for line_idx, expected in expected_lines.items():
+                if lines[line_idx] != expected:
+                    failures.append(
+                        f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
+                    )
+            if not lines[3].startswith("TX FRAMES: "):
+                failures.append(f"display line 3: expected prefix 'TX FRAMES: ', got {lines[3]!r}")
+            if not lines[4].startswith("RX FRAMES: "):
+                failures.append(f"display line 4: expected prefix 'RX FRAMES: ', got {lines[4]!r}")
+        except Exception as e:
+            failures.append(f"failed to read display image: {e}")
+
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("executable", help="the example executable to run (e.g. example-03-oled)")
     parser.add_argument("--duration", type=float, default=3.0, help="duration to run SITL in seconds")
     parser.add_argument("--tolerance", type=float, default=0.20, help="allowed relative rate error")
+    parser.add_argument("--msg-dir", default=None, help="directory of the generated vkmsg.py")
     args = parser.parse_args()
 
     target = Path(args.executable)
@@ -659,31 +736,73 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory() as tmp:
         display_file = Path(tmp) / "display.pbm"
-        duration = 10.0 if ex_name == "07-magnetometer" else args.duration
+        duration = 10.0 if ex_name == "07-magnetometer" else (5.0 if ex_name == "08-serial-link" else args.duration)
         cmd = [str(target), "--duration", str(duration), "--display", str(display_file)]
         if ex_name == "07-magnetometer":
             cmd.extend(["--motion", "rotate"])
+        if ex_name == "08-serial-link":
+            cmd.extend(["--udp", "127.0.0.1:0"])
+
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         stdout_lines: list[tuple[str, float]] = []
-        deadline = time.monotonic() + duration + 30
-        assert proc.stdout is not None
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                proc.kill()
-                raise subprocess.TimeoutExpired(cmd, duration + 30)
-            rlist, _, _ = select.select([proc.stdout], [], [], remaining)
-            if not rlist:
-                proc.kill()
-                raise subprocess.TimeoutExpired(cmd, duration + 30)
-            line = proc.stdout.readline()
-            if not line:
-                break
-            t = time.monotonic()
-            stdout_lines.append((line, t))
-            print(line, end="")
+        monitor = None
 
-        _, stderr = proc.communicate(timeout=30)
+        if ex_name == "08-serial-link":
+            assert proc.stdout is not None
+            first_line = proc.stdout.readline()
+            stdout_lines.append((first_line, time.monotonic()))
+            print(first_line, end="")
+            m = re.search(r"address=127\.0\.0\.1:(\d+)", first_line)
+            if not m:
+                proc.kill()
+                _, stderr = proc.communicate(timeout=10)
+                print(stderr, file=sys.stderr)
+                print("FAIL: could not parse bound UDP port from SITL output", file=sys.stderr)
+                return 1
+            port = int(m.group(1))
+
+            msg_dir = args.msg_dir
+            if not msg_dir:
+                proc.kill()
+                print("FAIL: 08-serial-link needs --msg-dir, the build's generated schema Python", file=sys.stderr)
+                return 1
+
+            from vklink.monitor import LinkMonitor, UdpConnection, load_messages
+
+            connection = UdpConnection("127.0.0.1", port)
+            monitor = LinkMonitor(connection, load_messages(msg_dir))
+            try:
+                if monitor.handshake(timeout_s=2.0):
+                    check_duration = max(1.0, duration - 2.0)
+                    monitor.run(check_duration)
+            finally:
+                connection.close()
+
+            out_rest, stderr = proc.communicate(timeout=30)
+            for line in out_rest.splitlines(keepends=True):
+                stdout_lines.append((line, time.monotonic()))
+                print(line, end="")
+        else:
+            deadline = time.monotonic() + duration + 30
+            assert proc.stdout is not None
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    proc.kill()
+                    raise subprocess.TimeoutExpired(cmd, duration + 30)
+                rlist, _, _ = select.select([proc.stdout], [], [], remaining)
+                if not rlist:
+                    proc.kill()
+                    raise subprocess.TimeoutExpired(cmd, duration + 30)
+                line = proc.stdout.readline()
+                if not line:
+                    break
+                t = time.monotonic()
+                stdout_lines.append((line, t))
+                print(line, end="")
+
+            _, stderr = proc.communicate(timeout=30)
+
         if proc.returncode != 0:
             print(stderr, file=sys.stderr)
             print(f"FAIL: {name} exited with {proc.returncode}", file=sys.stderr)
@@ -701,6 +820,9 @@ def main() -> int:
             failures = check_06_imu(full_stdout, stdout_lines, display_file, args.tolerance)
         elif ex_name == "07-magnetometer":
             failures = check_07_magnetometer(full_stdout, stdout_lines, display_file, args.tolerance)
+        elif ex_name == "08-serial-link":
+            assert monitor is not None
+            failures = check_08_serial_link(full_stdout, display_file, monitor, args.tolerance)
         else:
             failures = [f"unknown SITL example {ex_name}"]
 

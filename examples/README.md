@@ -21,7 +21,7 @@ The examples are numbered in dependency order:
 | [05-bus](c50c-v1_1/05-bus/README.md) | One work item publishes a counter that another, woken by it, draws on the OLED | Yes |
 | [06-imu](c50c-v1_1/06-imu/README.md) | ICM20948 IMU driver publishing imu_sample over software I2C; OLED shows specific force, rate and down axis | Yes |
 | [07-magnetometer](c50c-v1_1/07-magnetometer/README.md) | AK09916 magnetometer read through ICM20948 FIFO; OLED shows magnetic field, magnitude and heading | Yes |
-| `08-serial-link` *(pending)* | Custom protocol Link over serial ports `SERIAL1` and `SERIAL2` | Yes |
+| [08-serial-link](c50c-v1_1/08-serial-link/README.md) | Custom protocol Link over serial ports SERIAL1 and SERIAL2 carrying IMU topics | Yes |
 | `09-parameters` *(pending)* | Parameter system and persistent storage in internal Flash `PARAMS` | Yes |
 | `10-motor-outputs` *(pending)* | Actuator control outputs 1 to 4 with output watchdog and power sense | Yes |
 | `11-wheel-encoders` *(pending)* | Quadrature encoders for motor outputs 1 to 4 and `wheel_encoders` | Yes |

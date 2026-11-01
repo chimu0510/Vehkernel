@@ -29,6 +29,7 @@ if(VK_PLATFORM STREQUAL "stm32f4")
   add_board_example(example-05-bus 05-bus/main.cpp)
   add_board_example(example-06-imu 06-imu/main.cpp)
   add_board_example(example-07-magnetometer 07-magnetometer/main.cpp)
+  add_board_example(example-08-serial-link 08-serial-link/main.cpp)
 elseif(VK_PLATFORM STREQUAL "sitl")
   function(add_sitl_example dir)
     set(name example-${dir})
@@ -47,7 +48,7 @@ elseif(VK_PLATFORM STREQUAL "sitl")
     string(REPLACE "-" "_" test_name "example-${dir}")
     add_test(NAME ${test_name}
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/test/sitl/check_examples.py
-        $<TARGET_FILE:${name}>)
+        $<TARGET_FILE:${name}> --msg-dir ${VK_MSG_PYTHON_DIR})
   endfunction()
 
   foreach(ex IN LISTS VK_SITL_EXAMPLES)

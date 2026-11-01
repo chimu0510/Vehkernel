@@ -4,6 +4,7 @@
 
 #include <line.hpp>
 #include <vk/core/bus.hpp>
+#include <vk/core/critical_section.hpp>
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
@@ -11,9 +12,13 @@
 #include <vk/drivers/ssd1306.hpp>
 #include <vk/hal/clock.hpp>
 #include <vk/hal/i2c.hpp>
+#include <vk/hal/transport.hpp>
+#include <vk/link/link.hpp>
+#include <vk/link/topic_map.hpp>
 #include <vk/msg/imu_sample.hpp>
 #include <vk/msg/vehicle_attitude_groundtruth.hpp>
 #include <vk/platform/platform.hpp>
+#include <vk/platform/udp_transport.hpp>
 #include <vk/sim/icm20948.hpp>
 #include <vk/sim/ssd1306.hpp>
 
@@ -45,6 +50,46 @@ enum class MotionMode : std::uint8_t {
 };
 
 inline MotionMode motion_mode = MotionMode::Default;
+
+inline std::array<char, 64> udp_address{"127.0.0.1"};
+inline std::uint16_t udp_port = 15600;
+inline vk::platform::UdpTransport udp_transport;
+inline vk::core::StaticInstance<vk::link::Link> host_link;
+
+inline bool parse_address(const char* argument)
+{
+    const std::string_view text = argument;
+    const auto colon = text.rfind(':');
+    if (colon == std::string_view::npos || colon == 0) {
+        return false;
+    }
+    const std::string_view address = text.substr(0, colon);
+    const char* port = std::next(argument, static_cast<std::ptrdiff_t>(colon + 1));
+    if (address.size() >= udp_address.size() || *port == '\0') {
+        return false;
+    }
+    char* end = nullptr;
+    const unsigned long value = std::strtoul(port, &end, 10);
+    if (*end != '\0' || value > 65535) {
+        return false;
+    }
+    udp_address.fill('\0');
+    address.copy(udp_address.data(), address.size());
+    udp_port = static_cast<std::uint16_t>(value);
+    return true;
+}
+
+template <typename MapFn>
+vk::link::TopicMap get_topic_map(MapFn& fn, float imu_rate_hz, std::size_t link)
+{
+    if constexpr (std::is_invocable_v<MapFn, float, std::size_t>) {
+        return fn(imu_rate_hz, link);
+    } else if constexpr (std::is_invocable_v<MapFn, std::size_t>) {
+        return fn(link);
+    } else {
+        return fn;
+    }
+}
 
 // Rotating motion source for level rotation about the vertical (z) axis.
 // Sweeps a full 360 deg turn over 8 seconds (from 1.0 s to 9.0 s) at 45 deg/s,
@@ -219,6 +264,8 @@ inline void init(int argc = 0, char** argv = nullptr)
             if (motion_arg == "rotate") {
                 detail::motion_mode = detail::MotionMode::Rotate;
             }
+        } else if (arg == "--udp" && i + 1 < argc) {
+            detail::parse_address(argv[++i]);
         }
     }
 }
@@ -292,6 +339,32 @@ inline vk::drivers::Icm20948& imu()
             vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
     }
     return *detail::imu_driver;
+}
+
+// Starts a Link over UDP (default 127.0.0.1:15600, or --udp <address>:<port>),
+// printing the bound port line for host test tools.
+template <typename MapFn>
+inline void start_links(MapFn&& map_fn)
+{
+    if (!detail::host_link.has_value()) {
+        if (!detail::udp_transport.open(detail::udp_address.data(), detail::udp_port)) {
+            vk::core::fail("failed to open UDP transport");
+        }
+        std::printf("link transport=udp address=%s:%u\n", detail::udp_address.data(), detail::udp_transport.port());
+        std::fflush(stdout);
+
+        auto map = detail::get_topic_map(map_fn, static_cast<float>(vk::platform::imu_rate_hz), 0);
+        detail::host_link.emplace("link0", detail::udp_transport, map,
+                                  vk::link::Link::Config{.instance = 0},
+                                  vk::core::work_queue(vk::core::WorkQueueTier::Io));
+        detail::host_link->start();
+    }
+}
+
+// Returns SITL's Link.
+inline vk::link::Link& link(std::size_t /*instance*/ = 0)
+{
+    return *detail::host_link;
 }
 
 }  // namespace example

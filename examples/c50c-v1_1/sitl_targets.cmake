@@ -6,4 +6,5 @@ set(VK_SITL_EXAMPLES
   05-bus
   06-imu
   07-magnetometer
+  08-serial-link
 )
