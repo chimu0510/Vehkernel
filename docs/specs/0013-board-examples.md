@@ -1,6 +1,6 @@
 # Spec 0013: board examples
 
-**Status**: deferred. Issue: [#156](https://github.com/chimu0510/Vehkernel/issues/156); tickets #157 to #169, with the hardware check in #169. Deferred by the maintainer at publication, on 2026-10-29: spec 0012 stays the active spec until the maintainer names this one; every ticket is left.
+**Status**: in progress. Issue: [#156](https://github.com/chimu0510/Vehkernel/issues/156); tickets #157 to #169, with the hardware check in #169. Published as deferred on 2026-10-29; named by the maintainer on 2026-11-01, while spec 0012 waits on the part of its hardware check that needs a large site.
 
 Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
 
