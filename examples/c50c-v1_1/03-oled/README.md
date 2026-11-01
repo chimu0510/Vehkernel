@@ -20,10 +20,10 @@
 - **Board**: C50C V1.1 robot controller.
 - **Display (`DISPLAY0`)**: 0.96-inch 128 x 64 monochrome OLED display module based on the SSD1306 controller (`boards/c50c-v1_1/board.toml`).
 - **Pins**: The display is connected via a 4-wire software SPI interface:
-  - `OLED_SCL` (`PB13`): SPI clock.
-  - `OLED_SDA` (`PB15`): SPI MOSI (data).
-  - `OLED_RST` (`PB14`): Active-low hardware reset.
-  - `OLED_DC` (`PB12`): Data/command select line (low for commands, high for display data).
+  - `OLED_SCL` (`PD7`): SPI clock.
+  - `OLED_SDA` (`PD6`): SPI MOSI (data).
+  - `OLED_RST` (`PD5`): Active-low hardware reset.
+  - `OLED_DC` (`PD4`): Data/command select line (low for commands, high for display data).
 - **Connection**: Connect your development host to the board's one-key download port (`SERIAL2`).
 - **Safety**: This example drives only the local OLED display. Motor outputs and actuators are not configured.
 

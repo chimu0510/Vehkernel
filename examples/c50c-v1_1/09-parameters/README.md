@@ -14,7 +14,7 @@
 - Bus communication and event notification: `vk::msg::ParameterUpdate` is published on the bus whenever a parameter value changes, allowing consumers to re-read updated values event-driven rather than polling. `vk::msg::ParameterStatus` is published periodically at 1.0 Hz on the bus and streamed over the Link, reporting active sector, bytes used, unsaved change count, pending reboot count, and boot skip counters.
 - Visualizing parameter state on the SSD1306 OLED display (`DISPLAY0`) at 4 Hz on `wq:slow` ([ADR-0022](../../../docs/adr/0022-local-display-and-local-menu.md)): parameter name, current value formatted with fixed decimal places via `Line::add_float()`, save status (`SAVED: YES` or `SAVED: NO`), bytes used in the active Flash sector, and active sector index (0 or 1).
 - Why `ATT_KP` is chosen: `ATT_KP` is an existing firmware parameter defined in [`modules/estimation/params.toml`](../../../modules/estimation/params.toml) (the Mahony attitude filter's attitude correction gain, default 1.0 1/s, range 0.0 to 10.0 1/s). Because `09-parameters` does not instantiate or run the attitude estimator or any vehicle control modules, changing `ATT_KP` changes nothing on the vehicle while the example runs.
-- **Important note on persistence**: Any parameter modified over the Link is written directly to the board's non-volatile `PARAMS` Flash sectors (or to the simulated Flash file in SITL) and persists across reboots and firmware updates. When returning to standard vehicle firmware, the changed `ATT_KP` will take effect in the firmware's attitude estimator. To restore the standard default, run `tools/link/link_monitor.py ... param set ATT_KP 1.0`.
+- **Important note on persistence**: Any parameter modified over the Link is written directly to the board's non-volatile `PARAMS` Flash sectors (or to the simulated Flash file in SITL) and persists across reboots and firmware updates. When returning to standard vehicle firmware, the changed `ATT_KP` will take effect in the firmware's attitude estimator. So set the value it held before back when you finish, as the note under *Build and flash* says.
 - What this example leaves out: vehicle control commands and commander requests (`ControlAccess`, [ADR-0005](../../../docs/adr/0005-setpoint-arbitration.md)), attitude estimators ([ADR-0014](../../../docs/adr/0014-estimation-architecture.md)), actuator control, and log recording over Link.
 - Why returning to firmware via `flash_serial.py update` restarts the board through SERIAL2's hardware download circuit: `update` attempts to request a reboot into the bootloader over the Link. The Link passes reboot requests on to the commander as a `vehicle_command`, but only when its `ControlAccess` is enabled; `09-parameters` leaves it disabled and runs no commander, so the Link ignores the request and `link_monitor.py` gets no reply, and `flash_serial.py` automatically restarts the board through SERIAL2's hardware download circuit (asserting DTR and RTS to pulse NRST with BOOT0 high). On SERIAL1, the user must power-cycle the board when prompted.
 
@@ -134,9 +134,9 @@ tools/flash/flash_serial.py --port /dev/ttyACM0 update
 As with flashing an example, when its Link reboot request gets no reply, it restarts the board through SERIAL2's download circuit. Parameter sectors (`PARAMS`) remain intact.
 
 > [!IMPORTANT]
-> The modified `ATT_KP` remains stored in Flash. If you changed `ATT_KP` during testing, restore its default value of `1.0` using `link_monitor.py`:
+> The modified `ATT_KP` remains stored in Flash and the firmware will use it. Note its value with `param get ATT_KP` before you change it, and set that value back afterwards; `1.0` is only its default, and a calibrated board may hold another:
 > ```bash
-> tools/link/link_monitor.py --serial /dev/ttyACM0 param set ATT_KP 1.0
+> tools/link/link_monitor.py --serial /dev/ttyACM0 param set ATT_KP <the value you noted>
 > ```
 
 ## What you see
@@ -170,7 +170,7 @@ The OLED screen updates at 4 Hz on `wq:slow`:
 - Line 2: Monitored parameter name: `PARAM: ATT_KP`.
 - Line 3: Parameter value: `VALUE: 1.00`, transitioning to `VALUE: 2.50` upon update.
 - Line 4: Non-volatile save status: `SAVED: YES`, transitioning briefly to `SAVED: NO` while unsaved changes are queued, returning to `SAVED: YES` once written to Flash.
-- Line 5: Flash sector utilization: `BYTES USED: 8` at initial boot (8-byte sector header), increasing to `BYTES USED: 20` once the 12-byte entry is committed.
+- Line 5: Flash sector utilization: `BYTES USED: 8` on blank Flash (8-byte sector header), increasing to `BYTES USED: 20` once the 12-byte entry is committed. A board that has run the firmware already holds its stored parameters and shows more.
 - Line 6: Active Flash sector index: `SECTOR: 0` (or `SECTOR: 1`).
 - Line 7: Blank.
 
