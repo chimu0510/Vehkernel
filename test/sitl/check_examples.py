@@ -45,12 +45,21 @@ For 09-parameters:
 - Restarts SITL on the same parameter file.
 - Reads ATT_KP back over the Link, verifying persistence across restart.
 - Verifies OLED display shows persisted value 2.50, SAVED: YES, and parameter_status reports 0 skipped entries.
+For 10-motor-outputs:
+- Runs example with key presses at 1.0, 2.2, 3.4, 4.6, 5.8, 7.0 s and power cut at 8.3 s.
+- Verifies that no applied duty on any output ever exceeds 20 % in magnitude (max_duty cap, exact 0.200).
+- Verifies that output 1 follows each commanded demand (+10 %, +20 %, -10 %, -20 %).
+- Verifies that outputs 2 to 4 stay at zero throughout the run.
+- Verifies that output 1 returns to 0 within the demand timeout bound once demand stops.
+- Verifies that every output reads 0 after actuator power is cut, within the reaction bound.
+- Verifies display_on=1 and OLED screen lines (title, STEP: 0, DEMAND: +0.00, OUTPUT 1: +0.00, POWER: OFF).
 """
 
 from __future__ import annotations
 
 import argparse
 import bisect
+from dataclasses import dataclass
 from pathlib import Path
 import re
 import select
@@ -898,6 +907,217 @@ def check_09_parameters(target: Path, msg_dir: str) -> list[str]:
     return failures
 
 
+@dataclass(frozen=True)
+class TimelineStep:
+    label: str
+    key_press_s: float | None
+    check_start_s: float
+    check_end_s: float
+    expected_demand: float
+    expected_out1: float
+    out1_tol: float = 0.02
+
+
+TIMELINE_10_MOTOR_OUTPUTS: list[TimelineStep] = [
+    TimelineStep("boot (0 %)", None, 0.4, 0.9, 0.00, 0.00, 0.005),
+    TimelineStep("step 1 (+10 %)", 1.0, 1.6, 2.1, 0.10, 0.10, 0.02),
+    TimelineStep("step 2 (+20 %)", 2.2, 2.8, 3.3, 0.20, 0.20, 0.02),
+    TimelineStep("step 3 (-10 %)", 3.4, 4.0, 4.5, -0.10, -0.10, 0.02),
+    TimelineStep("step 4 (-20 %)", 4.6, 5.2, 5.7, -0.20, -0.20, 0.02),
+    TimelineStep("step 5 (0 %, demand stopped)", 5.8, 6.4, 6.9, 0.00, 0.00, 0.005),
+    TimelineStep("step 6 (+10 %, held)", 7.0, 7.6, 8.1, 0.10, 0.10, 0.02),
+]
+POWER_CUT_TIME_10_MOTOR_OUTPUTS = 8.3
+POST_CUT_CHECK_START_10_MOTOR_OUTPUTS = 8.7
+POST_CUT_CHECK_END_10_MOTOR_OUTPUTS = 9.2
+SCENARIO_DURATION_10_MOTOR_OUTPUTS = 9.5
+
+
+def check_10_motor_outputs(
+    stdout: str,
+    stdout_lines: list[tuple[str, float]],
+    display_file: Path,
+) -> list[str]:
+    """L3 check for 10-motor-outputs (spec 0013, ADR-0005, spec 0006).
+
+    Checks:
+    - No applied duty on any output ever exceeds 20 % in magnitude (max_duty cap, exact 0.200).
+    - Output 1 follows each commanded demand (+10 %, +20 %, -10 %, -20 %).
+    - Outputs 2 to 4 stay at 0 throughout the run.
+    - Applied duty returns to 0 within the demand timeout bound once demand stops.
+    - Every output reads 0 after power cut, within the reaction bound.
+    - OLED display shows step 0, demand +0.00, output 1 +0.00, power OFF.
+    """
+    failures: list[str] = []
+
+    # Bounds taken from the code:
+    # - Cap: max_duty = 0.2F in main.cpp and vk::params::mot.out_max lowered to
+    #   std::min(mot.out_max, max_duty) in RAM before ActuatorTask starts (spec 0013, ADR-0005).
+    #   Enforced by ActuatorControl::step() clamping duty to [-loop.out_max, loop.out_max].
+    #   No tolerance is added: applied duty must never exceed 0.200 in magnitude.
+    # - Key debounce time: Debouncer::debounce_count = 3 consecutive agreeing samples
+    #   sampled every 10 ms (30 ms debounce time, from 02-user-key and main.cpp).
+    # - Speed slew rate: MOT_SLEWRATE default = 2.0 (1/s, full duty in 0.5 s, from
+    #   modules/actuators/params.toml and actuator_control.cpp). Ramping 0.10 duty
+    #   takes 50 ms; ramping 0.30 duty takes 150 ms.
+    # - Motor model lag: Motor::Config::time_constant_s = 0.1 s in sim/include/vk/sim/motor.hpp.
+    #   Within 3 time constants (0.3 s), the speed loop settles to within 5 % of target.
+    # - Setpoint timeout: COM_SP_TIMEOUT default = 0.5 s in modules/commander/params.toml.
+    #   In this example, stopping is disarmed immediately on step 5 (back to 0 %) by
+    #   publishing armed = false, returning outputs to 0 within 0.4 s (well within COM_SP_TIMEOUT).
+    # - Output watchdog interval: OutputWatchdog::periods = 3 base periods (15 ms at 200 Hz,
+    #   from hal/include/vk/hal/output_watchdog.hpp). Refreshed every cycle by ActuatorTask on wq:ctrl.
+    # - Actuator power cut reaction: power cut occurs at 8.3 s. ActuatorPowerSense reads
+    #   unpowered in 1 control cycle (5 ms, DemandItem on wq:ctrl), resetting step to 0,
+    #   publishing armed = false, and emitting demand=0.000; simulated motor power is cut
+    #   immediately in sim/src/motor.cpp; and display reports at 4 Hz (250 ms). Within 0.4 s
+    #   (by 8.7 s), every output reads 0.
+
+    MAX_DUTY_CAP = 0.200  # Exact 20 % duty, enforced by MOT_OUT_MAX clamp
+
+    # 1. Parse report entries and timestamps
+    parsed_lines: list[tuple[float, str, float]] = []
+    for line, t in stdout_lines:
+        line_str = line.strip()
+        m_dem = re.match(r"^demand=([+-]?\d+(?:\.\d+)?)", line_str)
+        if m_dem:
+            parsed_lines.append((t, "demand", float(m_dem.group(1))))
+            continue
+        m_out1 = re.match(r"^out1=([+-]?\d+(?:\.\d+)?)", line_str)
+        if m_out1:
+            parsed_lines.append((t, "out1", float(m_out1.group(1))))
+            continue
+        m_out2 = re.match(r"^out2=([+-]?\d+(?:\.\d+)?)", line_str)
+        if m_out2:
+            parsed_lines.append((t, "out2", float(m_out2.group(1))))
+            continue
+        m_out3 = re.match(r"^out3=([+-]?\d+(?:\.\d+)?)", line_str)
+        if m_out3:
+            parsed_lines.append((t, "out3", float(m_out3.group(1))))
+            continue
+        m_out4 = re.match(r"^out4=([+-]?\d+(?:\.\d+)?)", line_str)
+        if m_out4:
+            parsed_lines.append((t, "out4", float(m_out4.group(1))))
+            continue
+        m_pow = re.match(r"^power=(\d+)", line_str)
+        if m_pow:
+            parsed_lines.append((t, "power", float(m_pow.group(1))))
+            continue
+
+    if not parsed_lines:
+        failures.append("no report lines captured from SITL output")
+        return failures
+
+    t0 = parsed_lines[0][0]
+
+    # 2. Check maximum duty cap (<= 0.200 in magnitude) across all outputs with no tolerance added
+    for t, kind, val in parsed_lines:
+        if kind in ("out1", "out2", "out3", "out4"):
+            if abs(val) > MAX_DUTY_CAP:
+                failures.append(
+                    f"output {kind} exceeded 20 % duty cap: {val:.3f} at t={t - t0:.2f} s"
+                )
+
+    # 3. Check outputs 2, 3, 4 stay at 0
+    for t, kind, val in parsed_lines:
+        if kind in ("out2", "out3", "out4"):
+            if abs(val) > 1e-4:
+                failures.append(
+                    f"output {kind} was not zero: {val:.3f} at t={t - t0:.2f} s"
+                )
+
+    # 4. Check demand sequence: derived from timeline plus power cut disarm
+    expected_seq = [s.expected_demand for s in TIMELINE_10_MOTOR_OUTPUTS] + [0.00]
+    demands = [val for _, kind, val in parsed_lines if kind == "demand"]
+    if len(demands) < len(expected_seq):
+        failures.append(
+            f"expected at least {len(expected_seq)} demand transitions, got {len(demands)}: {demands}"
+        )
+    else:
+        for idx, expected in enumerate(expected_seq):
+            if abs(demands[idx] - expected) > 0.005:
+                failures.append(
+                    f"demand transition {idx}: expected {expected:.2f}, got {demands[idx]:.2f}"
+                )
+
+    # 5. Check output 1 follows each demand in steady-state windows
+    for step in TIMELINE_10_MOTOR_OUTPUTS:
+        samples = [
+            val for t, kind, val in parsed_lines
+            if kind == "out1" and step.check_start_s <= (t - t0) <= step.check_end_s
+        ]
+        if not samples:
+            failures.append(
+                f"no out1 samples in window [{step.check_start_s:.1f}, {step.check_end_s:.1f}] for {step.label}"
+            )
+        else:
+            last_sample = samples[-1]
+            if abs(last_sample - step.expected_out1) > step.out1_tol:
+                failures.append(
+                    f"{step.label}: out1 reached {last_sample:.3f}, expected {step.expected_out1:.3f} "
+                    f"(tol {step.out1_tol:.3f})"
+                )
+
+    # 6. Check power cut: every output reads 0 after power cut, power reads 0
+    post_cut_out1 = [
+        val for t, kind, val in parsed_lines
+        if kind == "out1" and (t - t0) >= POST_CUT_CHECK_START_10_MOTOR_OUTPUTS
+    ]
+    if not post_cut_out1:
+        failures.append(
+            f"no out1 samples after power cut (t >= {POST_CUT_CHECK_START_10_MOTOR_OUTPUTS:.1f} s)"
+        )
+    else:
+        for val in post_cut_out1:
+            if abs(val) > 0.005:
+                failures.append(f"out1 did not read 0 after power cut: {val:.3f}")
+                break
+
+    post_cut_powers = [
+        val for t, kind, val in parsed_lines
+        if kind == "power" and (t - t0) >= POST_CUT_CHECK_START_10_MOTOR_OUTPUTS
+    ]
+    if not post_cut_powers or any(p != 0.0 for p in post_cut_powers):
+        failures.append("power did not report 0 after power cut")
+
+    # 7. Check display_on=1 and OLED frame content
+    display_on_match = re.search(r"^display_on=(\d+)", stdout, re.MULTILINE)
+    if not display_on_match:
+        failures.append("display_on not reported in stdout")
+    elif int(display_on_match.group(1)) != 1:
+        failures.append(f"expected display_on=1, got display_on={display_on_match.group(1)}")
+
+    if not display_file.exists():
+        failures.append("SITL wrote no display image")
+    else:
+        try:
+            lines = screen_text(display_file)
+            print("display:")
+            for idx, line in enumerate(lines):
+                print(f"  [{idx}] |{line}|")
+
+            expected_lines = {
+                0: "VEHKERNEL 10-MOTORS",
+                1: "",
+                2: "STEP: 0",
+                3: ("DEMAND: ", 0.0, ""),
+                4: ("OUTPUT 1: ", 0.0, ""),
+                5: "POWER: OFF",
+                6: "",
+                7: "",
+            }
+            for line_idx, expected in expected_lines.items():
+                ok = line_matches(lines[line_idx], expected)
+                if not ok:
+                    failures.append(
+                        f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
+                    )
+        except Exception as e:
+            failures.append(f"failed to read display image: {e}")
+
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("executable", help="the example executable to run (e.g. example-03-oled)")
@@ -927,12 +1147,27 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory() as tmp:
         display_file = Path(tmp) / "display.pbm"
-        duration = 10.0 if ex_name == "07-magnetometer" else (5.0 if ex_name == "08-serial-link" else args.duration)
+        duration = (
+            10.0 if ex_name == "07-magnetometer"
+            else (5.0 if ex_name == "08-serial-link"
+                  else (SCENARIO_DURATION_10_MOTOR_OUTPUTS if ex_name == "10-motor-outputs"
+                        else args.duration))
+        )
         cmd = [str(target), "--duration", str(duration), "--display", str(display_file)]
         if ex_name == "07-magnetometer":
             cmd.extend(["--motion", "rotate"])
         if ex_name == "08-serial-link":
             cmd.extend(["--udp", "127.0.0.1:0"])
+        if ex_name == "10-motor-outputs":
+            key_times = [
+                f"{s.key_press_s:.1f}"
+                for s in TIMELINE_10_MOTOR_OUTPUTS
+                if s.key_press_s is not None
+            ]
+            cmd.extend([
+                "--key-presses", ",".join(key_times),
+                "--power-cut-at", f"{POWER_CUT_TIME_10_MOTOR_OUTPUTS:.1f}",
+            ])
 
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         stdout_lines: list[tuple[str, float]] = []
@@ -1014,6 +1249,8 @@ def main() -> int:
         elif ex_name == "08-serial-link":
             assert monitor is not None
             failures = check_08_serial_link(full_stdout, display_file, monitor, args.tolerance)
+        elif ex_name == "10-motor-outputs":
+            failures = check_10_motor_outputs(full_stdout, stdout_lines, display_file)
         else:
             failures = [f"unknown SITL example {ex_name}"]
 

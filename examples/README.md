@@ -23,6 +23,6 @@ The examples are numbered in dependency order:
 | [07-magnetometer](c50c-v1_1/07-magnetometer/README.md) | AK09916 magnetometer read through ICM20948 FIFO; OLED shows magnetic field, magnitude and heading | Yes |
 | [08-serial-link](c50c-v1_1/08-serial-link/README.md) | Custom protocol Link over serial ports SERIAL1 and SERIAL2 carrying IMU topics | Yes |
 | [09-parameters](c50c-v1_1/09-parameters/README.md) | Parameter system and storage in non-volatile Flash; value set over Link shown on OLED and kept across reset | Yes |
-| `10-motor-outputs` *(pending)* | Actuator control outputs 1 to 4 with output watchdog and power sense | Yes |
+| [10-motor-outputs](c50c-v1_1/10-motor-outputs/README.md) | Actuator control outputs 1 to 4 with output watchdog and power sense | Yes |
 | `11-wheel-encoders` *(pending)* | Quadrature encoders for motor outputs 1 to 4 and `wheel_encoders` | Yes |
 | `12-usb-gamepad` *(pending)* | USB host on CN8 and XInput gamepad publishing `manual_control_input` | No |

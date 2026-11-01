@@ -3,6 +3,7 @@
 #pragma once
 
 #include <line.hpp>
+#include <vk/actuators/actuator_task.hpp>
 #include <vk/core/bus.hpp>
 #include <vk/core/critical_section.hpp>
 #include <vk/core/parameter_storage.hpp>
@@ -11,6 +12,7 @@
 #include <vk/core/work_queue.hpp>
 #include <vk/drivers/icm20948.hpp>
 #include <vk/drivers/ssd1306.hpp>
+#include <vk/hal/actuator.hpp>
 #include <vk/hal/clock.hpp>
 #include <vk/hal/flash.hpp>
 #include <vk/hal/i2c.hpp>
@@ -64,6 +66,70 @@ inline vk::sim::NorFlash param_flash;
 inline std::array<vk::core::ParameterStorage::Slot, vk::params::count> param_slots{};
 inline vk::core::StaticInstance<vk::core::ParameterStorage> param_storage;
 inline const char* param_file = nullptr;
+
+inline vk::core::StaticInstance<vk::actuators::ActuatorTask> actuator_control;
+constexpr std::uint32_t control_interval_us = 1'000'000 / vk::platform::imu_rate_hz;
+
+inline std::array<std::uint64_t, 32> key_presses_us{};
+inline std::size_t key_press_count = 0;
+inline std::size_t next_key_press_index = 0;
+inline std::uint64_t power_cut_us = 0;
+
+inline void parse_key_presses(const char* argument)
+{
+    key_press_count = 0;
+    next_key_press_index = 0;
+    const char* p = argument;
+    while (*p != '\0' && key_press_count < key_presses_us.size()) {
+        char* end = nullptr;
+        const double time_s = std::strtod(p, &end);
+        if (end == p) {
+            break;
+        }
+        if (time_s >= 0.0) {
+            key_presses_us[key_press_count++] = static_cast<std::uint64_t>(time_s * 1e6);
+        }
+        if (*end == ',') {
+            p = end + 1;
+        } else {
+            break;
+        }
+    }
+}
+
+class ScenarioItem final : public vk::core::WorkItem {
+public:
+    static constexpr std::uint32_t interval_us = 10'000;  // 10 ms (100 Hz)
+
+    explicit ScenarioItem(vk::core::WorkQueue& queue)
+        : WorkItem("scenario", queue)
+    {
+    }
+
+    void start()
+    {
+        schedule_periodic(interval_us);
+    }
+
+protected:
+    void run() override
+    {
+        const std::uint64_t now_us = queue().now_us();
+        while (next_key_press_index < key_press_count && now_us >= key_presses_us[next_key_press_index]) {
+            vk::platform::set_user_key(true, 100'000);  // hold for 100 ms
+            ++next_key_press_index;
+        }
+        if (power_cut_us > 0 && !power_cut_done && now_us >= power_cut_us) {
+            power_cut_done = true;
+            vk::platform::set_actuator_power(false);
+        }
+    }
+
+private:
+    bool power_cut_done = false;
+};
+
+inline vk::core::StaticInstance<ScenarioItem> scenario_item;
 
 inline bool parse_address(const char* argument)
 {
@@ -278,6 +344,15 @@ inline void init(int argc = 0, char** argv = nullptr)
             detail::parse_address(argv[++i]);
         } else if (arg == "--param-file" && i + 1 < argc) {
             detail::param_file = argv[++i];
+        } else if (arg == "--key-presses" && i + 1 < argc) {
+            detail::parse_key_presses(argv[++i]);
+        } else if (arg == "--power-cut-at" && i + 1 < argc) {
+            const double cut_s = std::strtod(argv[++i], nullptr);
+            if (cut_s > 0.0) {
+                detail::power_cut_us = static_cast<std::uint64_t>(cut_s * 1e6);
+            }
+        } else if (arg == "--actuator-power-off") {
+            vk::platform::set_actuator_power(false);
         }
     }
 }
@@ -287,6 +362,12 @@ inline void init(int argc = 0, char** argv = nullptr)
 // and exits 0.
 inline void start_scheduler()
 {
+    if (detail::key_press_count > 0 || detail::power_cut_us > 0) {
+        if (!detail::scenario_item.has_value()) {
+            detail::scenario_item.emplace(vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+            detail::scenario_item->start();
+        }
+    }
     if (detail::stop_duration_us > 0) {
         vk::platform::stop_after(detail::stop_duration_us);
     }
@@ -402,6 +483,41 @@ inline void start_links(MapFn&& map_fn)
 inline vk::link::Link& link(std::size_t /*instance*/ = 0)
 {
     return *detail::host_link;
+}
+
+// Starts actuator control on outputs 1 to 4 with the output watchdog on the simulated clock (ADR-0005, spec 0006).
+inline void start_actuators()
+{
+    if (!detail::actuator_control.has_value()) {
+        detail::actuator_control.emplace(
+            vk::actuators::ActuatorTask::Config{
+                .interval_us = detail::control_interval_us,
+                .channels = vk::platform::motor_channels(),
+                .bringup = false,
+            },
+            vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+        detail::actuator_control->start();
+        vk::platform::start_output_watchdog(detail::control_interval_us);
+
+        if (detail::key_press_count > 0 || detail::power_cut_us > 0) {
+            if (!detail::scenario_item.has_value()) {
+                detail::scenario_item.emplace(vk::core::work_queue(vk::core::WorkQueueTier::Slow));
+                detail::scenario_item->start();
+            }
+        }
+    }
+}
+
+// Senses whether the simulated actuator power is on (ADR-0005).
+inline bool actuator_power()
+{
+    return vk::platform::actuator_power();
+}
+
+// Returns whether the simulated user key is pressed (spec 0013).
+inline bool user_key_pressed()
+{
+    return vk::platform::user_key_pressed();
 }
 
 }  // namespace example

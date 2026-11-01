@@ -32,11 +32,6 @@ actuator_control = "Actuator task driving motor outputs with the output watchdog
 "flash:EVENTLOG" = "event log region; no event log sink yet (ADR-0019, ADR-0020)"
 
 [pending]
-"output:1" = "10-motor-outputs"
-"output:2" = "10-motor-outputs"
-"output:3" = "10-motor-outputs"
-"output:4" = "10-motor-outputs"
-"actuator_power" = "10-motor-outputs"
 "encoder:1" = "11-wheel-encoders"
 "encoder:2" = "11-wheel-encoders"
 "encoder:3" = "11-wheel-encoders"
@@ -105,5 +100,12 @@ name = "09-parameters"
 summary = "Parameter system and storage in non-volatile Flash; value set over Link shown on OLED and kept across reset"
 introduces = ["flash:PARAMS", "parameters"]
 uses = ["link", "serial:SERIAL1", "serial:SERIAL2", "bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE"]
+sitl = true
+
+[[example]]
+name = "10-motor-outputs"
+summary = "Actuator control outputs 1 to 4 with output watchdog and power sense"
+introduces = ["output:1", "output:2", "output:3", "output:4", "actuator_power", "actuator_control"]
+uses = ["user_key", "bus", "work_queue", "device:DISPLAY0", "flash:FIRMWARE", "parameters"]
 sitl = true
 

@@ -9,8 +9,10 @@
 #include <vk/core/scheduler.hpp>
 #include <vk/core/static_instance.hpp>
 #include <vk/core/work_queue.hpp>
+#include <vk/actuators/actuator_task.hpp>
 #include <vk/drivers/icm20948.hpp>
 #include <vk/drivers/ssd1306.hpp>
+#include <vk/hal/actuator.hpp>
 #include <vk/hal/clock.hpp>
 #include <vk/hal/display_bus.hpp>
 #include <vk/hal/flash.hpp>
@@ -20,7 +22,9 @@
 #include <vk/link/topic_map.hpp>
 #include <vk/params/params.hpp>
 #include <vk/platform/dma_uart.hpp>
+#include <vk/platform/gpio.hpp>
 #include <vk/platform/internal_flash.hpp>
+#include <vk/platform/motor_output.hpp>
 #include <vk/platform/platform.hpp>
 #include <vk/platform/soft_i2c.hpp>
 #include <vk/platform/soft_spi.hpp>
@@ -91,6 +95,32 @@ struct SerialLink {
 inline SerialLink<vk::board::ports::SERIAL1> serial1_link;
 inline SerialLink<vk::board::ports::SERIAL2> serial2_link;
 
+static_assert(vk::board::actuators::count == 4, "the C50C entry point drives four motor outputs");
+inline vk::platform::MotorOutputOn<vk::board::actuators::OUTPUT1> output1;
+inline vk::platform::MotorOutputOn<vk::board::actuators::OUTPUT2> output2;
+inline vk::platform::MotorOutputOn<vk::board::actuators::OUTPUT3> output3;
+inline vk::platform::MotorOutputOn<vk::board::actuators::OUTPUT4> output4;
+inline const std::array<vk::hal::MotorChannel, 4> motor_channels{{
+    {.pwm = &output1, .direction = &output1, .encoder = &output1},
+    {.pwm = &output2, .direction = &output2, .encoder = &output2},
+    {.pwm = &output3, .direction = &output3, .encoder = &output3},
+    {.pwm = &output4, .direction = &output4, .encoder = &output4},
+}};
+inline vk::core::StaticInstance<vk::actuators::ActuatorTask> actuator_control;
+
+inline void stop_motor_outputs()
+{
+    decltype(output1)::stop();
+    decltype(output2)::stop();
+    decltype(output3)::stop();
+    decltype(output4)::stop();
+}
+
+using ActuatorPowerSense = vk::platform::InputLine<vk::board::actuator_power::pin>;
+using UserKeyLine = vk::platform::InputLine<vk::board::user_key::pin>;
+
+constexpr std::uint32_t control_interval_us = 1'000'000 / vk::board::timing::base_rate_hz;
+
 template <typename MapFn>
 vk::link::TopicMap get_topic_map(MapFn& fn, float imu_rate_hz, std::size_t link)
 {
@@ -107,10 +137,12 @@ vk::link::TopicMap get_topic_map(MapFn& fn, float imu_rate_hz, std::size_t link)
 
 // Brings up the platform: configures fault handlers, interrupt priorities,
 // the clock tree from the board definition, the microsecond clock and the
-// cycle counter (ADR-0009).
+// cycle counter (ADR-0009). Also initializes actuator power sense and user key lines.
 inline void init(int /*argc*/ = 0, char** /*argv*/ = nullptr)
 {
     vk::platform::init();
+    detail::ActuatorPowerSense::init();
+    detail::UserKeyLine::init();
 }
 
 // Starts the FreeRTOS scheduler (ADR-0004). Never returns.
@@ -200,6 +232,38 @@ inline vk::link::Link& link(std::size_t instance = 0)
         return *detail::serial1_link.link;
     }
     return *detail::serial2_link.link;
+}
+
+// Starts actuator control on outputs 1 to 4 with the output watchdog on TIM6 (ADR-0005, spec 0006).
+inline void start_actuators()
+{
+    if (!detail::actuator_control.has_value()) {
+        detail::output1.init();
+        detail::output2.init();
+        detail::output3.init();
+        detail::output4.init();
+        detail::actuator_control.emplace(
+            vk::actuators::ActuatorTask::Config{
+                .interval_us = detail::control_interval_us,
+                .channels = detail::motor_channels,
+                .bringup = false,
+            },
+            vk::core::work_queue(vk::core::WorkQueueTier::Ctrl));
+        detail::actuator_control->start();
+        vk::platform::start_output_watchdog(detail::control_interval_us, &detail::stop_motor_outputs);
+    }
+}
+
+// Senses whether the actuator power circuit is closed (PE4 on C50C, ADR-0005).
+inline bool actuator_power()
+{
+    return detail::ActuatorPowerSense::is_high() == vk::board::actuator_power::powered_high;
+}
+
+// Returns raw pressed state of user key S3 (PC5 on C50C, active low).
+inline bool user_key_pressed()
+{
+    return detail::UserKeyLine::is_high() == vk::board::user_key::pressed_high;
 }
 
 }  // namespace example

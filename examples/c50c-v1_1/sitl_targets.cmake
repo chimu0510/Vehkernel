@@ -8,4 +8,5 @@ set(VK_SITL_EXAMPLES
   07-magnetometer
   08-serial-link
   09-parameters
+  10-motor-outputs
 )
