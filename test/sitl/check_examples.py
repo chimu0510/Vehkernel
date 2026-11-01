@@ -74,6 +74,20 @@ def fixed_line_matches(line: str, prefix: str, value: float, suffix: str) -> boo
     return abs(shown - value) <= 0.006
 
 
+def line_matches(line: str, expected) -> bool:
+    """Whether a display line matches `expected`: a text, a (prefix, value, suffix) number to two
+    decimals, or a list of either.
+
+    A list holds what the last two display updates drew: SITL stops at a set time, which can fall
+    between an item's report and its next draw, so the screen may still show the previous values.
+    """
+    if isinstance(expected, list):
+        return any(line_matches(line, alternative) for alternative in expected)
+    if isinstance(expected, tuple):
+        return fixed_line_matches(line, *expected)
+    return line == expected
+
+
 def check_03_oled(stdout: str, display_file: Path, duration_s: float, tolerance: float) -> list[str]:
     failures: list[str] = []
 
@@ -127,10 +141,7 @@ def check_03_oled(stdout: str, display_file: Path, duration_s: float, tolerance:
                     7: "",
                 }
                 for line_idx, expected in expected_lines.items():
-                    if isinstance(expected, tuple):
-                        ok = fixed_line_matches(lines[line_idx], *expected)
-                    else:
-                        ok = lines[line_idx] == expected
+                    ok = line_matches(lines[line_idx], expected)
                     if not ok:
                         failures.append(
                             f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
@@ -238,18 +249,15 @@ def check_04_work_queues(
                 expected_lines = {
                     0: "VEHKERNEL 04-WQ",
                     1: "",
-                    2: f"FAST: {fast_reports[-1][0]}",
+                    2: [f"FAST: {n}" for n, _ in fast_reports[-2:]],
                     3: "",
-                    4: f"SLOW: {slow_reports[-1][0]}",
+                    4: [f"SLOW: {n}" for n, _ in slow_reports[-2:]],
                     5: "",
                     6: "",
                     7: "",
                 }
                 for line_idx, expected in expected_lines.items():
-                    if isinstance(expected, tuple):
-                        ok = fixed_line_matches(lines[line_idx], *expected)
-                    else:
-                        ok = lines[line_idx] == expected
+                    ok = line_matches(lines[line_idx], expected)
                     if not ok:
                         failures.append(
                             f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
@@ -360,18 +368,15 @@ def check_05_bus(
                 expected_lines = {
                     0: "VEHKERNEL 05-BUS",
                     1: "",
-                    2: f"COUNT: {received_reports[-1][0]}",
+                    2: [f"COUNT: {n}" for n, _ in received_reports[-2:]],
                     3: "",
-                    4: f"RECEIVED: {len(received_reports)}",
+                    4: [f"RECEIVED: {len(received_reports) - k}" for k in (0, 1)],
                     5: "",
                     6: "",
                     7: "",
                 }
                 for line_idx, expected in expected_lines.items():
-                    if isinstance(expected, tuple):
-                        ok = fixed_line_matches(lines[line_idx], *expected)
-                    else:
-                        ok = lines[line_idx] == expected
+                    ok = line_matches(lines[line_idx], expected)
                     if not ok:
                         failures.append(
                             f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
@@ -454,24 +459,18 @@ def check_06_imu(
             if not rates or not downs or not ax_reports or not ay_reports or not az_reports:
                 failures.append("cannot verify display content without reported values")
             else:
-                last_rate = int(round(rates[-1]))
-                last_down = downs[-1]
-
                 expected_lines = {
                     0: "VEHKERNEL 06-IMU",
                     1: "",
-                    2: ("AX: ", last_ax, " M/S2"),
-                    3: ("AY: ", last_ay, " M/S2"),
-                    4: ("AZ: ", last_az, " M/S2"),
-                    5: f"RATE: {last_rate} HZ",
-                    6: f"DOWN: {last_down}",
+                    2: [("AX: ", v, " M/S2") for v in ax_reports[-2:]],
+                    3: [("AY: ", v, " M/S2") for v in ay_reports[-2:]],
+                    4: [("AZ: ", v, " M/S2") for v in az_reports[-2:]],
+                    5: [f"RATE: {round(r)} HZ" for r in rates[-2:]],
+                    6: [f"DOWN: {d}" for d in downs[-2:]],
                     7: "",
                 }
                 for line_idx, expected in expected_lines.items():
-                    if isinstance(expected, tuple):
-                        ok = fixed_line_matches(lines[line_idx], *expected)
-                    else:
-                        ok = lines[line_idx] == expected
+                    ok = line_matches(lines[line_idx], expected)
                     if not ok:
                         failures.append(
                             f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
@@ -621,28 +620,18 @@ def check_07_magnetometer(
             ):
                 failures.append("cannot verify display content without reported values")
             else:
-                last_rate = int(round(rates[-1]))
-                last_bx = bx_reports[-1]
-                last_by = by_reports[-1]
-                last_bz = bz_reports[-1]
-                last_norm = norm_reports[-1]
-                last_heading = headings[-1][0]
-
                 expected_lines = {
                     0: "VEHKERNEL 07-MAG",
                     1: "",
-                    2: ("BX: ", last_bx, " UT"),
-                    3: ("BY: ", last_by, " UT"),
-                    4: ("BZ: ", last_bz, " UT"),
-                    5: ("NORM: ", last_norm, " UT"),
-                    6: f"RATE: {last_rate} HZ",
-                    7: ("HEADING: ", last_heading, " DEG"),
+                    2: [("BX: ", v, " UT") for v in bx_reports[-2:]],
+                    3: [("BY: ", v, " UT") for v in by_reports[-2:]],
+                    4: [("BZ: ", v, " UT") for v in bz_reports[-2:]],
+                    5: [("NORM: ", v, " UT") for v in norm_reports[-2:]],
+                    6: [f"RATE: {round(r)} HZ" for r in rates[-2:]],
+                    7: [("HEADING: ", h, " DEG") for h, _ in headings[-2:]],
                 }
                 for line_idx, expected in expected_lines.items():
-                    if isinstance(expected, tuple):
-                        ok = fixed_line_matches(lines[line_idx], *expected)
-                    else:
-                        ok = lines[line_idx] == expected
+                    ok = line_matches(lines[line_idx], expected)
                     if not ok:
                         failures.append(
                             f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
