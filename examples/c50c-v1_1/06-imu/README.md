@@ -104,7 +104,7 @@ At boot, the FreeRTOS scheduler starts. The ICM20948 driver initializes on `wq:c
 ### Observing sensor motion on the bench
 
 - **Level at rest**: With the board resting flat on a level bench, `AX` and `AY` are near `+0.00 M/S2` while `AZ` reads approximately `-9.81 M/S2` (the upward reaction force supporting the board against gravity). The down axis names the body axis facing the ground: `DOWN: +Z`.
-- **Tilted forward (pitch)**: Raising the front edge tilts gravity's upward reaction force towards the rear ($-x$), causing `AX` to go negative, while $+X$ tilts upward and $-X$ points downward.
+- **Front edge raised (pitch)**: Raising the front edge tilts body $+x$ upward, so the upward reaction force gains a component along $+x$ and `AX` goes positive.
 - **Tilted right (roll)**: Lowering the right edge tilts the board so body $+Y$ faces the ground; gravity's upward reaction force tilts toward $-y$ (`AY` goes negative) and the down axis names the downward-facing side (`DOWN: +Y`).
 - **Turned on its side**: Tilting the board onto its right side causes body $+Y$ to face the ground, so `AY` reads approximately `-9.81 M/S2` and the OLED displays `DOWN: +Y`. Resting the board on its front nose displays `DOWN: +X`, while turning the board upside down (wheels up) displays `DOWN: -Z`.
 
