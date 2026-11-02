@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Example 08-serial-link: Custom protocol Link over SERIAL1 and SERIAL2 carrying IMU topics; OLED shows Link status.
+// Example 07-serial-link: Custom protocol Link over SERIAL1 and SERIAL2 carrying IMU topics; OLED shows Link status.
 // ADR-0002 (bus backbone and pluggable Links), ADR-0004 (FreeRTOS), ADR-0006 (schema and wire encoding), ADR-0008 (bus and work queues), ADR-0009 (layered HAL), ADR-0022 (local display), ADR-0025 (board examples).
-// Lesson: examples/c50c-v1_1/08-serial-link/README.md
+// Lesson: examples/c50c-v1_1/07-serial-link/README.md
 #include <line.hpp>
 #include <support.hpp>
 #include <vk/core/bus.hpp>
@@ -101,7 +101,7 @@ protected:
         example::report("scale", scale);
 
         screen_.clear();
-        screen_.put(0, 0, "VEHKERNEL 08-LINK");
+        screen_.put(0, 0, "VEHKERNEL 07-LINK");
         screen_.put(2, 0, Line().add("STATE: ").add(state_name(state)).view());
         screen_.put(3, 0, Line().add("TX FRAMES: ").add(tx).view());
         screen_.put(4, 0, Line().add("RX FRAMES: ").add(rx).view());

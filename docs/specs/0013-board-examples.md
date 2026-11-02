@@ -1,6 +1,6 @@
 # Spec 0013: board examples
 
-**Status**: in progress. Issue: [#156](https://github.com/chimu0510/Vehkernel/issues/156); tickets #157 to #169, with the hardware check in #169. Published as deferred on 2026-10-29; named by the maintainer on 2026-11-01, while spec 0012 waits on the part of its hardware check that needs a large site. #157 to #168 are done; the hardware check #169 is left.
+**Status**: in progress. Issue: [#156](https://github.com/chimu0510/Vehkernel/issues/156); tickets #157 to #169 and #183, with the hardware check in #169. Published as deferred on 2026-10-29; named by the maintainer on 2026-11-01, while spec 0012 waits on the part of its hardware check that needs a large site. #157 to #168 are done; #183 and the hardware check #169 are left.
 
 Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
 
@@ -55,7 +55,7 @@ Deliver the thirteenth milestone: **an `examples/` directory with one small exam
   - `name` (`NN-name`, matching its directory, numbered from 01 without gaps in list order), a one-line `summary`;
   - `introduces` and `uses`: the components the example teaches for the first time and the ones it relies on. A component is either a board component, named as the board definition names it (`device:IMU0`, `pin:LIGHT_R`, `output:1`, `encoder:1`, `serial:SERIAL1`, `flash:PARAMS`, `user_key`, `actuator_power`), or a firmware component the file declares in its `[firmware]` table (`work_queue`, `bus`, `link`, `parameters`, `actuator_control`), each with one line of description;
   - `sitl`: true when the example also runs in SITL.
-  - An example may introduce nothing new, as `07-magnetometer` does: the AK09916 is inside `IMU0`.
+  - An example may introduce nothing new, as `08-magnetometer` does: the AK09916 is inside `IMU0`.
   - A `[not_covered]` table lists each board component no example introduces, with the reason, such as "no driver yet".
   - While the examples are written, a `[pending]` table lists the components of the examples not yet written, so that the check passes from the first ticket on; each example's ticket moves its components out of it, and the last one removes it.
 - **The L0 check** (`tools/examples/check_examples.py`, run by `ctest --preset test` on every board's `examples.toml`, with the board generator's parsed board definition):
@@ -71,8 +71,8 @@ Deliver the thirteenth milestone: **an `examples/` directory with one small exam
   4. `04-work-queues`: FreeRTOS, the work queues and work items at a rate (ADR-0004, ADR-0008); two work items at different rates count on the OLED. SITL.
   5. `05-bus`: topics, publications and subscriptions (ADR-0002, ADR-0008); one work item publishes a counter on its own queued topic, `example_counter`, in `schema/msg/`, and another on a lower work queue, woken by it, reads every sample and draws it on the OLED. SITL.
   6. `06-imu`: the software I2C and the ICM20948 driver (`IMU0`), publishing `imu_sample`; the OLED shows the specific force and the rate, and which way is down. SITL.
-  7. `07-magnetometer`: the AK09916 read through the ICM20948's FIFO and `magnetometer_sample` (spec 0012); the OLED shows the field and its heading. Its ticket is blocked by #150. SITL.
-  8. `08-serial-link`: the Link on `SERIAL1` and `SERIAL2` (ADR-0002, ADR-0006); the IMU's topics seen with `link_monitor.py` on the development host. SITL, over UDP.
+  7. `07-serial-link`: the Link on `SERIAL1` and `SERIAL2` (ADR-0002, ADR-0006); the IMU's topics seen with `link_monitor.py` on the development host. SITL, over UDP.
+  8. `08-magnetometer`: the AK09916 read through the ICM20948's FIFO and `magnetometer_sample` (spec 0012); the OLED shows the field and its heading, and `link_monitor.py mag-read` averages the field over the Link at a chosen heading. Its ticket is blocked by #150. SITL, over UDP. The two swapped during the hardware check (#183, decided with the maintainer): reading each heading by eye from a 4 Hz display was slow and imprecise, and an example may use only what an earlier one introduced. Tickets #163 and #164 name them by their old numbers.
   9. `09-parameters`: the parameter system and its storage in the `PARAMS` region (ADR-0012, ADR-0020); a parameter set over the Link is shown on the OLED and kept across a reset. SITL, on the simulated NOR Flash.
   10. `10-motor-outputs`: actuator control on outputs 1 to 4, the output watchdog and the actuator power sense (ADR-0005, spec 0006); the user key steps one output through a few demands, capped at 20 % duty by lowering `MOT_OUT_MAX` in RAM, the clamp the actuator control applies, and the outputs stop when the demand steps back to 0 or the drive power is cut. The actuator task drives only while armed and has no demand timeout, so the example publishes `arming_state` and `actuator_demand` itself, without the commander, and disarms to stop; its lesson says why the firmware never does, and that the wheels must be off the ground. SITL, on the simulated motors.
   11. `11-wheel-encoders`: the encoders of outputs 1 to 4 and `wheel_encoders`; the OLED shows each wheel's count and speed, computed from `angle` and `MOTn_CPR`, since the message has no count. On the board the wheels are turned by hand: the actuator task runs disarmed so that its encoders are read, and the example drives nothing, since `10-motor-outputs` is a separate image. SITL, where the L3 case drives the simulated motors with the support code's `--wheel-speeds`, publishing the same topics as `10-motor-outputs`.

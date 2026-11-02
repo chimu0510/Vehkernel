@@ -129,6 +129,7 @@ Explicit options and the `VK_MSG_PYTHON_DIR` and `VK_PARAM_METADATA` environment
 | Command | Guide |
 |---|---|
 | `record <file.ulg> --profile <name> [--duration <s>]` | [Logging](#logging) |
+| `mag-read [--duration <s>] [--label <name>]` | [`08-magnetometer`](../../examples/c50c-v1_1/08-magnetometer/README.md#reading-a-heading-over-the-link) |
 | `param list`, `param get <name>`, `param set <name> <value>` | [Parameters](#parameters) |
 | `mode`, `arm`, `disarm`, `estop`, `drive`, `drive-body`, `bringup motors`, `sim-power` | [Driving the wheels](driving.md) |
 | `sim-gamepad` | [Remote control](driving.md#remote-control) |

@@ -25,7 +25,7 @@
 - [`03-oled`](../03-oled/README.md): SSD1306 OLED display driver (`DISPLAY0`) on software SPI, text rendering with `TextScreen`, and `Line` buffer formatting without heap allocation ([ADR-0007](../../../docs/adr/0007-cpp20-subset.md)).
 - [`04-work-queues`](../04-work-queues/README.md): Rate-tiered FreeRTOS work queues (`wq:ctrl`, `wq:io`, `wq:slow`), periodic scheduling with `schedule_periodic()`, and cooperative scheduling within a queue.
 - [`05-bus`](../05-bus/README.md): Publish/subscribe bus backbone, schema-generated topics, `vk::core::Publication<T>`, `vk::core::Subscription<T>`, and event-driven wakeups with `trigger_on()`.
-- [`08-serial-link`](../08-serial-link/README.md): Custom protocol Link over serial ports (`SERIAL1`, `SERIAL2`) or UDP in SITL, handshake version negotiation, time synchronization, and streaming topics.
+- [`07-serial-link`](../07-serial-link/README.md): Custom protocol Link over serial ports (`SERIAL1`, `SERIAL2`) or UDP in SITL, handshake version negotiation, time synchronization, and streaming topics.
 
 ## Hardware
 
@@ -214,7 +214,7 @@ The complete source code is in `main.cpp`:
   - In SITL (`examples/support/sitl/support.hpp`), it binds `vk::sim::NorFlash` to the file passed with `--param-file <path>` (or in-memory blank Flash if omitted).
   - It constructs `vk::core::ParameterStorage` on `wq:slow`, calls `param_storage->load()` at boot (which validates headers, loads non-default values into RAM structs, and erases the spare sector), and calls `param_storage->start()` to run background Flash writes.
 - **Link parameter integration (`example::start_links`)**:
-  - Once `example::start_parameters()` has run, the support code gives each Link the parameter access the firmware gives it: the parameter set, its set hash and the storage, for the flags of each `param_value`. Without it, as in `08-serial-link`, the Link answers no parameter request.
+  - Once `example::start_parameters()` has run, the support code gives each Link the parameter access the firmware gives it: the parameter set, its set hash and the storage, for the flags of each `param_value`. Without it, as in `07-serial-link`, the Link answers no parameter request.
   - Allows `link_monitor.py param list`, `param get`, and `param set` control frames to query and update the runtime parameters.
 - **Display work item (`DisplayItem`)**:
   - Subclasses `vk::core::WorkItem("display", queue)` and attaches to `wq:slow`.

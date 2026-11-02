@@ -11,7 +11,7 @@
 - How `imu_sample` topics are declared with static circular buffers (`@queue 4`, `@instances 2`) to ensure that high-rate samples are not overwritten when consumers are preempted (ADR-0008, ADR-0015, [`schema/msg/imu_sample.msg`](../../../schema/msg/imu_sample.msg)).
 - Subscribing to `imu_sample` on `wq:ctrl` via event-driven `trigger_on()`, draining the queue with `copy()`, and sharing state safely across rate tiers using short critical sections (`vk::core::CriticalSection`, ADR-0008).
 - Rendering live specific force components, measured sample rate in Hz, and the down axis on the local SSD1306 OLED display (`DISPLAY0`) at 4 Hz on `wq:slow` (ADR-0022).
-- What this example leaves out: runtime parameter storage (`SENS_BOARD_ROT`, gyro/accel calibration, introduced in `09-parameters`), attitude estimation filters (Mahony and EKF), and the internal AK09916 magnetometer (introduced in `07-magnetometer`).
+- What this example leaves out: runtime parameter storage (`SENS_BOARD_ROT`, gyro/accel calibration, introduced in `09-parameters`), attitude estimation filters (Mahony and EKF), and the internal AK09916 magnetometer (introduced in `08-magnetometer`).
 - Simulating the IMU in SITL under FreeRTOS POSIX and verifying sample rate, down axis, and display content in automated L3 tests (ADR-0018).
 
 ## Before this
@@ -168,7 +168,7 @@ The complete source code is in `main.cpp`:
   - Formats numbers with sign, integer part, and two decimal places (e.g. `+0.00`, `-9.81`) without heap allocation (`malloc` or `new`) or `printf` (ADR-0007).
 - **What this example leaves out**:
   - The parameter system: Uses hardcoded defaults (`Rotation::None` for `SENS_BOARD_ROT`, zero calibration offsets) rather than non-volatile Flash storage (introduced in `09-parameters`).
-  - Magnetometer: Does not configure the internal AK09916 or publish `magnetometer_sample` (introduced in `07-magnetometer`).
+  - Magnetometer: Does not configure the internal AK09916 or publish `magnetometer_sample` (introduced in `08-magnetometer`).
   - Estimators: Does not run Mahony or EKF attitude estimators.
 
 ## Exercises

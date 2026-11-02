@@ -1,4 +1,4 @@
-# 08-serial-link: Custom protocol Link over serial ports SERIAL1 and SERIAL2 carrying IMU topics
+# 07-serial-link: Custom protocol Link over serial ports SERIAL1 and SERIAL2 carrying IMU topics
 
 ## What you learn
 
@@ -13,7 +13,7 @@
 - Monitoring live topics, rates, and Link health on the development host using `link_monitor.py` ([`docs/guide/link-monitor.md`](../../../docs/guide/link-monitor.md)).
 - Visualizing Link health (`link_status`) on the local SSD1306 OLED display (`DISPLAY0`) at 4 Hz on `wq:slow` (ADR-0022): connection state (`WAITING`, `CONNECTED`, `SILENT`), frame counters (`TX FRAMES`, `RX FRAMES`), buffer drops, and rate scale.
 - What this example leaves out: parameter access and storage (`ParameterAccess`, introduced in `09-parameters`), vehicle control and commander requests (`ControlAccess`, ADR-0005), attitude estimators, and log recording over Link (spec 0011).
-- Why returning to firmware via `flash_serial.py update` restarts the board through SERIAL2's hardware download circuit: `update` attempts to request a reboot into the bootloader over the Link. The Link passes reboot requests on to the commander as a `vehicle_command`, but only when its `ControlAccess` is enabled; `08-serial-link` leaves it disabled and runs no commander, so the Link ignores the request and `link_monitor.py` gets no reply, and `flash_serial.py` automatically restarts the board through SERIAL2's hardware download circuit (asserting DTR and RTS to pulse NRST with BOOT0 high). On SERIAL1, the user must power-cycle the board when prompted.
+- Why returning to firmware via `flash_serial.py update` restarts the board through SERIAL2's hardware download circuit: `update` attempts to request a reboot into the bootloader over the Link. The Link passes reboot requests on to the commander as a `vehicle_command`, but only when its `ControlAccess` is enabled; `07-serial-link` leaves it disabled and runs no commander, so the Link ignores the request and `link_monitor.py` gets no reply, and `flash_serial.py` automatically restarts the board through SERIAL2's hardware download circuit (asserting DTR and RTS to pulse NRST with BOOT0 high). On SERIAL1, the user must power-cycle the board when prompted.
 
 ## Before this
 
@@ -57,7 +57,7 @@ cmake --build --preset c50c-v1_1-examples
 Flash the compiled example (`.apj`) over the one-key download port (`SERIAL2`) using the serial flasher tool:
 
 ```bash
-tools/flash/flash_serial.py --port /dev/ttyACM0 --build build/c50c-v1_1-examples update --image build/c50c-v1_1-examples/app/examples/example-08-serial-link.apj
+tools/flash/flash_serial.py --port /dev/ttyACM0 --build build/c50c-v1_1-examples update --image build/c50c-v1_1-examples/app/examples/example-07-serial-link.apj
 ```
 
 Global options (`--port`, `--build`) go before the `update` subcommand. `flash_serial.py update` first requests a reboot into the bootloader over the Link. Because this example leaves the Link's `ControlAccess` disabled and runs no commander, the Link ignores the request and no reply comes, and `flash_serial.py` automatically restarts the board through SERIAL2's hardware download circuit (asserting DTR and RTS to pulse NRST with BOOT0 high). On SERIAL1, power-cycle the board while `update` waits (see [C50C V1.1](../../../docs/boards/c50c-v1_1.md#serial-ports)).
@@ -79,7 +79,7 @@ tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/c50c-v1_1-examp
 
 ### Running in SITL
 
-`08-serial-link` also builds and runs in SITL simulation on the development host with the `sitl-examples` preset:
+`07-serial-link` also builds and runs in SITL simulation on the development host with the `sitl-examples` preset:
 
 ```bash
 cmake --preset sitl-examples
@@ -89,7 +89,7 @@ cmake --build --preset sitl-examples
 Run the example executable directly in one terminal, specifying duration 0 (runs until interrupted) and listening for UDP connections:
 
 ```bash
-build/sitl-examples/app/examples/example-08-serial-link --duration 0 --udp 127.0.0.1:15600
+build/sitl-examples/app/examples/example-07-serial-link --duration 0 --udp 127.0.0.1:15600
 ```
 
 In a second terminal, connect with the Link monitor:
@@ -107,7 +107,7 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600 --check --duration 5 --expect-r
 To run the automated L3 scenario check in SITL:
 
 ```bash
-ctest --preset sitl-examples -R example_08_serial_link
+ctest --preset sitl-examples -R example_07_serial_link
 ```
 
 ### Returning to the firmware
@@ -124,7 +124,7 @@ As with flashing an example, when its Link reboot request gets no reply, it rest
 
 ## What you see
 
-When connected to `08-serial-link`, `link_monitor.py` completes the handshake, exchanges time synchronization, and displays a live view refreshed twice a second.
+When connected to `07-serial-link`, `link_monitor.py` completes the handshake, exchanges time synchronization, and displays a live view refreshed twice a second.
 
 With `--check`, `link_monitor.py` prints summary `key=value` lines and confirms the negotiated session:
 
@@ -144,7 +144,7 @@ mcu_link instance=0 frames_sent=1005 bytes_sent=48240 frames_received=9 bytes_re
 
 The OLED screen updates at 4 Hz on `wq:slow` using information from the `link_status` topic on the bus:
 
-- Line 0: Header text `VEHKERNEL 08-LINK`.
+- Line 0: Header text `VEHKERNEL 07-LINK`.
 - Line 1: Blank.
 - Line 2: Connection state: `STATE: WAITING` before a host connects, changing to `STATE: CONNECTED` once the handshake completes. If the host stops transmitting, the state transitions to `STATE: SILENT` after the peer timeout.
 - Line 3: Total frames transmitted by the MCU: `TX FRAMES: <count>`.

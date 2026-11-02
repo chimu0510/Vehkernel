@@ -24,18 +24,19 @@ For 06-imu:
 - Verifies reported specific force components (ax ~ 0, ay ~ 0, az ~ -9.81 m/s^2).
 - Verifies display_on=1 reported from the simulated SSD1306.
 - Verifies whole frames: line 0 title, lines 2-4 specific force, line 5 sample rate, line 6 down axis.
-For 07-magnetometer:
-- Verifies reported sample rate against 100 Hz within tolerance.
-- Verifies that reported heading tracks simulated vehicle true yaw within tolerance (3.0 deg) over a rotating motion.
-- Verifies that heading sweeps through at least most of a turn (at least 270 deg).
-- Verifies display_on=1 reported from the simulated SSD1306.
-- Verifies whole frames: line 0 title, line 1 blank, lines 2-4 magnetic field components (BX, BY, BZ), line 5 norm, line 6 sample rate, line 7 heading.
-For 08-serial-link:
+For 07-serial-link:
 - Connects over UDP to the bound port.
 - Verifies handshake succeeds.
 - Verifies reported imu_sample rate matches 200 Hz within tolerance (20 %).
 - Verifies display_on=1 reported from the simulated SSD1306.
 - Verifies whole frames: line 0 title, line 2 STATE: CONNECTED, line 3 TX FRAMES, line 4 RX FRAMES, line 5 DROPS: 0, line 6 SCALE: 100 %.
+For 08-magnetometer:
+- Runs link_monitor.py mag-read over UDP and verifies its rate, its z field against the reported one and no failures.
+- Verifies reported sample rate against 100 Hz within tolerance.
+- Verifies that reported heading tracks simulated vehicle true yaw within tolerance (3.0 deg) over a rotating motion.
+- Verifies that heading sweeps through at least most of a turn (at least 270 deg).
+- Verifies display_on=1 reported from the simulated SSD1306.
+- Verifies whole frames: line 0 title, line 1 blank, lines 2-4 magnetic field components (BX, BY, BZ), line 5 norm, line 6 sample rate, line 7 heading.
 For 09-parameters:
 - Starts SITL on a simulated NOR Flash file with UDP transport.
 - Connects over UDP and verifies handshake succeeds.
@@ -512,10 +513,97 @@ def check_06_imu(
     return failures
 
 
-def check_07_magnetometer(
+def check_07_serial_link(
+    stdout: str,
+    display_file: Path,
+    monitor,
+    tolerance: float,
+) -> list[str]:
+    failures: list[str] = []
+
+    # 1. Check handshake
+    if not monitor.connected:
+        failures.append("no handshake with SITL Link")
+
+    # 2. Check imu_sample instance 0 rate
+    imu_stats = monitor.topics.get(("imu_sample", 0))
+    if imu_stats is None or imu_stats.messages < 2:
+        failures.append("topic imu_sample:0 never arrived or arrived with too few samples")
+    else:
+        expected_rate = 200.0
+        measured_rate = imu_stats.rate_hz
+        if abs(measured_rate - expected_rate) > expected_rate * tolerance:
+            failures.append(
+                f"imu_sample:0 rate {measured_rate:.2f} Hz outside expected {expected_rate:.2f} Hz "
+                f"(tolerance {tolerance:.0%})"
+            )
+
+    # 3. Check display_on=1 reported from simulated SSD1306's displaying()
+    display_on_match = re.search(r"^display_on=(\d+)", stdout, re.MULTILINE)
+    if not display_on_match:
+        failures.append("display_on not reported in stdout")
+    elif int(display_on_match.group(1)) != 1:
+        failures.append(f"expected display_on=1, got display_on={display_on_match.group(1)}")
+
+    # 4. Judge whole frames from captured display image:
+    # line 0 title, line 2 state, line 3 tx frames, line 4 rx frames, line 5 drops, line 6 scale
+    if not display_file.exists():
+        failures.append("SITL wrote no display image")
+    else:
+        try:
+            lines = screen_text(display_file)
+            print("display:")
+            for idx, line in enumerate(lines):
+                print(f"  [{idx}] |{line}|")
+
+            expected_lines = {
+                0: "VEHKERNEL 07-LINK",
+                1: "",
+                2: "STATE: CONNECTED",
+                5: "DROPS: 0",
+                6: "SCALE: 100 %",
+                7: "",
+            }
+            for line_idx, expected in expected_lines.items():
+                if lines[line_idx] != expected:
+                    failures.append(
+                        f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
+                    )
+            if not lines[3].startswith("TX FRAMES: "):
+                failures.append(f"display line 3: expected prefix 'TX FRAMES: ', got {lines[3]!r}")
+            if not lines[4].startswith("RX FRAMES: "):
+                failures.append(f"display line 4: expected prefix 'RX FRAMES: ', got {lines[4]!r}")
+        except Exception as e:
+            failures.append(f"failed to read display image: {e}")
+
+    return failures
+
+
+# Each 09-parameters run: long enough to connect, set and see the change stored, then ends by itself.
+RUN_S = 8.0
+
+
+def check_mag_read(line: str, bz_reports: list[float], tolerance: float) -> list[str]:
+    """Judges a mag_read line. While SITL rotates, x and y average out and z alone stays."""
+    fields = dict(pair.split("=", 1) for pair in line.split()[1:] if "=" in pair)
+    if not line.startswith("mag_read ") or not {"samples", "rate_hz", "bz", "failures"} <= fields.keys():
+        return [f"no mag_read line from link_monitor.py: {line!r}"]
+    failures: list[str] = []
+    expected_rate = 100.0
+    if abs(float(fields["rate_hz"]) - expected_rate) > expected_rate * tolerance:
+        failures.append(f"mag_read rate {fields['rate_hz']} Hz outside expected {expected_rate:.2f} Hz")
+    if int(fields["failures"]) != 0:
+        failures.append(f"mag_read reports {fields['failures']} failures")
+    if bz_reports and abs(float(fields["bz"]) - sum(bz_reports) / len(bz_reports)) > 1.0:
+        failures.append(f"mag_read bz {fields['bz']} uT differs from the reported {bz_reports[-1]:.2f} uT")
+    return failures
+
+
+def check_08_magnetometer(
     stdout: str,
     stdout_lines: list[tuple[str, float]],
     display_file: Path,
+    mag_read: str,
     tolerance: float,
 ) -> list[str]:
     failures: list[str] = []
@@ -563,6 +651,7 @@ def check_07_magnetometer(
         elif m := re.match(r"^norm=([+-]?[0-9.]+)", line):
             norm_reports.append(float(m.group(1)))
 
+    failures += check_mag_read(mag_read, bz_reports, tolerance)
     if not headings:
         failures.append("no heading reported in stdout")
     if not yaws:
@@ -653,7 +742,7 @@ def check_07_magnetometer(
                 failures.append("cannot verify display content without reported values")
             else:
                 expected_lines = {
-                    0: "VEHKERNEL 07-MAG",
+                    0: "VEHKERNEL 08-MAG",
                     1: "",
                     2: [("BX: ", v, " UT") for v in bx_reports[-2:]],
                     3: [("BY: ", v, " UT") for v in by_reports[-2:]],
@@ -672,76 +761,6 @@ def check_07_magnetometer(
             failures.append(f"failed to read display image: {e}")
 
     return failures
-
-
-def check_08_serial_link(
-    stdout: str,
-    display_file: Path,
-    monitor,
-    tolerance: float,
-) -> list[str]:
-    failures: list[str] = []
-
-    # 1. Check handshake
-    if not monitor.connected:
-        failures.append("no handshake with SITL Link")
-
-    # 2. Check imu_sample instance 0 rate
-    imu_stats = monitor.topics.get(("imu_sample", 0))
-    if imu_stats is None or imu_stats.messages < 2:
-        failures.append("topic imu_sample:0 never arrived or arrived with too few samples")
-    else:
-        expected_rate = 200.0
-        measured_rate = imu_stats.rate_hz
-        if abs(measured_rate - expected_rate) > expected_rate * tolerance:
-            failures.append(
-                f"imu_sample:0 rate {measured_rate:.2f} Hz outside expected {expected_rate:.2f} Hz "
-                f"(tolerance {tolerance:.0%})"
-            )
-
-    # 3. Check display_on=1 reported from simulated SSD1306's displaying()
-    display_on_match = re.search(r"^display_on=(\d+)", stdout, re.MULTILINE)
-    if not display_on_match:
-        failures.append("display_on not reported in stdout")
-    elif int(display_on_match.group(1)) != 1:
-        failures.append(f"expected display_on=1, got display_on={display_on_match.group(1)}")
-
-    # 4. Judge whole frames from captured display image:
-    # line 0 title, line 2 state, line 3 tx frames, line 4 rx frames, line 5 drops, line 6 scale
-    if not display_file.exists():
-        failures.append("SITL wrote no display image")
-    else:
-        try:
-            lines = screen_text(display_file)
-            print("display:")
-            for idx, line in enumerate(lines):
-                print(f"  [{idx}] |{line}|")
-
-            expected_lines = {
-                0: "VEHKERNEL 08-LINK",
-                1: "",
-                2: "STATE: CONNECTED",
-                5: "DROPS: 0",
-                6: "SCALE: 100 %",
-                7: "",
-            }
-            for line_idx, expected in expected_lines.items():
-                if lines[line_idx] != expected:
-                    failures.append(
-                        f"display line {line_idx}: expected {expected!r}, got {lines[line_idx]!r}"
-                    )
-            if not lines[3].startswith("TX FRAMES: "):
-                failures.append(f"display line 3: expected prefix 'TX FRAMES: ', got {lines[3]!r}")
-            if not lines[4].startswith("RX FRAMES: "):
-                failures.append(f"display line 4: expected prefix 'RX FRAMES: ', got {lines[4]!r}")
-        except Exception as e:
-            failures.append(f"failed to read display image: {e}")
-
-    return failures
-
-
-# Each 09-parameters run: long enough to connect, set and see the change stored, then ends by itself.
-RUN_S = 8.0
 
 
 def check_09_parameters(target: Path, msg_dir: str) -> list[str]:
@@ -1437,16 +1456,16 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         display_file = Path(tmp) / "display.pbm"
         duration = (
-            10.0 if ex_name == "07-magnetometer"
-            else (5.0 if ex_name == "08-serial-link"
+            10.0 if ex_name == "08-magnetometer"
+            else (5.0 if ex_name == "07-serial-link"
                   else (SCENARIO_DURATION_10_MOTOR_OUTPUTS if ex_name == "10-motor-outputs"
                         else (SCENARIO_DURATION_11_WHEEL_ENCODERS if ex_name == "11-wheel-encoders"
                               else args.duration)))
         )
         cmd = [str(target), "--duration", str(duration), "--display", str(display_file)]
-        if ex_name == "07-magnetometer":
-            cmd.extend(["--motion", "rotate"])
-        if ex_name == "08-serial-link":
+        if ex_name == "08-magnetometer":
+            cmd.extend(["--motion", "rotate", "--udp", "127.0.0.1:0"])
+        if ex_name == "07-serial-link":
             cmd.extend(["--udp", "127.0.0.1:0"])
         if ex_name == "10-motor-outputs":
             key_times = [
@@ -1470,8 +1489,9 @@ def main() -> int:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         stdout_lines: list[tuple[str, float]] = []
         monitor = None
+        mag_read = ""
 
-        if ex_name == "08-serial-link":
+        if ex_name in ("07-serial-link", "08-magnetometer"):
             assert proc.stdout is not None
             first_line = proc.stdout.readline()
             stdout_lines.append((first_line, time.monotonic()))
@@ -1488,19 +1508,27 @@ def main() -> int:
             msg_dir = args.msg_dir
             if not msg_dir:
                 proc.kill()
-                print("FAIL: 08-serial-link needs --msg-dir, the build's generated schema Python", file=sys.stderr)
+                print(f"FAIL: {ex_name} needs --msg-dir, the build's generated schema Python", file=sys.stderr)
                 return 1
 
-            from vklink.monitor import LinkMonitor, UdpConnection, load_messages
+            if ex_name == "08-magnetometer":
+                read = subprocess.run(
+                    [sys.executable, str(REPO_ROOT / "tools" / "link" / "link_monitor.py"),
+                     "--udp", f"127.0.0.1:{port}", "--msg-dir", msg_dir, "mag-read", "--duration", "5"],
+                    capture_output=True, text=True, timeout=30, check=False)
+                mag_read = read.stdout.strip() or read.stderr.strip()
+                print(mag_read)
+            else:
+                from vklink.monitor import LinkMonitor, UdpConnection, load_messages
 
-            connection = UdpConnection("127.0.0.1", port)
-            monitor = LinkMonitor(connection, load_messages(msg_dir))
-            try:
-                if monitor.handshake(timeout_s=2.0):
-                    check_duration = max(1.0, duration - 2.0)
-                    monitor.run(check_duration)
-            finally:
-                connection.close()
+                connection = UdpConnection("127.0.0.1", port)
+                monitor = LinkMonitor(connection, load_messages(msg_dir))
+                try:
+                    if monitor.handshake(timeout_s=2.0):
+                        check_duration = max(1.0, duration - 2.0)
+                        monitor.run(check_duration)
+                finally:
+                    connection.close()
 
             out_rest, stderr = proc.communicate(timeout=30)
             for line in out_rest.splitlines(keepends=True):
@@ -1542,11 +1570,11 @@ def main() -> int:
             failures = check_05_bus(full_stdout, stdout_lines, display_file, args.tolerance)
         elif ex_name == "06-imu":
             failures = check_06_imu(full_stdout, stdout_lines, display_file, args.tolerance)
-        elif ex_name == "07-magnetometer":
-            failures = check_07_magnetometer(full_stdout, stdout_lines, display_file, args.tolerance)
-        elif ex_name == "08-serial-link":
+        elif ex_name == "08-magnetometer":
+            failures = check_08_magnetometer(full_stdout, stdout_lines, display_file, mag_read, args.tolerance)
+        elif ex_name == "07-serial-link":
             assert monitor is not None
-            failures = check_08_serial_link(full_stdout, display_file, monitor, args.tolerance)
+            failures = check_07_serial_link(full_stdout, display_file, monitor, args.tolerance)
         elif ex_name == "10-motor-outputs":
             failures = check_10_motor_outputs(full_stdout, stdout_lines, display_file)
         elif ex_name == "11-wheel-encoders":

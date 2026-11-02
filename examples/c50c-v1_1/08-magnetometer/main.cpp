@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Example 07-magnetometer: AK09916 magnetometer read through ICM20948 FIFO; OLED shows magnetic field, magnitude and heading.
-// ADR-0002 (bus backbone), ADR-0004 (FreeRTOS), ADR-0006 (schema), ADR-0008 (bus and work queues), ADR-0009 (layered HAL), ADR-0014 (estimation architecture), ADR-0015 (selectable timing), ADR-0022 (local display), ADR-0025 (board examples).
-// Lesson: examples/c50c-v1_1/07-magnetometer/README.md
+// Example 08-magnetometer: AK09916 magnetometer read through ICM20948 FIFO; OLED shows magnetic field, magnitude and heading; the Link carries the samples.
+// ADR-0002 (bus backbone and pluggable Links), ADR-0004 (FreeRTOS), ADR-0006 (schema), ADR-0008 (bus and work queues), ADR-0009 (layered HAL), ADR-0014 (estimation architecture), ADR-0015 (selectable timing), ADR-0022 (local display), ADR-0025 (board examples).
+// Lesson: examples/c50c-v1_1/08-magnetometer/README.md
 #include <line.hpp>
 #include <support.hpp>
 #include <vk/core/bus.hpp>
@@ -10,17 +10,46 @@
 #include <vk/core/work_queue.hpp>
 #include <vk/drivers/icm20948.hpp>
 #include <vk/drivers/ssd1306.hpp>
+#include <vk/link/link.hpp>
+#include <vk/link/topic_map.hpp>
 #include <vk/local_display/pages.hpp>
+#include <vk/msg/link_status.hpp>
 #include <vk/msg/magnetometer_sample.hpp>
 
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <numbers>
 
 namespace {
 
 using example::Line;
+
+constexpr vk::link::MaxRate status_rate{1.0F};
+
+// Topic map: every magnetometer sample, for link_monitor.py mag-read, plus link_status for Link health.
+struct ExampleStreams {
+    vk::link::TopicStreamOf<vk::msg::MagnetometerSample> mag{vk::link::every_sample, 0,
+                                                             vk::msg::MagnetometerSample::nominal_rate_hz};
+    std::array<vk::link::TopicStreamOf<vk::msg::LinkStatus>, vk::msg::LinkStatus::instances> links{
+        vk::link::TopicStreamOf<vk::msg::LinkStatus>{status_rate, 0},
+        vk::link::TopicStreamOf<vk::msg::LinkStatus>{status_rate, 1},
+    };
+    std::array<vk::link::TopicStream*, 1 + vk::msg::LinkStatus::instances> map{
+        &mag, &links[0], &links[1],
+    };
+};
+
+vk::link::TopicMap example_topic_map(float /*imu_rate_hz*/, std::size_t link)
+{
+    static std::array<vk::core::StaticInstance<ExampleStreams>, vk::msg::LinkStatus::instances> streams;
+    auto& instance = streams.at(link);
+    if (!instance.has_value()) {
+        instance.emplace();
+    }
+    return instance->map;
+}
 
 class MagSubscriberItem final : public vk::core::WorkItem {
 public:
@@ -124,7 +153,7 @@ protected:
         const auto display_rate = static_cast<std::uint32_t>(std::lround(rate_hz_));
 
         screen_.clear();
-        screen_.put(0, 0, "VEHKERNEL 07-MAG");
+        screen_.put(0, 0, "VEHKERNEL 08-MAG");
         screen_.put(2, 0, Line().add("BX: ").add_fixed(bx).add(" UT").view());
         screen_.put(3, 0, Line().add("BY: ").add_fixed(by).add(" UT").view());
         screen_.put(4, 0, Line().add("BZ: ").add_fixed(bz).add(" UT").view());
@@ -163,6 +192,7 @@ int main(int argc, char** argv)
     subscriber_item.emplace(ctrl_queue);
     display_item.emplace(*subscriber_item, display, slow_queue);
 
+    example::start_links(example_topic_map);
     subscriber_item->start();
     display_item->start();
     imu.start();
