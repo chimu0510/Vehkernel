@@ -11,7 +11,7 @@ import pytest
 
 from vklink import PROTOCOL_VERSION, FrameReader, McuSession, TopicDescription
 from vklink.monitor import (LinkMonitor, RateExpectation, TopicStats, UdpConnection, WorkItemOverruns, check,
-                            euler_degrees, work_item_overruns_line)
+                            euler_degrees, long_runs, work_item_overruns_line)
 from vklink.view import render
 
 SAMPLE_HASH = 0x1122334455667788
@@ -312,6 +312,31 @@ def test_work_item_overruns_count_a_run_longer_than_its_period_on_sitl():
                                 {"imu": 0, "ctrl": 0, "act": 0, "cmd": 0, "link0": 1},
                                 run_time_max={"link0": 5_510}, late_starts_are_stalls=True)
     assert tracker.judge() == ({"imu": 0, "ctrl": 0, "act": 0, "cmd": 0, "link0": 1}, 0)
+
+
+def work_item_report(name, runs, overruns, run_time_max_us):
+    """A work item's line of a SITL report, by its fields."""
+    return {"name": name, "runs": str(runs), "overruns": str(overruns), "run_time_max_us": str(run_time_max_us)}
+
+
+def test_long_runs_leave_out_a_host_stalling_sitl():
+    # As in CI run 41304168158: the host paused SITL over 13 s, and the work
+    # items' longest runs stayed far shorter than their periods.
+    report = [work_item_report("icm20948", 2580, 17, 1466), work_item_report("actuators", 2580, 17, 1072),
+              work_item_report("local_menu", 1296, 4, 406), work_item_report("mahony_attitude", 2558, 0, 54)]
+    assert long_runs(report, 13.0) == []
+
+
+def test_long_runs_name_a_work_item_that_took_its_period_or_more():
+    report = [work_item_report("icm20948", 2600, 3, 400), work_item_report("hog", 2600, 3, 5_000),
+              work_item_report("slow", 100, 1, 130_000)]
+    assert long_runs(report, 13.0) == ["hog", "slow"]
+
+
+def test_long_runs_leave_out_a_work_item_that_did_not_overrun():
+    # A triggered work item cannot overrun a period, and one that never ran has none.
+    report = [work_item_report("triggered", 10, 0, 2_000_000), work_item_report("idle", 0, 0, 0)]
+    assert long_runs(report, 13.0) == []
 
 
 def test_work_item_overruns_line_gives_the_stalls_and_the_real_overruns():

@@ -13,8 +13,10 @@ Overruns are judged over the check alone, report by report, by the Link
 monitor (vklink's WorkItemOverruns): SITL runs on a shared host, and a stall
 in the seconds around it says nothing about the Link. Nor does one interval
 in which the host paused the whole process, which shows as most work items
-at the base rate overrunning at once. A second such stall fails the check,
-as do overruns of one work item, or a few, while the others keep time.
+at the base rate overrunning at once. A second such stall fails the check
+only when a work item that overran has a run as long as its period, which the
+host's pauses do not explain (#182). Overruns of one work item, or a few,
+while the others keep time fail it too.
 
     check_link.py build/test/app/vehkernel-sitl tools/link/link_monitor.py \\
         --msg-dir build/test/generated/schema/python --duration 5 --expect-rate imu_sample:0=200
@@ -29,13 +31,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "link"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from check_report import parse_report  # noqa: E402
+from vklink.monitor import long_runs  # noqa: E402
 
 # Time SITL runs before and after the monitor's check: start-up and handshake.
 MARGIN_S = 4.0
-MAX_STALLS = 1  # host stalls set aside in one check; more fail it
+MAX_STALLS = 1  # host stalls set aside in one check; more fail it if a work item took its period
 
 
 def free_udp_port() -> int:
@@ -105,8 +109,14 @@ def main() -> int:
         failures.append("the Link monitor could not judge the work items' overruns")
     else:
         if int(judged["stalls"]) > MAX_STALLS:
-            failures.append(f"the host stalled SITL {judged['stalls']} times during the check, "
-                            f"more than {MAX_STALLS}")
+            duration_s = next((float(line.split("duration_s=")[1].split()[0]) for line in report.splitlines()
+                               if line.startswith("report ")), 0.0)  # SITL that stopped early has failed above
+            long = long_runs(work_items, duration_s)
+            if long:
+                failures.append(f"SITL stalled {judged['stalls']} times during the check, more than {MAX_STALLS}, "
+                                f"and {', '.join(long)} overran with a run as long as the period")
+            else:
+                print(f"host stalls={judged['stalls']} (no work item took its period; not counted)")
         for entry in filter(None, judged.get("overran", "").split(",")):
             name, count = entry.split(":")
             failures.append(f"work item {name} overran {count} times during the check, not in a host stall")

@@ -25,7 +25,7 @@ import tty
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
-from typing import Callable, Mapping, Protocol
+from typing import Callable, Iterable, Mapping, Protocol
 
 from .enums import GamepadButton, HandshakeState, MagnetometerFailure, MagnetometerState, MenuState
 from .frame import Frame, FrameReader, FrameType, LogDropout, LogInfo
@@ -505,6 +505,20 @@ class WorkItemOverruns:
             for name, count in counts.items():
                 overruns[name] += count
         return overruns, stalls
+
+
+def long_runs(work_items: Iterable[Mapping[str, str]], duration_s: float) -> list[str]:
+    """The work items of a SITL report that overran with a run as long as their period.
+
+    A host that pauses SITL between runs makes work items start late, not run
+    long, so stalls with no such work item are the host's. One that does take
+    its period can look like a stall too, by making the others overrun (#182).
+    The time is the wall clock's, so a pause in the middle of a run counts as
+    well: on a heavily loaded host this still fails some checks with nothing
+    wrong, the price of keeping the backstop.
+    """
+    return [item["name"] for item in work_items
+            if int(item["overruns"]) > 0 and int(item["run_time_max_us"]) * int(item["runs"]) >= duration_s * 1e6]
 
 
 def work_item_overruns_line(judged: tuple[dict[str, int], int] | None) -> str:
