@@ -10,8 +10,8 @@ import types
 import pytest
 
 from vklink import PROTOCOL_VERSION, FrameReader, McuSession, TopicDescription
-from vklink.monitor import (LinkMonitor, RateExpectation, TopicStats, UdpConnection, WorkItemOverruns, check,
-                            euler_degrees, long_runs, work_item_overruns_line)
+from vklink.monitor import (LinkMonitor, MagnetometerRead, RateExpectation, TopicStats, UdpConnection,
+                            WorkItemOverruns, check, euler_degrees, long_runs, work_item_overruns_line)
 from vklink.view import render
 
 SAMPLE_HASH = 0x1122334455667788
@@ -312,6 +312,37 @@ def test_work_item_overruns_count_a_run_longer_than_its_period_on_sitl():
                                 {"imu": 0, "ctrl": 0, "act": 0, "cmd": 0, "link0": 1},
                                 run_time_max={"link0": 5_510}, late_starts_are_stalls=True)
     assert tracker.judge() == ({"imu": 0, "ctrl": 0, "act": 0, "cmd": 0, "link0": 1}, 0)
+
+
+def magnetometer_read(*fields, rate_hz=100.0, failures=0):
+    """MagnetometerRead fed one magnetometer_sample per field, at `rate_hz`."""
+    read = MagnetometerRead()
+    for index, field in enumerate(fields):
+        read.record(types.SimpleNamespace(timestamp=5_000_000 + round(index * 1e6 / rate_hz), field=field,
+                                          failures=failures))
+    return read
+
+
+@pytest.mark.parametrize("field, heading", [((30.0, 0.0, 30.0), "0.00"), ((0.0, -30.0, 30.0), "90.00"),
+                                            ((-30.0, 0.0, 30.0), "180.00"), ((0.0, 30.0, 30.0), "-90.00")])
+def test_magnetometer_read_gives_the_lessons_headings(field, heading):
+    assert f" heading_deg={heading} " in magnetometer_read(field, field).line()
+
+
+def test_magnetometer_read_averages_the_field_and_gives_the_rate():
+    read = magnetometer_read((29.0, 1.0, 30.0), (31.0, -1.0, 30.0), rate_hz=94.0, failures=2)
+    assert read.line(label="north") == ("mag_read label=north samples=2 rate_hz=94.00 bx=30.00 by=0.00 bz=30.00 "
+                                        "norm=42.43 heading_deg=0.00 heading_spread_deg=1.97 failures=2")
+
+
+def test_magnetometer_read_averages_a_heading_across_180_degrees():
+    # Averaging the angles, +179 and -179, would give 0: the field gives 180.
+    read = magnetometer_read((-30.0, -0.5236, 30.0), (-30.0, 0.5236, 30.0))
+    assert " heading_deg=180.00 heading_spread_deg=1.00 " in read.line()
+
+
+def test_magnetometer_read_has_no_line_without_a_sample():
+    assert MagnetometerRead().line() is None
 
 
 def work_item_report(name, runs, overruns, run_time_max_us):

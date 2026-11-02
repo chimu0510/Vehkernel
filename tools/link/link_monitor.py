@@ -84,6 +84,7 @@ from vklink.frame import (  # noqa: E402
 from vklink.enums import BringupResult, GamepadButton  # noqa: E402
 from vklink.monitor import (  # noqa: E402
     LinkMonitor,
+    MagnetometerRead,
     WorkItemOverruns,
     find_matching_build_trees,
     format_build_tree_hint,
@@ -411,6 +412,23 @@ def run_record(monitor: LinkMonitor, args: argparse.Namespace) -> int:
     )
 
 
+def run_mag_read(monitor: LinkMonitor, args: argparse.Namespace) -> int:
+    read = MagnetometerRead()
+
+    def on_topic(name: str, instance: int, message: object) -> None:
+        if name == "magnetometer_sample" and instance == 0:
+            read.record(message)
+
+    monitor.listeners.append(on_topic)
+    monitor.run(args.read_duration)
+    line = read.line(args.label)
+    if line is None:
+        print(f"FAIL: no magnetometer_sample in {args.read_duration:g} s", file=sys.stderr)
+        return 1
+    print(line)
+    return 0
+
+
 def main() -> int:
     bundle = bundle_root(Path(__file__))
     if "VK_MSG_PYTHON_DIR" in os.environ:
@@ -493,6 +511,10 @@ def main() -> int:
                                  "put -- before a negative first one")
     drive_body.add_argument("--duration", dest="drive_duration", type=parse_duration, required=True,
                             metavar="SECONDS", help="seconds to send the setpoints")
+    mag_read = commands.add_parser("mag-read", help="average the magnetometer at one heading and print it once")
+    mag_read.add_argument("--duration", dest="read_duration", type=parse_duration, default=2.0, metavar="SECONDS",
+                          help="seconds to average (default 2)")
+    mag_read.add_argument("--label", help="a name for this read, such as north, printed in its line")
     record_cmd = commands.add_parser("record", help="record a log file over the Link")
     record_cmd.add_argument("file", help="output .ulg file path")
     record_cmd.add_argument("--profile", required=True, help="log profile to record (e.g. estimator_replay)")
@@ -532,6 +554,8 @@ def main() -> int:
         if monitor.session.version < PROTOCOL_VERSION:
             print(f"warning: the MCU speaks protocol version {monitor.session.version}, older than the host's "
                   f"{PROTOCOL_VERSION}; newer requests are refused", file=sys.stderr)
+        if args.command == "mag-read":
+            return run_mag_read(monitor, args)
         if args.command == "param":
             return run_param(monitor, args, metadata)
         if args.command in ("drive", "drive-body"):

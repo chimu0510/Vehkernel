@@ -507,6 +507,53 @@ class WorkItemOverruns:
         return overruns, stalls
 
 
+class MagnetometerRead:
+    """magnetometer_sample averaged over a window, for a board held at one heading (#183).
+
+    The heading comes from the mean field, not from averaging angles, which
+    would fail across +/-180 degrees. It holds for a level board, as in
+    08-magnetometer's lesson, and no calibration beyond the sample's own.
+    `heading_spread_deg` is the furthest any sample's heading was from it: a
+    large one means the board moved during the read.
+    """
+
+    def __init__(self) -> None:
+        self._fields: list[tuple[float, float, float]] = []
+        self._first_us = 0
+        self._last_us = 0
+        self._failures = 0
+
+    def record(self, sample: object) -> None:
+        """Adds one magnetometer_sample."""
+        if not self._fields:
+            self._first_us = sample.timestamp
+        self._last_us = sample.timestamp
+        self._failures = sample.failures
+        self._fields.append(tuple(sample.field))
+
+    def line(self, label: str | None = None) -> str | None:
+        """The read as a key=value line; None with no sample."""
+        if not self._fields:
+            return None
+        count = len(self._fields)
+        bx, by, bz = (sum(field[axis] for field in self._fields) / count for axis in range(3))
+        heading = _level_heading_deg(bx, by)
+        spread = max(abs((_level_heading_deg(field[0], field[1]) - heading + 180.0) % 360.0 - 180.0)
+                     for field in self._fields)
+        elapsed_us = self._last_us - self._first_us
+        rate_hz = (count - 1) * 1e6 / elapsed_us if elapsed_us > 0 else 0.0
+        prefix = "mag_read" if label is None else f"mag_read label={label}"
+        return (f"{prefix} samples={count} rate_hz={rate_hz:.2f} bx={bx:.2f} by={by:.2f} bz={bz:.2f} "
+                f"norm={math.sqrt(bx * bx + by * by + bz * bz):.2f} heading_deg={heading:.2f} "
+                f"heading_spread_deg={spread:.2f} failures={self._failures}")
+
+
+def _level_heading_deg(bx: float, by: float) -> float:
+    """Heading of a level board from its field: atan2(-y, x). Adding 0.0 turns -0.0 into 0.0, so that a board
+    facing south reads +180, not -180."""
+    return math.degrees(math.atan2(-by + 0.0, bx))
+
+
 def long_runs(work_items: Iterable[Mapping[str, str]], duration_s: float) -> list[str]:
     """The work items of a SITL report that overran with a run as long as their period.
 
