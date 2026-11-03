@@ -586,7 +586,7 @@ RUN_S = 8.0
 def check_mag_read(line: str, bz_reports: list[float], tolerance: float) -> list[str]:
     """Judges a mag_read line. While SITL rotates, x and y average out and z alone stays.
 
-    Its failures field is not judged: a host stall of about 20 ms overflows the driver's
+    Its failures field is not judged: a host stall of about 15 ms overflows the driver's
     FIFO limit and counts a failure with nothing wrong (#184). The rate catches a
     magnetometer that keeps failing.
     """
