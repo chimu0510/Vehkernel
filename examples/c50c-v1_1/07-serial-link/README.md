@@ -138,7 +138,7 @@ mcu_link instance=0 frames_sent=1005 bytes_sent=48240 frames_received=9 bytes_re
 - `link handshake=ok`: the host and MCU agreed on protocol version 5. Because this example does not include parameter storage, `params=0` and `param_set_hash=0x0000000000000000`.
 - `topic name=imu_sample`: the IMU's high-rate sensor readings arrive at 200 Hz (`rate_hz=200.00`), matching `vk::board::timing::base_rate_hz`.
 - `topic name=link_status`: MCU Link statistics published once per second (`rate_hz=1.00`).
-- `mcu_link`: reports MCU-side counters: frames and bytes sent/received, zero drops (`drops=0`), zero CRC errors, handshake state `connected`, and `rate_scale=100` (unscaled bandwidth).
+- `mcu_link`: reports MCU-side counters: frames and bytes sent/received, zero drops (`drops=0`), zero CRC errors, handshake state `connected`, and `rate_scale=100` (unscaled bandwidth). The board prints one `mcu_link` line and one `link_status` topic per Link: the Link with no cable, or no host, shows zero frames and `handshake_state=waiting`.
 
 ### Observing the SSD1306 OLED display
 

@@ -152,7 +152,7 @@ mag_read label=north samples=200 rate_hz=100.00 bx=30.00 by=0.00 bz=30.00 norm=4
 - `heading_spread_deg` is how far the furthest sample's heading was from it. A large value means the board moved during the read, or a disturbance.
 - `--label` is only a name in the line. Repeat the command with `east`, `south` and `west` at the other headings.
 
-The example does not load the stored parameters, so the field carries no calibration: expect offsets from the board's and the vehicle's own magnetism in the absolute heading.
+The example does not load the stored parameters, so the field carries no calibration: expect offsets from the board's and the vehicle's own magnetism. They move the absolute heading and also the change between headings: on the C50C V1.1, four quarter turns read 99, 153, 54 and 54 deg in one check (#169). The turning direction and the total of one turn still hold.
 
 In SITL, standard output prints report lines:
 - `heading=<deg>`, `bx=<val>`, `by=<val>`, `bz=<val>`, `norm=<val>` emitted on each display update at 4 Hz.
