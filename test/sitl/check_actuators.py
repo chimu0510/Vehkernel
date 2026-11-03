@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import statistics
 import subprocess
 import sys
 import time
@@ -134,13 +135,17 @@ def driving(output) -> bool:
 
 
 def holds_target(encoders, from_us: int) -> str | None:
-    """Why the wheels did not hold TARGET from `from_us` on, or None."""
+    """Why the wheels did not hold TARGET from `from_us` on, or None.
+
+    Judges each wheel's median speed: a host stall can leave one sample's speed
+    wrong, a count difference over the time of a different interval (#185).
+    """
     samples = [e for e in encoders if e.timestamp >= from_us]
     if not samples:
         return "no wheel_encoders sample"
-    for sample in samples:
-        if any(abs(speed - TARGET) > TARGET * TOLERANCE for speed in sample.speed):
-            return f"wheel speeds {', '.join(f'{s:.2f}' for s in sample.speed)} rad/s"
+    medians = [statistics.median(wheel) for wheel in zip(*(sample.speed for sample in samples))]
+    if any(abs(speed - TARGET) > TARGET * TOLERANCE for speed in medians):
+        return f"median wheel speeds {', '.join(f'{s:.2f}' for s in medians)} rad/s"
     return None
 
 
