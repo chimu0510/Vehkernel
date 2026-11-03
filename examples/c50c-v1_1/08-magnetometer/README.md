@@ -4,7 +4,7 @@
 
 - How the internal Asahi Kasei AK09916 3-axis magnetometer inside the ICM20948 (`IMU0`) is read over software I2C on the C50C V1.1 (ADR-0015, [`docs/boards/c50c-v1_1.md`](../../../docs/boards/c50c-v1_1.md#imu)).
 - How the ICM20948 internal I2C master configures and reads the AK09916: checks `WHO_AM_I` (`0x09` at register `0x01`) on slave 4, configures continuous measurement mode 4 at nominal 100 Hz, and reads the 9-byte measurement block (`ST1`, `HXL`, `HXH`, `HYL`, `HYH`, `HZL`, `HZH`, `TMPS`, `ST2`) via slave 0 (`drivers/icm20948/src/icm20948.cpp`, [`docs/specs/0012-ekf-attitude-and-magnetometer.md`](../../../docs/specs/0012-ekf-attitude-and-magnetometer.md#reading-the-magnetometer)).
-- Why magnetometer records are read through the ICM20948 FIFO: the master reads `ST1` to `ST2` on every cycle, and reading `ST2` clears data-ready. Reading `EXT_SLV_SENS_DATA_00` directly at 200 Hz would miss about 1 sample in 9. Transferring 9-byte records to the FIFO at 281.25 Hz (`I2C_MST_ODR_CONFIG` 2, `GYRO_SMPLRT_DIV` 3) ensures that every 100 Hz sample is read exactly once without dropping samples (spec 0012).
+- Why magnetometer records are read through the ICM20948 FIFO: the master reads `ST1` to `ST2` on every cycle, and reading `ST2` clears data-ready. Reading `EXT_SLV_SENS_DATA_00` directly at 200 Hz would miss about 1 sample in 9. Transferring 9-byte records to the FIFO at 281.25 Hz (`I2C_MST_ODR_CONFIG` 2, `GYRO_SMPLRT_DIV` 3) reads each sample once. On the board the AK09916 still skips a measurement that ends while the master reads `ST1` to `ST2`, about 6 %, so the rate is about 94 Hz rather than the nominal 100 Hz (spec 0012).
 - How the driver converts raw sensor counts to microtesla (µT) using the AK09916 sensitivity of 0.15 µT per LSB, handles AK09916 inverted axes, and maps measurements into the vehicle body frame ($x$ forward, $y$ right, $z$ down) using mounting rotation `YAW_90` and board orientation `SENS_BOARD_ROT` (ADR-0014, [`GLOSSARY.md`](../../../GLOSSARY.md#vehicles-and-hardware)).
 - Deriving the magnetic heading formula for a level board:
   - In local level NED (North-East-Down) coordinates, the Earth's magnetic field vector $\mathbf{B}$ points toward magnetic north ($B_N > 0$) with downward vertical component $B_D > 0$ in the northern hemisphere: $\mathbf{B}_{NED} = [B_N, 0, B_D]^T$.
@@ -147,7 +147,7 @@ It averages `magnetometer_sample` for two seconds (`--duration` changes that) an
 mag_read label=north samples=200 rate_hz=100.00 bx=30.00 by=0.00 bz=30.00 norm=42.43 heading_deg=0.00 heading_spread_deg=0.40 failures=0
 ```
 
-- `rate_hz` comes from the MCU's timestamps, so host scheduling does not skew it.
+- `rate_hz` comes from the MCU's timestamps, so host scheduling does not skew it. The C50C V1.1 reads about 94 Hz, as the top of this lesson explains; the 100 above is SITL's.
 - `heading_deg` comes from the mean field, by the same `atan2(-y, x)` as the OLED.
 - `heading_spread_deg` is how far the furthest sample's heading was from it. A large value means the board moved during the read, or a disturbance.
 - `--label` is only a name in the line. Repeat the command with `east`, `south` and `west` at the other headings.
