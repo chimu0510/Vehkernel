@@ -1,8 +1,8 @@
 # Spec 0013: board examples
 
-**Status**: in progress. Issue: [#156](https://github.com/chimu0510/Vehkernel/issues/156); tickets #157 to #169 and #183, with the hardware check in #169. Published as deferred on 2026-10-29; named by the maintainer on 2026-11-01, while spec 0012 waits on the part of its hardware check that needs a large site. #157 to #168 and #183 are done; the hardware check #169 is left.
+**Status**: done. Issue: [#156](https://github.com/chimu0510/Vehkernel/issues/156); tickets #157 to #169 and #183. The hardware check in [#169](https://github.com/chimu0510/Vehkernel/issues/169) confirmed it on 2026-11-03 on the maintainer's C50C V1.1, with outputs and encoders 3 and 4 recorded as not connected on that vehicle, not verified. Published as deferred on 2026-10-29; named by the maintainer on 2026-11-01, while spec 0012 waits on the part of its hardware check that needs a large site.
 
-Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
+This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 
 ## Problem Statement
 
