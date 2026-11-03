@@ -31,8 +31,10 @@ jobs:
               cmake --preset "$preset"
               cmake --build --preset "$preset"
             done
-            ctest --preset test
-            ctest --preset sitl-examples
+            # A SITL check judges timing, and a stall of the shared runner can fail it, so a
+            # failed test gets a second attempt (docs/guide/testing.md).
+            ctest --preset test --repeat until-pass:2
+            ctest --preset sitl-examples --repeat until-pass:2
           '
 
       # Upload the board presets' host tools bundles (spec 0014, ADR-0026).

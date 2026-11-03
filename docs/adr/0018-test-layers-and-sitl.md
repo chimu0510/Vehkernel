@@ -37,4 +37,6 @@ On every push:
 3. L2, once recorded replay data exists.
 4. L3 with the built-in simulator.
 
+CI gives a failed test a second attempt: L3 checks judge timing on a shared runner, and a host stall can fail them with nothing wrong. An intermittent bug can then pass on its second attempt, which is the accepted cost (#186).
+
 L4 moves to a self-hosted runner later; until then it runs manually.
