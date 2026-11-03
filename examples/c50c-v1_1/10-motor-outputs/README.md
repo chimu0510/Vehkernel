@@ -128,6 +128,7 @@ The bootloader preserves the non-volatile parameter storage (`PARAMS`), keeping 
    - **Press 4 (Step 4)**: Output 1 accelerates backward to -20 % duty (`DEMAND: -0.20`, `OUTPUT 1: -0.20`), reaching the safety cap in reverse.
    - **Press 5 (Step 0)**: Returns to Step 0 (0 % duty, `DEMAND: +0.00`). The example publishes `armed = false`; output 1 immediately coasts to a complete stop (`OUTPUT 1: +0.00`).
    - **Press 6 (Step 1)**: Re-advances to Step 1 (+10 % duty).
+   - **If the motor and its encoder disagree**: the duties above hold only while they agree under the parameter defaults. Forward here means positive duty, not the vehicle's forward. This example loads no stored parameters, so on a vehicle that stores `MOTn_ENC_REV` as `REVERSED`, the speed loop's feedback has the wrong sign and drives the duty to the cap. The C50C on a WHEELTEC vehicle with `MOT1_ENC_REV` stored as `REVERSED` read `OUTPUT 1: +0.20` at Steps 1 and 2 and `-0.20` at Steps 3 and 4 (#169). The 20 % cap, Step 0 and cutting the drive power still stop it as described.
 3. **Cutting actuator power**:
    - If connector CN6 is unplugged or switched off while motor 1 is spinning:
    - `PE4` senses the power loss within 5 ms on `wq:ctrl`.
