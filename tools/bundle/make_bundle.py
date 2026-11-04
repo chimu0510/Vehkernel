@@ -147,8 +147,8 @@ def collect_files(source_dir: Path, build_dir: Path, board: str | None) -> list[
             if not should_skip(rel):
                 entries.append((p, rel))
 
-    # 4. tools/log/compare.py, cut.py, mag_cal.py (replay.py and tests/ left out)
-    for name in ("compare.py", "cut.py", "mag_cal.py"):
+    # 4. tools/log/accel_check.py, compare.py, cut.py, mag_cal.py (replay.py and tests/ left out)
+    for name in ("accel_check.py", "compare.py", "cut.py", "mag_cal.py"):
         p = source_dir / "tools" / "log" / name
         if p.is_file():
             entries.append((p, f"tools/log/{name}"))

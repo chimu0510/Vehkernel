@@ -151,6 +151,56 @@ tools/log/mag_cal.py mag_cal.ulg --3d --apply --serial /dev/ttyACM0
 
 This fits and applies offsets and scales for all three axes (`CAL_MAG_XOFF`, `CAL_MAG_YOFF`, `CAL_MAG_ZOFF`, `CAL_MAG_XSCALE`, `CAL_MAG_YSCALE`, `CAL_MAG_ZSCALE`).
 
+### Checking board orientation (`accel_check.py`)
+
+Vehkernel checks that the board orientation parameter `SENS_BOARD_ROT` matches how the board sits in the vehicle using `tools/log/accel_check.py` (#188). The tool evaluates two stationary ULog recordings of the whole vehicle: one level, and one with the nose tilted down by at least 30°. A larger tilt gives a better check. The tool cannot tell a nose-up log from a nose-down one on a turned board (as the tool's note says, recording with the nose up instead names `YAW_180`).
+
+The check runs entirely on the development host or companion computer from recorded logs; the MCU runs no fitting routines.
+
+The whole vehicle must be completely still and held safely during both recordings, disarmed with the drive power off:
+
+1. **Record the level pose**:
+   Place the vehicle on a level surface. Keep it completely still and record for 12 seconds with the `estimator_replay` profile:
+   ```bash
+   tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/<preset>/generated/schema/python \
+       record level.ulg --profile estimator_replay --duration 12
+   ```
+
+2. **Record the nose-down pose**:
+   Tilt the vehicle nose down by 40° or more. The tool refuses under 30° between the two poses as measured, and an uncalibrated accelerometer can read about a degree less than the tilt. Hold it still and safely, and record:
+   ```bash
+   tools/link/link_monitor.py --serial /dev/ttyACM0 --msg-dir build/<preset>/generated/schema/python \
+       record nose_down.ulg --profile estimator_replay --duration 12
+   ```
+
+3. **Run the check tool**:
+   Pass both recordings to `tools/log/accel_check.py`:
+   ```bash
+   tools/log/accel_check.py level.ulg nose_down.ulg
+   ```
+
+The tool leaves out samples within 1 second of the first and last `imu_sample` timestamp in each log to eliminate motion from starting and stopping the recording, checks that the vehicle was stationary, verifies the gravity magnitude and pose separation angle, and prints summary lines for each pose:
+
+```text
+pose=level samples=1000 dropouts=0 mean=0.128,0.000,-9.806 max_accel_std=0.0120 mean_temp=25.00
+pose=nose_down samples=1000 dropouts=0 mean=-9.806,0.000,-0.128 max_accel_std=0.0120 mean_temp=25.00
+logged_rotation=NONE
+best_rotation=NONE
+fit=0.75 deg
+Logged rotation NONE fits (fit 0.8 deg).
+Note: assumes the first log was level and the second nose down: a log with the nose up instead names YAW_180, which the tool cannot tell apart.
+```
+
+The tool's exit code indicates the result:
+- **`0`**: the logged rotation is the best fit.
+- **`1`**: the logged rotation does not fit, or the check was refused (for example if the vehicle moved, the tilt angle was under 30°, the valid duration was under 5 seconds, or gravity magnitude deviated). When another rotation fits, the tool prints the command to set `SENS_BOARD_ROT`:
+  ```bash
+  tools/link/link_monitor.py --serial <port> param set SENS_BOARD_ROT PITCH_90
+  ```
+- **`2`**: a log could not be read or a usage error occurred.
+
+Because `SENS_BOARD_ROT` requires a reboot to take effect (`reboot_required`), reboot the board after changing the parameter before recording new logs. A log already shows the new parameter value while the firmware only applies it to sensor axes after a reboot, so reboot before recording. Changing `SENS_BOARD_ROT` also requires a new magnetometer calibration (see *Recalibrating after board rotation* below).
+
 ### Recalibrating after board rotation (`SENS_BOARD_ROT`)
 
 `CAL_MAG_*` parameters are defined in the **vehicle body frame** (forward, right, down). The driver applies `SENS_BOARD_ROT` before applying calibration offsets and scales.

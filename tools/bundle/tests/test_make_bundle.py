@@ -55,6 +55,8 @@ def setup_fake_source_and_build(root: Path) -> tuple[Path, Path]:
     (log_dir / "compare.py").chmod(0o755)
     (log_dir / "cut.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
     (log_dir / "cut.py").chmod(0o644)  # non-executable in repo
+    (log_dir / "accel_check.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    (log_dir / "accel_check.py").chmod(0o755)
     (log_dir / "mag_cal.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
     (log_dir / "mag_cal.py").chmod(0o755)
     (log_dir / "replay.py").write_text("#!/usr/bin/env python3\n# replay stays out\n", encoding="utf-8")
@@ -140,6 +142,7 @@ def test_make_bundle_sitl(tmp_path: Path) -> None:
         "tools/link/vklink/frame.py",
         "tools/link/vklink/cobs.py",
         "tools/log/vkulog/reader.py",
+        "tools/log/accel_check.py",
         "tools/log/compare.py",
         "tools/log/cut.py",
         "tools/log/mag_cal.py",
@@ -168,6 +171,7 @@ def test_make_bundle_sitl(tmp_path: Path) -> None:
     # Check file modes in output directory
     for script_name in (
         "tools/link/link_monitor.py",
+        "tools/log/accel_check.py",
         "tools/log/compare.py",
         "tools/log/mag_cal.py",
         "tools/flash/flash_serial.py",
@@ -207,6 +211,7 @@ def test_make_bundle_sitl(tmp_path: Path) -> None:
             rel = m.name.removeprefix("vehkernel-sitl-testcommit/")
             if rel in (
                 "tools/link/link_monitor.py",
+                "tools/log/accel_check.py",
                 "tools/log/compare.py",
                 "tools/log/mag_cal.py",
                 "tools/flash/flash_serial.py",
