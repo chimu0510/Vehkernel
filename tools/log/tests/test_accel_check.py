@@ -9,6 +9,8 @@ import re
 import struct
 import sys
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO / "tools" / "log"))
 sys.path.insert(0, str(REPO / "tools" / "link"))
@@ -167,6 +169,8 @@ def test_rotations_table_against_source():
     """Validates the 20 rotations table against drivers/params.toml and hal/include/vk/hal/rotation.hpp."""
     # 1. Parse drivers/params.toml for names and values
     toml_path = REPO / "drivers" / "params.toml"
+    if not toml_path.is_file():
+        pytest.skip("firmware sources not present: these tests run from a host tools bundle")
     text = toml_path.read_text(encoding="utf-8")
     matches = re.findall(r'\{\s*name\s*=\s*"([^"]+)",\s*value\s*=\s*(\d+)\s*\}', text)
     assert len(matches) == 20
@@ -215,7 +219,10 @@ def test_rotations_table_against_source():
                     f"eval={evaluated_col[row]}, matrix={expected}"
                 )
 
-    # 3. Check all 20 matrices are orthonormal with determinant +1 and distinct
+
+def test_rotations_table_is_20_distinct_proper_rotations():
+    """All 20 matrices are orthonormal with determinant +1 and distinct."""
+
     def det3(m: tuple[tuple[float, float, float], ...]) -> float:
         return (
             m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
