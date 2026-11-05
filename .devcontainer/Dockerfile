@@ -27,6 +27,10 @@ ARG GTEST_SHA256=65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27
 # apt maps archive.ubuntu.com and security.ubuntu.com to the snapshot service
 # but not ports.ubuntu.com, where arm64 comes from. The service keeps every
 # architecture under /ubuntu/ (it has no ubuntu-ports path), so ports maps there.
+# The service sometimes answers with HTTP 5xx for minutes. apt waits up to 30 s
+# between retries, so 20 retries cover about 8 minutes for each file. An index
+# that still fails stops apt-get update, instead of the install failing later
+# on a package it cannot find.
 ARG UBUNTU_SNAPSHOT=20261027T000000Z
 RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && case "$arch" in \
@@ -43,6 +47,8 @@ RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && mv /tmp/ubuntu.sources /etc/apt/sources.list.d/ \
     && { echo "APT::Snapshot \"${UBUNTU_SNAPSHOT}\";"; \
          echo 'Acquire::Snapshots::URI::Host::ports.ubuntu.com "https://snapshot.ubuntu.com/ubuntu/@SNAPSHOTID@/";'; \
+         echo 'Acquire::Retries "20";'; \
+         echo 'APT::Update::Error-Mode "any";'; \
        } > /etc/apt/apt.conf.d/50vk-snapshot \
     && rm -rf /var/lib/apt/lists/*
 
