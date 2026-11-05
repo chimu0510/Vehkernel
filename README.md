@@ -6,21 +6,26 @@
 **Vehkernel** (Vehicle + Kernel) is open-source MCU firmware with ROS2 support, built as a common core for any vehicle: one system drives many vehicles and frames. The MCU handles real-time state estimation, low-level control and safety, and keeps running without a companion computer; global localization and navigation are left to ROS2 applications above it. The first test platform is a UGV.
 
 > [!WARNING]
-> Vehkernel is in early development and has not been validated on a moving vehicle. It drives motors: test with the wheels off the ground, output power limited and an emergency stop within reach ([Driving the wheels](docs/guide/driving.md)). Interfaces, parameters and the wire protocol may change without notice.
+> Vehkernel is in early development. It has driven a vehicle only in short runs on the ground at limited output power, and its state estimate has not been checked over a drive ([#155](https://github.com/chimu0510/Vehkernel/issues/155)). It drives motors: test first with the wheels off the ground, output power limited and an emergency stop within reach ([Driving the wheels](docs/guide/driving.md)). Interfaces, parameters and the wire protocol may change without notice.
 
 ## Status
 
-The bootloader (spec 0008) is in progress; the hardware check of the first wheel motion (spec 0006) is deferred. What runs today, in SITL and on the C50C V1.1 unless noted:
+The EKF and the magnetometer (spec 0012) are in progress: the bench part of the hardware check is done, and the driving part waits for a large site ([#155](https://github.com/chimu0510/Vehkernel/issues/155)). Every other spec is done. What runs today, in SITL and on the C50C V1.1 unless noted:
 
 - FreeRTOS with the bus and rate-tiered work queues, and the ICM20948 driver publishing IMU samples at 200 Hz.
 - A Link with the custom protocol to the development host, over serial on the board and UDP or a pty in SITL, with the Link monitor showing every topic live.
-- A Mahony attitude estimator, checked in CI against SITL's ground truth.
+- An EKF, the default, and a Mahony filter as attitude estimators, with magnetometer calibration and heading fusion; checked in CI against SITL's ground truth, and the EKF so far only at the bench on the board.
 - Parameters defined in TOML, set over the Link or the local menu, and stored in internal Flash.
-- Modes, arming checks and an emergency stop gating four motor outputs with wheel speed loops; checked in SITL, with the board's hardware check still to come.
+- Modes, arming checks, an emergency stop and a fault stop gating four motor outputs with wheel speed loops; on the board, checked on a two-motor vehicle, with outputs and encoders 3 and 4 not connected.
+- Body velocity control with the wheeled vehicle model and local odometry.
+- A USB gamepad with the manual mode, takeover and the RC failsafe.
+- Logging over the Link in ULog, with log profiles and estimator replay.
 - The local display and local menu on the board's OLED and user key.
-- ArduPilot's app descriptor and `.apj` file, reboot into the bootloader over the Link, and the Vehkernel bootloader in S0 of the board, flashed by ArduPilot's `uploader.py` and checked against it in SITL; its hardware check is still to come.
+- ArduPilot's app descriptor and `.apj` file, reboot into the bootloader over the Link, and the Vehkernel bootloader in S0 of the board, flashed by ArduPilot's `uploader.py`.
+- [Board examples](examples/README.md) that teach the hardware one component at a time.
+- A host tools bundle for the development host and an arm64 companion computer, with the tools for magnetometer calibration and the board orientation check.
 
-Decided but not built yet: the ROS2 Bridge (`bridge/` is a placeholder), the vehicle models and the control chain above the wheel speed loops, and the ROS2 (L5) test layer (`test/ros2/` is a placeholder), and boards other than the C50C V1.1.
+Decided but not built yet: the ROS2 Bridge (`bridge/` is a placeholder), vehicle models other than the wheeled one, the ROS2 (L5) test layer (`test/ros2/` is a placeholder), and boards other than the C50C V1.1.
 
 Every decision is recorded in [`docs/adr/`](docs/adr/), each milestone in [`docs/specs/`](docs/specs/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary.
 
@@ -32,7 +37,7 @@ Vehkernel targets the boards ArduPilot and PX4 run on, and follows their convent
 |---|---|
 | MCU | STM32F407VET6 |
 | Board | C50C V1.1 (ICM20948, USB gamepad, no RS-485), the first development board ([board page](docs/boards/c50c-v1_1.md), [ADR-0024](docs/adr/0024-c50c-v1_1-board.md)) |
-| Companion computer | Raspberry Pi 5 (ROS2), planned: the Bridge does not exist yet, so the development host talks to the board over a Link with the Link monitor |
+| Companion computer | Raspberry Pi 5: the host tools bundle runs on it and talks to the board over a Link. ROS2 is planned: the Bridge does not exist yet |
 
 ## Architecture highlights
 
@@ -95,8 +100,8 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600
 | [SITL](docs/guide/sitl.md) | Options, report, motion profiles, transports |
 | [Link monitor](docs/guide/link-monitor.md) | Live view, checks, attitude, parameters |
 | [Companion computer](docs/guide/companion-computer.md) | Host tools bundle, unpacking, parameters, flashing |
-| [Estimation](docs/guide/estimation.md) | Attitude estimators, heading fusion, magnetometer calibration |
-| [Driving the wheels](docs/guide/driving.md) | Safety conditions, arming, motor bring-up, driving |
+| [Estimation](docs/guide/estimation.md) | Attitude estimators, heading fusion, magnetometer calibration, board orientation check |
+| [Driving the wheels](docs/guide/driving.md) | Safety conditions, arming, motor bring-up, driving, odometry, remote control |
 | [Local display](docs/guide/local-display.md) | Pages, user key, local menu |
 | [Logging](docs/guide/logging.md) | Recording, profiles, dropouts, opening logs, replay |
 | [Testing](docs/guide/testing.md) | Test layers, `ctest`, bring-up image, hardware checks |
