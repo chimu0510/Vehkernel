@@ -6,28 +6,15 @@
 **Vehkernel** (Vehicle + Kernel) is open-source MCU firmware with ROS2 support, built as a common core for any vehicle: one system drives many vehicles and frames. The MCU handles real-time state estimation, low-level control and safety, and keeps running without a companion computer; global localization and navigation are left to ROS2 applications above it. The first test platform is a UGV.
 
 > [!WARNING]
-> Vehkernel is in early development. It has driven a vehicle only in short runs on the ground at limited output power, and its state estimate has not been checked over a drive ([#155](https://github.com/chimu0510/Vehkernel/issues/155)). It drives motors: test first with the wheels off the ground, output power limited and an emergency stop within reach ([Driving the wheels](docs/guide/driving.md)). Interfaces, parameters and the wire protocol may change without notice.
+> Vehkernel is in early development. It has driven a vehicle only in short runs on the ground at limited output power, and its state estimate has not been checked over a drive. It drives motors: test first with the wheels off the ground, output power limited and an emergency stop within reach ([Driving the wheels](docs/guide/driving.md)). Interfaces, parameters and the wire protocol may change without notice.
 
 ## Status
 
-The EKF and the magnetometer (spec 0012) are in progress: the bench part of the hardware check is done, and the driving part waits for a large site ([#155](https://github.com/chimu0510/Vehkernel/issues/155)). Every other spec is done. What runs today, in SITL and on the C50C V1.1 unless noted:
+Built, in SITL and on the C50C V1.1: attitude estimation, body velocity control for a wheeled vehicle, a USB gamepad, a Link to the development host, logging and replay, parameters, the local display and the bootloader.
 
-- FreeRTOS with the bus and rate-tiered work queues, and the ICM20948 driver publishing IMU samples at 200 Hz.
-- A Link with the custom protocol to the development host, over serial on the board and UDP or a pty in SITL, with the Link monitor showing every topic live.
-- An EKF, the default, and a Mahony filter as attitude estimators, with magnetometer calibration and heading fusion; checked in CI against SITL's ground truth, and the EKF so far only at the bench on the board.
-- Parameters defined in TOML, set over the Link or the local menu, and stored in internal Flash.
-- Modes, arming checks, an emergency stop and a fault stop gating four motor outputs with wheel speed loops; on the board, checked on a two-motor vehicle, with outputs and encoders 3 and 4 not connected.
-- Body velocity control with the wheeled vehicle model and local odometry.
-- A USB gamepad with the manual mode, takeover and the RC failsafe.
-- Logging over the Link in ULog, with log profiles and estimator replay.
-- The local display and local menu on the board's OLED and user key.
-- ArduPilot's app descriptor and `.apj` file, reboot into the bootloader over the Link, and the Vehkernel bootloader in S0 of the board, flashed by ArduPilot's `uploader.py`.
-- [Board examples](examples/README.md) that teach the hardware one component at a time.
-- A host tools bundle for the development host and an arm64 companion computer, with the tools for magnetometer calibration and the board orientation check.
+Not built yet: the ROS2 Bridge, vehicle models other than the wheeled one, the ROS2 test layer, and boards other than the C50C V1.1.
 
-Decided but not built yet: the ROS2 Bridge (`bridge/` is a placeholder), vehicle models other than the wheeled one, the ROS2 (L5) test layer (`test/ros2/` is a placeholder), and boards other than the C50C V1.1.
-
-Every decision is recorded in [`docs/adr/`](docs/adr/), each milestone in [`docs/specs/`](docs/specs/), and [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary.
+What each milestone built and how far it was checked on hardware is in [`docs/specs/`](docs/specs/); open work is in the [issues](https://github.com/chimu0510/Vehkernel/issues).
 
 ## Target hardware
 
@@ -36,38 +23,17 @@ Vehkernel targets the boards ArduPilot and PX4 run on, and follows their convent
 | Item | Supported now |
 |---|---|
 | MCU | STM32F407VET6 |
-| Board | C50C V1.1 (ICM20948, USB gamepad, no RS-485), the first development board ([board page](docs/boards/c50c-v1_1.md), [ADR-0024](docs/adr/0024-c50c-v1_1-board.md)) |
+| Board | C50C V1.1, the first development board ([board page](docs/boards/c50c-v1_1.md)) |
 | Companion computer | Raspberry Pi 5: the host tools bundle runs on it and talks to the board over a Link. ROS2 is planned: the Bridge does not exist yet |
 
-## Architecture highlights
+## Design
 
-The design as the ADRs decide it; [Status](#status) says which parts run today.
+- **Role**: the MCU is the companion computer's real-time coprocessor and safety gatekeeper, not an autopilot.
+- **Communication**: a publish/subscribe bus is the internal backbone and ROS2 is just one Link. Messages are defined in a single schema and code is generated from it.
+- **Safety**: the mode decides who is in control and the remote control can always take over. Arming checks, an emergency stop and watchdogs guard the outputs.
+- **Vehicles**: every frame shares one control chain and differs only in its vehicle model.
 
-- **Role**: the MCU is the companion computer's real-time coprocessor and safety gatekeeper, not an autopilot ([0001](docs/adr/0001-mcu-responsibility-boundary.md)).
-- **Communication**:
-  - A publish/subscribe bus is the internal backbone and ROS2 is just one Link; a Link is made of a topic map, a protocol and a transport, all replaceable ([0002](docs/adr/0002-bus-backbone-and-pluggable-links.md)).
-  - Messages are defined in a single schema and code is generated from it ([0006](docs/adr/0006-schema-and-wire-encoding.md)).
-- **ROS2 interface**: a vehicle-level topic API with three setpoint levels; ros2_control is optional ([0003](docs/adr/0003-vehicle-level-ros2-api.md)).
-- **Safety and local operation**:
-  - The mode decides who is in control, and the remote control can always take over; arming checks, an emergency stop, an output watchdog, a fault stop and the hardware watchdog guard the outputs ([0005](docs/adr/0005-setpoint-arbitration.md)).
-  - A local display shows the vehicle's status, and its local menu changes whitelisted parameters only while disarmed ([0022](docs/adr/0022-local-display-and-local-menu.md)).
-- **Runtime**: FreeRTOS, a C++20 subset, and rate-tiered work queues ([0004](docs/adr/0004-freertos.md), [0007](docs/adr/0007-cpp20-subset.md), [0008](docs/adr/0008-bus-and-work-queues.md)).
-- **Hardware support**:
-  - Board definitions are written in TOML; the generator validates pins against the SoC database and solves DMA assignments ([0011](docs/adr/0011-toml-board-definition-toolchain.md)).
-  - The HAL picks its form of polymorphism by when each choice is made ([0009](docs/adr/0009-layered-hal.md)).
-  - Firmware updates use the ArduPilot and PX4 bootloader protocol: boards that ship with that bootloader keep it, and boards without one get a compatible Vehkernel bootloader ([0023](docs/adr/0023-bootloader.md)).
-- **Configuration**:
-  - Kconfig decides which features are compiled in; parameters decide which one is enabled at runtime ([0017](docs/adr/0017-kconfig-build-configuration.md), [0012](docs/adr/0012-parameter-system.md)).
-  - Third-party packages are allowed but must be pinned ([0016](docs/adr/0016-dependency-policy.md)).
-- **Control and estimation**:
-  - Every frame shares one control chain and differs only in its vehicle model; frames have a class and a type, and the vehicle type (ground, surface, underwater) also sets depth control and failsafe defaults ([0013](docs/adr/0013-control-chain-and-vehicle-models.md)).
-  - Estimators are replaceable, and the math components form a separate library ([0014](docs/adr/0014-estimation-architecture.md)).
-  - Timing is split into selectable dimensions ([0015](docs/adr/0015-selectable-timing.md)).
-- **Quality and observability**:
-  - Six test layers; SITL runs the same RTOS ([0018](docs/adr/0018-test-layers-and-sitl.md)).
-  - Logs use the ULog format with replaceable sinks ([0019](docs/adr/0019-logging.md)).
-  - Internal Flash is split into bootloader, parameter, event log and firmware regions, and is never erased while armed ([0020](docs/adr/0020-internal-flash-layout-and-write-policy.md)).
-- **Language**: everything in the repository is written in English ([0021](docs/adr/0021-english-project-language.md)).
+The [ADR index](docs/adr/README.md) lists every decision and why it was made.
 
 ## Quick start
 
@@ -93,23 +59,7 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600
 
 ## Documentation
 
-| Guide | Contents |
-|---|---|
-| [Building](docs/guide/building.md) | Devcontainer, host tools, presets, Kconfig |
-| [Flashing](docs/guide/flashing.md) | SWD, the serial flasher, rebooting into the bootloader |
-| [SITL](docs/guide/sitl.md) | Options, report, motion profiles, transports |
-| [Link monitor](docs/guide/link-monitor.md) | Live view, checks, attitude, parameters |
-| [Companion computer](docs/guide/companion-computer.md) | Host tools bundle, unpacking, parameters, flashing |
-| [Estimation](docs/guide/estimation.md) | Attitude estimators, heading fusion, magnetometer calibration, board orientation check |
-| [Driving the wheels](docs/guide/driving.md) | Safety conditions, arming, motor bring-up, driving, odometry, remote control |
-| [Local display](docs/guide/local-display.md) | Pages, user key, local menu |
-| [Logging](docs/guide/logging.md) | Recording, profiles, dropouts, opening logs, replay |
-| [Testing](docs/guide/testing.md) | Test layers, `ctest`, bring-up image, hardware checks |
-| [Examples](docs/guide/examples.md) | Building, flashing, SITL and lessons for the board examples |
-| [Delegating to agy](docs/guide/delegating-to-agy.md) | Sandboxing the Antigravity CLI for ticket work: install, login, checks |
-| [C50C V1.1](docs/boards/c50c-v1_1.md) | The first board: connectors, ports and wiring |
-
-The [documentation index](docs/README.md) also lists the decision records, the milestone specs and the repository layout.
+The [documentation index](docs/README.md) lists every guide, the board pages, the decision records, the milestone specs and the repository layout. [`GLOSSARY.md`](GLOSSARY.md) defines the vocabulary. To learn the hardware one component at a time, start with the [board examples](docs/guide/examples.md).
 
 ## Contributing
 

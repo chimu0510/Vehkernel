@@ -22,7 +22,7 @@ The tickets listed are the issue's sub-issues; where the two differ, the sub-iss
 
 - **Until it is done**, the file and the issue body carry the same spec. A decision changed while implementing goes into both in the same edit, into every ADR it touches, and the commit message says why. The line under the status line reads: "Until this spec is done, this file and its issue carry the same spec; update both in the same edit."
 - **Once it is done**, the spec is a record of what the milestone set out to build and is no longer edited, apart from its status line. Later decisions live in the ADRs and the code, which win where they differ. The line under the status line reads: "This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ."
-- **When its status changes**, the Status section of the [README](../../README.md) changes in the same commit: what runs today, what is in progress and what is not built yet.
+- **When it is done**, check that the Status section and the warning in the [README](../../README.md) still hold, and change them in the same commit if not. They say only what is built and what is not, so a spec's details stay out of them.
 
 ## Tickets outside a spec
 
