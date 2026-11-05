@@ -45,27 +45,18 @@
   - Bridge: WCH CH9102F USB-to-UART bridge.
   - Peripheral: `USART1`, TX `PA9`, RX `PA10` ([`docs/boards/c50c-v1_1.md`](../../../docs/boards/c50c-v1_1.md#serial-ports)).
   - Default baud rate: 921,600 baud 8N1 (`vk::board::defaults::SERIAL2_BAUD`).
-- **Display (`DISPLAY0`)**: 0.96-inch 128 x 64 monochrome OLED on software SPI (`PD7` SCL, `PD6` SDA, `PD5` RST, `PD4` DC).
+- **Display (`DISPLAY0`)**: the SSD1306 OLED of [`03-oled`](../03-oled/README.md#hardware).
 - **Safety**: Motors and actuator outputs remain unconfigured and inactive.
 
 ## Build and flash
 
 ### Building for the board
 
-Build the example with the `c50c-v1_1-examples` preset inside the development container:
-
-```bash
-cmake --preset c50c-v1_1-examples
-cmake --build --preset c50c-v1_1-examples
-```
-
-Flash the compiled example (`.apj`) over the one-key download port (`SERIAL2`) using the serial flasher tool:
+Build with the `c50c-v1_1-examples` preset, then flash this example's image ([Board examples](../../../docs/guide/examples.md#flashing-an-example)):
 
 ```bash
 tools/flash/flash_serial.py --port /dev/ttyACM0 --build build/c50c-v1_1-examples update --image build/c50c-v1_1-examples/app/examples/example-09-parameters.apj
 ```
-
-Global options (`--port`, `--build`) precede the `update` subcommand. `flash_serial.py update` attempts to request a reboot into the bootloader over the Link. Because this example leaves `ControlAccess` disabled and runs no commander, the Link ignores the request and no reply comes, and `flash_serial.py` automatically restarts the board through SERIAL2's hardware download circuit (asserting DTR and RTS to pulse NRST with BOOT0 high). On SERIAL1, power-cycle the board when prompted.
 
 ### Connecting with the Link monitor on the board
 
@@ -95,12 +86,7 @@ tools/link/link_monitor.py --serial /dev/ttyACM0 \
 
 ### Running in SITL
 
-`09-parameters` builds and runs in SITL simulation on the development host with the `sitl-examples` preset:
-
-```bash
-cmake --preset sitl-examples
-cmake --build --preset sitl-examples
-```
+`09-parameters` also runs on the development host with the `sitl-examples` preset ([Running in SITL](../../../docs/guide/examples.md#running-in-sitl)).
 
 Run the example executable directly in one terminal, specifying duration 0 (runs until interrupted), listening for UDP connections, and backing parameter storage with a file:
 
@@ -115,23 +101,7 @@ tools/link/link_monitor.py --udp 127.0.0.1:15600 param get ATT_KP
 tools/link/link_monitor.py --udp 127.0.0.1:15600 param set ATT_KP 2.5
 ```
 
-To run the automated L3 scenario check in SITL:
-
-```bash
-ctest --preset sitl-examples -R example_09_parameters
-```
-
-### Returning to the firmware
-
-When finished with this example, return the board to standard vehicle firmware:
-
-```bash
-cmake --preset c50c-v1_1
-cmake --build --preset c50c-v1_1
-tools/flash/flash_serial.py --port /dev/ttyACM0 update
-```
-
-As with flashing an example, when its Link reboot request gets no reply, it restarts the board through SERIAL2's download circuit. Parameter sectors (`PARAMS`) remain intact.
+When finished, [return to the firmware](../../../docs/guide/examples.md#returning-to-the-firmware).
 
 > [!IMPORTANT]
 > The modified `ATT_KP` remains stored in Flash and the firmware will use it. Note its value with `param get ATT_KP` before you change it, and set that value back afterwards; `1.0` is only its default, and a calibrated board may hold another:

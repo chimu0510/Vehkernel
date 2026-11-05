@@ -50,11 +50,7 @@
   - Bus address: `0x68`.
   - AK09916 internal I2C address: `0x0C` (accessed through ICM20948 master slave 0 and slave 4).
   - Mounting rotation: `YAW_90` relative to the board forward axis ([`docs/boards/c50c-v1_1.md`](../../../docs/boards/c50c-v1_1.md#imu)).
-- **Display (`DISPLAY0`)**: 0.96-inch 128 x 64 monochrome OLED display based on the SSD1306 controller, connected via software SPI:
-  - `OLED_SCL` (`PD7`): SPI clock line.
-  - `OLED_SDA` (`PD6`): SPI MOSI line.
-  - `OLED_RST` (`PD5`): Active-low reset line.
-  - `OLED_DC` (`PD4`): Data/command select line.
+- **Display (`DISPLAY0`)**: the SSD1306 OLED of [`03-oled`](../03-oled/README.md#hardware).
 - **Connection**: Connect your development host to the board's one-key download port (`SERIAL2`).
 - **Safety**: Motor outputs and actuators remain unconfigured and inactive.
 
@@ -62,37 +58,15 @@
 
 ### Building for the board
 
-Build the example with the `c50c-v1_1-examples` preset inside the development container:
-
-```bash
-cmake --preset c50c-v1_1-examples
-cmake --build --preset c50c-v1_1-examples
-```
-
-Flash the compiled example (`.apj`) over the one-key download port using the serial flasher tool:
+Build with the `c50c-v1_1-examples` preset, then flash this example's image ([Board examples](../../../docs/guide/examples.md#flashing-an-example)):
 
 ```bash
 tools/flash/flash_serial.py --port /dev/ttyACM0 --build build/c50c-v1_1-examples update --image build/c50c-v1_1-examples/app/examples/example-08-magnetometer.apj
 ```
 
-Global options (`--port`, `--build`) go before the `update` subcommand. This example's Link has no control access, so it ignores `update`'s reboot request, and `update` restarts the board through `SERIAL2`'s download circuit instead; on `SERIAL1` the user must power-cycle the board while `update` waits (see [C50C V1.1](../../../docs/boards/c50c-v1_1.md#serial-ports)).
-
-When finished with this example, return the board to standard firmware:
-
-```bash
-cmake --preset c50c-v1_1
-cmake --build --preset c50c-v1_1
-tools/flash/flash_serial.py --port /dev/ttyACM0 update
-```
-
 ### Running in SITL
 
-`08-magnetometer` also builds and runs on your development host in SITL simulation with the `sitl-examples` preset:
-
-```bash
-cmake --preset sitl-examples
-cmake --build --preset sitl-examples
-```
+`08-magnetometer` also runs on the development host with the `sitl-examples` preset ([Running in SITL](../../../docs/guide/examples.md#running-in-sitl)).
 
 Run the example executable directly, specifying duration, rotating motion, the Link's UDP address, and capturing the display output:
 
@@ -106,11 +80,7 @@ In a second terminal, read the field over the Link. While SITL rotates, the hori
 tools/link/link_monitor.py --udp 127.0.0.1:15600 --msg-dir build/sitl-examples/generated/schema/python mag-read --duration 5
 ```
 
-To run the automated L3 scenario check in SITL:
-
-```bash
-ctest --preset sitl-examples
-```
+When finished, [return to the firmware](../../../docs/guide/examples.md#returning-to-the-firmware).
 
 ## What you see
 

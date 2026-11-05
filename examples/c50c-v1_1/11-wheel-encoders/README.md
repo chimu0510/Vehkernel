@@ -50,29 +50,15 @@
 
 ### Building for the board
 
-Build the example using the `c50c-v1_1-examples` preset inside the development container:
-
-```bash
-cmake --preset c50c-v1_1-examples
-cmake --build --preset c50c-v1_1-examples
-```
-
-Flash the compiled example (`.apj`) over the one-key download port (`SERIAL2`) using the serial flasher tool:
+Build with the `c50c-v1_1-examples` preset, then flash this example's image ([Board examples](../../../docs/guide/examples.md#flashing-an-example)):
 
 ```bash
 tools/flash/flash_serial.py --port /dev/ttyACM0 --build build/c50c-v1_1-examples update --image build/c50c-v1_1-examples/app/examples/example-11-wheel-encoders.apj
 ```
 
-Because this example runs no Link and no commander, `flash_serial.py update` restarts the board through SERIAL2's hardware auto-download circuit (pulsing NRST with BOOT0 asserted).
-
 ### Running in SITL
 
-`11-wheel-encoders` compiles and runs on the development host using the `sitl-examples` preset:
-
-```bash
-cmake --preset sitl-examples
-cmake --build --preset sitl-examples
-```
+`11-wheel-encoders` also runs on the development host with the `sitl-examples` preset ([Running in SITL](../../../docs/guide/examples.md#running-in-sitl)).
 
 Run the SITL executable directly, specifying run duration, display capture path, and simulated wheel speeds:
 
@@ -83,23 +69,7 @@ build/sitl-examples/app/examples/example-11-wheel-encoders \
     --wheel-speeds 3,-6,9,-12
 ```
 
-To run the automated L3 scenario test in CI:
-
-```bash
-ctest --preset sitl-examples -R example_11_wheel_encoders
-```
-
-### Returning to the firmware
-
-When finished testing, restore the standard vehicle firmware:
-
-```bash
-cmake --preset c50c-v1_1
-cmake --build --preset c50c-v1_1
-tools/flash/flash_serial.py --port /dev/ttyACM0 update
-```
-
-The bootloader preserves the non-volatile parameter storage (`PARAMS`), keeping all sensor and actuator calibrations intact.
+When finished, [return to the firmware](../../../docs/guide/examples.md#returning-to-the-firmware).
 
 ## What you see
 

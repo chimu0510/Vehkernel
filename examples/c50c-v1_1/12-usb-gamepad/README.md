@@ -20,28 +20,15 @@
 
 ## Build and flash
 
-Build the example with the `c50c-v1_1-examples` preset inside the development container:
-
-```bash
-cmake --preset c50c-v1_1-examples
-cmake --build --preset c50c-v1_1-examples
-```
-
-Flash its `.apj` over the one-key download port:
+Build with the `c50c-v1_1-examples` preset, then flash this example's image ([Board examples](../../../docs/guide/examples.md#flashing-an-example)):
 
 ```bash
 tools/flash/flash_serial.py --port /dev/ttyACM0 --build build/c50c-v1_1-examples update --image build/c50c-v1_1-examples/app/examples/example-12-usb-gamepad.apj
 ```
 
-This example runs no Link, so `update` restarts the board through `SERIAL2`'s download circuit, or waits for a power cycle on `SERIAL1`. It does not run in SITL: its subject is the USB host, which SITL replaces with a simulated gamepad ([SITL](../../../docs/guide/sitl.md)).
+It does not run in SITL: its subject is the USB host, which SITL replaces with a simulated gamepad ([SITL](../../../docs/guide/sitl.md)).
 
-To go back to the firmware:
-
-```bash
-cmake --preset c50c-v1_1
-cmake --build --preset c50c-v1_1
-tools/flash/flash_serial.py --port /dev/ttyACM0 update
-```
+When finished, [return to the firmware](../../../docs/guide/examples.md#returning-to-the-firmware).
 
 ## What you see
 

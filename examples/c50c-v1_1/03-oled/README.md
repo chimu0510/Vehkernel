@@ -31,37 +31,15 @@
 
 ### Building for the board
 
-Build the example with the `c50c-v1_1-examples` preset inside the development container:
-
-```bash
-cmake --preset c50c-v1_1-examples
-cmake --build --preset c50c-v1_1-examples
-```
-
-Flash the compiled example (`.apj`) over the one-key download port using the serial flasher tool:
+Build with the `c50c-v1_1-examples` preset, then flash this example's image ([Board examples](../../../docs/guide/examples.md#flashing-an-example)):
 
 ```bash
 tools/flash/flash_serial.py --port /dev/ttyACM0 --build build/c50c-v1_1-examples update --image build/c50c-v1_1-examples/app/examples/example-03-oled.apj
 ```
 
-Global options (`--port`, `--build`) go before the `update` subcommand. An example runs no Link, so `update` finds no Link to ask and restarts the board through `SERIAL2`'s download circuit instead; on `SERIAL1` the user must power-cycle the board while `update` waits (see [C50C V1.1](../../../docs/boards/c50c-v1_1.md#serial-ports)).
-
-When finished with this example, return the board to the standard firmware using the default build:
-
-```bash
-cmake --preset c50c-v1_1
-cmake --build --preset c50c-v1_1
-tools/flash/flash_serial.py --port /dev/ttyACM0 update
-```
-
 ### Running in SITL
 
-`03-oled` also builds and runs on your development host in SITL simulation with the `sitl-examples` preset:
-
-```bash
-cmake --preset sitl-examples
-cmake --build --preset sitl-examples
-```
+`03-oled` also runs on the development host with the `sitl-examples` preset ([Running in SITL](../../../docs/guide/examples.md#running-in-sitl)).
 
 Run the example executable directly, specifying a run duration and a file to capture the display image:
 
@@ -69,11 +47,7 @@ Run the example executable directly, specifying a run duration and a file to cap
 build/sitl-examples/app/examples/example-03-oled --duration 3 --display /tmp/display.pbm
 ```
 
-To run the automated L3 scenario check in SITL:
-
-```bash
-ctest --preset sitl-examples
-```
+When finished, [return to the firmware](../../../docs/guide/examples.md#returning-to-the-firmware).
 
 ## What you see
 

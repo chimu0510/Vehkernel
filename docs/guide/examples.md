@@ -39,7 +39,7 @@ Examples are flashed over the bootloader using the serial flasher tool ([Flashin
 tools/flash/flash_serial.py --port /dev/ttyACM0 --build build/c50c-v1_1-examples update --image build/c50c-v1_1-examples/app/examples/example-01-led.apj
 ```
 
-Global options (`--port`, `--build`) go before the `update` subcommand. An example runs no Link, so `update` finds no Link to ask and restarts the board through SERIAL2's download circuit instead; on SERIAL1 the user must power-cycle the board while `update` waits (see [C50C V1.1](../boards/c50c-v1_1.md#serial-ports)).
+Global options (`--port`, `--build`) go before the `update` subcommand. An example runs no Link, or a Link with no control access that ignores the request, so `update` gets no reply and restarts the board through SERIAL2's download circuit instead; on SERIAL1 the user must power-cycle the board while `update` waits (see [C50C V1.1](../boards/c50c-v1_1.md#serial-ports)).
 
 Because examples share the board's Flash layout and Kconfig parameters, flashing an example leaves the parameter sectors (`PARAMS`) untouched.
 
@@ -58,10 +58,11 @@ The build compiles the SITL examples with clang-tidy into host executables under
 build/sitl-examples/app/examples/example-03-oled --duration 3 --display /tmp/display.pbm
 ```
 
-To run the automated L3 scenario checks for every SITL example:
+To run the automated L3 scenario checks for every SITL example, or for one with `-R`:
 
 ```bash
 ctest --preset sitl-examples
+ctest --preset sitl-examples -R example_07_serial_link
 ```
 
 ## Returning to the firmware
@@ -74,4 +75,4 @@ cmake --build --preset c50c-v1_1
 tools/flash/flash_serial.py --port /dev/ttyACM0 update
 ```
 
-As with flashing an example, when returning from an example that runs no Link, `update` restarts the board through SERIAL2's download circuit (or waits for a power-cycle on SERIAL1). Since parameter storage is preserved across updates, all vehicle calibration and runtime parameters are retained.
+As with flashing an example, when the running example does not answer the Link's reboot request, `update` restarts the board through SERIAL2's download circuit (or waits for a power-cycle on SERIAL1). Since parameter storage is preserved across updates, all vehicle calibration and runtime parameters are retained.

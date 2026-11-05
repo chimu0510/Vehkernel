@@ -3,9 +3,9 @@
 ## What you learn
 
 - How actuator control operates as the final execution stage of the Vehkernel control stack ([ADR-0013](../../../docs/adr/0013-control-chain-and-vehicle-models.md), [spec 0006](../../../docs/specs/0006-first-wheel-motion.md)):
-  - Motor outputs: drives four independent DC motor H-bridges via timer PWM and dual direction GPIO lines (`OUTPUT1` to `OUTPUT4`). On the STM32F407, TIM8 provides 4-channel PWM at `MOT_PWM_FREQ` (10 kHz default), paired with quadrature encoders on TIM2 through TIM5 ([`boards/c50c-v1_1/board.toml`](../../../boards/c50c-v1_1/board.toml)).
+  - Motor outputs: drives four independent DC motor H-bridges via timer PWM and dual direction GPIO lines (`OUTPUT1` to `OUTPUT4`). On the STM32F407, TIM8 provides 4-channel PWM at `MOT_PWM_FREQ`, paired with quadrature encoders on TIM2 through TIM5 ([`boards/c50c-v1_1/board.toml`](../../../boards/c50c-v1_1/board.toml)).
   - Wheel speed PI control loops: [`vk::actuators::ActuatorControl`](../../../modules/actuators/include/vk/actuators/actuator_control.hpp) closes an independent speed loop per wheel based on encoder pulse rate differences. Targets are clamped to `MOT_MAX_SPD` (30.0 rad/s default). The duty is computed as `MOT_SPD_FF * target + MOT_SPD_P * error + integral` and clamped to `MOT_OUT_MAX` (0.3 default), with anti-windup clamping to prevent integrator saturation.
-  - Slew rate limiting: `MOT_SLEWRATE` (default 2.0 1/s, full duty change in 0.5 s) bounds the rate of change of output duty to protect gearboxes and limit current surges. Stopping (transition to zero or disarmed) is never slew-limited and takes effect immediately.
+  - Slew rate limiting: `MOT_SLEWRATE` bounds the rate of change of output duty to protect gearboxes and limit current surges. Stopping (transition to zero or disarmed) is never slew-limited and takes effect immediately.
   - Work item execution: [`vk::actuators::ActuatorTask`](../../../modules/actuators/include/vk/actuators/actuator_task.hpp) runs periodically on `wq:ctrl` at the base control rate (200 Hz, 5000 µs interval).
 - The three-tier output safety architecture ([ADR-0005](../../../docs/adr/0005-setpoint-arbitration.md)):
   - **Output watchdog** ([`vk::hal::OutputWatchdog`](../../../hal/include/vk/hal/output_watchdog.hpp)): runs on a dedicated high-priority hardware timer interrupt (TIM6 on STM32F4, at interrupt priority 2 above FreeRTOS) or a high-priority task in SITL. If `ActuatorTask` stalls and fails to refresh outputs within 3 base control periods (15 ms), the output watchdog trips and shuts down all motor channels directly via hardware registers without using FreeRTOS or the bus.
@@ -13,7 +13,7 @@
   - **Actuator power sense**: physical sensing of the actuator supply circuit on `PE4` (`ACT_POWER_SENSE`, active high). Arming requires power to read continuously present for 0.5 s; losing power while armed disarms in that very cycle to prevent motor runaway or integrator windup against unpowered wheels.
 - Demand conversion and safety cap:
   - This example commands wheel speeds through `vk::msg::ActuatorDemand` ([`actuator_demand.msg`](../../../schema/msg/actuator_demand.msg)). With the feedforward gain `MOT_SPD_FF = 0.02 s/rad` matching the full scale speed of 50.0 rad/s (`1.0 / 0.02 = 50.0`), commanded duty is converted directly to target wheel speed: `target_speed = duty * 50.0F`.
-  - Clamping only the speed target is not enough: the speed loop's PI term can drive the duty higher (up to `MOT_OUT_MAX`, default 0.3). The duty limit enforced by actuator control is `MOT_OUT_MAX`, read from `vk::params::mot.out_max` on every run (`modules/actuators/src/actuator_task.cpp`).
+  - Clamping only the speed target is not enough: the speed loop's PI term can drive the duty higher (up to `MOT_OUT_MAX`). The duty limit enforced by actuator control is `MOT_OUT_MAX`, read from `vk::params::mot.out_max` on every run (`modules/actuators/src/actuator_task.cpp`).
   - Before the actuator task starts, `main.cpp` lowers `vk::params::mot.out_max` in RAM to `std::min(vk::params::mot.out_max, max_duty)`, with `max_duty = 0.2F` as the named constant, ensuring the speed loop's own clamp bounds the applied duty to 20 % in either direction. Commanded step duty in `main.cpp` is clamped to the same constant.
   - **Non-persistent RAM parameters**: This RAM value is never stored in Flash because the example starts no parameter storage (`example::start_parameters()` is not called). For the same reason, the example runs with the parameters' compiled-in defaults, not the calibrated values stored on the board (e.g. motor reversal, encoder counts, speed loop gains), so a motor may turn the other way than under the firmware; the duty cap holds either way.
 - Why this example feeds the actuator task directly in place of the commander, and why the firmware never does that:
@@ -21,7 +21,7 @@
   - `ActuatorTask` requires an armed state (`armed = true` in `ArmingState`) to enable its speed loops and drive PWM outputs. In this example, `main.cpp` feeds `ActuatorTask` directly without instantiating the commander module, mode state machine, or Link communications. To satisfy `ActuatorTask`'s safety interlock, `main.cpp` publishes `ArmingState` with `armed = true` while a non-zero demand step is active, and `armed = false` when demand stops or power is cut. The firmware never does this: allowing arbitrary modules to claim armed state would bypass setpoint arbitration, mode validation, and safety interlocks.
 - What stops the outputs when demand stops:
   - In this example, the outputs stop because the example publishes `armed = false` (both on the step back to 0 and when actuator power is cut).
-  - As verified by the source code (`actuator_task.cpp` and `output_watchdog.hpp`), `ActuatorTask` has no internal demand timeout—in production firmware, setpoint timeout (`COM_SP_TIMEOUT = 0.5 s`) is strictly enforced by `CommanderTask`, which disarms the vehicle.
+  - `ActuatorTask` has no internal demand timeout—in production firmware, setpoint timeout (`COM_SP_TIMEOUT`) is strictly enforced by `CommanderTask`, which disarms the vehicle.
   - Furthermore, because `ActuatorTask` runs periodically at 200 Hz on `wq:ctrl` and refreshes the output watchdog on every cycle, the output watchdog acts only if `wq:ctrl` stalls or crashes; it does not trip when setpoint publications merely cease.
   - If demand were left published while armed, `ActuatorTask` would keep driving the motors indefinitely. This is one key reason why production firmware never permits application modules to publish `arming_state` directly.
 - Monitoring actuator state:
@@ -54,29 +54,15 @@
 
 ### Building for the board
 
-Build the example using the `c50c-v1_1-examples` preset inside the development container:
-
-```bash
-cmake --preset c50c-v1_1-examples
-cmake --build --preset c50c-v1_1-examples
-```
-
-Flash the compiled example (`.apj`) over the one-key download port (`SERIAL2`) using the serial flasher tool:
+Build with the `c50c-v1_1-examples` preset, then flash this example's image ([Board examples](../../../docs/guide/examples.md#flashing-an-example)):
 
 ```bash
 tools/flash/flash_serial.py --port /dev/ttyACM0 --build build/c50c-v1_1-examples update --image build/c50c-v1_1-examples/app/examples/example-10-motor-outputs.apj
 ```
 
-Because this example runs no Link and no commander, `flash_serial.py update` restarts the board through SERIAL2's hardware auto-download circuit (pulsing NRST with BOOT0 asserted).
-
 ### Running in SITL
 
-`10-motor-outputs` compiles and runs on the development host using the `sitl-examples` preset:
-
-```bash
-cmake --preset sitl-examples
-cmake --build --preset sitl-examples
-```
+`10-motor-outputs` also runs on the development host with the `sitl-examples` preset ([Running in SITL](../../../docs/guide/examples.md#running-in-sitl)).
 
 Run the SITL executable directly, specifying run duration, simulated key presses, and a power cut time:
 
@@ -88,23 +74,7 @@ build/sitl-examples/app/examples/example-10-motor-outputs \
     --power-cut-at 8.3
 ```
 
-To run the automated L3 scenario test in CI:
-
-```bash
-ctest --preset sitl-examples -R example_10_motor_outputs
-```
-
-### Returning to the firmware
-
-When finished testing, restore the standard vehicle firmware:
-
-```bash
-cmake --preset c50c-v1_1
-cmake --build --preset c50c-v1_1
-tools/flash/flash_serial.py --port /dev/ttyACM0 update
-```
-
-The bootloader preserves the non-volatile parameter storage (`PARAMS`), keeping all sensor calibrations intact.
+When finished, [return to the firmware](../../../docs/guide/examples.md#returning-to-the-firmware).
 
 ## What you see
 
