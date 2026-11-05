@@ -19,6 +19,7 @@ jobs:
           submodules: true
 
       - name: Build devcontainer image
+        timeout-minutes: 30
         run: docker build -t vehkernel-dev -f .devcontainer/Dockerfile .
 
       - name: Build presets, run L0 checks and host tests
