@@ -1,6 +1,6 @@
 # Spec 0006: first wheel motion
 
-**Status**: done. Issue: [#43](https://github.com/chimu0510/Vehkernel/issues/43); tickets #44 to #50. The hardware check in #50 confirmed it on the C50C V1.1 on 2026-10-25, on a two-motor vehicle (outputs 1 and 2), after the fault stop of #81; its oscilloscope readings of the PWM frequency and slew rate moved to #101.
+**Status**: done. Issue: [#43](https://github.com/chimu0510/VehKernel/issues/43); tickets #44 to #50. The hardware check in #50 confirmed it on the C50C V1.1 on 2026-10-25, on a two-motor vehicle (outputs 1 and 2), after the fault stop of #81; its oscilloscope readings of the PWM frequency and slew rate moved to #101.
 
 This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 

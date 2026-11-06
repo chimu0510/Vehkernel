@@ -13,7 +13,7 @@ Thank you for helping. This page covers how work is proposed, how it is built an
 Everything that affects build output is pinned in the development container's image, and `cmake` and `ctest` run inside it, never on the host ([ADR-0016](docs/adr/0016-dependency-policy.md)). Clone with submodules, then open the repository in VS Code Dev Containers or run each command through Docker, as [Building](docs/guide/building.md#development-environment) shows:
 
 ```bash
-git clone --recurse-submodules https://github.com/chimu0510/Vehkernel.git
+git clone --recurse-submodules https://github.com/chimu0510/VehKernel.git
 ```
 
 [Building](docs/guide/building.md) lists the presets and the host tools needed for flashing. You do not need hardware to contribute: SITL runs the complete firmware on the development host ([SITL](docs/guide/sitl.md)).

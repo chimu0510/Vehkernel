@@ -13,10 +13,10 @@ Vehkernel has no releases yet. Only the `main` branch is supported; fixes land t
 - A way to write Flash or flash firmware that bypasses the documented paths ([ADR-0020](docs/adr/0020-internal-flash-layout-and-write-policy.md), [ADR-0023](docs/adr/0023-bootloader.md)).
 - Secrets or third-party material that should not be in the repository.
 
-Ordinary bugs, including control or estimation bugs that need a deliberate configuration error to trigger, go in a public [bug report](https://github.com/chimu0510/Vehkernel/issues/new/choose).
+Ordinary bugs, including control or estimation bugs that need a deliberate configuration error to trigger, go in a public [bug report](https://github.com/chimu0510/VehKernel/issues/new/choose).
 
 ## How to report
 
-Use GitHub's [private vulnerability reporting](https://github.com/chimu0510/Vehkernel/security/advisories/new). Include the commit, the board or SITL, the steps or input that trigger it, and what happens. Please do not disclose the issue publicly until a fix is on `main`.
+Use GitHub's [private vulnerability reporting](https://github.com/chimu0510/VehKernel/security/advisories/new). Include the commit, the board or SITL, the steps or input that trigger it, and what happens. Please do not disclose the issue publicly until a fix is on `main`.
 
 You will get an acknowledgement within 7 days. Once the issue is confirmed, the fix is developed in a private advisory and the advisory is published with the fix, crediting you unless you prefer otherwise.

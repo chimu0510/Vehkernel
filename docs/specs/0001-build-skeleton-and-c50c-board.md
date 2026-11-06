@@ -1,6 +1,6 @@
 # Spec 0001: build skeleton and C50C V1.1 board definition
 
-**Status**: done. Issue: [#4](https://github.com/chimu0510/Vehkernel/issues/4); tickets #5 to #13. The boot path was confirmed on hardware in [#10](https://github.com/chimu0510/Vehkernel/issues/10).
+**Status**: done. Issue: [#4](https://github.com/chimu0510/VehKernel/issues/4); tickets #5 to #13. The boot path was confirmed on hardware in [#10](https://github.com/chimu0510/VehKernel/issues/10).
 
 This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 

@@ -1,6 +1,6 @@
 # Spec 0005: parameter system
 
-**Status**: done. Issue: [#36](https://github.com/chimu0510/Vehkernel/issues/36); tickets #37 to #42. Parameter storage in internal Flash and the five parameters were confirmed on the C50C in [#42](https://github.com/chimu0510/Vehkernel/issues/42).
+**Status**: done. Issue: [#36](https://github.com/chimu0510/VehKernel/issues/36); tickets #37 to #42. Parameter storage in internal Flash and the five parameters were confirmed on the C50C in [#42](https://github.com/chimu0510/VehKernel/issues/42).
 
 This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 

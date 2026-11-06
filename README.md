@@ -1,6 +1,6 @@
 # Vehkernel
 
-[![CI](https://github.com/chimu0510/Vehkernel/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/chimu0510/Vehkernel/actions/workflows/ci.yml)
+[![CI](https://github.com/chimu0510/VehKernel/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/chimu0510/VehKernel/actions/workflows/ci.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 
 **Vehkernel** (Vehicle + Kernel) is open-source MCU firmware with ROS2 support, built as a common core for any vehicle: one system drives many vehicles and frames. The MCU handles real-time state estimation, low-level control and safety, and keeps running without a companion computer; global localization and navigation are left to ROS2 applications above it. The first test platform is a UGV.
@@ -14,7 +14,7 @@ Built, in SITL and on the C50C V1.1: attitude estimation, body velocity control 
 
 Not built yet: the ROS2 Bridge, vehicle models other than the wheeled one, the ROS2 test layer, and boards other than the C50C V1.1.
 
-What each milestone built and how far it was checked on hardware is in [`docs/specs/`](docs/specs/); open work is in the [issues](https://github.com/chimu0510/Vehkernel/issues).
+What each milestone built and how far it was checked on hardware is in [`docs/specs/`](docs/specs/); open work is in the [issues](https://github.com/chimu0510/VehKernel/issues).
 
 ## Target hardware
 
@@ -40,8 +40,8 @@ The [ADR index](docs/adr/README.md) lists every decision and why it was made.
 Vehkernel builds in a container: `cmake` and `ctest` run inside the image that `.devcontainer/Dockerfile` builds, and fail on the host ([Building](docs/guide/building.md#development-environment)). Clone with the submodules, build the image, then build and run SITL for 5 s inside it:
 
 ```bash
-git clone --recurse-submodules https://github.com/chimu0510/Vehkernel.git
-cd Vehkernel
+git clone --recurse-submodules https://github.com/chimu0510/VehKernel.git
+cd VehKernel
 docker build -t vehkernel-dev -f .devcontainer/Dockerfile .
 vk() { docker run --rm -it -u "$(id -u):$(id -g)" -v "$PWD:$PWD" -w "$PWD" --network host vehkernel-dev "$@"; }
 vk cmake --preset sitl

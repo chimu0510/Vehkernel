@@ -1,8 +1,8 @@
 # Spec 0010: the remote control (a USB gamepad, the manual mode, takeover and the RC failsafe)
 
-**Status**: done. Issue: [#120](https://github.com/chimu0510/Vehkernel/issues/120); tickets #121 to #126, with the hardware check in #126.
+**Status**: done. Issue: [#120](https://github.com/chimu0510/VehKernel/issues/120); tickets #121 to #126, with the hardware check in #126.
 
-Until this spec is done, this file and its issue carry the same spec; update both in the same edit.
+This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 
 ## Problem Statement
 

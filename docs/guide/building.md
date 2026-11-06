@@ -7,7 +7,7 @@ Vehkernel builds in a container. Every tool that affects build output, from the 
 Third-party C code (FreeRTOS, CMSIS, ST LL, TinyUSB) is pinned as git submodules under `external/`. Clone with them, or run `git submodule update --init` in an existing clone:
 
 ```bash
-git clone --recurse-submodules https://github.com/chimu0510/Vehkernel.git
+git clone --recurse-submodules https://github.com/chimu0510/VehKernel.git
 ```
 
 There are two ways into the container.

@@ -7,7 +7,7 @@ A spec describes one milestone: the problem, the solution, the user stories, the
 The line under the title gives the status, the issue and the tickets, and lives in the file only; the issue's open or closed state follows it:
 
 ```md
-**Status**: in progress. Issue: [#61](https://github.com/chimu0510/Vehkernel/issues/61); tickets #62 to #67, with the hardware check in #67.
+**Status**: in progress. Issue: [#61](https://github.com/chimu0510/VehKernel/issues/61); tickets #62 to #67, with the hardware check in #67.
 ```
 
 | Status | Meaning | What the status line adds |

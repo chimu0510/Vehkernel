@@ -1,6 +1,6 @@
 # Spec 0003: first Link to the development host
 
-**Status**: done. Issue: [#23](https://github.com/chimu0510/Vehkernel/issues/23); tickets #24 to #29. The serial Link was confirmed on the C50C over USB in [#28](https://github.com/chimu0510/Vehkernel/issues/28).
+**Status**: done. Issue: [#23](https://github.com/chimu0510/VehKernel/issues/23); tickets #24 to #29. The serial Link was confirmed on the C50C over USB in [#28](https://github.com/chimu0510/VehKernel/issues/28).
 
 This spec is done and no longer edited; later decisions live in the ADRs and the code, which win where they differ.
 

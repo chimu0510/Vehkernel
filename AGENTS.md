@@ -12,7 +12,7 @@ The rules for every contributor, human or agent, are in `CONTRIBUTING.md`: the b
 
 ### Issue tracker
 
-Issues live in GitHub Issues for `chimu0510/Vehkernel`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues for `chimu0510/VehKernel`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
